@@ -1,4 +1,5 @@
 import factory
+
 from django.contrib.auth.models import User
 
 from arl.blog.models import Post
@@ -24,3 +25,4 @@ class PostFactory(factory.django.DjangoModelFactory):
     author = factory.SubFactory(UserFactory)
     content = "x"
     status = "published"
+
