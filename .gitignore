@@ -7,3 +7,4 @@ htmlcov/
 .coverage
 *.md
 __pychache__
+*.md
