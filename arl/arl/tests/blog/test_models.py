@@ -8,3 +8,4 @@ class TestPostModel:
         post = post_factory(title="test-post")
         assert post.__str__() == "test-post"
 
+
