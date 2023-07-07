@@ -26,3 +26,4 @@ class PostFactory(factory.django.DjangoModelFactory):
     content = "x"
     status = "published"
 
+
