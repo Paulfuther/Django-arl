@@ -1,5 +1,5 @@
 import factory
-from django.contrib.auth.models import User
+from django.contrib.auth.models import CustomUser
 from .models import Post
 from factory.faker import faker
 
@@ -13,7 +13,7 @@ class PostFactory(factory.django.DjangoModelFactory):
     title = factory.Faker("sentence", nb_words=12)
     subtitle = factory.Faker("sentence", nb_words=12)
     slug = factory.Faker("slug")
-    author = User.objects.get_or_create(username="admin")[0]
+    author = CustomUser.objects.get_or_create(username="admin")[0]
 
     @factory.lazy_attribute
     def content(self):

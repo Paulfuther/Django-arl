@@ -1,0 +1,121 @@
+{% extends "../base/base.html" %}
+{% block title %}Index{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+    <title>International telephone input</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/css/intlTelInput.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/intlTelInput.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+
+</head>
+
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+        <form id="login" method="post">
+            {% csrf_token %}
+            <legend class="border-bottm mb-4">Join Today</legend>
+            {{ form|crispy }}
+            <fieldset class="form-group mt-3">
+                <input class="form-control" id="phone" type="tel" name="phone" />
+
+                <button type="submit"  class="btn btn-primary" id="verify-button" value="Verify">Verify</button> 
+            </fieldset>
+            <button type="submit" id="register_button" class="btn btn-primary mt-1 mb-1" disabled>Register</button>
+            <input type="hidden" id="phone-number" name="phone_number" value="">
+            <div class="alert alert-info" id="phone_number_error" style="display: none;"></div>
+        </form>
+        <div class="alert alert-info" style="display: none;"></div>
+        </div>
+        </div>
+    </div>
+
+
+
+</body>
+<script>
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const phoneInputField = document.querySelector("#phone");
+        const phoneInput = window.intlTelInput(phoneInputField, {
+            utilsScript:
+                "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js",
+        });
+        var verifyButton = document.querySelector('#verify-button');
+        verifyButton.addEventListener('click', function () {
+            // Do something when the button is clicked
+            event.preventDefault();
+            const phoneNumber = phoneInput.getNumber();
+            console.log('Verify button clicked!');
+            $("#phone-number").val(phoneNumber);
+
+            var csrftoken = getCookie('csrftoken');
+
+            // Perform AJAX request to check the uniqueness of the phone number
+            $.ajax({
+                url: '{% url 'check_phone_number_unique' %}',
+                type: 'POST',
+                data: { 'phone_number': phoneNumber },
+                headers: { 'X-CSRFToken': csrftoken },  // Include the CSRF token in the request headers
+                success: function (response) {
+                    if (response.exists) {
+                        // Phone number is not unique, display error message
+                        $('#phone_number').siblings('.error-message').text('This phone number is already in use.');
+                        $('#phone_number_error').removeClass('alert-info').addClass('alert-danger').text('This phone number is in use or invalid.').show();
+                        console.log("used")
+                        $('#register_button').prop('disabled', true);
+                    } else {
+                        // Phone number is unique, enable register button and submit form
+                        $('#phone_number').val(phoneNumber);
+                        // Phone number is unique, display success message
+                        $('#phone_number_error').removeClass('alert-danger').addClass('alert-info').text('Phone number is valid.').show();
+                        console.log("good")
+                        $('#register_button').prop('disabled', false);
+
+                    }
+                },
+                error: function () {
+                    // Handle error case
+                }
+            });
+
+
+
+            // Enable the register button for submission
+            document.getElementById('register_button').disabled = false;
+        })
+    });
+
+    // Helper function to retrieve the CSRF token from the cookies
+    function getCookie(name) {
+        var cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            var cookies = document.cookie.split(';');
+            for (var i = 0; i < cookies.length; i++) {
+                var cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+</script>
+
+</html>
+
+
+
+{% endblock %}
