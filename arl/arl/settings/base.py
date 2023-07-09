@@ -32,6 +32,10 @@ INSTALLED_APPS = [
     'arl.blog',
     'django_htmx',
     'taggit',
+    'arl.user',
+    'intl_tel_input',
+    'crispy_forms',
+    "crispy_bootstrap4",
 ]
 
 
@@ -123,3 +127,8 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 STATICFILES_DIRS = [BASE_DIR / "static"]
+
+AUTH_USER_MODEL = 'user.CustomUser'
+
+CRISPY_TEMPLATE_PACK = 'bootstrap4'
+

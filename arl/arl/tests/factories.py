@@ -29,6 +29,6 @@ class PostFactory(factory.django.DjangoModelFactory):
     @factory.post_generation
     def tags(self, create, extracted, **kwargs):
         if not create:
-            return 
+            return
         if extracted:
             self.tags.add(*extracted)
