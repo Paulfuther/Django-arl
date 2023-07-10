@@ -3,6 +3,9 @@ from .forms import CustomUserCreationForm
 from django.http import JsonResponse
 from django.views import View
 from .models import CustomUser
+from django.core.mail import EmailMessage, send_mail
+from django.http import HttpResponse
+import os
 
 
 def register(request):
@@ -16,7 +19,14 @@ def register(request):
             user = form.save(commit=False)
             user.phone_number = verified_phone_number
             user.save()
-            
+
+            msg = EmailMessage(
+                from_email=os.environ.get('MAIL_DEFAULT_SENDER'),
+                to=['paul.futher@gmail.com'],
+            )
+            msg.template_id = os.environ.get('SENDGRID_NEWHIRE_ID')
+            msg.send(fail_silently=False)
+
             # Handle successful registration, e.g., redirect to login page
             return redirect('/')
     else:
@@ -34,3 +44,13 @@ class CheckPhoneNumberUniqueView(View):
             return JsonResponse({'exists': True})
         else:
             return JsonResponse({'exists': False})
+
+
+def send_email_view(request):
+    subject = 'Test Email'
+    message = 'This is a test email'
+    from_email = os.environ.get('MAIL_DEFAULT_SENDER'),
+    recipient_list = ['paul.futher@gmail.com']
+
+    send_mail(subject, message, from_email, recipient_list)
+    return HttpResponse('Email sent successfully')
