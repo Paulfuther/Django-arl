@@ -1,14 +1,17 @@
-from django import forms
-from django.contrib.auth.forms import UserCreationForm
-from .models import CustomUser
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
+from django import forms
+from django.contrib.auth.forms import UserCreationForm
+
+from .models import CustomUser
 
 
 class CustomUserCreationForm(UserCreationForm):
     class Meta(UserCreationForm.Meta):
         model = CustomUser
-        fields = ('username', 'password1', 'password2', 'first_name', 'last_name', 'email')
+        fields = ('username', 'password1', 'password2', 'first_name', 'last_name', 'email',
+                  'mon_avail', 'tue_avail', 'wed_avail', 'thu_avail', 'fri_avail', 'sat_avail',
+                  'sun_avail')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
