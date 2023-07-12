@@ -43,7 +43,7 @@ class CheckPhoneNumberUniqueView(View):
 # function to create an email using sendgrid and tempaltes
 
 
-def create_email(to_email, subject, name, template_id):
+def create_email(to_email, subject, name=None, template_id=None):
     subject = subject
     message = Mail(
         from_email=os.environ.get('MAIL_DEFAULT_SENDER'),
