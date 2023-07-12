@@ -133,14 +133,4 @@ AUTH_USER_MODEL = 'user.CustomUser'
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 
-# Bottom of settings.py 
-# Twilio SendGrid
-EMAIL_HOST = 'smtp.sendgrid.net'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'apikey' # Name for all the SenGrid accounts
-EMAIL_HOST_PASSWORD = os.environ.get('SENDGRID_API_KEY')
 
-# The email you'll be sending emails from
-DEFAULT_FROM_EMAIL = os.environ.get('MAIL_DEFAULT_SENDER')
-LOGIN_REDIRECT_URL = 'success'
