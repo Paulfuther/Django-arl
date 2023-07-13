@@ -4,6 +4,7 @@ import os
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from twilio.rest import Client
+from django.http import HttpResponse
 
 account_sid = os.environ.get('TWILIO_ACCOUNT_SID')
 auth_token = os.environ.get('TWILIO_AUTH_TOKEN')
@@ -51,10 +52,14 @@ def send_sms(phone_number):
     return None
 
 
-def send_bulk_sms(request):
-    numbers = '+15196707469',
-    body = 'hello',
+def create_bulk_sms(request):
+    numbers = ['+15196707469', '+12267730404']
+    body = 'hello crazy people. Its time.',
     bindings = list(map(lambda number:
                         json.dumps({"binding_type": "sms", "address": number}), numbers))
     print("=====> To Bindings :>", bindings, "<: =====")
-    notification = client.notify.services(notify_service_sid, to_binding=bindings, body=body)
+    notification = client.notify.services(notify_service_sid).notifications.create(
+            to_binding=bindings,
+            body=body)
+    return HttpResponse('Bulk SMS sent successfully.')  # or redirect to a success page
+   
