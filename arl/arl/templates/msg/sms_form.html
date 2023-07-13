@@ -1,0 +1,21 @@
+{% extends "../base/base.html" %}
+{% block title %}Index{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+
+
+
+
+
+<form method="post" action="">
+  {% csrf_token %}
+  <label for="phone_number">Phone Number:</label>
+  <input type="text" name="phone_number" id="phone_number" required>
+  <button type="submit">Send SMS</button>
+</form>
+
+
+
+{% endblock %}
