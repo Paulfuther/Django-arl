@@ -1,17 +1,19 @@
 import json
 import os
 
+from django.http import HttpResponse, request, JsonResponse
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from twilio.rest import Client
+from twilio.base.exceptions import TwilioException
 
 account_sid = os.environ.get('TWILIO_ACCOUNT_SID')
 auth_token = os.environ.get('TWILIO_AUTH_TOKEN')
 twilio_from = os.environ.get('TWILIO_FROM')
+twilio_verify_sid = os.environ.get('TWILIO_VERIFY_SID')
 notify_service_sid = os.environ.get('TWILIO_NOTIFY_SERVICE_SID')
 
 client = Client(account_sid, auth_token)
-
 
 sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
 
@@ -51,10 +53,35 @@ def send_sms(phone_number):
     return None
 
 
-def send_bulk_sms(request):
-    numbers = '+15196707469',
-    body = 'hello',
+def create_bulk_sms(request):
+    numbers = ['+15196707469', '+12267730404']
+    body = 'hello crazy people. Its time.',
     bindings = list(map(lambda number:
                         json.dumps({"binding_type": "sms", "address": number}), numbers))
     print("=====> To Bindings :>", bindings, "<: =====")
-    notification = client.notify.services(notify_service_sid, to_binding=bindings, body=body)
+    notification = client.notify.services(notify_service_sid).notifications.create(
+            to_binding=bindings,
+            body=body)
+    return HttpResponse('Bulk SMS sent successfully.')  # or redirect to a success page
+   
+
+def _get_twilio_verify_client():
+    return Client(account_sid, auth_token).verify.services(twilio_verify_sid)
+
+
+def request_verification_token(phone):
+    verify = _get_twilio_verify_client()
+    try:
+        verify.verifications.create(to=phone, channel='sms')
+    except TwilioException:
+        verify.verifications.create(to=phone, channel='call')
+
+
+def check_verification_token(phone, token):
+    verify = _get_twilio_verify_client()
+    try:
+        result = verify.verification_checks.create(to=phone, code=token)
+    except TwilioException:
+        return False
+    return result.status == 'approved'
+

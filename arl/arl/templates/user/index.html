@@ -22,21 +22,22 @@
     <div class="container">
         <div class="row justify-content-center">
             <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
-        <form id="login" method="post">
-            {% csrf_token %}
-            <legend class="border-bottm mb-4">Join Today</legend>
-            {{ form|crispy }}
-            <fieldset class="form-group mt-3">
-                <input class="form-control" id="phone" type="tel" name="phone" />
+                <form id="login" method="post">
+                    {% csrf_token %}
+                    <legend class="border-bottm mb-4">Join Today</legend>
+                    {{ form|crispy }}
+                    <fieldset class="form-group mt-3">
+                        <input class="form-control" id="phone" type="tel" name="phone" />
 
-                <button type="submit"  class="btn btn-primary" id="verify-button" value="Verify">Verify</button> 
-            </fieldset>
-            <button type="submit" id="register_button" class="btn btn-primary mt-1 mb-1" disabled>Register</button>
-            <input type="hidden" id="phone-number" name="phone_number" value="">
-            <div class="alert alert-info" id="phone_number_error" style="display: none;"></div>
-        </form>
-        <div class="alert alert-info" style="display: none;"></div>
-        </div>
+                        <button type="submit" class="btn btn-primary" id="verify-button" value="Verify">Verify</button>
+                    </fieldset>
+                    <button type="submit" id="register_button" class="btn btn-primary mt-1 mb-1"
+                        disabled>Register</button>
+                    <input type="hidden" id="phone-number" name="phone_number" value="">
+                    <div class="alert alert-info" id="phone_number_error" style="display: none;"></div>
+                </form>
+                <div class="alert alert-info" style="display: none;"></div>
+            </div>
         </div>
     </div>
 
@@ -80,21 +81,70 @@
                         // Phone number is unique, display success message
                         $('#phone_number_error').removeClass('alert-danger').addClass('alert-info').text('Phone number is valid.').show();
                         console.log("good")
-                        $('#register_button').prop('disabled', false);
 
-                    }
-                },
-                error: function () {
-                    // Handle error case
+
+
+                        // Request verification code from Twilio
+                        $.ajax({
+                        url: '/request-verification/',
+                        type: 'POST',
+                        data: { 'phone_number': phoneNumber },
+                        headers: { 'X-CSRFToken': csrftoken },
+                        success: function (response) {
+                            if (response.success) {
+                                // Verification request successful
+                                var verificationCode = prompt('Enter the verification code:');
+                                if (verificationCode) {
+                                    // Send the verification code to the server for verification
+                                    $.ajax({
+                                        url: '/check-verification/',
+                                        type: 'POST',
+                                        data: {
+                                            'phone_number': phoneNumber,
+                                            'verification_code': verificationCode
+                                        },
+                                        headers: { 'X-CSRFToken': csrftoken },  // Include the CSRF token in the request headers
+                                        success: function (response) {
+                                            if (response.success) {
+                                                // Verification successful, enable the submit button
+                                                 // Verification successful, show pop-up message
+                                                 alert('Phone number verified. Complete the form and click Register');
+                                                document.getElementById('register_button').disabled = false;
+                                            } else {
+                                                // Verification failed, display an error message
+                                                alert('Invalid verification code. Please try again.');
+                                            }
+                                        },
+                                        error: function () {
+                                            // Handle error case
+                                        }
+                                    });
+                                } else {
+                                    // Verification code not entered, display an error message
+                                    alert('Verification code is required. Please try again.');
+                                }
+                            } else {
+                                // Verification request failed
+                                alert('Failed to request verification code. Please try again.');
+                            }
+                        },
+                        error: function () {
+                            // Handle error case
+                        }
+                    });
                 }
-            });
-
-
-
-            // Enable the register button for submission
-            document.getElementById('register_button').disabled = false;
-        })
+            },
+            error: function () {
+                // Handle error case
+            }
+        });
     });
+});
+
+
+
+
+
 
     // Helper function to retrieve the CSRF token from the cookies
     function getCookie(name) {

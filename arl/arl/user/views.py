@@ -1,25 +1,13 @@
-import json
 import os
 
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views import View
-from sendgrid import SendGridAPIClient
-from twilio.rest import Client
-
-from arl.msg.helpers import create_email, send_sms
+from twilio.base.exceptions import TwilioException
+from arl.msg.helpers import create_bulk_sms, create_email, send_sms, request_verification_token, check_verification_token
 
 from .forms import CustomUserCreationForm
 from .models import CustomUser
-
-account_sid = os.environ.get('TWILIO_ACCOUNT_SID')
-auth_token = os.environ.get('TWILIO_AUTH_TOKEN')
-twilio_from = os.environ.get('TWILIO_FROM')
-NOTIFY_SERVICES_SID = os.environ.get('TWILIO_NOTIFY_SERVICE_SID')
-client = Client(account_sid, auth_token)
-
-sender_email = os.environ.get("MAIL_DEFAULT_SENDER")
-sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
 
 
 def register(request):
@@ -44,12 +32,12 @@ def register(request):
 class CheckPhoneNumberUniqueView(View):
     def post(self, request):
         phone_number = request.POST.get('phone_number')
-
+        print(phone_number)
         if CustomUser.objects.filter(phone_number=phone_number).exists():
             return JsonResponse({'exists': True})
         else:
-            return JsonResponse({'exists': False})
-        
+            return JsonResponse({'exists': False})         
+
 
 def sms_form(request):
     if request.method == 'POST':
@@ -66,15 +54,39 @@ def sms_form(request):
 
 def send_bulk_sms(request):
     if request.method == 'POST':
-        numbers = ['+15196707469', '+12267730404']
-        body = 'hello crazy people',
-        bindings = list(map(lambda number:
-                        json.dumps({"binding_type": "sms", "address": number}), numbers))
-        print("=====> To Bindings :>", bindings, "<: =====")
-        notification = client.notify.services(NOTIFY_SERVICES_SID).notifications.create(
-            to_binding=bindings,
-            body=body)
-        return HttpResponse('Bulk SMS sent successfully.')  # or redirect to a success page
+        create_bulk_sms(request)
+        return HttpResponse('Bulk SMS sent successfully.')  # or redirect to a success page  
     else:
         return render(request, 'msg/sms_form.html')
-   
+ 
+
+def request_verification(request):
+    if request.method == 'POST':
+        phone_number = request.POST.get('phone_number')
+        print('Phone number:', phone_number)  # Debugging statement
+        try:
+            # Request the verification code from Twilio
+            request_verification_token(phone_number)
+            # Verification request successful  
+            # Return a success response
+            return JsonResponse({'success': True})
+        except TwilioException:
+            # Handle TwilioException if verification request fails
+            return JsonResponse({'success': False, 'error': 'Failed to send verification code'})
+    # Return an error response for unsupported request methods
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+
+def check_verification(request):
+    if request.method == 'POST':
+        phone = request.POST.get('phone_number')
+        token = request.POST.get('verification_code')
+        print('Phone number:', phone)
+        print('Verification code:', token)
+        print(phone, token)
+        try:
+            if check_verification_token(phone, token):
+                return JsonResponse({'success': True})
+        except TwilioException:
+            return JsonResponse({'success': False, 'error': 'Failed to send verification code'})
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
