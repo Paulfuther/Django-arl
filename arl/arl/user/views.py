@@ -3,15 +3,11 @@ import os
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views import View
-from sendgrid import SendGridAPIClient
-
-from arl.msg.helpers import create_bulk_sms, create_email, send_sms
+from twilio.base.exceptions import TwilioException
+from arl.msg.helpers import create_bulk_sms, create_email, send_sms, request_verification_token, check_verification_token
 
 from .forms import CustomUserCreationForm
 from .models import CustomUser
-
-sender_email = os.environ.get("MAIL_DEFAULT_SENDER")
-sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
 
 
 def register(request):
@@ -36,7 +32,7 @@ def register(request):
 class CheckPhoneNumberUniqueView(View):
     def post(self, request):
         phone_number = request.POST.get('phone_number')
-
+        print(phone_number)
         if CustomUser.objects.filter(phone_number=phone_number).exists():
             return JsonResponse({'exists': True})
         else:
@@ -62,3 +58,20 @@ def send_bulk_sms(request):
         return HttpResponse('Bulk SMS sent successfully.')  # or redirect to a success page  
     else:
         return render(request, 'msg/sms_form.html')
+ 
+
+def request_verification(request):
+    if request.method == 'POST':
+        phone_number = request.POST.get('phone_number')
+        print('Phone number:', phone_number)  # Debugging statement
+        try:
+            # Request the verification code from Twilio
+            request_verification_token(phone_number)
+            # Verification request successful  
+            # Return a success response
+            return JsonResponse({'success': True})
+        except TwilioException:
+            # Handle TwilioException if verification request fails
+            return JsonResponse({'success': False, 'error': 'Failed to send verification code'})
+    # Return an error response for unsupported request methods
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
