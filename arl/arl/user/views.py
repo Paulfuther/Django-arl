@@ -75,3 +75,18 @@ def request_verification(request):
             return JsonResponse({'success': False, 'error': 'Failed to send verification code'})
     # Return an error response for unsupported request methods
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+
+def check_verification(request):
+    if request.method == 'POST':
+        phone = request.POST.get('phone_number')
+        token = request.POST.get('verification_code')
+        print('Phone number:', phone)
+        print('Verification code:', token)
+        print(phone, token)
+        try:
+            if check_verification_token(phone, token):
+                return JsonResponse({'success': True})
+        except TwilioException:
+            return JsonResponse({'success': False, 'error': 'Failed to send verification code'})
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})

@@ -77,23 +77,11 @@ def request_verification_token(phone):
         verify.verifications.create(to=phone, channel='call')
 
 
-def check_verification_token(request):
-    if request.method == 'POST':
-        phone = request.POST.get('phone_number')
-        token = request.POST.get('verification_code')
-        print('Phone number:', phone)
-        print('Verification code:', token)
-        print(phone, token)
-        verify = _get_twilio_verify_client()
+def check_verification_token(phone, token):
+    verify = _get_twilio_verify_client()
+    try:
         result = verify.verification_checks.create(to=phone, code=token)
-        if result:
-            # Verification successful
-            print("pass")
-            return JsonResponse({'success': True})
-        else:
-            # Verification failed
-            print("faile")
-            return JsonResponse({'success': False, 'error': 'Invalid verification code'})
+    except TwilioException:
+        return False
+    return result.status == 'approved'
 
-    # Return an error response for unsupported request methods
-    return JsonResponse({'success': False, 'error': 'Invalid request method'})
