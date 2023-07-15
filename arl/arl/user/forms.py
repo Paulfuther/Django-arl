@@ -9,7 +9,7 @@ from .models import CustomUser
 class CustomUserCreationForm(UserCreationForm):
     class Meta(UserCreationForm.Meta):
         model = CustomUser
-        fields = ('username', 'password1', 'password2', 'first_name', 'last_name', 'email',
+        fields = ('username', 'password1', 'password2', 'first_name', 'last_name', 'email', 'sin',
                   'mon_avail', 'tue_avail', 'wed_avail', 'thu_avail', 'fri_avail', 'sat_avail',
                   'sun_avail')
 
@@ -18,6 +18,7 @@ class CustomUserCreationForm(UserCreationForm):
         self.fields['first_name'].required = True
         self.fields['last_name'].required = True
         self.fields['email'].required = True
+        self.fields['sin'].required = True
         self.helper = FormHelper()
         self.helper.form_method = 'post'
         self.helper.add_input(Submit('submit', 'Register')) 

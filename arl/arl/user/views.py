@@ -1,10 +1,14 @@
 import os
 
+from django.contrib.auth.models import Group
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views import View
 from twilio.base.exceptions import TwilioException
-from arl.msg.helpers import create_bulk_sms, create_email, send_sms, request_verification_token, check_verification_token
+
+from arl.msg.helpers import (check_verification_token, create_bulk_sms,
+                             create_email, request_verification_token,
+                             send_sms)
 
 from .forms import CustomUserCreationForm
 from .models import CustomUser
@@ -19,9 +23,12 @@ def register(request):
             print(verified_phone_number)
             user = form.save(commit=False)
             user.phone_number = verified_phone_number
+            user.save()
             create_email(user.email, 'Welcome Aboard', user.first_name,
                          os.environ.get('SENDGRID_NEWHIRE_ID'))
-            user.save()
+            gsa_group = Group.objects.get(name='GSA')
+            user.groups.add(gsa_group)
+            
             return redirect('/')
     else:
         form = CustomUserCreationForm()
