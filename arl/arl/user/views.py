@@ -11,10 +11,11 @@ from arl.msg.helpers import (check_verification_token, create_bulk_sms,
                              send_sms)
 
 from .forms import CustomUserCreationForm
-from .models import CustomUser
+from .models import CustomUser, Employer
 
 
 def register(request):
+    employers = Employer.objects.all()  # Retrieve all employers from the database
     if request.method == 'POST':
         form = CustomUserCreationForm(request.POST)
         print(form.data)    
@@ -33,7 +34,7 @@ def register(request):
     else:
         form = CustomUserCreationForm()
         print(form.errors)
-    return render(request, 'user/index.html', {'form': form})
+    return render(request, 'user/index.html', {'form': form, 'Employer': employers})
 
 
 class CheckPhoneNumberUniqueView(View):
