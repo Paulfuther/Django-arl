@@ -1,11 +1,11 @@
 import json
 import os
 
-from django.http import HttpResponse, request, JsonResponse
+from django.http import HttpResponse, request
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
-from twilio.rest import Client
 from twilio.base.exceptions import TwilioException
+from twilio.rest import Client
 
 account_sid = os.environ.get('TWILIO_ACCOUNT_SID')
 auth_token = os.environ.get('TWILIO_AUTH_TOKEN')
