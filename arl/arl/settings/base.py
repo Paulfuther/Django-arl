@@ -8,7 +8,6 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
@@ -38,6 +37,11 @@ INSTALLED_APPS = [
     'crispy_forms',
     'crispy_bootstrap4',
     'arl.msg',
+    'django_celery_results',
+    'django_countries',
+    'import_export',
+    'flower',
+    'django_celery_beat',
 ]
 
 
@@ -135,3 +139,5 @@ AUTH_USER_MODEL = 'user.CustomUser'
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 
 BROKER_URL = os.environ.get('CLOUDAMQP_URL')
+
+CELERY_RESULT_BACKEND = 'django-db'
