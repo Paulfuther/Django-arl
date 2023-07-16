@@ -2,7 +2,6 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
 from django.contrib.auth.forms import UserCreationForm
 from django.urls import reverse_lazy
-from django import forms
 
 from .models import CustomUser
 
@@ -24,9 +23,10 @@ class CustomUserCreationForm(UserCreationForm):
         self.helper.form_method = 'post'
         self.helper.add_input(Submit('submit', 'Register'))
         self.helper.form_action = reverse_lazy('index')
-        self.fields['employer'].empty_label = 'Select an employer'  # Optionally set an empty label for the dropdown
+        # Optionally set an empty label for the dropdown
+        self.fields['employer'].empty_label = 'Select an employer'
         self.fields['employer'].required = True
-    # Apply margin-top or margin-bottom to all fields
+        # Apply margin-top or margin-bottom to all fields
         for field_name in self.fields:
             self.fields[field_name].widget.attrs['class'] = 'mt-1'  # Apply margin-top
             self.fields[field_name].widget.attrs['class'] = 'mb-2'  # Apply margin-bottom
@@ -41,4 +41,3 @@ class CustomUserCreationForm(UserCreationForm):
             self.add_error('email', 'This email is already in use')
 
         return cleaned_data
-

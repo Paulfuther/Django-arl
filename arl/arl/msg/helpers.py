@@ -43,7 +43,7 @@ def create_email(to_email, subject, name=None, template_id=None):
 def send_sms(phone_number):
     try:
         message = client.messages.create(
-                body='Hello from me, dude!',
+                body='Hello from me, dude! Its Sunday',
                 from_=twilio_from,
                 to=phone_number,
             )

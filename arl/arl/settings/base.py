@@ -8,6 +8,7 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
@@ -133,4 +134,4 @@ AUTH_USER_MODEL = 'user.CustomUser'
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 
-
+BROKER_URL = os.environ.get('CLOUDAMQP_URL')

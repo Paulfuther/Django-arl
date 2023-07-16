@@ -63,7 +63,7 @@
 
             // Perform AJAX request to check the uniqueness of the phone number
             $.ajax({
-                url: '{% url 'check_phone_number_unique' %}',
+                url: "{% url 'check_phone_number_unique' %}",
                 type: 'POST',
                 data: { 'phone_number': phoneNumber },
                 headers: { 'X-CSRFToken': csrftoken },  // Include the CSRF token in the request headers
