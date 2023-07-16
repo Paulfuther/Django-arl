@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from .models import CustomUser, Employer
+from arl.msg.models import Twimlmessages, BulkEmailSendgrid
 
 
 fields = list(UserAdmin.fieldsets)
@@ -10,8 +11,7 @@ fields[1] = ('Personal Info', {'fields': ('employer','first_name', 'last_name', 
 
 
 UserAdmin.fieldsets = tuple(fields)
-
-
 admin.site.register(CustomUser, UserAdmin)
 admin.site.register(Employer)
-
+admin.site.register(Twimlmessages)
+admin.site.register(BulkEmailSendgrid)

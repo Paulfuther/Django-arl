@@ -1,7 +1,7 @@
 import json
 import os
 
-from django.http import HttpResponse, request
+from django.http import HttpResponse
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from twilio.base.exceptions import TwilioException
@@ -20,7 +20,7 @@ sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
 # function to create an email using sendgrid and tempaltes
 
 
-def create_email(to_email, subject, name=None, template_id=None):
+def create_email(to_email, subject, name, template_id):
     subject = subject
     message = Mail(
         from_email=os.environ.get('MAIL_DEFAULT_SENDER'),
@@ -43,7 +43,7 @@ def create_email(to_email, subject, name=None, template_id=None):
 def send_sms(phone_number):
     try:
         message = client.messages.create(
-                body='Hello from me, dude! Its Sunday',
+                body='Hello from me, dude! Its Sunday again',
                 from_=twilio_from,
                 to=phone_number,
             )
@@ -53,9 +53,9 @@ def send_sms(phone_number):
     return None
 
 
-def create_bulk_sms(request):
-    numbers = ['+15196707469', '+12267730404']
-    body = 'hello crazy people. Its time.',
+def create_bulk_sms():
+    numbers = ['+15196707469']
+    body = 'hello crazy people. Its time.'
     bindings = list(map(lambda number:
                         json.dumps({"binding_type": "sms", "address": number}), numbers))
     print("=====> To Bindings :>", bindings, "<: =====")
@@ -63,7 +63,7 @@ def create_bulk_sms(request):
             to_binding=bindings,
             body=body)
     return HttpResponse('Bulk SMS sent successfully.')  # or redirect to a success page
-   
+
 
 def _get_twilio_verify_client():
     return Client(account_sid, auth_token).verify.services(twilio_verify_sid)
@@ -84,4 +84,3 @@ def check_verification_token(phone, token):
     except TwilioException:
         return False
     return result.status == 'approved'
-

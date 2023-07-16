@@ -1,12 +1,22 @@
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import (MaxLengthValidator, MinLengthValidator,
                                     RegexValidator)
+from phonenumber_field.modelfields import PhoneNumberField
+from django_countries.fields import CountryField
 from django.db import models
 
 
 class Employer(models.Model):
     name = models.CharField(max_length=100)
     # Add any additional fields for the employer
+    address = models.CharField(max_length=100, null=True)
+    address_two = models.CharField(max_length=100, null=True)
+    city = models.CharField(max_length=100, null=True)
+    state_province = models.CharField(max_length=100, null=True)
+    country = CountryField(null=True)
+    phone_number = PhoneNumberField(null=True)
+    created = models.DateTimeField(auto_now_add=True, null=True)
+    updated = models.DateTimeField(auto_now=True, null=True)
 
     def __str__(self):
         return self.name
@@ -35,5 +45,6 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return self.first_name
+
 
 
