@@ -37,17 +37,17 @@ def create_api_client(base_path, access_token):
 
 def get_access_token():
     api_client = ApiClient()
-    api_client.host = 'https//demo.docusign.net/restapi'
+    api_client.host = os.environ.get('DOCUSIGN_API_CLIENT_HOST'),
     # Configure your API credentials
     clientid = os.environ.get('DOCUSIGN_INTEGRATION_KEY')
     impersonated_user_id = os.environ.get('DOCUSIGN_USER_ID')
-    in_file = open("/Users/paulfuther/Documents/GitHub/Django-arl/private.key", "rb")
+    in_file = open("/", "rb")
     private_key = in_file.read()
     in_file.close()
     access_token = api_client.request_jwt_user_token(
-        client_id=clientid, 
-        user_id=impersonated_user_id, 
-        oauth_host_name="account-d.docusign.com",
+        client_id=clientid,
+        user_id=impersonated_user_id,
+        oauth_host_name=os.environ.get('DOCUSIGN_OAUTH_HOST_NAME'),
         private_key_bytes=private_key,
         expires_in=3600,
         scopes=SCOPES

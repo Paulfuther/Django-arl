@@ -60,7 +60,7 @@ def create_envelope(request):
 
     api_client = ApiClient()
     print("1", api_client)
-    api_client.host = "https://demo.docusign.net/restapi"  # Update with the correct base path
+    api_client.host = os.environ.get('DOCUSIGN_API_CLIENT_HOST')  # Update with the correct base path
     api_client.set_default_header("Authorization", "Bearer " + access_token)  # Replace with your access token
     envelope_api = EnvelopesApi(api_client)
 
