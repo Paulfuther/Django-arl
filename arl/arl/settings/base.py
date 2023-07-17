@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'import_export',
     'flower',
     'django_celery_beat',
+    'arl.dsign',
 ]
 
 
