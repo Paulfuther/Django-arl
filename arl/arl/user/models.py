@@ -47,4 +47,17 @@ class CustomUser(AbstractUser):
         return self.first_name
 
 
+class Store(models.Model):
+    number = models.IntegerField()
+    carwash = models.BooleanField(default=False)
+    address = models.CharField(max_length=100, null=True)
+    address_two = models.CharField(max_length=100, blank=True)
+    city = models.CharField(max_length=100, null=True)
+    province = models.CharField(max_length=100, null=True)
+    country = CountryField(null=True)
+    phone_number = PhoneNumberField(null=True)
+    created = models.DateTimeField(auto_now_add=True, null=True)
+    updated = models.DateTimeField(auto_now=True, null=True)
 
+    def __str__(self):
+        return f"{self.number}  {self.address}  {self.city}  {self.province}"
