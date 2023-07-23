@@ -142,3 +142,7 @@ CRISPY_TEMPLATE_PACK = 'bootstrap4'
 BROKER_URL = os.environ.get('CLOUDAMQP_URL')
 
 CELERY_RESULT_BACKEND = 'django-db'
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+]
