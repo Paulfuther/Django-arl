@@ -1,5 +1,7 @@
 import os
 
+from django.contrib.auth import login, logout
+from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import Group
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
@@ -7,13 +9,13 @@ from django.views import View
 # from arl.msg.tasks import send_sms_task
 from twilio.base.exceptions import TwilioException
 
-from arl.msg.helpers import (check_verification_token, 
-                             request_verification_token,
-                             send_sms)
+from arl.msg.helpers import (check_verification_token,
+                             request_verification_token, send_sms)
+from arl.tasks import (send_bulk_sms_task, send_sms_task,
+                       send_template_email_task)
 
 from .forms import CustomUserCreationForm
 from .models import CustomUser, Employer
-from arl.tasks import send_sms_task, send_template_email_task, send_bulk_sms_task
 
 
 def register(request):
@@ -92,3 +94,26 @@ def check_verification(request):
         except TwilioException:
             return JsonResponse({'success': False, 'error': 'Failed to send verification code'})
     return JsonResponse({'success': False, 'error': 'Invalid request method'})
+
+
+def login_view(request):
+    if request.user.is_authenticated:
+        # If the user is already logged in, redirect them to the homepage or any other URL.
+        return redirect('home')
+    if request.method == 'POST':
+        form = AuthenticationForm(request, request.POST)
+        if form.is_valid():
+            login(request, form.get_user())
+            return redirect('home')  # Replace 'home' with your desired URL name for the homepage
+    else:
+        form = AuthenticationForm(request)
+    return render(request, 'user/login.html', {'form': form})
+
+
+def logout_view(request):
+    logout(request)
+    return redirect('home')  # Replace 'home' with your desired URL name for the homepage\
+
+
+def home_view(request):
+    return render(request, 'user/home.html')
