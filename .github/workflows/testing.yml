@@ -12,6 +12,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    env: # Define environment variables for Twilio credentials
+      TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
+      TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v2
@@ -20,11 +24,6 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: 3.9
-
-    - name: Set Twilio credentials
-      env:
-        TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
-        TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
 
     - name: Install dependencies
       run: |
@@ -45,6 +44,8 @@ jobs:
     - name: Django Testing
       run: |
         python manage.py test
+
+
 
 
 
