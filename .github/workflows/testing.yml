@@ -3,17 +3,18 @@ name: Django Tests part two
 on:
     push:
         branches:
-            -https://github.com/Paulfuther/Django-arl/tree/dev-v1.0.01
+        -https://github.com/Paulfuther/Django-arl/tree/dev-v1.0.01
 
     pull_request:
         branches:
-            -https://github.com/Paulfuther/Django-arl/tree/dev-v1.0.01
+        -https://github.com/Paulfuther/Django-arl/tree/dev-v1.0.01
 
 jobs:
     build:
-        runs-on: ubuntu-latest
 
-         steps:
+    runs-on: ubuntu-latest
+
+      steps:
         - uses: actions/checkout@v2
         - name: Set p Python 3.9
           uses: actions/setup-python@v2
