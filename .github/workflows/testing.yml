@@ -28,11 +28,11 @@ jobs:
     - name: Coverage report
       run: |
         pip install coverage
-        coverage run manage.py test
+        coverage run arl/manage.py test
         coverage report
 
     - name: Django Testing
       run: |
-        python manage.py test
+        python arl/manage.py test
 
 
