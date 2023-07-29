@@ -13,7 +13,7 @@ jobs:
     build:
         runs-on: ubuntu-latest
 
-        steps:
+        step:
         - uses: actions/checkout@v2
         - name: Set p Python 3.9
           uses: actions/setup-python@v2
