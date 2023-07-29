@@ -8,6 +8,8 @@ htmlcov/
 *.md
 __pycache__
 *.md
+private.key
+*.key
 
 
 # Django #
