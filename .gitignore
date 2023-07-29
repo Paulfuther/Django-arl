@@ -8,7 +8,7 @@ htmlcov/
 *.md
 __pycache__
 *.md
-
+private.key
 
 # Django #
 *.log
