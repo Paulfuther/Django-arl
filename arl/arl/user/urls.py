@@ -19,4 +19,3 @@ urlpatterns = [
     path('logout/', logout_view, name='logout'),
     path('home/', home_view, name='home')
 ]
- 
