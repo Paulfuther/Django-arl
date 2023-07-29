@@ -3,11 +3,11 @@ name: Django Tests part two
 on:
     push:
         branches:
-            -main
+            -https://github.com/Paulfuther/Django-arl/tree/dev-v1.0.01
 
     pull_request:
         branches:
-            -main
+            -https://github.com/Paulfuther/Django-arl/tree/dev-v1.0.01
 
 jobs:
     build:
