@@ -146,3 +146,10 @@ CELERY_RESULT_BACKEND = 'django-db'
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
 ]
+
+LOGIN_URL = '/login',
+
+try:
+    from .local_settings import *
+except ImportError:
+    pass

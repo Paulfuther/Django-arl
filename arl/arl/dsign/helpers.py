@@ -43,7 +43,7 @@ def get_access_token():
     # Configure your API credentials
     clientid = os.environ.get('DOCUSIGN_INTEGRATION_KEY')
     impersonated_user_id = os.environ.get('DOCUSIGN_USER_ID')
-    in_file = open("/Users/paulfuther/Documents/GitHub/Django-arl/private.key", "rb")
+    in_file = open("/Users/paulfuther/Documents/GitHub/Django-arl/arl/private.key", "rb")
     private_key = in_file.read()
     print(private_key)
     in_file.close()

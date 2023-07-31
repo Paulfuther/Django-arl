@@ -1,6 +1,7 @@
 import os
 
 from django.contrib.auth import login, logout
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import Group
 from django.http import HttpResponse, JsonResponse
@@ -49,7 +50,7 @@ class CheckPhoneNumberUniqueView(View):
         else:
             return JsonResponse({'exists': False})
 
-
+@login_required
 def sms_form(request):
     if request.method == 'POST':
         phone_number = request.POST.get('phone_number')
