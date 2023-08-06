@@ -8,8 +8,9 @@ from docusign_esign import (ApiClient, EnvelopeDefinition, EnvelopesApi,
 
 from .forms import NameEmailForm
 from .helpers import get_access_token
-
+from django.conf import settings
 # Create your views here.
+
 
 def create_newhire(request):
     if request.method == 'POST':
@@ -32,11 +33,10 @@ def create_envelope(request):
             d_name = form.cleaned_data['name']
             d_email = form.cleaned_data['email']
             print(d_name, d_email)
-            # ##clientid =DOCUSIGN_INTEGRATION_KEY
-            # ##impersonated_user_id = DOCUSIGN_USER_ID
             access_token = get_access_token()
             access_token = access_token.access_token
-            ds_template = os.environ.get('DOCUSIGN_TEMPLATE_ID')
+            ds_template = settings.DOCUSIGN_TEMPLATE_ID
+            print(ds_template)
             envelope_args = {
                 "signer_email": d_email,
                 "signer_name": d_name,
@@ -44,11 +44,12 @@ def create_envelope(request):
             }
 
             args = {
-                "base_path": "ca.docusign.net/restapi",
+                "base_path": settings.DOCUSIGN_BASE_PATH,
                 "ds_access_token": access_token,
-                "account_id": os.environ.get('DOCUSIGN_ACCOUNT_ID'),
+                "account_id": settings.DOCUSIGN_ACCOUNT_ID,
                 "envelope_args": envelope_args
             }
+            print(args)
 
             # Specify your webhook URL where you want to receive the event notifications
             webhook_url = "https://www.paulfuther.com/docusign-webhook"
@@ -85,7 +86,7 @@ def create_envelope(request):
                 }
 
             email_subject = f"{d_name} - {'New Hire File'}"
-
+            print(email_subject)
             # Create the envelope definition
             envelope_definition = EnvelopeDefinition(
                 status="sent",  # requests that the envelope be created and sent.
@@ -138,15 +139,20 @@ def create_envelope(request):
             # Add the TemplateRole objects to the envelope object
             envelope_definition.template_roles = [signer]
             api_client = ApiClient()
-            api_client.host = 'https://ca.docusign.net/restapi'  # Update with the correct base path
-            api_client.set_default_header("Authorization", "Bearer " + access_token)  # Replace with your access token
+            api_client.host = settings.DOCUSIGN_API_CLIENT_HOST  
+            print(api_client.host)
+            print(settings.DOCUSIGN_ACCOUNT_ID)
+            api_client.set_default_header("Authorization", "Bearer " + access_token)  
+            print(api_client)
             envelope_api = EnvelopesApi(api_client)
+            print(envelope_api)
             try:
-                results = envelope_api.create_envelope(os.environ.get('DOCUSIGN_ACCOUNT_ID'),
-                                                    envelope_definition=envelope_definition)
+                results = envelope_api.create_envelope(settings.DOCUSIGN_ACCOUNT_ID,
+                                                       envelope_definition=envelope_definition)
                 envelope_id = results.envelope_id
                 return JsonResponse({'envelope_id': envelope_id})
             except Exception as e:
+                print("error")
                 return JsonResponse({'error': str(e)}), 500
     else:
         form = NameEmailForm()

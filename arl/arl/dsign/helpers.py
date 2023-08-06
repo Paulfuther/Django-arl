@@ -1,11 +1,7 @@
 import os
 
+from django.conf import settings
 from docusign_esign import ApiClient
-
-DOCUSIGN_INTEGRATION_KEY = os.environ.get('DOCUSIGN_INTEGRATION_KEY')
-DOCUSIGN_USER_ID = os.environ.get('DOCUSIGN_USER_ID')
-DOCUSIGN_ACCOUNT_ID = os.environ.get('DOCUSIGN_ACCOUNT_ID')
-DOCUSIGN_PRIVATE_KEY = os.environ.get('DOCUSIGN_PRIVATE_KEY')
 
 SCOPES = [
     'signature impersonation'
@@ -39,20 +35,24 @@ def create_api_client(base_path, access_token):
 
 def get_access_token():
     api_client = ApiClient()
-    api_client.host = 'https://ca.docusign.net/restapi/v2.1',
+    api_client.host = settings.DOCUSIGN_API_CLIENT_HOST
+    
     # Configure your API credentials
-    clientid = os.environ.get('DOCUSIGN_INTEGRATION_KEY')
-    impersonated_user_id = os.environ.get('DOCUSIGN_USER_ID')
-    in_file = open("/Users/paulfuther/Documents/GitHub/Django-arl/arl/private.key", "rb")
+    print(api_client.host)
+    clientid = settings.DOCUSIGN_INTEGRATION_KEY
+    impersonated_user_id = settings.DOCUSIGN_USER_ID
+    in_file = open(settings.DOCUSIGN_PRIVATE_KEY, "rb")
     private_key = in_file.read()
     print(private_key)
     in_file.close()
+    print(settings.DOCUSIGN_OAUTH_HOST_NAME)
     access_token = api_client.request_jwt_user_token(
         client_id=clientid,
         user_id=impersonated_user_id,
-        oauth_host_name="account.docusign.com",
+        oauth_host_name=settings.DOCUSIGN_OAUTH_HOST_NAME,
         private_key_bytes=private_key,
         expires_in=3600,
         scopes=SCOPES
             )
+    print(access_token)
     return access_token
