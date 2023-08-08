@@ -1,0 +1,17 @@
+{% extends "../base/base.html" %}
+{% block title %}Index{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+
+
+<h2>Contents of folder: {{ folder_name }}</h2>
+<ul>
+  {% for file_name in file_names %}
+    <li><a href="{% url 'download_file' folder_name file_name %}">{{ file_name }}</a></li>
+  {% endfor %}
+</ul>
+
+
+  {% endblock %}

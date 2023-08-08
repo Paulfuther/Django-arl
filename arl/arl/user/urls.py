@@ -2,7 +2,8 @@
 from django.urls import path
 
 from arl.dsign.views import create_envelope
-
+from arl.dbox.views import (list_folders, list_files, view_folder, list_folder_contents,
+                            download_file)
 from .views import (CheckPhoneNumberUniqueView, check_verification, home_view,
                     login_view, logout_view, register, request_verification,
                     sms_form)
@@ -18,5 +19,11 @@ urlpatterns = [
     path('docsign/', create_envelope, name='Create Envelope'),
     path('login/', login_view, name='login'),
     path('logout/', logout_view, name='logout'),
-    path('home/', home_view, name='home')
+    path('home/', home_view, name='home'),
+    path('list_folders/', list_folders, name='list_folders'),
+    path('list_files/', list_files, name='list_files'),
+    path('list_files/<str:path>/', list_files, name='list_files'),
+    path('view_folder/', view_folder, name='view_folder'),
+    path('list_folder_contents/<path:path>/', list_folder_contents, name='list_folder_contents'),
+    path('download_file/', download_file, name='download_file'),
 ]
