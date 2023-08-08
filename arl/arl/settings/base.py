@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'flower',
     'django_celery_beat',
     'arl.dsign',
+    'arl.dbox',
 ]
 
 
