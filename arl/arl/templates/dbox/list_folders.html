@@ -6,24 +6,24 @@
 {% load crispy_forms_tags %}
 <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.25/css/jquery.dataTables.min.css">
 
-<div class="container">
+<div class="container mb-2">
     <div class="row justify-content-center">
         <div class="col-12 col-sm-10 col-md-8 col-lg-8 col-xl-8">
 
-            <legend class="border-bottm mb-4">Contents of Folder: {{ folder_path|slice:"1:" }}</legend>
-
+            <legend class="border-bottm mb-4 mt-4">Contents of Folder: {{ folder_path|slice:"1:" }}</legend>
+             
             <table id="fileTable">
                 <thead>
                     <tr>
-                        <th>File Name</th>
-                        <th>Download Link</th>
+                        <th>Folder</th>
+                        <th>Select</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for folder in folders %}
                     <tr>
                         <td>{{ folder.name }}</td>
-                        <td><a href="{% url 'list_folder_contents' path=folder.path_display|urlencode %}">Download</a>
+                        <td><a href="{% url 'list_folder_contents' path=folder.path_display %}">Select</a>
                         </td>
                         {% endfor %}
                 </tbody>

@@ -13,20 +13,39 @@
     <div class="row justify-content-center">
         <div class="col-12 col-sm-10 col-md-8 col-lg-8 col-xl-8">
 
-            <legend class="border-bottm mb-4">Contents of Folder: {{ folder_path|slice:"1:" }}</legend>
+            <legend class="border-bottom mb-4 mt-4">Contents of Folder: {{ folder_path|slice:"1:" }}</legend>
+            <!-- Add a "Back" button -->
+            <a href="{% url 'list_folders' %}" class="btn btn-secondary mb-2">Back</a>
+            <div class="mb-4">
+                <form id="uploadForm" method="post" enctype="multipart/form-data" class="mb-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="folder_path" value="{{ folder_path }}">
+                    <div class="input-group">
+                        <input type="file" class="form-control" name="file" id="inputFile">
+                        <button id="uploadButton" type="submit" class="btn btn-primary">Upload</button>
+                    </div>
+                </form>
+            </div>
 
-            <table id="fileTable">
+            <table id="fileTable" class="table">
                 <thead>
                     <tr>
                         <th>File Name</th>
-                        <th>Download Link</th>
+                        <th class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for file in files %}
                     <tr>
                         <td>{{ file.name }}</td>
-                        <td><a href="{% url 'download_file' %}?path={{ file.path_display }}">Download</a></td>
+                        <td class="text-end">
+                            <div class="btn-group" role="group">
+                                <a href="{% url 'download_file' %}?path={{ file.path_display|urlencode }}"
+                                    class="btn btn-sm btn-primary me-2">Download</a>
+                                <a href="{% url 'delete_file' %}?path={{ file.path_display|urlencode }}"
+                                    class="btn btn-sm btn-danger">Delete</a>
+                            </div>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -35,20 +54,53 @@
     </div>
 </div>
 
-
 <!-- Include jQuery (required by DataTables) -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
 <!-- Include DataTables JS -->
 <script type="text/javascript" src="https://cdn.datatables.net/1.10.25/js/jquery.dataTables.min.js"></script>
 
-
 <!-- Initialize DataTables on the table -->
 <script>
     $(document).ready(function () {
         $('#fileTable').DataTable();
+
+        $('#uploadButton').click(function () {
+            event.preventDefault();
+            var uploadedFile = $('#inputFile')[0].files[0];
+            var folderPath = $('[name="folder_path"]').val(); // Get the folder path value
+            console.log('File name:', uploadedFile.name);
+            console.log('File type:', uploadedFile.type);
+
+            var formData = new FormData($('#uploadForm')[0]);
+            formData.append('folder_path', folderPath);
+            formData.append('file', uploadedFile); 'File appended:', formData;
+            $.ajax({
+                type: 'POST',
+                url: '{% url "upload_file" %}',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function () {
+                    console.log('Upload successful');
+                    location.reload();
+                },
+                error: function () {
+                    console.log('Error uploading file.');
+                    alert('Error uploading file.');
+                }
+            });
+        });
     });
 </script>
+
+
+
+
+
+
+
+
 
 
 {% endblock %}
