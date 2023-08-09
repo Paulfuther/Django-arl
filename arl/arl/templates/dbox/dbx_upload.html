@@ -1,5 +1,23 @@
+{% extends "../base/base.html" %}
+{% block title %}Index{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+
+
 <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
+    <label for="folder_path">Select Folder:</label>
+    <select name="folder_path">
+        {% for folder in folders %}
+        <option value="{{ folder.path_display }}">{{ folder.name }}</option>
+        {% endfor %}
+    </select>
+    <br>
     <input type="file" name="file">
     <button type="submit">Upload File</button>
 </form>
+
+
+{% endblock %}

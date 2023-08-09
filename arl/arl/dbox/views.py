@@ -3,13 +3,15 @@
 import os
 
 import dropbox
-import requests
 from django.conf import settings
 from django.http import HttpResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from dropbox import DropboxOAuth2FlowNoRedirect
 from dropbox.exceptions import ApiError
 from dropbox.files import FolderMetadata, ListFolderResult
+from urllib.parse import quote
+
+from .helpers import generate_new_access_token
 
 app_key = settings.DROP_BOX_KEY
 app_secret = settings.DROP_BOX_SECRET
@@ -30,7 +32,7 @@ def dropbox_auth(request):
 def use_dropbox(request):
     # Replace with your actual app key and secret
     # Use the authorization code to obtain tokens
-    authorization_code = 'ZsbiIpbNLlkAAAAAAAAAZrrB7pjzTezdkK4q_hVC8xc'  # Replace with the actual
+    authorization_code = settings.DROP_BOX_AUTHORIZATION_CODE  # Replace with the actual
     # authorization code
     auth_flow = DropboxOAuth2FlowNoRedirect(app_key, app_secret, token_access_type='offline')
     oauth_result = auth_flow.finish(authorization_code)
@@ -38,8 +40,9 @@ def use_dropbox(request):
     access_token = oauth_result.access_token
 
     # Refresh token can be used to obtain a new access token when needed
-    refresh_token = oauth_result.refresh_token
-    print(access_token, refresh_token)
+    # Uncomment refresh_token to create a new one should the old be revoked
+    # refresh_token = oauth_result.refresh_token
+    # print(access_token, refresh_token)
 
     # Now you can use the access_token and refresh_token for API calls and token management
     dbx = dropbox.Dropbox(oauth2_access_token=access_token)
@@ -50,38 +53,11 @@ def use_dropbox(request):
         return HttpResponse("Authentication failed: " + str(e))
 
 
-def generate_new_access_token():
-    refresh_token = settings.DROP_BOX_REFRESH_TOKEN
-    # print(refresh_token)
-    if not refresh_token:
-        return None
-    app_key = settings.DROP_BOX_KEY
-    app_secret = settings.DROP_BOX_SECRET
-    token_url = "https://api.dropboxapi.com/oauth2/token"
-    data = {
-        "grant_type": "refresh_token",
-        "refresh_token": refresh_token,
-        "client_id": app_key,
-        "client_secret": app_secret
-    }
-
-    response = requests.post(token_url, data=data)
-    if response.status_code == 200:
-        response_data = response.json()
-        new_access_token = response_data.get('access_token')
-        print('New Access Token: ', new_access_token)
-        return new_access_token
-    else:
-        # Handle error response
-        print("Error generating new access token:", response.text)
-        return None
-
-
 def list_folders(request):
     new_access_token = generate_new_access_token()
     if new_access_token:
         # Use the new access token to create the Dropbox client
-        dbx = dropbox.Dropbox(oauth2_access_token=new_access_token)
+        dbx = dropbox.Dropbox(new_access_token)
         try:
             folder_list = dbx.files_list_folder(path="")
             folders = [entry for entry in folder_list.entries if isinstance(entry, FolderMetadata)]
@@ -100,7 +76,7 @@ def list_folders(request):
 def list_files(request, folder_name):
     new_access_token = generate_new_access_token()
     if new_access_token:
-        dbx = dropbox.Dropbox(oauth2_access_token=new_access_token)
+        dbx = dropbox.Dropbox(new_access_token)
         try:
             # Make API request to list files within the specified folder
             folder_path = f"/{folder_name}"
@@ -133,7 +109,6 @@ def download_file(request):
     access_token = generate_new_access_token()
     try:
         dbx = dropbox.Dropbox(access_token)
-
         metadata, response = dbx.files_download(file_path)
         response = HttpResponse(content=response.content)
         response['Content-Disposition'] = f'attachment; filename="{os.path.basename(file_path)}"'
@@ -146,7 +121,7 @@ def view_folder(request):
     new_access_token = generate_new_access_token()
     if new_access_token:
         # Use the new access token to create the Dropbox client
-        dbx = dropbox.Dropbox(oauth2_access_token=new_access_token)
+        dbx = dropbox.Dropbox(new_access_token)
 
         try:
             # Make API request to list the root folder
@@ -173,8 +148,9 @@ def view_folder(request):
 def list_folder_contents(request, path=''):
     new_access_token = generate_new_access_token()
     if new_access_token:
-        dbx = dropbox.Dropbox(oauth2_access_token=new_access_token)
+        dbx = dropbox.Dropbox(new_access_token)
         try:
+            # encoded_path = quote(path)
             folder_list = dbx.files_list_folder(path)
             if isinstance(folder_list, dropbox.files.ListFolderResult):
                 files = [
@@ -193,3 +169,68 @@ def list_folder_contents(request, path=''):
             return HttpResponse("API request failed. Error: " + str(e))
     else:
         return HttpResponse("Refresh token not found in .env file.", status=500)
+
+
+def upload_file(request):
+    if request.method == 'POST':
+        new_access_token = generate_new_access_token()
+        if new_access_token:
+            dbx = dropbox.Dropbox(new_access_token)
+            try:
+                # Fetch the list of folders from Dropbox
+                folder_list = dbx.files_list_folder(path='')
+                folders = [entry for entry in folder_list.entries if
+                           isinstance(entry, FolderMetadata)]
+
+                folder_path = request.POST.get('folder_path', '')
+                # Get the selected folder path from the form
+                uploaded_file = request.FILES['file']
+                # print(uploaded_file)
+                file_path = os.path.join(folder_path, uploaded_file.name)
+                # Upload the file to Dropbox
+                with uploaded_file.open() as f:
+                    dbx.files_upload(f.read(), file_path)
+                # Redirect to list_folder_contents view
+                return redirect('list_folder_contents', path=quote(folder_path))
+            except ApiError as e:
+                return render(request, 'error.html', {'error_message': str(e)})
+            except Exception as e:
+                return render(request, 'error.html', {'error_message': str(e)})
+        else:
+            return render(request, 'error.html', {'error_message':
+                                                  "Refresh token not found in .env file."})
+    else:
+        new_access_token = generate_new_access_token()
+        if new_access_token:
+            dbx = dropbox.Dropbox(new_access_token)
+            try:
+                # Fetch the list of folders from Dropbox
+                folder_list = dbx.files_list_folder(path='')
+                folders = [entry for entry in folder_list.entries
+                           if isinstance(entry, FolderMetadata)]
+                return render(request, 'dbox/dbx_upload.html', {'folders': folders})
+            except ApiError as e:
+                return render(request, 'error.html', {'error_message': str(e)})
+            except Exception as e:
+                return render(request, 'error.html', {'error_message': str(e)})
+        else:
+            return render(request, 'error.html', {'error_message':
+                                                  "Refresh token not found in .env file."})
+
+
+def delete_file(request):
+    if request.method == 'GET':
+        try:
+            file_path = request.GET.get('path', '')
+            new_access_token = generate_new_access_token()
+            if new_access_token:
+                dbx = dropbox.Dropbox(new_access_token)
+                dbx.files_delete_v2(file_path)
+                return redirect('list_folder_contents', path=os.path.dirname(file_path))
+            else:
+                return render(request, 'error.html', {'error_message':
+                                                      "Refresh token not found in .env file."})
+        except ApiError as e:
+            return render(request, 'error.html', {'error_message': str(e)})
+        except Exception as e:
+            return render(request, 'error.html', {'error_message': str(e)})

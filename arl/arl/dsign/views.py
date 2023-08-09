@@ -1,4 +1,4 @@
-import os
+import json
 
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -32,11 +32,11 @@ def create_envelope(request):
         if form.is_valid():
             d_name = form.cleaned_data['name']
             d_email = form.cleaned_data['email']
-            print(d_name, d_email)
+            # print(d_name, d_email)
             access_token = get_access_token()
             access_token = access_token.access_token
             ds_template = settings.DOCUSIGN_TEMPLATE_ID
-            print(ds_template)
+            # print(ds_template)
             envelope_args = {
                 "signer_email": d_email,
                 "signer_name": d_name,
@@ -86,7 +86,7 @@ def create_envelope(request):
                 }
 
             email_subject = f"{d_name} - {'New Hire File'}"
-            print(email_subject)
+            # print(email_subject)
             # Create the envelope definition
             envelope_definition = EnvelopeDefinition(
                 status="sent",  # requests that the envelope be created and sent.
@@ -139,13 +139,13 @@ def create_envelope(request):
             # Add the TemplateRole objects to the envelope object
             envelope_definition.template_roles = [signer]
             api_client = ApiClient()
-            api_client.host = settings.DOCUSIGN_API_CLIENT_HOST  
-            print(api_client.host)
-            print(settings.DOCUSIGN_ACCOUNT_ID)
-            api_client.set_default_header("Authorization", "Bearer " + access_token)  
-            print(api_client)
+            api_client.host = settings.DOCUSIGN_API_CLIENT_HOST
+            # print(api_client.host)
+            # print(settings.DOCUSIGN_ACCOUNT_ID)
+            api_client.set_default_header("Authorization", "Bearer " + access_token)
+            # print(api_client)
             envelope_api = EnvelopesApi(api_client)
-            print(envelope_api)
+            # print(envelope_api)
             try:
                 results = envelope_api.create_envelope(settings.DOCUSIGN_ACCOUNT_ID,
                                                        envelope_definition=envelope_definition)
@@ -157,3 +157,20 @@ def create_envelope(request):
     else:
         form = NameEmailForm()
         return render(request, 'dsign/name_email_form.html', {'form': form})
+
+
+def docusign_webhook(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        print(data)
+        # Extract envelope status and signer information from the data
+        envelope_status = data['envelopeStatus']
+        signer_email = data['signerEmail']
+        signer_name = data['singerName']
+        # Send a Twilio SMS if the envelope status changes to completed
+        if envelope_status == 'Completed':
+            print("Email :", signer_email, "Name :", signer_name)
+
+            return JsonResponse({"message": "Twilio SMS sent."})
+
+    return JsonResponse({"message": "Invalid request."})

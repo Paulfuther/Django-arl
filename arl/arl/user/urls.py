@@ -1,9 +1,9 @@
 
 from django.urls import path
 
-from arl.dsign.views import create_envelope
+from arl.dsign.views import create_envelope, docusign_webhook
 from arl.dbox.views import (list_folders, list_files, view_folder, list_folder_contents,
-                            download_file)
+                            download_file, upload_file, delete_file)
 from .views import (CheckPhoneNumberUniqueView, check_verification, home_view,
                     login_view, logout_view, register, request_verification,
                     sms_form)
@@ -26,4 +26,7 @@ urlpatterns = [
     path('view_folder/', view_folder, name='view_folder'),
     path('list_folder_contents/<path:path>/', list_folder_contents, name='list_folder_contents'),
     path('download_file/', download_file, name='download_file'),
+    path('docusign-webhook/', docusign_webhook, name='webhook'),
+    path('upload_file/', upload_file, name='upload_file'),
+    path('delete_file/', delete_file, name='delete_file'),
 ]

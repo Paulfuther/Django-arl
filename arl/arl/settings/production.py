@@ -5,6 +5,10 @@ from dotenv import load_dotenv
 
 from .base import *
 
+load_dotenv()
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+
 DOCUSIGN_INTEGRATION_KEY = os.environ.get('DOCUSIGN_INTEGRATION_KEY')
 NEW_HIRE_DATA_EMAIL = ['paul.futher@gmail.com', 'hr1553690@yahoo.com']
 DOCUSIGN_ACCOUNT_ID = os.environ.get('DOCUSIGN_ACCOUNT_ID')
@@ -20,3 +24,4 @@ DROP_BOX_KEY = os.environ.get('DROP_BOX_KEY')
 DROP_BOX_SECRET = os.environ.get('DROP_BOX_SECRET')
 DROPBOX_REDIRECT_URI = 'http://localhost:8000/dropbox/callback/'
 DROP_BOX_REFRESH_TOKEN = os.environ.get('DROP_BOX_REFRESH_TOKEN')
+DROP_BOX_AUTHORIZATION_CODE = os.environ.get('DROP_BOX_AUTHORIZATION_CODE')
