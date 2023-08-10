@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'django_celery_beat',
     'arl.dsign',
     'arl.dbox',
+    'arl.incident'
 ]
 
 
@@ -152,7 +153,7 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
 ]
 
-LOGIN_URL = '/login',
+LOGIN_URL = 'login',
 
 try:
     from .local_settings import *

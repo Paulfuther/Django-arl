@@ -1,15 +1,16 @@
 # your_app_name/views.py
 
 import os
+from urllib.parse import quote
 
 import dropbox
 from django.conf import settings
+from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
-from django.shortcuts import render, redirect
+from django.shortcuts import redirect, render
 from dropbox import DropboxOAuth2FlowNoRedirect
 from dropbox.exceptions import ApiError
 from dropbox.files import FolderMetadata, ListFolderResult
-from urllib.parse import quote
 
 from .helpers import generate_new_access_token
 
@@ -17,6 +18,7 @@ app_key = settings.DROP_BOX_KEY
 app_secret = settings.DROP_BOX_SECRET
 
 
+@login_required
 def dropbox_auth(request):
     # Replace with your actual app key and secret
     auth_flow = DropboxOAuth2FlowNoRedirect(app_key, app_secret, token_access_type='offline')
@@ -29,6 +31,7 @@ def dropbox_auth(request):
     return HttpResponse("Authorization URL printed to console.")
 
 
+@login_required(login_url='login')
 def use_dropbox(request):
     # Replace with your actual app key and secret
     # Use the authorization code to obtain tokens

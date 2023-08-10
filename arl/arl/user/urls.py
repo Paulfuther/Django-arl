@@ -3,7 +3,8 @@ from django.urls import path
 
 from arl.dsign.views import create_envelope, docusign_webhook
 from arl.dbox.views import (list_folders, list_files, view_folder, list_folder_contents,
-                            download_file, upload_file, delete_file)
+                            download_file, upload_file, delete_file, use_dropbox)
+from arl.incident.views import MultiSectionFormView
 from .views import (CheckPhoneNumberUniqueView, check_verification, home_view,
                     login_view, logout_view, register, request_verification,
                     sms_form)
@@ -20,6 +21,7 @@ urlpatterns = [
     path('login/', login_view, name='login'),
     path('logout/', logout_view, name='logout'),
     path('home/', home_view, name='home'),
+    path('use_dropbox/', use_dropbox, name='new token'),
     path('list_folders/', list_folders, name='list_folders'),
     path('list_files/', list_files, name='list_files'),
     path('list_files/<str:path>/', list_files, name='list_files'),
@@ -29,4 +31,5 @@ urlpatterns = [
     path('docusign-webhook/', docusign_webhook, name='webhook'),
     path('upload_file/', upload_file, name='upload_file'),
     path('delete_file/', delete_file, name='delete_file'),
+    path('form/', MultiSectionFormView.as_view(), name='multi_section_form'),
 ]
