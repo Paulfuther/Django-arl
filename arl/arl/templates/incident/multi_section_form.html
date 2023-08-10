@@ -1,0 +1,43 @@
+{% extends "../base/base.html" %}
+{% block title %}Index{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+            <h1 class="mt-5">Multi-Section Form</h1>
+            <form method="post">
+                {% csrf_token %}
+                <div class="section mt-4" id="section-one">
+                    <h2>Section 1</h2>
+                    {{ form1|crispy }}
+                </div>
+                <div class="section mt-4" id="section-two" style="display: none;">
+                    <h2>Section 2</h2>
+                    {{ form2|crispy }}
+                </div>
+                <div class="mt-4">
+                    <button type="button" class="btn btn-primary" id="prevBtn"
+                        onclick="showSection('section-one')">Previous</button>
+                    <button type="button" class="btn btn-primary ms-2" id="nextBtn"
+                        onclick="showSection('section-two')">Next</button>
+                    <button type="submit" class="btn btn-success ms-2">Submit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+    function showSection(sectionId) {
+        document.querySelectorAll('.section').forEach(function (section) {
+            section.style.display = 'none';
+        });
+        document.getElementById(sectionId).style.display = 'block';
+    }
+</script>
+
+{% endblock %}
