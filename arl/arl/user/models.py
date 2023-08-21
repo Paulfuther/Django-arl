@@ -59,5 +59,11 @@ class Store(models.Model):
     created = models.DateTimeField(auto_now_add=True, null=True)
     updated = models.DateTimeField(auto_now=True, null=True)
 
+    employer = models.ForeignKey(Employer, on_delete=models.CASCADE, 
+                                 null=True, related_name='stores')
+
     def __str__(self):
-        return f"{self.number}  {self.address}  {self.city}  {self.province}"
+        if self.employer:
+            return f"Store {self.number} - {self.employer.name}"
+        else:
+            return f"Store {self.number}"

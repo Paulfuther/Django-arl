@@ -1,10 +1,13 @@
 
 from django.urls import path
 
+from arl.dbox.views import (delete_file, download_file, list_files,
+                            list_folder_contents, list_folders, upload_file,
+                            use_dropbox, view_folder)
 from arl.dsign.views import create_envelope, docusign_webhook
-from arl.dbox.views import (list_folders, list_files, view_folder, list_folder_contents,
-                            download_file, upload_file, delete_file, use_dropbox)
-from arl.incident.views import MultiSectionFormView
+from arl.incident.views import (create_incident, incident_form_pdf,
+                                process_incident_images, generate_pdf)
+
 from .views import (CheckPhoneNumberUniqueView, check_verification, home_view,
                     login_view, logout_view, register, request_verification,
                     sms_form)
@@ -31,5 +34,8 @@ urlpatterns = [
     path('docusign-webhook/', docusign_webhook, name='webhook'),
     path('upload_file/', upload_file, name='upload_file'),
     path('delete_file/', delete_file, name='delete_file'),
-    path('form/', MultiSectionFormView.as_view(), name='multi_section_form'),
+    path('incident/', create_incident, name='create_incident'),
+    path('incident_upload/', process_incident_images, name='incident_upload'),
+    path('incident-form-pdf/<int:incident_id>/', incident_form_pdf, name='incident_form_pdf'),
+    path('generate-pdf/<int:incident_id>/', generate_pdf, name='generate_pdf'),
 ]

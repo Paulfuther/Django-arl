@@ -93,7 +93,7 @@ DATABASES = {
         'USER': 'postgres',
         'PASSWORD': 'Paulee12!@',
         'HOST': 'localhost'
-        
+
     }
 }
 
@@ -154,6 +154,13 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 LOGIN_URL = 'login',
+
+LINODE_ACCESS_KEY = os.environ.get('LINODE_BUCKET_ACCESS_KEY')
+LINODE_SECRET_KEY = os.environ.get('LINODE_BUCKET_SECRET_KEY')
+LINODE_NAME = os.environ.get('LINODE_BUCKET_NAME')
+LINODE_URL = os.environ.get('LINODE_BUCKET_URL')
+LINODE_REGION = os.environ.get('LINODE_REGION')
+LINODE_BUCKET_NAME = os.environ.get('LINODE_BUCKET_NAME')
 
 try:
     from .local_settings import *

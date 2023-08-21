@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from .models import CustomUser, Employer, Store
 from arl.msg.models import Twimlmessages, BulkEmailSendgrid
+from arl.incident.models import Incident
 
 
 fields = list(UserAdmin.fieldsets)
@@ -16,3 +17,4 @@ admin.site.register(Employer)
 admin.site.register(Twimlmessages)
 admin.site.register(BulkEmailSendgrid)
 admin.site.register(Store)
+admin.site.register(Incident)
