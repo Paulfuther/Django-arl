@@ -3,10 +3,12 @@
 from io import BytesIO
 
 import pdfkit
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
+from django.urls import reverse_lazy
+from django.views.generic.edit import CreateView
 from PIL import Image
 
 from arl.helpers import (get_s3_images_for_incident,
@@ -16,15 +18,29 @@ from .forms import IncidentForm
 from .models import Incident
 
 
-def create_incident(request):
-    if request.method == 'POST':
-        form = IncidentForm(request.POST)
+class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView):
+    model = Incident
+    login_url = '/login/'
+    permission_required = 'incident.can_add_incident'
+    raise_exception = True  # Raise exception when no access instead of redirect
+    permission_denied_message = "You are not allowed to add incidents."
+    form_class = IncidentForm
+    template_name = 'incident/create_incident.html'
+    success_url = reverse_lazy('home')
+
+    def get(self, request, *args, **kwargs):
+        user = self.request.user
+        employer = user.employer
+        form = self.form_class(initial={'user_employer': employer})
+        return self.render_to_response({'form': form})
+
+    def post(self, request, *args, **kwargs):
+        form = self.form_class(request.POST)
         if form.is_valid():
-            form.save()
-            return redirect('home')  # Redirect to a view that lists incidents
-    else:
-        form = IncidentForm()
-    return render(request, 'incident/create_incident.html', {'form': form})
+            form.instance.user_employer = self.request.user.employer
+            return self.form_valid(form)
+        else:
+            return self.form_invalid(form)
 
 
 def update_incident(request, incident_id):

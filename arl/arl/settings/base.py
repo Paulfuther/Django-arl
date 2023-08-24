@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -153,7 +154,7 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
 ]
 
-LOGIN_URL = 'login',
+LOGIN_URL = 'login/'
 
 LINODE_ACCESS_KEY = os.environ.get('LINODE_BUCKET_ACCESS_KEY')
 LINODE_SECRET_KEY = os.environ.get('LINODE_BUCKET_SECRET_KEY')

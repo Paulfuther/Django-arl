@@ -9,6 +9,9 @@ class IncidentForm(forms.ModelForm):
         model = Incident
         fields = '__all__'
         image_folder = CharField(widget=HiddenInput(), required=False)
+        widgets = {
+            'user_employer': forms.HiddenInput(),
+        }
         labels = {
             'syes': 'Off Property Impact: Yes',
             'sno': 'Off Property Impact: No',

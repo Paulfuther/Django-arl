@@ -1,6 +1,7 @@
+
 from django.db import models
 
-from arl.user.models import Store
+from arl.user.models import Employer, Store
 
 
 class Incident(models.Model):
@@ -96,6 +97,7 @@ class Incident(models.Model):
     direction = models.CharField(max_length=255, blank=True)
     damage = models.CharField(max_length=255, blank=True)
     image_folder = models.CharField(max_length=255, null=True)
+    user_employer = models.ForeignKey(Employer, on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
         return f"Incident {self.pk}"

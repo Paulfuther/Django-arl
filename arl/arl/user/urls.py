@@ -5,7 +5,7 @@ from arl.dbox.views import (delete_file, download_file, list_files,
                             list_folder_contents, list_folders, upload_file,
                             use_dropbox, view_folder)
 from arl.dsign.views import create_envelope, docusign_webhook
-from arl.incident.views import (create_incident, incident_form_pdf,
+from arl.incident.views import (IncidentCreateView, incident_form_pdf,
                                 process_incident_images, generate_pdf)
 
 from .views import (CheckPhoneNumberUniqueView, check_verification, home_view,
@@ -13,7 +13,7 @@ from .views import (CheckPhoneNumberUniqueView, check_verification, home_view,
                     sms_form)
 
 urlpatterns = [
-    path('', login_view, name='login'),
+    path('', login_view, name='home'),
     path('register', register, name='register'),
     path('check_phone_number_unique/', CheckPhoneNumberUniqueView.as_view(),
          name='check_phone_number_unique'),
@@ -34,7 +34,7 @@ urlpatterns = [
     path('docusign-webhook/', docusign_webhook, name='webhook'),
     path('upload_file/', upload_file, name='upload_file'),
     path('delete_file/', delete_file, name='delete_file'),
-    path('incident/', create_incident, name='create_incident'),
+    path('create-incident/', IncidentCreateView.as_view(), name='create-incident'),
     path('incident_upload/', process_incident_images, name='incident_upload'),
     path('incident-form-pdf/<int:incident_id>/', incident_form_pdf, name='incident_form_pdf'),
     path('generate-pdf/<int:incident_id>/', generate_pdf, name='generate_pdf'),

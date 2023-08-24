@@ -1,9 +1,10 @@
+
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import (MaxLengthValidator, MinLengthValidator,
                                     RegexValidator)
-from phonenumber_field.modelfields import PhoneNumberField
-from django_countries.fields import CountryField
 from django.db import models
+from django_countries.fields import CountryField
+from phonenumber_field.modelfields import PhoneNumberField
 
 
 class Employer(models.Model):
@@ -59,7 +60,7 @@ class Store(models.Model):
     created = models.DateTimeField(auto_now_add=True, null=True)
     updated = models.DateTimeField(auto_now=True, null=True)
 
-    employer = models.ForeignKey(Employer, on_delete=models.CASCADE, 
+    employer = models.ForeignKey(Employer, on_delete=models.CASCADE,
                                  null=True, related_name='stores')
 
     def __str__(self):
