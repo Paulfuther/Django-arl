@@ -33,12 +33,15 @@ def get_s3_images_for_incident(image_folder, employer):
     bucket_name = LINODE_BUCKET_NAME
     folder_path = f'SITEINCIDENT/{employer}/{image_folder}/'
     images = []
-    bucket = conn.get_bucket(bucket_name)
-    objects = bucket.list(prefix=folder_path)
-    for obj in objects:
-        if obj.key.endswith(('jpg', 'jpeg', 'png', 'gif')):
-            image_key = obj.key
-            image_url = conn.generate_url(expires_in=3600, method='GET',
-                                          bucket=bucket_name, key=image_key)
-            images.append(image_url)
+    try:
+        bucket = conn.get_bucket(bucket_name)
+        objects = bucket.list(prefix=folder_path)
+        for obj in objects:
+            if obj.key.endswith(('jpg', 'jpeg', 'png', 'gif')):
+                image_key = obj.key
+                image_url = conn.generate_url(expires_in=3600, method='GET',
+                                              bucket=bucket_name, key=image_key)
+                images.append(image_url)
+    except Exception as e:
+        print("An error occurred:", e)
     return images

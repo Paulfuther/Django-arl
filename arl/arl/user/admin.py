@@ -6,7 +6,7 @@ from arl.incident.models import Incident
 
 
 fields = list(UserAdmin.fieldsets)
-fields[1] = ('Personal Info', {'fields': ('employer', 'first_name', 'last_name', 'email',
+fields[1] = ('Personal Info', {'fields': ('employer', 'first_name', 'last_name', 'sin', 'email',
                                           'phone_number', 'mon_avail', 'tue_avail', 'wed_avail',
                                           'thu_avail', 'fri_avail', 'sat_avail', 'sun_avail')})
 
