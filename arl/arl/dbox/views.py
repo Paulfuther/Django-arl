@@ -56,6 +56,7 @@ def use_dropbox(request):
         return HttpResponse("Authentication failed: " + str(e))
 
 
+@login_required(login_url='login')
 def list_folders(request):
     new_access_token = generate_new_access_token()
     if new_access_token:
@@ -76,6 +77,7 @@ def list_folders(request):
         return HttpResponse("Refresh token not found in .env file.", status=500)
 
 
+@login_required(login_url='login')
 def list_files(request, folder_name):
     new_access_token = generate_new_access_token()
     if new_access_token:
@@ -104,6 +106,7 @@ def list_files(request, folder_name):
         return HttpResponse("Refresh token not found in .env file.", status=500)
 
 
+@login_required(login_url='login')
 def download_file(request):
     file_path = request.GET.get('path', '')
 
@@ -120,6 +123,7 @@ def download_file(request):
         return HttpResponse(f"Failed to download file: {str(e)}", status=500)
 
 
+@login_required(login_url='login')
 def view_folder(request):
     new_access_token = generate_new_access_token()
     if new_access_token:
@@ -148,6 +152,7 @@ def view_folder(request):
         return HttpResponse("Refresh token not found in .env file.", status=500)
 
 
+@login_required(login_url='login')
 def list_folder_contents(request, path=''):
     new_access_token = generate_new_access_token()
     if new_access_token:
@@ -174,6 +179,7 @@ def list_folder_contents(request, path=''):
         return HttpResponse("Refresh token not found in .env file.", status=500)
 
 
+@login_required(login_url='login')
 def upload_file(request):
     if request.method == 'POST':
         new_access_token = generate_new_access_token()
@@ -221,6 +227,7 @@ def upload_file(request):
                                                   "Refresh token not found in .env file."})
 
 
+@login_required(login_url='login')
 def delete_file(request):
     if request.method == 'GET':
         try:

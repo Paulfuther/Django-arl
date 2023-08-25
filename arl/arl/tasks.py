@@ -3,10 +3,16 @@ from __future__ import absolute_import, unicode_literals
 import json
 import os
 
+import pdfkit
+from django.template.loader import render_to_string
+
 from arl.celery import app
+from arl.helpers import get_s3_images_for_incident
+from arl.incident.models import Incident
 from arl.msg.helpers import client, create_email, notify_service_sid, send_sms
 from arl.user.models import Store
-
+from io import BytesIO
+from django.http import HttpResponse
 
 @app.task(name='add')
 def add(x, y):
@@ -49,3 +55,38 @@ def monthly_store_calls_task():
             url=twimlid,
             to=phone_number,
             from_=twilio_from)
+       
+        
+
+@app.task(name='create_incident_pdf')
+def create_incident_pdf(incident_id):
+    user = request.user
+    #  Fetch incident data based on incident_id
+    incident = Incident.objects.get(pk=incident_id)  # Get the incident
+    images = get_s3_images_for_incident(incident.image_folder, user.employer)
+    context = {'incident': incident, 'images': images}  # Add more context as needed
+    html_content = render_to_string('incident/incident_form_pdf.html', context)
+
+    #  Generate the PDF using pdfkit
+    options = {
+            'enable-local-file-access': None,
+            '--keep-relative-links': '',
+            'encoding': "UTF-8",
+        }
+    pdf = pdfkit.from_string(html_content, False, options)
+
+    #  Create a BytesIO object to store the PDF content
+    pdf_buffer = BytesIO(pdf)
+
+    #  Set the BytesIO buffer's position to the beginning
+    pdf_buffer.seek(0)
+
+    #  Create an HTTP response with PDF content
+    response = HttpResponse(pdf_buffer.read(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="incident_report.pdf"'
+
+    #  Close the BytesIO buffer to free up resources
+    pdf_buffer.close()
+
+    return response
+

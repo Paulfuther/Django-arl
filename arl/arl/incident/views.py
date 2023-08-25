@@ -1,36 +1,144 @@
 
-from django.shortcuts import render, redirect
-from .forms import SectionOneForm, SectionTwoForm  # Import your SectionOneForm
-from django.views import View
+
+from io import BytesIO
+
+import pdfkit
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
+from django.urls import reverse_lazy
+from django.views.generic.edit import CreateView
+from PIL import Image
+
+from arl.helpers import (get_s3_images_for_incident,
+                         upload_to_linode_object_storage)
+
+from .forms import IncidentForm
+from .models import Incident
 
 
-class MultiSectionFormView(View):
-    template_name = 'incident/multi_section_form.html'
+class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView):
+    model = Incident
+    login_url = '/login/'
+    permission_required = 'incident.can_add_incident'
+    raise_exception = True  # Raise exception when no access instead of redirect
+    permission_denied_message = "You are not allowed to add incidents."
+    form_class = IncidentForm
+    template_name = 'incident/create_incident.html'
+    success_url = reverse_lazy('home')
 
-    def get(self, request, section=1):
-        form1 = SectionOneForm()
-        form2 = SectionTwoForm()
-        # form1 = form2 = None  # Handle invalid section number here
+    def get(self, request, *args, **kwargs):
+        user = self.request.user
+        employer = user.employer
+        form = self.form_class(initial={'user_employer': employer})
+        return self.render_to_response({'form': form})
 
-        context = {'form1': form1, 'form2': form2, 'section': section}
-        return render(request, self.template_name, context)
-
-    def post(self, request, section=None):
-        if section == 1:
-            form1 = SectionOneForm(request.POST)
-            form2 = None
-        elif section == 2:
-            form1 = None
-            form2 = SectionTwoForm(request.POST)
+    def post(self, request, *args, **kwargs):
+        form = self.form_class(request.POST)
+        if form.is_valid():
+            form.instance.user_employer = self.request.user.employer
+            return self.form_valid(form)
         else:
-            form1 = form2 = None  # Handle invalid section number here
+            return self.form_invalid(form)
 
-        if form1 and form1.is_valid():
-            # Process section 1 data and redirect to section 2
-            return redirect('multi_section_form', section=2)
-        elif form2 and form2.is_valid():
-            # Process section 2 data and perform final submission
-            return redirect('multi_section_form')
 
-        context = {'form1': form1, 'form2': form2, 'section': section}
-        return render(request, self.template_name, context)
+def update_incident(request, incident_id):
+    incident = get_object_or_404(Incident, pk=incident_id)
+    if request.method == 'POST':
+        form = IncidentForm(request.POST, instance=incident)
+        if form.is_valid():
+            form.save()
+            return redirect('incident_list')  # Redirect to a view that lists incidents
+    else:
+        form = IncidentForm(instance=incident)
+    return render(request, 'update_incident.html', {'form': form})
+
+
+# @login_required
+def process_incident_images(request):
+    if request.method == 'POST':
+        user = request.user  # Authenticated user
+        print(user.employer)
+        random_number = request.POST.get('random_number')
+        employer = user.employer  # Assuming user.profile holds profile information
+        # Process the uploaded files here
+        uploaded_files = request.FILES.getlist('file')  # 'file' is the field name used by Dropzone
+        for uploaded_file in uploaded_files:
+            print(uploaded_file.name)
+            file = uploaded_file
+            folder_name = f'SITEINCIDENT/{employer}/{random_number}/'
+            filename = uploaded_file.name
+            employee_key = '{}/{}'.format(folder_name, filename)
+            print(employee_key)
+            # Open the uploaded image using Pillow
+            image = Image.open(file)
+            # Resize the image to a larger thumbnail size, e.g., 1000x1000 pixels
+            thumbnail_size = (1500, 1500)
+            image.thumbnail(thumbnail_size, Image.LANCZOS)
+            # Resize the image to your desired dimensions (e.g., 1000x1000)
+            # resized_image = image.resize((500, 500), Image.LANCZOS)
+            print(image)
+            # Save the resized image to a temporary BytesIO object
+            temp_buffer = BytesIO()
+            image.save(temp_buffer, format='JPEG')
+            temp_buffer.seek(0)
+            # Upload the resized image to Linode Object Storage
+            upload_to_linode_object_storage(temp_buffer, employee_key)
+            # Close the temporary buffer
+            temp_buffer.close()
+
+        # Process and save the files to the desired location
+        # You can use the uploaded_files list to iterate through the files and save them
+
+        # Return a JSON response indicating success
+        return JsonResponse({'message': 'Files uploaded successfully'})
+    else:
+        # Handle GET request or other methods
+        return JsonResponse({'message': 'Invalid request method'})
+
+
+def incident_form_pdf(request, incident_id):
+    user = request.user  # Authenticated user
+    incident = Incident.objects.get(pk=incident_id)  # Get the incident
+    print(incident.pk)
+    images = get_s3_images_for_incident(incident.image_folder, user.employer)
+    print(incident.image_folder)
+    context = {
+        'incident': incident,
+        'images': images,
+    }
+
+    return render(request, 'incident/incident_form_pdf.html', context)
+
+
+def generate_pdf(request, incident_id):
+    user = request.user
+    #  Fetch incident data based on incident_id
+    incident = Incident.objects.get(pk=incident_id)  # Get the incident
+    images = get_s3_images_for_incident(incident.image_folder, user.employer)
+    context = {'incident': incident, 'images': images}  # Add more context as needed
+    html_content = render_to_string('incident/incident_form_pdf.html', context)
+
+    #  Generate the PDF using pdfkit
+    options = {
+            'enable-local-file-access': None,
+            '--keep-relative-links': '',
+            'encoding': "UTF-8",
+        }
+    pdf = pdfkit.from_string(html_content, False, options)
+
+    #  Create a BytesIO object to store the PDF content
+    pdf_buffer = BytesIO(pdf)
+
+    #  Set the BytesIO buffer's position to the beginning
+    pdf_buffer.seek(0)
+
+    #  Create an HTTP response with PDF content
+    response = HttpResponse(pdf_buffer.read(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="incident_report.pdf"'
+
+    #  Close the BytesIO buffer to free up resources
+    pdf_buffer.close()
+
+    return response

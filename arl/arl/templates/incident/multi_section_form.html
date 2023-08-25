@@ -4,40 +4,232 @@
 {% block template %}
 {% include "../base/navbar.html" %}
 {% load crispy_forms_tags %}
+{{ form|as_crispy_errors }}
 
+<head>
+    <style>
+        .section {
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+        }
+    </style>
+</head>
 
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
             <h1 class="mt-5">Multi-Section Form</h1>
-            <form method="post">
+            <form method="post" enctype="multipart/form-data" id="form" class="was-validated" data-multi-step>
                 {% csrf_token %}
-                <div class="section mt-4" id="section-one">
+
+
+                <div class="section  mt-4" data-step>
                     <h2>Section 1</h2>
-                    {{ form1|crispy }}
+                    <button type="button" class="btn btn-primary ms-2" data-next>Next</button>
+                    {{ form|crispy }}
+                    <div class="mt-4">
+
+                    </div>
                 </div>
-                <div class="section mt-4" id="section-two" style="display: none;">
+
+                <div class="section mt-4 " data-step>
                     <h2>Section 2</h2>
-                    {{ form2|crispy }}
+                    <button type="button" class="btn btn-primary" data-previous>Previous</button>
+                    <button type="button" class="btn btn-primary ms-2" data-next>Next</button>
+
+
+                    {{ form|crispy }}
+
+
+
                 </div>
-                <div class="mt-4">
-                    <button type="button" class="btn btn-primary" id="prevBtn"
-                        onclick="showSection('section-one')">Previous</button>
-                    <button type="button" class="btn btn-primary ms-2" id="nextBtn"
-                        onclick="showSection('section-two')">Next</button>
-                    <button type="submit" class="btn btn-success ms-2">Submit</button>
+
+                <div class="section mt-4" data-step>
+                    <h2>Section 3</h2>
+                    <button type="button" class="btn btn-primary" data-previous>Previous</button>
+                    <button type="button" class="btn btn-primary ms-2" data-next>Next</button>
+                    {{ form|crispy }}
+
                 </div>
-            </form>
+
+                <div class="section mt-4" data-step>
+                    <h2>SECTION 2 - SPILLS</h2>
+
+                    <button type="button" class="btn btn-primary" data-previous>Previous</button>
+                    <button type="button" class="btn btn-primary ms-2" data-next>Next</button>
+                    {{ form|crispy }}
+
+                </div>
+
+                <div class="section mt-4" data-step>
+                    <h2>five</h2>
+                    <button type="button" class="btn btn-primary" data-previous>Previous</button>
+                    <button type="button" class="btn btn-primary ms-2" data-next>Next</button>
+                    {{ form|crispy }}
+
+                </div>
+
+                <div class="section mt-4" data-step>
+                    <h2>SECTION 4 - Suspect Information</h2>
+                    <button type="button" class="btn btn-primary" data-previous>Previous</button>
+                    <button type="button" class="btn btn-primary ms-2" data-next>Next</button>
+                    {{ form|crispy }}
+
+                </div>
+                <div class="section mt-4" data-step>
+                    <h2>Section 7</h2>
+                    <button type="button" class="btn btn-primary" data-previous>Previous</button>
+                    <button type="button" class="btn btn-primary ms-2" id="nextBtn7" data-next>Next</button>
+                    <div class="mb-2">
+                        <div class="dropzone" id="my-dropzone" class="mb-3"> </div>
+                    </div>
+
+                </div>
+                <div class="section mt-4" data-step>
+                    <h2>Section 8</h2>
+                    <button type="button" class="btn btn-primary" data-previous>Previous</button>
+                    <button type="submit" class="btn btn-success ms-2" id="submitBtn">Submit</button>
+                </div>
+        </div>
+        </form>
+    </div>
+</div>
+</div>
+
+<div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="successModalLabel">Files Uploaded Successfully</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Your files have been uploaded successfully.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
         </div>
     </div>
 </div>
+<div class="modal fade" id="processingModal" tabindex="-1" aria-labelledby="processingModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="processingModalLabel">Processing</h5>
+            </div>
+            <div class="modal-body">
+                Your form is being processed.
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
-    function showSection(sectionId) {
-        document.querySelectorAll('.section').forEach(function (section) {
-            section.style.display = 'none';
-        });
-        document.getElementById(sectionId).style.display = 'block';
+    // Function to retrieve CSRF token from cookies
+    function getCSRFToken() {
+        let csrfToken = null;
+        const cookies = document.cookie.split(';');
+        for (const cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'csrftoken') {
+                csrfToken = decodeURIComponent(value);
+                break;
+            }
+        }
+        return csrfToken;
     }
+
+    // Initialise Dropzone
+    let randomNumber;
+    let myDropzone = new Dropzone("#my-dropzone", {
+        url: "{% url 'incident_upload' %}",
+        maxFilesize: 5, // MB
+        maxFiles: 4,
+        acceptedFiles: "image/*",
+        headers: {
+            "X-CSRFToken": getCSRFToken(),
+        },
+    });
+
+    randomNumber = Math.random().toString(36).substring(2);
+    myDropzone.on("sending", function (file, xhr, formData) {
+        formData.append("random_number", randomNumber);
+    });
+
+    // Enable the next button initially
+    const nextButton = document.getElementById("nextBtn7");
+    nextButton.disabled = false;
+
+    myDropzone.on("sending", function (file, xhr, formData) {
+        formData.append("random_number", randomNumber);
+
+        // Deactivate the next button while sending the file
+        nextButton.disabled = true;
+    });
+
+    myDropzone.on("success", function (file, response) {
+        // Enable the next button after files are uploaded successfully
+        document.getElementById("nextBtn7").disabled = false;
+
+        // Show a success popup using a Bootstrap modal
+        $("#successModal").modal("show");
+    });
+
+    myDropzone.on("complete", function (file) {
+        // Optionally, remove the uploaded file from Dropzone
+        //myDropzone.removeFile(file);
+    });
+
 </script>
+
+
+<script>
+    const multiStepForm = document.querySelector("[data-multi-step]")
+    const formSteps = [...multiStepForm.querySelectorAll("[data-step]")]
+    let currentStep = formSteps.findIndex(step => {
+        return step.classList.contains("active")
+    })
+    if (currentStep < 0) {
+        currentStep = 0
+        showCurrentStep()
+        console.log("first", currentStep)
+    }
+
+    multiStepForm.addEventListener("click", e => {
+        console.log("click")
+        let incrementor
+        if (e.target.matches("[data-next]")) {
+
+            incrementor = 1
+            console.log("increementer" , incrementor)
+        } else if (e.target.matches("[data-previous]")) {
+            incrementor = -1
+        }
+
+        if (incrementor == null) return
+        const inputs = [...formSteps[currentStep].querySelectorAll("input")]
+        const allValid = inputs.every(input => input.reportValidity())
+        if (allValid) {
+            currentStep += incrementor
+            showCurrentStep()
+            console.log("validate", currentStep)
+        }
+
+
+        console.log(currentStep)
+    })
+
+    function showCurrentStep() {
+        formSteps.forEach((step, index) => {
+            step.classList.toggle("active", index === currentStep)
+        })
+    }
+
+</script>
+
 
 {% endblock %}
