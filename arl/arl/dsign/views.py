@@ -166,7 +166,7 @@ def docusign_webhook(request):
         # Extract envelope status and signer information from the data
         envelope_status = data['envelopeStatus']
         signer_email = data['signerEmail']
-        signer_name = data['singerName']
+        signer_name = data['signerName']
         # Send a Twilio SMS if the envelope status changes to completed
         if envelope_status == 'Completed':
             print("Email :", signer_email, "Name :", signer_name)

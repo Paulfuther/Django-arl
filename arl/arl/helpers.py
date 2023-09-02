@@ -8,13 +8,16 @@ LINODE_REGION = settings.LINODE_REGION
 LINODE_BUCKET_NAME = settings.LINODE_BUCKET_NAME
 LINODE_URL = settings.LINODE_URL
 
-conn = boto.connect_s3(
-        aws_access_key_id=LINODE_ACCESS_KEY,
-        aws_secret_access_key=LINODE_SECRET_KEY,
-        host=LINODE_REGION,
-        # is_secure=False,               # uncomment if you are not using ssl
-        calling_format=boto.s3.connection.OrdinaryCallingFormat(),
-        )
+try:
+    conn = boto.connect_s3(
+            aws_access_key_id=LINODE_ACCESS_KEY,
+            aws_secret_access_key=LINODE_SECRET_KEY,
+            host=LINODE_REGION,
+            # is_secure=False,               # uncomment if you are not using ssl
+            calling_format=boto.s3.connection.OrdinaryCallingFormat(),
+            )
+except Exception as e:
+    print("An error occurred while connecting to S3:", e)
 
 
 def upload_to_linode_object_storage(file_obj, object_key):
