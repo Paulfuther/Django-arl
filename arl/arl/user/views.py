@@ -1,5 +1,6 @@
-import os
 
+
+from django.conf import settings
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
@@ -31,7 +32,7 @@ def register(request):
             user.phone_number = verified_phone_number
             user.save()
             send_template_email_task.delay(user.email, 'Welcome Aboard', user.first_name,
-                                           os.environ.get('SENDGRID_NEWHIRE_ID'))
+                                           settings.SENDGRID_NEWHIRE_ID)
             gsa_group = Group.objects.get(name='GSA')
             user.groups.add(gsa_group)
             return render(request, 'msg/success.html')
@@ -49,6 +50,7 @@ class CheckPhoneNumberUniqueView(View):
             return JsonResponse({'exists': True})
         else:
             return JsonResponse({'exists': False})
+
 
 @login_required
 def sms_form(request):

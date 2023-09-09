@@ -1,21 +1,21 @@
 import json
-import os
 
+from django.conf import settings
 from django.http import HttpResponse
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from twilio.base.exceptions import TwilioException
 from twilio.rest import Client
 
-account_sid = os.environ.get('TWILIO_ACCOUNT_SID')
-auth_token = os.environ.get('TWILIO_AUTH_TOKEN')
-twilio_from = os.environ.get('TWILIO_FROM')
-twilio_verify_sid = os.environ.get('TWILIO_VERIFY_SID')
-notify_service_sid = os.environ.get('TWILIO_NOTIFY_SERVICE_SID')
+account_sid = settings.TWILIO_ACCOUNT_SID
+auth_token = settings.TWILIO_AUTH_TOKEN
+twilio_from = settings.TWILIO_FROM
+twilio_verify_sid = settings.TWILIO_VERIFY_SID
+notify_service_sid = settings.TWILIO_NOTIFY_SERVICE_SID
 
 client = Client(account_sid, auth_token)
 
-sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
+sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
 
 # function to create an email using sendgrid and tempaltes
 
@@ -23,7 +23,7 @@ sg = SendGridAPIClient(os.environ.get('SENDGRID_API_KEY'))
 def create_email(to_email, subject, name, template_id):
     subject = subject
     message = Mail(
-        from_email=os.environ.get('MAIL_DEFAULT_SENDER'),
+        from_email=settings.MAIL_DEFAULT_SENDER,
         to_emails=to_email)
     message.dynamic_template_data = {
             'subject': subject,
