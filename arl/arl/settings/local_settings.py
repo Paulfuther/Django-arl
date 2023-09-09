@@ -1,8 +1,12 @@
 import os
 import json
 
-with open('/etc/config.json') as config_file:
-     config=json.load(config_file)
+
+try:
+    with open('/etc/config.json') as config_file:
+        config = json.load(config_file)
+except ImportError:
+    pass
 
 SECRET_KEY = config.get('SECRET_KEY')
 
