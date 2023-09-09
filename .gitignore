@@ -10,7 +10,7 @@ __pycache__
 *.md
 private.key
 *.key
-
+config.json
 
 # Django #
 *.log
