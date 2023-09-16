@@ -5,16 +5,15 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import Group
-from django.http import HttpResponse, JsonResponse
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.views import View
 # from arl.msg.tasks import send_sms_task
 from twilio.base.exceptions import TwilioException
 
 from arl.msg.helpers import (check_verification_token,
-                             request_verification_token, send_sms)
-from arl.tasks import (send_bulk_sms_task, send_sms_task,
-                       send_template_email_task)
+                             request_verification_token)
+from arl.tasks import send_sms_task, send_template_email_task
 
 from .forms import CustomUserCreationForm
 from .models import CustomUser, Employer
