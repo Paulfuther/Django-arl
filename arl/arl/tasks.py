@@ -14,6 +14,7 @@ from arl.user.models import Store
 from io import BytesIO
 from django.http import HttpResponse
 
+
 @app.task(name='add')
 def add(x, y):
     return x + y

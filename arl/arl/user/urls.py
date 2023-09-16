@@ -11,7 +11,7 @@ from arl.incident.views import (IncidentCreateView, incident_form_pdf,
 from .views import (CheckPhoneNumberUniqueView, check_verification, home_view,
                     login_view, logout_view, register, request_verification,
                     sms_form)
-from arl.msg.views import send_sms_view
+from arl.msg.views import send_sms_view, sendgrid_webhook
 
 urlpatterns = [
     path('', login_view, name='home'),
@@ -40,4 +40,5 @@ urlpatterns = [
     path('incident-form-pdf/<int:incident_id>/', incident_form_pdf, name='incident_form_pdf'),
     path('generate-pdf/<int:incident_id>/', generate_pdf, name='generate_pdf'),
     path('send-sms/', send_sms_view, name='send_sms_view'),
+    path('sendgrid_hook/', sendgrid_webhook, name='sendgrid_webhook'),
 ]
