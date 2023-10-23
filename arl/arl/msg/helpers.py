@@ -40,6 +40,19 @@ def create_email(to_email, subject, name, template_id):
         return False
 
 
+def send_sms_model(phone_number, message):
+    try:
+        message = client.messages.create(
+                body=message,
+                from_=twilio_from,
+                to=phone_number,
+            )
+        return message.sid
+    except Exception as e:
+        print("Failed to send SMS:", str(e))
+    return None
+
+
 def send_sms(phone_number):
     try:
         message = client.messages.create(
