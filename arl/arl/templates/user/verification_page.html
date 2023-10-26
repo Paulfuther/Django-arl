@@ -1,0 +1,28 @@
+{% extends "../base/base.html" %}
+{% block title %}Index{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+
+<head>
+    <title>Verification</title>
+</head>
+<body>
+    <div class="container">
+        <h2>Two-Factor Authentication</h2>
+        {% if verification_error %}
+            <p style="color: red;">Verification failed. Please try again.</p>
+        {% endif %}
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="verification_code">Enter Verification Code:</label>
+                <input type="text" name="verification_code" id="verification_code" class="form-control" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Submit</button>
+        </form>
+    </div>
+</body>
+
+{% endblock %}

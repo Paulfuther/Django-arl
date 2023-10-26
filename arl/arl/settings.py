@@ -47,7 +47,6 @@ INSTALLED_APPS = [
     "arl.dsign",
     "arl.dbox",
     "arl.incident",
-    
 ]
 
 
@@ -132,9 +131,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-STATIC_URL = "/static/"
-STATIC_ROOT = "/var/www/static"
-# STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+STATIC_URL = "static/"
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -156,9 +154,6 @@ AUTHENTICATION_BACKENDS = [
 LOGIN_URL = "login/"
 
 BROKER_URL = os.environ.get("CLOUDAMQP_URL")
-
-EMAIL_BACKEND = 'arl.msg.helpers.SendGridEmailBackend'
-
 
 # DOCUSIGN_BASE_PATH = os.environ.get('DOCUSIGN_BASE_PATH_DEV')
 # DOCUSIGN_INTEGRATION_KEY = os.environ.get('DOCUSIGN_INTEGRATION_KEY_DEV')
@@ -207,14 +202,6 @@ MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER")
 SENDGRID_NEWHIRE_ID = os.environ.get("SENDGRID_NEWHIRE_ID")
 SENDGRID_NEW_HIRE_FILE_ID = os.environ.get("SENDGRID_NEW_HIRE_FILE_ID")
 
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-
-EMAIL_HOST = 'smtp.sendgrid.net'
-EMAIL_HOST_USER = 'apikey' # this is exactly the value 'apikey'
-EMAIL_HOST_PASSWORD = SENDGRID_API_KEY
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-DEFAULT_FROM_EMAIL = 'paul.futher@outlook.com'
 
 try:
     from .local_settings import *
