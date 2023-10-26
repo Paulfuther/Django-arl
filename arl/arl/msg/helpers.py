@@ -6,6 +6,7 @@ from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from twilio.base.exceptions import TwilioException
 from twilio.rest import Client
+from django.core.mail.backends.base import BaseEmailBackend
 
 account_sid = settings.TWILIO_ACCOUNT_SID
 auth_token = settings.TWILIO_AUTH_TOKEN
@@ -97,3 +98,4 @@ def check_verification_token(phone, token):
     except TwilioException:
         return False
     return result.status == 'approved'
+
