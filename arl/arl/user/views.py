@@ -1,22 +1,24 @@
 from django.conf import settings
+from django.contrib import admin, messages
+from django.contrib.admin import AdminSite
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import Group
-from django.contrib.auth.views import PasswordResetView
+from django.contrib.auth.views import LoginView, PasswordResetView
 from django.contrib.messages.views import SuccessMessageMixin
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.views import View
-
+from django_ratelimit.decorators import ratelimit
 # from arl.msg.tasks import send_sms_task
 from twilio.base.exceptions import TwilioException
 
 from arl.msg.helpers import check_verification_token, request_verification_token
 from arl.tasks import send_sms_task, send_template_email_task
 
-from .forms import CustomUserCreationForm
+from .forms import CustomUserCreationForm, TwoFactorAuthenticationForm
 from .models import CustomUser, Employer
 
 
@@ -131,6 +133,55 @@ def login_view(request):
 
 
 def verification_page(request):
+    form = TwoFactorAuthenticationForm(request.POST)
+    user_id = request.session.get("user_id", None)
+    if not user_id:
+        return HttpResponse(
+            "User information not found in session. Please start the process again."
+        )
+    try:
+        user = CustomUser.objects.get(id=user_id)
+        print(user.username)
+    except CustomUser.DoesNotExist:
+        return HttpResponse("User not found.")
+
+    if request.method == "POST":
+        if form.is_valid():
+            token = request.POST.get("verification_code")
+            phone_number = request.session.get("phone_number", None)
+
+            print("testing", token, phone_number)
+            try:
+                if check_verification_token(phone_number, token):
+                    login(request, user)
+                    return redirect("home")
+                else:
+                    return render(
+                        request,
+                        "user/verification_page.html",
+                        {"verification_error": True, "form": form},
+                    )
+            except TwilioException:
+                return render(
+                    request,
+                    "user/verification_page.html",
+                    {"verification_error": True, "form": form},
+                )
+
+    return render(request, "user/verification_page.html", {"form": form})
+
+
+def logout_view(request):
+    logout(request)
+    return redirect("home")  # Replace 'home' with your desired URL name for the homepage\
+
+@ratelimit(key='user_or_ip', rate='5/m')
+def home_view(request):
+    return render(request, "user/home.html")
+
+
+def admin_verification_page(request):
+    form = TwoFactorAuthenticationForm(request.POST)
     user_id = request.session.get("user_id", None)
     if not user_id:
         return HttpResponse(
@@ -150,19 +201,54 @@ def verification_page(request):
         try:
             if check_verification_token(phone_number, token):
                 login(request, user)
-                return redirect("home")
+                return redirect("admin:index")
             else:
-                return render(request, "user/verification_page.html", {"verification_error": True})
+                return render(
+                    request,
+                    "user/admin_verification_page.html",
+                    {"verification_error": True, "form": form},
+                )
         except TwilioException:
-            return render(request, "user/verification_page.html", {"verification_error": True})
+            return render(
+                request,
+                "user/admin_verification_page.html",
+                {"verification_error": True, "form": form},
+            )
 
-    return render(request, "user/verification_page.html")
+    return render(request, "user/admin_verification_page.html", {"form": form})
 
 
-def logout_view(request):
-    logout(request)
-    return redirect("home")  # Replace 'home' with your desired URL name for the homepage\
+class CustomAdminLoginView(LoginView):
+    template_name = "registration/login.html"
+    form_class = AuthenticationForm
+
+    def form_invalid(self, form):
+        # This method is called when the form is invalid (e.g., user doesn't exist).
+        # You can display an error message here.
+        messages.error(self.request, "Invalid username or password")
+        return super().form_invalid(form)
+
+    def form_valid(self, form):
+        # Here, you can perform additional logic after a user successfully logs in.
+        # For example, check if the user has 2FA enabled and redirect accordingly.
+        user = form.get_user()
+        print(user.username)
+        # Implement your 2FA logic here
+        if user and user.is_active:
+            print("yah", user.phone_number)
+            if user.phone_number:
+                # Request the verification code from Twilio
+                try:
+                    request_verification_token(user.phone_number)
+                    self.request.session["user_id"] = user.id  # Store user ID in the session
+                    self.request.session["phone_number"] = user.phone_number
+                    return redirect("admin_verification_page")
+
+                except TwilioException as e:
+                    messages.error(self.request, f"Failed to send verification code: {e}")
+                    # Redirect back to the login page (you may need to specify the correct URL name)
+                    return redirect(reverse("custom_admin_login"))
+            return redirect("admin:index")
 
 
-def home_view(request):
-    return render(request, "user/home.html")
+

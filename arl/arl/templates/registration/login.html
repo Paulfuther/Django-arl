@@ -1,0 +1,36 @@
+{% extends "admin/login.html" %}
+
+{% block title %}Index{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+
+
+<head>
+
+</head>
+
+<body>
+
+
+    <h1>Admin Login</h1>
+    <form method="post" action="{% url 'custom_admin_login' %}">
+        {% csrf_token %}
+        {% if messages %}
+        <div class="alert alert-danger">
+            <ul class="errorlist">
+                {% for message in messages %}
+                <li>{{ message }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+        {{ form|crispy }}
+        <input type="submit" value="Login">
+    </form>
+</body>
+
+
+
+{% endblock %}
