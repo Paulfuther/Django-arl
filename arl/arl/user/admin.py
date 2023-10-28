@@ -2,12 +2,18 @@ import io
 
 import openpyxl
 from django.contrib import admin
+from django.contrib.admin import AdminSite
+from django.contrib.auth import login
 from django.contrib.auth.admin import UserAdmin
 from django.http import HttpResponse
+from django.shortcuts import redirect, render
+from django.views import View
 from openpyxl import Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
-
+from twilio.base.exceptions import TwilioException
+from .views import CustomAdminLoginView
 from arl.incident.models import Incident
+from arl.msg.helpers import request_verification_token
 from arl.msg.models import BulkEmailSendgrid, Twimlmessages
 
 from .models import CustomUser, Employer, Store
@@ -66,13 +72,7 @@ class CustomUserAdmin(UserAdmin):
         sheet.append(headers)
 
         for user in queryset:
-            data = [
-                user.username,
-                user.email,
-                user.first_name,
-                user.last_name,
-                user.phone_number
-            ]
+            data = [user.username, user.email, user.first_name, user.last_name, user.phone_number]
             sheet.append(data)
 
         virtual_workbook = io.BytesIO()
@@ -88,7 +88,6 @@ class CustomUserAdmin(UserAdmin):
         return response
 
     export_selected_users_to_excel.short_description = "Export selected users to Excel"
-
 
 UserAdmin.fieldsets = tuple(fields)
 admin.site.register(Employer)

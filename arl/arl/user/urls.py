@@ -10,7 +10,6 @@ from arl.dbox.views import (
     upload_file,
     use_dropbox,
     view_folder,
-    
 )
 from arl.dsign.views import create_envelope, docusign_webhook
 from arl.incident.views import (
@@ -23,6 +22,7 @@ from arl.msg.views import send_sms_view, sendgrid_webhook
 
 from .views import (
     CheckPhoneNumberUniqueView,
+    admin_verification_page,
     check_verification,
     home_view,
     login_view,
@@ -46,7 +46,8 @@ urlpatterns = [
     path("sms_form/", sms_form, name="sms_form"),
     path("docsign/", create_envelope, name="Create Envelope"),
     path("login/", login_view, name="login"),
-    path('verification/', verification_page, name='verification_page'),
+    path("verification/", verification_page, name="verification_page"),
+    path("admin_verification/", admin_verification_page, name="admin_verification_page"),
     path("logout/", logout_view, name="logout"),
     path(
         "password-reset/",
@@ -60,12 +61,16 @@ urlpatterns = [
     ),
     path(
         "password-reset-confirm/<uidb64>/<token>/",
-        auth_views.PasswordResetConfirmView.as_view(template_name="user/password_reset_confirm.html"),
+        auth_views.PasswordResetConfirmView.as_view(
+            template_name="user/password_reset_confirm.html"
+        ),
         name="password_reset_confirm",
     ),
     path(
         "password-reset-complete/",
-        auth_views.PasswordResetCompleteView.as_view(template_name="user/password_reset_complete.html"),
+        auth_views.PasswordResetCompleteView.as_view(
+            template_name="user/password_reset_complete.html"
+        ),
         name="password_reset_complete",
     ),
     path("home/", home_view, name="home"),

@@ -1,7 +1,7 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
 from django import forms
-from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.urls import reverse_lazy
 
 from .models import CustomUser
@@ -57,3 +57,14 @@ class CustomUserCreationForm(UserCreationForm):
 
         return cleaned_data
 
+
+class TwoFactorAuthenticationForm(forms.Form):
+    verification_code = forms.CharField(
+        max_length=12,
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super(TwoFactorAuthenticationForm, self).__init__(*args, **kwargs)
+        self.fields['verification_code'].widget.attrs.update({'style': 'margin: 10px 0;'})  
