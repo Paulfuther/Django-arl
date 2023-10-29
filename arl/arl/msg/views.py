@@ -157,7 +157,7 @@ def send_weekly_tobacco_emails(request):
 
     return render(request, "msg/send_tobacco_emails.html")
 
-
+# below is a test
 @user_passes_test(is_member_of_msg_group)
 def send_weekly_tobacco_text(request):
     if request.method == "POST":
