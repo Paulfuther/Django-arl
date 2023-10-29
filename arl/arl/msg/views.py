@@ -1,6 +1,7 @@
 import json
 import logging
 
+from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.db.models import Q
 from django.http import JsonResponse
@@ -135,9 +136,9 @@ def sms_success_view(request):
     return render(request, "msg/sms_success.html")
 
 
+@user_passes_test(is_member_of_msg_group)
 def send_weekly_tobacco_emails(request):
     if request.method == "POST":
-
         active_users_with_email = CustomUser.objects.filter(
             Q(is_active=True) & ~Q(email="") & Q(email__isnull=False)
         )
@@ -157,9 +158,10 @@ def send_weekly_tobacco_emails(request):
     return render(request, "msg/send_tobacco_emails.html")
 
 
+@user_passes_test(is_member_of_msg_group)
 def send_weekly_tobacco_text(request):
-    if request.method == 'POST':
-        #users = CustomUser.objects.filter(is_active=True)  # Retrieve active users, adjust this as needed
+    if request.method == "POST":
+        # users = CustomUser.objects.filter(is_active=True)  # Retrieve active users, adjust this as needed
         active_users_with_phone = CustomUser.objects.filter(
             Q(is_active=True) & ~Q(phone_number="") & Q(phone_number__isnull=False)
         )
@@ -173,7 +175,9 @@ def send_weekly_tobacco_text(request):
             print(gsatt, id.username)
             numbers.append(gsatt)
 
-        message = 'Required Action Policy for Tobacco and Vape Products WHAT IS REQUIRED? You must request ID from anyone purchasing tobacco or vape products, who looks to be younger than 40. WHY? It is against the law to sell tobacco or vape products to minors. A person who distributes tobacco or vape products to a minor is guilty of an offence, and could be punished with: Loss of employment. Face personal fines of $4,000 to $100,000. Loss of license to sell tobacco and vape products, as well as face additional fines of $10,000 to $150,000. (for the Associate) WHO? Each and every Guest that wants to buy tobacco products. REQUIRED Guests that look under the age of 40 are asked for (picture) I.D. when purchasing tobacco products. Ask for (picture) I.D. if they look under 40 before quoting the price of tobacco products. Ask for (picture) I.D. if they look under 40 before placing tobacco products on the counter. Dont let an angry Guest stop you from asking for (picture) I.D. ITs THE LAW! I.D. Drivers license Passport Certificate of Canadian Citizenship Canadian permanent resident card Canadian Armed Forces I.D. card Any documents issued by a federal or provincial authority or a foreign government that contain a photo, date of birth and signature are also acceptable. IMPORTANT - School I.D. cannot be accepted as proof of age. EXPECTED RESULTS. No employee is charged with selling tobacco products to a minor. Employees always remember to ask for I.D. No Employee receives a warning letter about selling to a minor.',  
+        message = (
+            "Required Action Policy for Tobacco and Vape Products WHAT IS REQUIRED? You must request ID from anyone purchasing tobacco or vape products, who looks to be younger than 40. WHY? It is against the law to sell tobacco or vape products to minors. A person who distributes tobacco or vape products to a minor is guilty of an offence, and could be punished with: Loss of employment. Face personal fines of $4,000 to $100,000. Loss of license to sell tobacco and vape products, as well as face additional fines of $10,000 to $150,000. (for the Associate) WHO? Each and every Guest that wants to buy tobacco products. REQUIRED Guests that look under the age of 40 are asked for (picture) I.D. when purchasing tobacco products. Ask for (picture) I.D. if they look under 40 before quoting the price of tobacco products. Ask for (picture) I.D. if they look under 40 before placing tobacco products on the counter. Dont let an angry Guest stop you from asking for (picture) I.D. ITs THE LAW! I.D. Drivers license Passport Certificate of Canadian Citizenship Canadian permanent resident card Canadian Armed Forces I.D. card Any documents issued by a federal or provincial authority or a foreign government that contain a photo, date of birth and signature are also acceptable. IMPORTANT - School I.D. cannot be accepted as proof of age. EXPECTED RESULTS. No employee is charged with selling tobacco products to a minor. Employees always remember to ask for I.D. No Employee receives a warning letter about selling to a minor.",
+        )
         send_bulk_sms(numbers, message)
 
         return render(
