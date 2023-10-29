@@ -12,9 +12,21 @@ from arl.dbox.views import (
     view_folder,
 )
 from arl.dsign.views import create_envelope, docusign_webhook
-from arl.incident.views import IncidentCreateView, generate_pdf, incident_form_pdf, process_incident_images
-
-from arl.msg.views import SendSMSView, sendgrid_webhook, sms_success_view, SendTemplateEmailView, SendEmailView, send_weekly_tobacco_emails, send_weekly_tobacco_text
+from arl.incident.views import (
+    IncidentCreateView,
+    generate_pdf,
+    incident_form_pdf,
+    process_incident_images,
+)
+from arl.msg.views import (
+    SendEmailView,
+    SendSMSView,
+    SendTemplateEmailView,
+    send_weekly_tobacco_emails,
+    send_weekly_tobacco_text,
+    sendgrid_webhook,
+    sms_success_view,
+)
 
 from .views import (
     CheckPhoneNumberUniqueView,
@@ -85,10 +97,10 @@ urlpatterns = [
     path("incident-form-pdf/<int:incident_id>/", incident_form_pdf, name="incident_form_pdf"),
     path("generate-pdf/<int:incident_id>/", generate_pdf, name="generate_pdf"),
     path("send-sms/", SendSMSView.as_view(), name="send_sms_view"),
-    path('sms-success/', sms_success_view, name='sms_success'),
+    path("sms-success/", sms_success_view, name="sms_success"),
     path("send-template-email/", SendTemplateEmailView.as_view(), name="send_template_email_view"),
     path("send-email/", SendEmailView.as_view(), name="send_email_view"),
     path("sendgrid_hook/", sendgrid_webhook, name="sendgrid_webhook"),
-    path('send_tobacco_emails/', send_weekly_tobacco_emails, name='send_tobacco_emails'),
-    path('send_tobacco_sms/', send_weekly_tobacco_text, name='send_weekly_tobacco_text'),
+    path("send_tobacco_emails/", send_weekly_tobacco_emails, name="send_tobacco_emails"),
+    path("send_tobacco_sms/", send_weekly_tobacco_text, name="send_weekly_tobacco_text"),
 ]
