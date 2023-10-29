@@ -14,7 +14,7 @@ from arl.dbox.views import (
 from arl.dsign.views import create_envelope, docusign_webhook
 from arl.incident.views import IncidentCreateView, generate_pdf, incident_form_pdf, process_incident_images
 
-from arl.msg.views import SendSMSView, sendgrid_webhook, sms_success_view, SendTemplateEmailView
+from arl.msg.views import SendSMSView, sendgrid_webhook, sms_success_view, SendTemplateEmailView, SendEmailView, send_weekly_tobacco_emails, send_weekly_tobacco_text
 
 from .views import (
     CheckPhoneNumberUniqueView,
@@ -87,5 +87,8 @@ urlpatterns = [
     path("send-sms/", SendSMSView.as_view(), name="send_sms_view"),
     path('sms-success/', sms_success_view, name='sms_success'),
     path("send-template-email/", SendTemplateEmailView.as_view(), name="send_template_email_view"),
+    path("send-email/", SendEmailView.as_view(), name="send_email_view"),
     path("sendgrid_hook/", sendgrid_webhook, name="sendgrid_webhook"),
+    path('send_tobacco_emails/', send_weekly_tobacco_emails, name='send_tobacco_emails'),
+    path('send_tobacco_sms/', send_weekly_tobacco_text, name='send_weekly_tobacco_text'),
 ]

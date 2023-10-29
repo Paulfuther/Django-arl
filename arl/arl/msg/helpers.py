@@ -21,6 +21,25 @@ sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
 # function to create an email using sendgrid and tempaltes
 
 
+def create_tobacco_email(to_email, subject, name, template_id):
+    subject = subject
+    message = Mail(
+        from_email=settings.MAIL_DEFAULT_SENDER,
+        to_emails=to_email)
+    message.dynamic_template_data = {
+        'subject': subject,
+        'name': name,
+        }
+    message.template_id = template_id
+    response = sg.send(message)
+
+    # Handle the response and return an appropriate value based on your requirements
+    if response.status_code == 202:
+        return True
+    else:
+        print("Failed to send email. Error code:", response.status_code)
+        return False
+
 def create_email(to_email, subject, name, template_id):
     subject = subject
     message = Mail(
@@ -31,6 +50,22 @@ def create_email(to_email, subject, name, template_id):
         'name': name,
         }
     message.template_id = template_id
+    response = sg.send(message)
+
+    # Handle the response and return an appropriate value based on your requirements
+    if response.status_code == 202:
+        return True
+    else:
+        print("Failed to send email. Error code:", response.status_code)
+        return False
+
+def create_single_email(to_email, subject, body):
+    subject = subject
+    message = Mail(
+        from_email=settings.MAIL_DEFAULT_SENDER,
+        to_emails=to_email,
+        subject=subject,
+        html_content=body)
     response = sg.send(message)
 
     # Handle the response and return an appropriate value based on your requirements
@@ -77,6 +112,15 @@ def create_bulk_sms():
             to_binding=bindings,
             body=body)
     return HttpResponse('Bulk SMS sent successfully.')  # or redirect to a success page
+
+def send_bulk_sms(numbers, body):
+    bindings = list(map(lambda number: json.dumps({"binding_type":"sms","address": number}), numbers))
+    print("=====> To Bindings :>", bindings, "<: =====")
+    notification = client.notify.services(notify_service_sid)\
+        .notifications.create(
+            to_binding=bindings,
+        body=body)
+
 
 
 def _get_twilio_verify_client():

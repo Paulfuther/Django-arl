@@ -5,14 +5,23 @@ import os
 from io import BytesIO
 
 import pdfkit
+from django.db.models import Q
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 
 from arl.celery import app
 from arl.helpers import get_s3_images_for_incident
 from arl.incident.models import Incident
-from arl.msg.helpers import client, create_email, notify_service_sid, send_sms, send_sms_model
-from arl.user.models import Store
+from arl.msg.helpers import (
+    client,
+    create_email,
+    create_single_email,
+    create_tobacco_email,
+    notify_service_sid,
+    send_sms,
+    send_sms_model,
+)
+from arl.user.models import CustomUser, Store
 
 
 @app.task(name="add")
@@ -30,11 +39,38 @@ def send_sms_task(phone_number, message):
     # return send_sms(phone_number)
 
 
-@app.task(name="send_email")
+@app.task(name="send_weekly_tobacco_email")
+def send_tobacco_emails(request):
+    try:
+        active_users_with_email = CustomUser.objects.filter(
+            Q(is_active=True) & ~Q(email="") & Q(email__isnull=False)
+        )
+        for user in active_users_with_email:
+            to_email = user.email
+            subject = "Required Actions for Tobacco and Vape"
+            name = user.username
+            template_id = "d-488749fd81d4414ca7bbb2eea2b830db"
+            # Send the email to the current user
+            create_tobacco_email(to_email, subject, name, template_id)
+        return "Template Email Sent Successfully"
+    except Exception as e:
+        return str(e)
+
+
+@app.task(name="send_template_email")
 def send_template_email_task(to_email, subject, name, template_id):
     try:
         create_email(to_email, subject, name, template_id)
         return "Template Email Sent Successfully"
+    except Exception as e:
+        return str(e)
+
+
+@app.task(name="send_email")
+def send_email_task(to_email, subject, name):
+    try:
+        create_single_email(to_email, subject, name)
+        return "Email Sent Successfully"
     except Exception as e:
         return str(e)
 
