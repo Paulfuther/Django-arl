@@ -34,3 +34,23 @@ class TemplateEmailForm(forms.Form):
         widget=forms.TextInput(attrs={'class': 'form-control'}),
         help_text='Enter the email template ID'
     )
+
+class EmailForm(forms.Form):
+    to_email = forms.EmailField(
+        label='To Email',
+        widget=forms.EmailInput(attrs={'class': 'form-control'}),
+        help_text='Enter a valid email address'
+    )
+    subject = forms.CharField(
+        label='Subject',
+        max_length=255,
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+        help_text='Enter the email subject'
+    )
+    body = forms.CharField(
+        label='Body',
+        max_length=255,
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+        help_text='Enter Body of Email'
+    )
+  
