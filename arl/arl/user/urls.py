@@ -12,13 +12,9 @@ from arl.dbox.views import (
     view_folder,
 )
 from arl.dsign.views import create_envelope, docusign_webhook
-from arl.incident.views import (
-    IncidentCreateView,
-    generate_pdf,
-    incident_form_pdf,
-    process_incident_images,
-)
-from arl.msg.views import send_sms_view, sendgrid_webhook
+from arl.incident.views import IncidentCreateView, generate_pdf, incident_form_pdf, process_incident_images
+
+from arl.msg.views import SendSMSView, sendgrid_webhook, sms_success_view, SendTemplateEmailView
 
 from .views import (
     CheckPhoneNumberUniqueView,
@@ -88,6 +84,8 @@ urlpatterns = [
     path("incident_upload/", process_incident_images, name="incident_upload"),
     path("incident-form-pdf/<int:incident_id>/", incident_form_pdf, name="incident_form_pdf"),
     path("generate-pdf/<int:incident_id>/", generate_pdf, name="generate_pdf"),
-    path("send-sms/", send_sms_view, name="send_sms_view"),
+    path("send-sms/", SendSMSView.as_view(), name="send_sms_view"),
+    path('sms-success/', sms_success_view, name='sms_success'),
+    path("send-template-email/", SendTemplateEmailView.as_view(), name="send_template_email_view"),
     path("sendgrid_hook/", sendgrid_webhook, name="sendgrid_webhook"),
 ]

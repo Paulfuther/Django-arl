@@ -27,8 +27,8 @@ def create_email(to_email, subject, name, template_id):
         from_email=settings.MAIL_DEFAULT_SENDER,
         to_emails=to_email)
     message.dynamic_template_data = {
-            'subject': subject,
-            'name': name,
+        'subject': subject,
+        'name': name,
         }
     message.template_id = template_id
     response = sg.send(message)

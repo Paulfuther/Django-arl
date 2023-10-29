@@ -32,7 +32,11 @@ def send_sms_task(phone_number, message):
 
 @app.task(name="send_email")
 def send_template_email_task(to_email, subject, name, template_id):
-    return create_email(to_email, subject, name, template_id)
+    try:
+        create_email(to_email, subject, name, template_id)
+        return "Template Email Sent Successfully"
+    except Exception as e:
+        return str(e)
 
 
 @app.task(name="bulk_sms")
