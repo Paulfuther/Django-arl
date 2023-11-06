@@ -104,3 +104,4 @@ urlpatterns = [
     path("send_tobacco_emails/", send_weekly_tobacco_emails, name="send_tobacco_emails"),
     path("send_tobacco_sms/", send_weekly_tobacco_text, name="send_weekly_tobacco_text"),
 ]
+ 
