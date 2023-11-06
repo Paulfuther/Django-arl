@@ -20,6 +20,7 @@ from arl.msg.helpers import (
     notify_service_sid,
     send_sms,
     send_sms_model,
+    send_monthly_store_phonecall
 )
 from arl.user.models import CustomUser, Store
 
@@ -91,14 +92,7 @@ def send_bulk_sms_task():
 
 @app.task(name="monthly_store_calls")
 def monthly_store_calls_task():
-    twimlid = "https://handler.twilio.com/twiml/EH559f02f8d84080226304bfd390b8ceb9"
-    twilio_from = os.environ.get("TWILIO_FROM")
-    # this is using twilml machine learning text to speach.
-    # this only goes out to stores.
-    stores = Store.objects.all()
-    phone_numbers = [store.phone_number for store in stores]
-    for phone_number in phone_numbers:
-        call = client.calls.create(url=twimlid, to=phone_number, from_=twilio_from)
+   send_monthly_store_phonecall()
 
 
 @app.task(name="create_incident_pdf")
