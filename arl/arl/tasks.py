@@ -40,22 +40,22 @@ def send_sms_task(phone_number, message):
     # return send_sms(phone_number)
 
 
-@app.task(name="send_weekly_tobacco_email")
-def send_tobacco_emails(request):
-    try:
-        active_users_with_email = CustomUser.objects.filter(
-            Q(is_active=True) & ~Q(email="") & Q(email__isnull=False)
-        )
-        for user in active_users_with_email:
-            to_email = user.email
-            subject = "Required Actions for Tobacco and Vape"
-            name = user.username
-            template_id = "d-488749fd81d4414ca7bbb2eea2b830db"
-            # Send the email to the current user
-            create_tobacco_email(to_email, subject, name, template_id)
-        return "Template Email Sent Successfully"
-    except Exception as e:
-        return str(e)
+#@app.task(name="send_weekly_tobacco_email")
+#def send_tobacco_emails(request):
+#    try:
+#        active_users_with_email = CustomUser.objects.filter(
+#            Q(is_active=True) & ~Q(email="") & Q(email__isnull=False)
+#        )
+#        for user in active_users_with_email:
+#            to_email = user.email
+#            subject = "Required Actions for Tobacco and Vape"
+#            name = user.username
+#            template_id = "d-488749fd81d4414ca7bbb2eea2b830db"
+#            # Send the email to the current user
+#            create_tobacco_email(to_email, subject, name, template_id)
+#        return "Template Email Sent Successfully"
+#    except Exception as e:
+#        return str(e)
 
 
 @app.task(name="send_template_email")

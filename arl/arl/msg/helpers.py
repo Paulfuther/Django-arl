@@ -153,7 +153,7 @@ def send_monthly_store_phonecall():
     for phone_number in store_phone_numbers:
         call = client.calls.create(
             to=phone_number,
-            from_=settings.TWILLIO_FROM,  # Replace with your Twilio phone number
+            from_=settings.TWILIO_FROM,  # Replace with your Twilio phone number
             url="https://handler.twilio.com/twiml/EH559f02f8d84080226304bfd390b8ceb9"
         )
 
