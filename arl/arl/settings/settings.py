@@ -47,7 +47,6 @@ INSTALLED_APPS = [
     "arl.dsign",
     "arl.dbox",
     "arl.incident",
-    
 ]
 
 
@@ -122,7 +121,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = "UTC"
+TIME_ZONE = "America/New_York"
 
 USE_I18N = True
 
@@ -157,7 +156,7 @@ LOGIN_URL = "login/"
 
 BROKER_URL = os.environ.get("CLOUDAMQP_URL")
 
-EMAIL_BACKEND = 'arl.msg.helpers.SendGridEmailBackend'
+EMAIL_BACKEND = "arl.msg.helpers.SendGridEmailBackend"
 
 
 # DOCUSIGN_BASE_PATH = os.environ.get('DOCUSIGN_BASE_PATH_DEV')
@@ -207,14 +206,14 @@ MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER")
 SENDGRID_NEWHIRE_ID = os.environ.get("SENDGRID_NEWHIRE_ID")
 SENDGRID_NEW_HIRE_FILE_ID = os.environ.get("SENDGRID_NEW_HIRE_FILE_ID")
 
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
-EMAIL_HOST = 'smtp.sendgrid.net'
-EMAIL_HOST_USER = 'apikey' # this is exactly the value 'apikey'
+EMAIL_HOST = "smtp.sendgrid.net"
+EMAIL_HOST_USER = "apikey"  # this is exactly the value 'apikey'
 EMAIL_HOST_PASSWORD = SENDGRID_API_KEY
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-DEFAULT_FROM_EMAIL = 'paul.futher@outlook.com'
+DEFAULT_FROM_EMAIL = "paul.futher@outlook.com"
 
 try:
     from .local_settings import *
