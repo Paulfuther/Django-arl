@@ -9,6 +9,9 @@ urlpatterns = [
     path("custom-admin-login/", CustomAdminLoginView.as_view(), name="custom_admin_login"),
     path("admin/", admin.site.urls),
     path("", include("arl.user.urls")),
+    path("", include("arl.dbox.urls")),
+    path("", include("arl.incident.urls")),
+    path("", include("arl.dsign.urls")),
 ]
 
 handler403 = "arl.views.error_403"

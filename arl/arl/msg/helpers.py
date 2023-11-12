@@ -1,10 +1,19 @@
+import base64
 import json
 
 from django.conf import settings
 from django.core.mail.backends.base import BaseEmailBackend
 from django.http import HttpResponse
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
+from sendgrid.helpers.mail import (
+    Attachment,
+    ContentId,
+    Disposition,
+    FileContent,
+    FileName,
+    FileType,
+    Mail,
+)
 from twilio.base.exceptions import TwilioException
 from twilio.rest import Client
 
@@ -59,7 +68,9 @@ def create_email(to_email, subject, name, template_id):
         return False
 
 
-def create_single_email(to_email, subject, body):
+def create_single_email(
+    to_email, subject, body, attachment_buffer=None, attachment_filename=None
+):
     subject = subject
     message = Mail(
         from_email=settings.MAIL_DEFAULT_SENDER,
@@ -67,8 +78,22 @@ def create_single_email(to_email, subject, body):
         subject=subject,
         html_content=body,
     )
-    response = sg.send(message)
 
+    if attachment_buffer and attachment_filename:
+        # Create an attachment
+        attachment = Attachment()
+        attachment.file_content = FileContent(
+            base64.b64encode(attachment_buffer.read()).decode()
+        )
+        attachment.file_name = FileName(attachment_filename)
+        attachment.file_type = FileType("application/pdf")
+        attachment.disposition = Disposition("attachment")
+        attachment.content_id = ContentId("Attachment")
+
+        # Add the attachment to the message
+        message.attachment = attachment
+
+    response = sg.send(message)
     # Handle the response and return an appropriate value based on your requirements
     if response.status_code == 202:
         return True
@@ -107,7 +132,10 @@ def create_bulk_sms():
     numbers = ["+15196707469"]
     body = "hello crazy people. Its time."
     bindings = list(
-        map(lambda number: json.dumps({"binding_type": "sms", "address": number}), numbers)
+        map(
+            lambda number: json.dumps({"binding_type": "sms", "address": number}),
+            numbers,
+        )
     )
     print("=====> To Bindings :>", bindings, "<: =====")
     notification = client.notify.services(notify_service_sid).notifications.create(
@@ -118,7 +146,10 @@ def create_bulk_sms():
 
 def send_bulk_sms(numbers, body):
     bindings = list(
-        map(lambda number: json.dumps({"binding_type": "sms", "address": number}), numbers)
+        map(
+            lambda number: json.dumps({"binding_type": "sms", "address": number}),
+            numbers,
+        )
     )
     print("=====> To Bindings :>", bindings, "<: =====")
     notification = client.notify.services(notify_service_sid).notifications.create(
@@ -154,7 +185,7 @@ def send_monthly_store_phonecall():
         call = client.calls.create(
             to=phone_number,
             from_=settings.TWILIO_FROM,  # Replace with your Twilio phone number
-            url="https://handler.twilio.com/twiml/EH559f02f8d84080226304bfd390b8ceb9"
+            url="https://handler.twilio.com/twiml/EH559f02f8d84080226304bfd390b8ceb9",
         )
 
     return HttpResponse("Call initiated!")

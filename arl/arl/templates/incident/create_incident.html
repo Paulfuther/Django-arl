@@ -13,11 +13,8 @@
             <h1>Create Incident</h1>
             <form method="post" enctype="multipart/form-data" id="form" class="was-validated">
                 {% csrf_token %}
-             
-               
+                {{ form.user_employer|as_crispy_field }}
                 {{ form.image_folder }}
-                {{ form.user_employer }}
-              
                 <div class="section">
                     <h2>Section 1: Incident Information</h2>
                     <h4>Primary Incident Type</h4>
@@ -140,17 +137,32 @@
                         {{ form.damage|as_crispy_field }}
                     </div>
                 </div>
-                <div class="section">
+
+
+                {% if existing_images %}
+                <div class= "text-center mt-2 mb-2 border border-dark p-3" >
+                <h2>Existing Images</h2>
+                <div class="ms-2 mt-2">
+
+                    {% for image_url in existing_images %}
+                    <img src="{{ image_url }}" alt="Existing Image" width="100" height="100">
+                    {% endfor %}
+                </div>
+                </div>
+                {% endif %}
+
+                <div class="section text-center">
                     <h2>Upload Images</h2>
-                    <h3>Pictures Only</h3>
-                    <h3>Maximum 4</h3>
-                    <h3>No Video</h3>
+                    Pictures Only
+                    Maximum 4
+                    No Video
                     <div class="form-group">
                         <div class="dropzone" id="my-dropzone" class="mb-3"> </div>
                     </div>
                 </div>
-
-                <button type="submit" id="submit">Create Incident</button>
+                <div class="text-center">
+                    <button type="submit" id="submit" class="btn btn-primary ms-2 mt-2" style="margin-bottom: 20px;">Submit</button>
+                </div>
             </form>
         </div>
     </div>
@@ -165,82 +177,74 @@
     </ul>
 </div>
 {% endif %}
-        <div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="successModalLabel">Files Uploaded Successfully</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        Your files have been uploaded successfully.
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    </div>
-                </div>
+<div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="successModalLabel">Files Uploaded Successfully</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Your files have been uploaded successfully.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
+    </div>
+</div>
 
 
-    <script>
-        // Function to retrieve CSRF token from cookies
-        function getCSRFToken() {
-            let csrfToken = null;
-            const cookies = document.cookie.split(';');
-            for (const cookie of cookies) {
-                const [name, value] = cookie.trim().split('=');
-                if (name === 'csrftoken') {
-                    csrfToken = decodeURIComponent(value);
-                    break;
-                }
+<script>
+    // Function to retrieve CSRF token from cookies
+    function getCSRFToken() {
+        let csrfToken = null;
+        const cookies = document.cookie.split(';');
+        for (const cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'csrftoken') {
+                csrfToken = decodeURIComponent(value);
+                break;
             }
-            return csrfToken;
         }
+        return csrfToken;
+    }
 
-        // Initialise Dropzone
-        let randomNumber;
-        let myDropzone = new Dropzone("#my-dropzone", {
-            url: "{% url 'incident_upload' %}",
-            maxFilesize: 5, // MB
-            maxFiles: 4,
-            acceptedFiles: "image/*",
-            headers: {
-                "X-CSRFToken": getCSRFToken(),
-            },
-        });
+    // Initialise Dropzone
+    let randomNumber;
+    let myDropzone = new Dropzone("#my-dropzone", {
+        url: "{% url 'incident_upload' %}",
+        maxFilesize: 5, // MB
+        maxFiles: 4,
+        acceptedFiles: "image/*",
+        headers: {
+            "X-CSRFToken": getCSRFToken(),
+        },
+    });
 
-        randomNumber = Math.random().toString(36).substring(2);
-        myDropzone.on("sending", function (file, xhr, formData) {
-        var imageFolderField = document.getElementById('id_image_folder'); // Use the actual ID of the hidden field
+    // Enable the next button initially
+    const submitButton = document.getElementById("submit");
+    submitButton.disabled = false;
 
-        // Set the value of the hidden field
-        var imageFolderValue = randomNumber; // Replace with the actual value from your JavaScript
-        imageFolderField.value = imageFolderValue;
-        });
+    myDropzone.on("sending", function (file, xhr, formData) {
+        var imageFolderValue = document.getElementById('id_image_folder').value;
+        formData.append("image_folder", imageFolderValue);
 
-        // Enable the next button initially
-        const submitButton = document.getElementById("submit");
-        submitButton.disabled = false;
+        // Deactivate the next button while sending the file
+        submitButton.disabled = true;
+    });
 
-        myDropzone.on("sending", function (file, xhr, formData) {
-            formData.append("random_number", randomNumber);
+    myDropzone.on("success", function (file, response) {
+        // Enable the next button after files are uploaded successfully
+        document.getElementById("submit").disabled = false;
 
-            // Deactivate the next button while sending the file
-            submitButton.disabled = true;
-        });
+        // Show a success popup using a Bootstrap modal
+        $("#successModal").modal("show");
+    });
 
-        myDropzone.on("success", function (file, response) {
-            // Enable the next button after files are uploaded successfully
-            document.getElementById("submit").disabled = false;
-
-            // Show a success popup using a Bootstrap modal
-            $("#successModal").modal("show");
-        });
-
-    </script>
+</script>
 
 
 
 
-    {% endblock %}
+{% endblock %}

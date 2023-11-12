@@ -1,0 +1,68 @@
+{% extends "../base/base.html" %}
+{% block title %}Index{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+{{ form|as_crispy_errors }}
+
+<head>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" type="text/css"
+        href="https://cdn.datatables.net/v/dt/jq-3.6.0/jszip-2.5.0/dt-1.12.1/b-2.2.3/b-html5-2.2.3/b-print-2.2.3/r-2.3.0/datatables.min.css" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/pdfmake.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/vfs_fonts.js"></script>
+    <script type="text/javascript"
+        src="https://cdn.datatables.net/v/dt/jq-3.6.0/jszip-2.5.0/dt-1.12.1/b-2.2.3/b-html5-2.2.3/b-print-2.2.3/r-2.3.0/datatables.min.js"></script>
+
+</head>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+            <table id="table_id" class="display">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Store</th>
+                        <th>Description</th>
+                        <th>Edit</th>
+                        <th>PDF</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for incident in incidents %}
+                    <tr>
+                        <td>{{ incident.id }}</td>
+                        <td>{{ incident.store.number }}</td>
+                        <td>{{ incident.brief_description }}</td>
+                        <td>
+                            <a href="{% url 'update_incident' pk=incident.id %}" class="btn btn-primary">Edit</a>
+                        </td>
+                        <td>
+                            <a href="{% url 'generate_pdf' incident.id %}" class="fa fa-file-pdf-o"
+                                style="font-size:36px;color:red"></a>
+
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function () {
+        $('#table_id').DataTable({
+
+            dom: 'Bfrtip',
+            responsive: true,
+
+        });
+    });
+</script>
+
+{% endblock %}

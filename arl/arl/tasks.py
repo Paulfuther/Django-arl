@@ -1,16 +1,14 @@
 from __future__ import absolute_import, unicode_literals
 
 import json
-import os
 from io import BytesIO
 
 import pdfkit
-from django.db.models import Q
-from django.http import HttpResponse
 from django.template.loader import render_to_string
+from django.utils.text import slugify
 
 from arl.celery import app
-from arl.helpers import get_s3_images_for_incident
+from arl.helpers import get_s3_images_for_incident, upload_to_linode_object_storage
 from arl.incident.models import Incident
 from arl.msg.helpers import (
     client,
@@ -18,11 +16,12 @@ from arl.msg.helpers import (
     create_single_email,
     create_tobacco_email,
     notify_service_sid,
+    send_monthly_store_phonecall,
     send_sms,
     send_sms_model,
-    send_monthly_store_phonecall
 )
 from arl.user.models import CustomUser, Store
+from arl.dsign.helpers import create_docusign_envelope
 
 
 @app.task(name="add")
@@ -40,8 +39,8 @@ def send_sms_task(phone_number, message):
     # return send_sms(phone_number)
 
 
-#@app.task(name="send_weekly_tobacco_email")
-#def send_tobacco_emails(request):
+# @app.task(name="send_weekly_tobacco_email")
+# def send_tobacco_emails(request):
 #    try:
 #        active_users_with_email = CustomUser.objects.filter(
 #            Q(is_active=True) & ~Q(email="") & Q(email__isnull=False)
@@ -81,7 +80,10 @@ def send_bulk_sms_task():
     numbers = ["+15196707469"]
     body = "hello crazy people. Its time."
     bindings = list(
-        map(lambda number: json.dumps({"binding_type": "sms", "address": number}), numbers)
+        map(
+            lambda number: json.dumps({"binding_type": "sms", "address": number}),
+            numbers,
+        )
     )
     print("=====> To Bindings :>", bindings, "<: =====")
     notification = client.notify.services(notify_service_sid).notifications.create(
@@ -92,37 +94,62 @@ def send_bulk_sms_task():
 
 @app.task(name="monthly_store_calls")
 def monthly_store_calls_task():
-   send_monthly_store_phonecall()
+    send_monthly_store_phonecall()
 
 
 @app.task(name="create_incident_pdf")
-def create_incident_pdf(incident_id):
-    user = request.user
-    #  Fetch incident data based on incident_id
-    incident = Incident.objects.get(pk=incident_id)  # Get the incident
-    images = get_s3_images_for_incident(incident.image_folder, user.employer)
-    context = {"incident": incident, "images": images}  # Add more context as needed
-    html_content = render_to_string("incident/incident_form_pdf.html", context)
+def generate_pdf_task(incident_id, user_email):
+    try:
+        #  Fetch incident data based on incident_id
+        incident = Incident.objects.get(pk=incident_id)  # Get the incident
+        # user = incident.user
+        images = get_s3_images_for_incident(
+            incident.image_folder, incident.user_employer
+        )
+        # print(images)
+        context = {"incident": incident, "images": images}
+        html_content = render_to_string("incident/incident_form_pdf.html", context)
+        #  Generate the PDF using pdfkit
+        options = {
+            "enable-local-file-access": None,
+            "--keep-relative-links": "",
+            "encoding": "UTF-8",
+        }
+        pdf = pdfkit.from_string(html_content, False, options)
+        #  Create a BytesIO object to store the PDF content
+        pdf_buffer = BytesIO(pdf)
+        # Create a unique file name for the PDF
+        store_number = incident.store.number  # Replace with your actual attribute name
+        brief_description = (
+            incident.brief_description
+        )  # Replace with your actual attribute name
+        # Create a unique file name for the PDF using store number and brief description
+        pdf_filename = f"{store_number}_{slugify(brief_description)}_report.pdf"
+        # Save the PDF to a temporary location
+        # with open(pdf_filename, "wb") as pdf_file:
+        #    pdf_file.write(pdf_buffer.getvalue())
+        # Close the BytesIO buffer to free up resources
+        #  Set the BytesIO buffer's position to the beginning
+        # Upload the PDF to Linode Object Storage
+        object_key = f"SITEINCIDENT/{incident.user_employer}/INCIDENTPDF/{pdf_filename}"
+        upload_to_linode_object_storage(pdf_buffer, object_key)
+        pdf_buffer.seek(0)
+        #  Close the BytesIO buffer to free up resources
+        subject = "Your Incident Report"
+        body = "Thank you for using our services. Attached is your incident report."
+        attachment_data = pdf_buffer.getvalue()
 
-    #  Generate the PDF using pdfkit
-    options = {
-        "enable-local-file-access": None,
-        "--keep-relative-links": "",
-        "encoding": "UTF-8",
-    }
-    pdf = pdfkit.from_string(html_content, False, options)
+        # Call the create_single_email function with user_email and other details
+        create_single_email(user_email, subject, body, pdf_buffer, pdf_filename)
+        #create_single_email(user_email, subject, body, pdf_buffer)
 
-    #  Create a BytesIO object to store the PDF content
-    pdf_buffer = BytesIO(pdf)
+        return {
+            "status": "success",
+            "message": "PDF generated and uploaded successfully",
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
-    #  Set the BytesIO buffer's position to the beginning
-    pdf_buffer.seek(0)
-
-    #  Create an HTTP response with PDF content
-    response = HttpResponse(pdf_buffer.read(), content_type="application/pdf")
-    response["Content-Disposition"] = f'attachment; filename="incident_report.pdf"'
-
-    #  Close the BytesIO buffer to free up resources
-    pdf_buffer.close()
-
-    return response
+@app.task(name="create_docusign_envelope")
+def create_docusign_envelope_task(envelope_args):
+    create_docusign_envelope(envelope_args)
