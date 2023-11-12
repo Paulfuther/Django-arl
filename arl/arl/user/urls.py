@@ -1,23 +1,7 @@
 from django.contrib.auth import views as auth_views
 from django.urls import path
 
-from arl.dbox.views import (
-    delete_file,
-    download_file,
-    list_files,
-    list_folder_contents,
-    list_folders,
-    upload_file,
-    use_dropbox,
-    view_folder,
-)
 from arl.dsign.views import create_envelope, docusign_webhook
-from arl.incident.views import (
-    IncidentCreateView,
-    generate_pdf,
-    incident_form_pdf,
-    process_incident_images,
-)
 from arl.msg.views import (
     SendEmailView,
     SendSMSView,
@@ -52,10 +36,11 @@ urlpatterns = [
     path("request-verification/", request_verification, name="request_verification"),
     path("check-verification/", check_verification, name="check_verification"),
     path("sms_form/", sms_form, name="sms_form"),
-    path("docsign/", create_envelope, name="Create Envelope"),
     path("login/", login_view, name="login"),
     path("verification/", verification_page, name="verification_page"),
-    path("admin_verification/", admin_verification_page, name="admin_verification_page"),
+    path(
+        "admin_verification/", admin_verification_page, name="admin_verification_page"
+    ),
     path("logout/", logout_view, name="logout"),
     path(
         "password-reset/",
@@ -64,7 +49,9 @@ urlpatterns = [
     ),
     path(
         "password-reset/done/",
-        auth_views.PasswordResetDoneView.as_view(template_name="user/password_reset_done.html"),
+        auth_views.PasswordResetDoneView.as_view(
+            template_name="user/password_reset_done.html"
+        ),
         name="password_reset_done",
     ),
     path(
@@ -82,26 +69,19 @@ urlpatterns = [
         name="password_reset_complete",
     ),
     path("home/", home_view, name="home"),
-    path("use_dropbox/", use_dropbox, name="new token"),
-    path("list_folders/", list_folders, name="list_folders"),
-    path("list_files/", list_files, name="list_files"),
-    path("list_files/<str:path>/", list_files, name="list_files"),
-    path("view_folder/", view_folder, name="view_folder"),
-    path("list_folder_contents/<path:path>/", list_folder_contents, name="list_folder_contents"),
-    path("download_file/", download_file, name="download_file"),
-    path("docusign-webhook/", docusign_webhook, name="webhook"),
-    path("upload_file/", upload_file, name="upload_file"),
-    path("delete_file/", delete_file, name="delete_file"),
-    path("create-incident/", IncidentCreateView.as_view(), name="create-incident"),
-    path("incident_upload/", process_incident_images, name="incident_upload"),
-    path("incident-form-pdf/<int:incident_id>/", incident_form_pdf, name="incident_form_pdf"),
-    path("generate-pdf/<int:incident_id>/", generate_pdf, name="generate_pdf"),
     path("send-sms/", SendSMSView.as_view(), name="send_sms_view"),
     path("sms-success/", sms_success_view, name="sms_success"),
-    path("send-template-email/", SendTemplateEmailView.as_view(), name="send_template_email_view"),
+    path(
+        "send-template-email/",
+        SendTemplateEmailView.as_view(),
+        name="send_template_email_view",
+    ),
     path("send-email/", SendEmailView.as_view(), name="send_email_view"),
     path("sendgrid_hook/", sendgrid_webhook, name="sendgrid_webhook"),
-    path("send_tobacco_emails/", send_weekly_tobacco_emails, name="send_tobacco_emails"),
-    path("send_tobacco_sms/", send_weekly_tobacco_text, name="send_weekly_tobacco_text"),
+    path(
+        "send_tobacco_emails/", send_weekly_tobacco_emails, name="send_tobacco_emails"
+    ),
+    path(
+        "send_tobacco_sms/", send_weekly_tobacco_text, name="send_weekly_tobacco_text"
+    ),
 ]
- 
