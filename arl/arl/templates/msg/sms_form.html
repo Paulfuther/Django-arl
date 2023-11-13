@@ -6,22 +6,34 @@
 {% load crispy_forms_tags %}
 
 
-
-
-
 <form method="post" action="">
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
-        <legend class="border-bottm mb-4">Login</legend>
+        <legend class="border-bottom mb-4">Send Text Message</legend>
         {% csrf_token %}
-        {{ form|crispy }}
-        <button type="submit">Send SMS</button>
+
+        <div class="mb-4">
+          <legend>Select Users</legend>
+          {{ form.selected_users }}
+        </div>
+
+        <div class="mb-4">
+          <small class="form-text text-muted">{{ form.message.help_text }}</small>
+        </div>
+        <div class="mb-4">
+          {{ form.message }}
+
+        </div>
+
+        <button type="submit" class="btn btn-primary">Send SMS</button>
       </div>
     </div>
   </div>
-
 </form>
+
+
+
 
 
 

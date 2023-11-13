@@ -1,14 +1,7 @@
 from django.contrib.auth import views as auth_views
 from django.urls import path
 
-from arl.dsign.views import create_envelope, docusign_webhook
 from arl.msg.views import (
-    SendEmailView,
-    SendSMSView,
-    SendTemplateEmailView,
-    send_weekly_tobacco_emails,
-    send_weekly_tobacco_text,
-    sendgrid_webhook,
     sms_success_view,
 )
 
@@ -21,7 +14,6 @@ from .views import (
     logout_view,
     register,
     request_verification,
-    sms_form,
     verification_page,
 )
 
@@ -35,7 +27,6 @@ urlpatterns = [
     ),
     path("request-verification/", request_verification, name="request_verification"),
     path("check-verification/", check_verification, name="check_verification"),
-    path("sms_form/", sms_form, name="sms_form"),
     path("login/", login_view, name="login"),
     path("verification/", verification_page, name="verification_page"),
     path(
@@ -69,19 +60,6 @@ urlpatterns = [
         name="password_reset_complete",
     ),
     path("home/", home_view, name="home"),
-    path("send-sms/", SendSMSView.as_view(), name="send_sms_view"),
     path("sms-success/", sms_success_view, name="sms_success"),
-    path(
-        "send-template-email/",
-        SendTemplateEmailView.as_view(),
-        name="send_template_email_view",
-    ),
-    path("send-email/", SendEmailView.as_view(), name="send_email_view"),
-    path("sendgrid_hook/", sendgrid_webhook, name="sendgrid_webhook"),
-    path(
-        "send_tobacco_emails/", send_weekly_tobacco_emails, name="send_tobacco_emails"
-    ),
-    path(
-        "send_tobacco_sms/", send_weekly_tobacco_text, name="send_weekly_tobacco_text"
-    ),
+    
 ]
