@@ -4,25 +4,29 @@ import json
 from io import BytesIO
 
 import pdfkit
+from celery.exceptions import SoftTimeLimitExceeded
+from celery.utils.log import get_task_logger
 from django.template.loader import render_to_string
 from django.utils.text import slugify
 
 from arl.celery import app
+from arl.dsign.helpers import create_docusign_envelope
 from arl.helpers import get_s3_images_for_incident, upload_to_linode_object_storage
 from arl.incident.models import Incident
-from arl.user.models import CustomUser
 from arl.msg.helpers import (
     client,
     create_email,
+    create_hr_newhire_email,
     create_single_email,
     create_tobacco_email,
     notify_service_sid,
     send_monthly_store_phonecall,
     send_sms,
     send_sms_model,
-    create_hr_newhire_email)
+)
 from arl.user.models import CustomUser, Store
-from arl.dsign.helpers import create_docusign_envelope
+
+logger = get_task_logger(__name__)
 
 
 @app.task(name="add")
@@ -41,13 +45,15 @@ def send_sms_task(phone_number, message):
 
 
 @app.task(name="send_weekly_tobacco_email")
-def send_weekly_tobacco_email(to_email, name):
-    active_users = CustomUser.objects.filter(is_active=True)
-
-    # Iterate over each active user and send the tobacco email
-    for user in active_users:
-        create_tobacco_email.delay(user.email, user.username)
-
+def send_weekly_tobacco_email():
+    try:
+        active_users = CustomUser.objects.filter(is_active=True)
+        for user in active_users:
+            create_tobacco_email(user.email, user.username)
+        return "Tobacco Emails Sent Successfully"
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        return f"Failed to send tobacco emails. Error: {str(e)}"
 
 
 @app.task(name="send_template_email")
@@ -134,7 +140,7 @@ def generate_pdf_task(incident_id, user_email):
 
         # Call the create_single_email function with user_email and other details
         create_single_email(user_email, subject, body, pdf_buffer, pdf_filename)
-        #create_single_email(user_email, subject, body, pdf_buffer)
+        # create_single_email(user_email, subject, body, pdf_buffer)
 
         return {
             "status": "success",
@@ -142,6 +148,7 @@ def generate_pdf_task(incident_id, user_email):
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
 
 @app.task(name="create_docusign_envelope")
 def create_docusign_envelope_task(envelope_args):
