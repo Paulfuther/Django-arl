@@ -1,6 +1,7 @@
 import base64
 import json
 
+from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.core.mail.backends.base import BaseEmailBackend
 from django.http import HttpResponse
@@ -19,6 +20,8 @@ from twilio.rest import Client
 
 from arl.user.models import Store
 
+logger = get_task_logger(__name__)
+
 account_sid = settings.TWILIO_ACCOUNT_SID
 auth_token = settings.TWILIO_AUTH_TOKEN
 twilio_from = settings.TWILIO_FROM
@@ -32,7 +35,27 @@ sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
 # function to create an email using sendgrid and tempaltes
 
 
-def create_tobacco_email(to_email, subject, name, template_id):
+def create_tobacco_email(to_email, name):
+    try:
+        templatename = "Required Actions for Tobacco and Vape"
+        message = Mail(from_email=settings.MAIL_DEFAULT_SENDER, to_emails=to_email)
+        message.dynamic_template_data = {
+            "subject": templatename,
+            "name": name,
+        }
+        message.template_id = "d-488749fd81d4414ca7bbb2eea2b830db"
+        response = sg.send(message)
+
+        # Handle the response and return an appropriate value based on your requirements
+        if response.status_code != 202:
+            logger.error(
+                f"Failed to send email to {to_email}. Error code: {response.status_code}"
+            )
+    except Exception as e:
+        logger.error(f"An error occurred while sending email to {to_email}: {str(e)}")
+
+
+def create_email(to_email, subject, name, template_id):
     subject = subject
     message = Mail(from_email=settings.MAIL_DEFAULT_SENDER, to_emails=to_email)
     message.dynamic_template_data = {
@@ -50,14 +73,27 @@ def create_tobacco_email(to_email, subject, name, template_id):
         return False
 
 
-def create_email(to_email, subject, name, template_id):
-    subject = subject
-    message = Mail(from_email=settings.MAIL_DEFAULT_SENDER, to_emails=to_email)
+def create_hr_newhire_email(**kwargs):
+    message = Mail(
+        from_email=settings.MAIL_DEFAULT_SENDER,
+        to_emails=["paul.futher@gmail.com", "hr1553690@yahoo.com"],
+        subject="We have a New Employee",
+    )
     message.dynamic_template_data = {
-        "subject": subject,
-        "name": name,
+        "firstname": kwargs["firstname"],
+        "lastname": kwargs["lastname"],
+        "email": kwargs["email"],
+        "mobilephone": kwargs["mobilephone"],
+        "addressone": kwargs["addressone"],
+        "addresstwo": kwargs["addresstwo"],
+        "city": kwargs["city"],
+        "province": kwargs["province"],
+        "postal": kwargs["postal"],
+        "country": kwargs["country"],
+        "sin_number": kwargs["sin_number"],
+        "dob": kwargs["dob"],
     }
-    message.template_id = template_id
+    message.template_id = "d-d0806dff1e62449d9ba8cfcb481accaa"
     response = sg.send(message)
 
     # Handle the response and return an appropriate value based on your requirements

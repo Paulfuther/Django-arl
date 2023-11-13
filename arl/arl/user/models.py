@@ -33,6 +33,13 @@ class CustomUser(AbstractUser):
             RegexValidator(r'^\d{9}$', 'SIN number must be 9 digits')
         ], null=True
     )
+    dob = models.DateField(blank=True, null=True, verbose_name='Date of Birth')
+    address = models.CharField(max_length=100, null=True)
+    address_two = models.CharField(max_length=100, null=True)
+    city = models.CharField(max_length=100, null=True)
+    state_province = models.CharField(max_length=100, null=True)
+    country = CountryField(null=True)
+    postal = models.CharField(max_length=7,null=True)
     mon_avail = models.CharField(max_length=20, null=True)
     tue_avail = models.CharField(max_length=20, null=True)
     wed_avail = models.CharField(max_length=20, null=True)

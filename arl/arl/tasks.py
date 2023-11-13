@@ -10,6 +10,7 @@ from django.utils.text import slugify
 from arl.celery import app
 from arl.helpers import get_s3_images_for_incident, upload_to_linode_object_storage
 from arl.incident.models import Incident
+from arl.user.models import CustomUser
 from arl.msg.helpers import (
     client,
     create_email,
@@ -19,7 +20,7 @@ from arl.msg.helpers import (
     send_monthly_store_phonecall,
     send_sms,
     send_sms_model,
-)
+    create_hr_newhire_email)
 from arl.user.models import CustomUser, Store
 from arl.dsign.helpers import create_docusign_envelope
 
@@ -39,22 +40,14 @@ def send_sms_task(phone_number, message):
     # return send_sms(phone_number)
 
 
-# @app.task(name="send_weekly_tobacco_email")
-# def send_tobacco_emails(request):
-#    try:
-#        active_users_with_email = CustomUser.objects.filter(
-#            Q(is_active=True) & ~Q(email="") & Q(email__isnull=False)
-#        )
-#        for user in active_users_with_email:
-#            to_email = user.email
-#            subject = "Required Actions for Tobacco and Vape"
-#            name = user.username
-#            template_id = "d-488749fd81d4414ca7bbb2eea2b830db"
-#            # Send the email to the current user
-#            create_tobacco_email(to_email, subject, name, template_id)
-#        return "Template Email Sent Successfully"
-#    except Exception as e:
-#        return str(e)
+@app.task(name="send_weekly_tobacco_email")
+def send_weekly_tobacco_email(to_email, name):
+    active_users = CustomUser.objects.filter(is_active=True)
+
+    # Iterate over each active user and send the tobacco email
+    for user in active_users:
+        create_tobacco_email.delay(user.email, user.username)
+
 
 
 @app.task(name="send_template_email")
@@ -153,3 +146,8 @@ def generate_pdf_task(incident_id, user_email):
 @app.task(name="create_docusign_envelope")
 def create_docusign_envelope_task(envelope_args):
     create_docusign_envelope(envelope_args)
+
+
+@app.task(name="create_hr_newhire_email")
+def create_newhiredata_email(**kwargs):
+    create_hr_newhire_email(**kwargs)
