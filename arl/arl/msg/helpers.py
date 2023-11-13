@@ -38,12 +38,13 @@ sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
 def create_tobacco_email(to_email, name):
     try:
         templatename = "Required Actions for Tobacco and Vape"
+        bm = "d-488749fd81d4414ca7bbb2eea2b830db"
         message = Mail(from_email=settings.MAIL_DEFAULT_SENDER, to_emails=to_email)
         message.dynamic_template_data = {
             "subject": templatename,
             "name": name,
         }
-        message.template_id = "d-488749fd81d4414ca7bbb2eea2b830db"
+        message.template_id = bm
         response = sg.send(message)
 
         # Handle the response and return an appropriate value based on your requirements
@@ -164,33 +165,28 @@ def send_sms(phone_number):
     return None
 
 
-def create_bulk_sms():
-    numbers = ["+15196707469"]
-    body = "hello crazy people. Its time."
-    bindings = list(
-        map(
-            lambda number: json.dumps({"binding_type": "sms", "address": number}),
-            numbers,
-        )
-    )
-    print("=====> To Bindings :>", bindings, "<: =====")
-    notification = client.notify.services(notify_service_sid).notifications.create(
-        to_binding=bindings, body=body
-    )
-    return HttpResponse("Bulk SMS sent successfully.")  # or redirect to a success page
-
-
 def send_bulk_sms(numbers, body):
-    bindings = list(
-        map(
-            lambda number: json.dumps({"binding_type": "sms", "address": number}),
-            numbers,
+    try:
+        # Your existing code
+
+        bindings = list(
+            map(
+                lambda number: json.dumps({"binding_type": "sms", "address": number}),
+                numbers,
+            )
         )
-    )
-    print("=====> To Bindings :>", bindings, "<: =====")
-    notification = client.notify.services(notify_service_sid).notifications.create(
-        to_binding=bindings, body=body
-    )
+        print("=====> To Bindings :>", bindings, "<: =====")
+        notification = client.notify.services(
+            settings.TWILIO_NOTIFY_SERVICE_SID
+        ).notifications.create(to_binding=bindings, body=body)
+
+        # Log a success message
+        logger.info(f"Bulk SMS sent successfully to {', '.join(numbers)}")
+        return True
+    except Exception as e:
+        # Log the exception
+        logger.error(f"Failed to send bulk SMS: {str(e)}")
+        return False
 
 
 def _get_twilio_verify_client():
