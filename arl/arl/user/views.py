@@ -7,16 +7,23 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import Group
 from django.contrib.auth.views import LoginView, PasswordResetView
 from django.contrib.messages.views import SuccessMessageMixin
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse, reverse_lazy
 from django.views import View
-from django_ratelimit.decorators import ratelimit
-# from arl.msg.tasks import send_sms_task
 from twilio.base.exceptions import TwilioException
 
-from arl.msg.helpers import check_verification_token, request_verification_token
-from arl.tasks import send_sms_task, send_template_email_task
+from arl.msg.helpers import (
+    check_verification_token,
+    create_hr_newhire_email,
+    request_verification_token,
+)
+from arl.tasks import (
+    create_docusign_envelope_task,
+    send_sms_task,
+    send_template_email_task,
+    create_newhiredata_email,
+)
 
 from .forms import CustomUserCreationForm, TwoFactorAuthenticationForm
 from .models import CustomUser, Employer
@@ -26,19 +33,61 @@ def register(request):
     employers = Employer.objects.all()  # Retrieve all employers from the database
     if request.method == "POST":
         form = CustomUserCreationForm(request.POST)
-        print(form.data)
+        # print(form.data)
         if form.is_valid():
             verified_phone_number = request.POST.get("phone_number")
-            print(verified_phone_number)
+            if verified_phone_number is None:
+                raise Http404("Phone number not found in form data.")
+            #print(verified_phone_number)
             user = form.save(commit=False)
             user.phone_number = verified_phone_number
             user.save()
+            # send welcome email
             send_template_email_task.delay(
-                user.email, "Welcome Aboard", user.first_name, settings.SENDGRID_NEWHIRE_ID
+                user.email,
+                "Welcome Aboard",
+                user.first_name,
+                settings.SENDGRID_NEWHIRE_ID,
             )
-            gsa_group = Group.objects.get(name="GSA")
+            # assign to group GSA
+            gsa_group_name = "GSA"
+            gsa_group, created = Group.objects.get_or_create(name=gsa_group_name)
             user.groups.add(gsa_group)
-            return render(request, "msg/success.html")
+            # create docusign newhire file
+            d_name = form.cleaned_data["username"]
+            d_email = form.cleaned_data["email"]
+            ds_template = settings.DOCUSIGN_TEMPLATE_ID
+            envelope_args = {
+                "signer_email": d_email,
+                "signer_name": d_name,
+                "template_id": ds_template,
+            }
+            create_docusign_envelope_task.delay(envelope_args)
+            # create HR new hire email
+            date_obj = form.cleaned_data["dob"]
+            serialized_date = date_obj.isoformat()
+            email_data = {
+                "firstname": form.cleaned_data["first_name"],
+                "lastname": form.cleaned_data["last_name"],
+                "email": form.cleaned_data["email"],
+                "mobilephone": verified_phone_number,
+                "addressone": form.cleaned_data["address"],
+                "addresstwo": form.cleaned_data["address_two"],
+                "city": form.cleaned_data["city"],
+                "province": form.cleaned_data["state_province"],
+                "postal": form.cleaned_data["postal"],
+                "country": form.cleaned_data["country"],
+                "sin_number": form.cleaned_data["sin"],
+                "dob": serialized_date,
+            }
+            print(email_data)
+            create_newhiredata_email.delay(**email_data)
+            # complete registration and redirect to home with a message.
+            messages.success(
+                request,
+                "Thank you for registering. Please check your email for your New Hire File from Docusign.",
+            )
+            return redirect("home")
     else:
         form = CustomUserCreationForm()
         print(form.errors)
@@ -82,7 +131,9 @@ def request_verification(request):
             return JsonResponse({"success": True})
         except TwilioException:
             # Handle TwilioException if verification request fails
-            return JsonResponse({"success": False, "error": "Failed to send verification code"})
+            return JsonResponse(
+                {"success": False, "error": "Failed to send verification code"}
+            )
     # Return an error response for unsupported request methods
     return JsonResponse({"success": False, "error": "Invalid request method"})
 
@@ -98,7 +149,9 @@ def check_verification(request):
             if check_verification_token(phone, token):
                 return JsonResponse({"success": True})
         except TwilioException:
-            return JsonResponse({"success": False, "error": "Failed to send verification code"})
+            return JsonResponse(
+                {"success": False, "error": "Failed to send verification code"}
+            )
     return JsonResponse({"success": False, "error": "Invalid request method"})
 
 
@@ -124,9 +177,13 @@ def login_view(request):
                 except TwilioException:
                     # Handle TwilioException if verification request fails
                     return render(
-                        request, "user/login.html", {"form": form, "verification_error": True}
+                        request,
+                        "user/login.html",
+                        {"form": form, "verification_error": True},
                     )
-            return redirect("home")  # Replace 'home' with your desired URL name for the homepage
+            return redirect(
+                "home"
+            )  # Replace 'home' with your desired URL name for the homepage
     else:
         form = AuthenticationForm(request)
     return render(request, "user/login.html", {"form": form})
@@ -173,9 +230,12 @@ def verification_page(request):
 
 def logout_view(request):
     logout(request)
-    return redirect("home")  # Replace 'home' with your desired URL name for the homepage\
+    return redirect(
+        "home"
+    )  # Replace 'home' with your desired URL name for the homepage\
 
-#@ratelimit(key='user_or_ip', rate='5/m')
+
+# @ratelimit(key='user_or_ip', rate='5/m')
 def home_view(request):
     return render(request, "user/home.html")
 
@@ -240,15 +300,16 @@ class CustomAdminLoginView(LoginView):
                 # Request the verification code from Twilio
                 try:
                     request_verification_token(user.phone_number)
-                    self.request.session["user_id"] = user.id  # Store user ID in the session
+                    self.request.session[
+                        "user_id"
+                    ] = user.id  # Store user ID in the session
                     self.request.session["phone_number"] = user.phone_number
                     return redirect("admin_verification_page")
 
                 except TwilioException as e:
-                    messages.error(self.request, f"Failed to send verification code: {e}")
+                    messages.error(
+                        self.request, f"Failed to send verification code: {e}"
+                    )
                     # Redirect back to the login page (you may need to specify the correct URL name)
                     return redirect(reverse("custom_admin_login"))
             return redirect("admin:index")
-
-
-

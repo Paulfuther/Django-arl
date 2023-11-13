@@ -17,8 +17,15 @@ class CustomUserCreationForm(UserCreationForm):
             "password2",
             "first_name",
             "last_name",
+            "dob",
             "email",
             "sin",
+            "address",
+            "address_two",
+            "city",
+            "state_province",
+            "country",
+            "postal",
             "mon_avail",
             "tue_avail",
             "wed_avail",
@@ -27,13 +34,23 @@ class CustomUserCreationForm(UserCreationForm):
             "sat_avail",
             "sun_avail",
         )
-
+        widgets = {
+            'dob': forms.DateInput(attrs={'type': 'date'}),
+        }
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["first_name"].required = True
         self.fields["last_name"].required = True
+        self.fields["address"].required = True
+        self.fields["address_two"].required = True
+        self.fields["city"].required = True
+        self.fields["state_province"].required = True
+        self.fields["country"].required = True
+        self.fields["postal"].required = True
         self.fields["email"].required = True
         self.fields["sin"].required = True
+        self.fields['dob'].required = True
+        self.fields['postal'].required = True
         self.helper = FormHelper()
         self.helper.form_method = "post"
         self.helper.add_input(Submit("submit", "Register"))
