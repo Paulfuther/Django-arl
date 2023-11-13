@@ -21,7 +21,7 @@ from arl.msg.helpers import (
     create_tobacco_email,
     notify_service_sid,
     send_monthly_store_phonecall,
-    send_sms,
+    send_bulk_sms,
     send_sms_model,
 )
 from arl.user.models import CustomUser, Store
@@ -76,19 +76,18 @@ def send_email_task(to_email, subject, name):
 
 @app.task(name="bulk_sms")
 def send_bulk_sms_task():
-    numbers = ["+15196707469"]
-    body = "hello crazy people. Its time."
-    bindings = list(
-        map(
-            lambda number: json.dumps({"binding_type": "sms", "address": number}),
-            numbers,
-        )
-    )
-    print("=====> To Bindings :>", bindings, "<: =====")
-    notification = client.notify.services(notify_service_sid).notifications.create(
-        to_binding=bindings, body=body
-    )
-    return "Bulk SMS sent successfully."  # or redirect to a success page
+    try:
+        active_users = CustomUser.objects.filter(is_active=True)
+        gsat = [user.phone_number for user in active_users]
+
+        message = 'Required Action Policy for Tobacco and Vape Products WHAT IS REQUIRED? You must request ID from anyone purchasing tobacco or vape products, who looks to be younger than 40. WHY? It is against the law to sell tobacco or vape products to minors. A person who distributes tobacco or vape products to a minor is guilty of an offence, and could be punished with: Loss of employment. Face personal fines of $4,000 to $100,000. Loss of license to sell tobacco and vape products, as well as face additional fines of $10,000 to $150,000. (for the Associate) WHO? Each and every Guest that wants to buy tobacco products. REQUIRED Guests that look under the age of 40 are asked for (picture) I.D. when purchasing tobacco products. Ask for (picture) I.D. if they look under 40 before quoting the price of tobacco products. Ask for (picture) I.D. if they look under 40 before placing tobacco products on the counter. Dont let an angry Guest stop you from asking for (picture) I.D. ITs THE LAW! I.D. Drivers license Passport Certificate of Canadian Citizenship Canadian permanent resident card Canadian Armed Forces I.D. card Any documents issued by a federal or provincial authority or a foreign government that contain a photo, date of birth and signature are also acceptable. IMPORTANT - School I.D. cannot be accepted as proof of age. EXPECTED RESULTS. No employee is charged with selling tobacco products to a minor. Employees always remember to ask for I.D. No Employee receives a warning letter about selling to a minor.', 
+        send_bulk_sms(gsat, message)
+
+        # Log the result
+        logger.info("Bulk SMS task completed successfully")
+    except Exception as e:
+        # Log or handle other exceptions
+        logger.error(f"An error occurred: {str(e)}")
 
 
 @app.task(name="monthly_store_calls")
