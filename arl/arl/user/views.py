@@ -13,16 +13,12 @@ from django.urls import reverse, reverse_lazy
 from django.views import View
 from twilio.base.exceptions import TwilioException
 
-from arl.msg.helpers import (
-    check_verification_token,
-    create_hr_newhire_email,
-    request_verification_token,
-)
+from arl.msg.helpers import check_verification_token, request_verification_token
 from arl.tasks import (
     create_docusign_envelope_task,
+    create_newhiredata_email,
     send_sms_task,
     send_template_email_task,
-    create_newhiredata_email,
 )
 
 from .forms import CustomUserCreationForm, TwoFactorAuthenticationForm
@@ -38,7 +34,7 @@ def register(request):
             verified_phone_number = request.POST.get("phone_number")
             if verified_phone_number is None:
                 raise Http404("Phone number not found in form data.")
-            #print(verified_phone_number)
+            # print(verified_phone_number)
             user = form.save(commit=False)
             user.phone_number = verified_phone_number
             user.save()

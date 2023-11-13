@@ -1,13 +1,19 @@
 from django import forms
+from arl.user.models import CustomUser
 
 
 class SMSForm(forms.Form):
-    phone_number = forms.CharField(max_length=15, help_text="Enter a valid phone number")
-
     message = forms.CharField(
         max_length=100,
         widget=forms.Textarea(attrs={"rows": 4}),
-        help_text="Enter a message (max 100 characters)",
+        help_text="Enter a message (max 200 characters)",
+    )
+
+    selected_users = forms.ModelMultipleChoiceField(
+        queryset=CustomUser.objects.filter(is_active=True),
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Select Users to Send SMS"
     )
 
 class TemplateEmailForm(forms.Form):
