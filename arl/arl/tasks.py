@@ -40,7 +40,7 @@ def add(x, y):
 def send_sms_task(phone_number, message):
     try:
         send_sms_model(phone_number, message)
-        return "Message sent successfully"
+        return "Text message sent successfully"
     except Exception as e:
         return str(e)
     # return send_sms(phone_number)
@@ -52,7 +52,7 @@ def send_weekly_tobacco_email():
         active_users = CustomUser.objects.filter(is_active=True)
         for user in active_users:
             create_tobacco_email(user.email, user.username)
-        return "Tobacco Emails Sent Successfully"
+        return "Weekly Tobacco Emails Sent Successfully"
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         return f"Failed to send tobacco emails. Error: {str(e)}"
@@ -97,7 +97,11 @@ def send_bulk_sms_task():
 
 @app.task(name="monthly_store_calls")
 def monthly_store_calls_task():
-    send_monthly_store_phonecall()
+    try:
+        send_monthly_store_phonecall()
+        return "Monthly Phone Calls sent successfully"
+    except Exception as e:
+        return str(e)
 
 
 @app.task(name="create_incident_pdf")
