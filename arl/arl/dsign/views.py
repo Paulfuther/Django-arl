@@ -7,22 +7,6 @@ from django.shortcuts import redirect, render
 
 from .forms import NameEmailForm
 from arl.tasks import create_docusign_envelope_task
-# Create your views here.
-
-
-def create_newhire(request):
-    if request.method == "POST":
-        form = NameEmailForm(request.POST)
-        if form.is_valid():
-            d_name = form.cleaned_data["name"]
-            d_email = form.cleaned_data["email"]
-            # Do something with the collected data, e.g., save to database
-            # Return a success message or redirect to another page
-            return render(request, "success.html", {"name": d_name, "email": d_email})
-    else:
-        form = NameEmailForm()
-    return render(request, "name_email_form.html", {"form": form})
-
 
 def create_envelope(request):
     if request.method == "POST":
