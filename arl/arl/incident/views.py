@@ -39,7 +39,15 @@ class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView
 
     def form_valid(self, form):
         form.instance.user_employer = self.request.user.employer
-        return super().form_valid(form)
+        response = super().form_valid(form)
+
+        # Trigger the create_pdf_file_task asynchronously
+        generate_pdf_task.delay(self.object.id, self.request.user.email)
+
+        messages.success(
+            self.request, "PDF generation started. Check your email. The file is attached."
+        )
+        return redirect("home")
 
     def form_invalid(self, form):
         return self.render_to_response({"form": form})
@@ -149,7 +157,7 @@ def generate_pdf(request, incident_id):
     user_email = request.user.email 
     generate_pdf_task.delay(incident_id, user_email)
     messages.success(
-        request, "PDF generation started. Check your email for the download link."
+        request, "PDF generation started. Check your email. The file is attached."
     )
     return redirect("home")
 
