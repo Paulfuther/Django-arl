@@ -17,7 +17,9 @@ from sendgrid.helpers.mail import (
 )
 from twilio.base.exceptions import TwilioException
 from twilio.rest import Client
-
+from django.contrib.auth.models import Group
+from django.contrib.auth import get_user_model
+from django.core.mail import send_mail
 from arl.user.models import Store
 
 logger = get_task_logger(__name__)
@@ -75,9 +77,17 @@ def create_email(to_email, subject, name, template_id):
 
 
 def create_hr_newhire_email(**kwargs):
+    CustomUser = get_user_model()
+    hr_group = Group.objects.get(name='HR')
+
+    # Get all active users in the 'hr' group
+    hr_users = CustomUser.objects.filter(groups=hr_group, is_active=True)
+
+    # Extract email addresses from the CustomUser objects
+    to_emails = [user.email for user in hr_users]
     message = Mail(
         from_email=settings.MAIL_DEFAULT_SENDER,
-        to_emails=["paul.futher@gmail.com", "hr1553690@yahoo.com"],
+        to_emails=to_emails,
         subject="We have a New Employee",
     )
     message.dynamic_template_data = {

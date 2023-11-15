@@ -63,9 +63,11 @@ def send_weekly_tobacco_email():
 def send_template_email_task(to_email, subject, name, template_id):
     try:
         create_email(to_email, subject, name, template_id)
+        logger.info(f"Template email sent successfully to {to_email}")
         return "Template Email Sent Successfully"
     except Exception as e:
-        return str(e)
+        logger.error(f"Error sending template email to {to_email}: {str(e)}")
+        return f"Error sending template email: {str(e)}"
 
 
 @app.task(name="send_email")
@@ -166,18 +168,22 @@ def generate_pdf_task(incident_id, user_email):
 def create_docusign_envelope_task(envelope_args):
     try:
         create_docusign_envelope(envelope_args)
-        return "Docusign Doucment Sent Successfully"
+        logger.info("Docusign envelope created successfully")
+        return "Docusign envelope created successfully"
     except Exception as e:
-        return str(e)
+        logger.error(f"Error creating Docusign envelope: {str(e)}")
+        return f"Error creating Docusign envelope: {str(e)}"
 
 
 @app.task(name="create_hr_newhire_email")
-def create_newhiredata_email(**kwargs):
+def create_newhiredata_email(**email_data):
     try:
-        create_hr_newhire_email(**kwargs)
-        return "New Hire Data Email Sent"
+        create_hr_newhire_email(**email_data)
+        logger.info(f"New hire email created successfully for {email_data['email']}")
+        return "New hire email created successfully"
     except Exception as e:
-        return str(e)
+        logger.error(f"Error creating new hire email for {email_data['email']}: {str(e)}")
+        return f"Error creating new hire email: {str(e)}"
 
 
 @app.task(name="sendgrid_webhook")
