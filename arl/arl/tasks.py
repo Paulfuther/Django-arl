@@ -6,6 +6,7 @@ from io import BytesIO
 import pdfkit
 from celery.exceptions import SoftTimeLimitExceeded
 from celery.utils.log import get_task_logger
+from django.core.exceptions import ObjectDoesNotExist
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.text import slugify
@@ -107,13 +108,15 @@ def monthly_store_calls_task():
 @app.task(name="create_incident_pdf")
 def generate_pdf_task(incident_id, user_email):
     try:
-        #  Fetch incident data based on incident_id
-        incident = Incident.objects.get(pk=incident_id)  # Get the incident
-        # user = incident.user
+        # Fetch incident data based on incident_id
+        try:
+            incident = Incident.objects.get(pk=incident_id)
+        except ObjectDoesNotExist:
+            raise ValueError("Incident with ID {} does not exist.".format(incident_id))
+
         images = get_s3_images_for_incident(
             incident.image_folder, incident.user_employer
         )
-        # print(images)
         context = {"incident": incident, "images": images}
         html_content = render_to_string("incident/incident_form_pdf.html", context)
         #  Generate the PDF using pdfkit
@@ -155,54 +158,67 @@ def generate_pdf_task(incident_id, user_email):
             "message": "PDF generated and uploaded successfully",
         }
     except Exception as e:
+        logger.error("Error in generate_pdf_task: {}".format(e))
         return {"status": "error", "message": str(e)}
 
 
 @app.task(name="create_docusign_envelope")
 def create_docusign_envelope_task(envelope_args):
-    create_docusign_envelope(envelope_args)
+    try:
+        create_docusign_envelope(envelope_args)
+        return "Docusign Doucment Sent Successfully"
+    except Exception as e:
+        return str(e)
 
 
 @app.task(name="create_hr_newhire_email")
 def create_newhiredata_email(**kwargs):
-    create_hr_newhire_email(**kwargs)
+    try:
+        create_hr_newhire_email(**kwargs)
+        return "New Hire Data Email Sent"
+    except Exception as e:
+        return str(e)
 
 
 @app.task(name="sendgrid_webhook")
 def process_sendgrid_webhook(payload):
-    if isinstance(payload, list) and len(payload) > 0:
-        event_data = payload[0]
-        email = event_data.get("email", "")
-        event = event_data.get("event", "")
-        ip = event_data.get("ip", "")
-        sg_event_id = event_data.get("sg_event_id", "")
-        sg_message_id = event_data.get("sg_message_id", "")
-        sg_template_id = event_data.get("sg_template_id", "")
-        sg_template_name = event_data.get("sg_template_name", "")
-        timestamp = timezone.datetime.fromtimestamp(
-            event_data.get("timestamp", 0), tz=timezone.utc
-        )
-        url = event_data.get("url", "")
-        useragent = event_data.get("useragent", "")
-        # Find the user by email address in your custom user model
-        try:
-            user = CustomUser.objects.get(email=email)
-        except CustomUser.DoesNotExist:
-            user = None
-        username = user.username if user else None
-        # Create and save the EmailEvent instance
-        event = EmailEvent(
-            email=email,
-            event=event,
-            ip=ip,
-            sg_event_id=sg_event_id,
-            sg_message_id=sg_message_id,
-            sg_template_id=sg_template_id,
-            sg_template_name=sg_template_name,
-            timestamp=timestamp,
-            url=url,
-            user=user,  # Set the user associated with this email event
-            username=username,
-            useragent=useragent,
-        )
-        event.save()
+    try:
+        if isinstance(payload, list) and len(payload) > 0:
+            event_data = payload[0]
+            email = event_data.get("email", "")
+            event = event_data.get("event", "")
+            ip = event_data.get("ip", "")
+            sg_event_id = event_data.get("sg_event_id", "")
+            sg_message_id = event_data.get("sg_message_id", "")
+            sg_template_id = event_data.get("sg_template_id", "")
+            sg_template_name = event_data.get("sg_template_name", "")
+            timestamp = timezone.datetime.fromtimestamp(
+                event_data.get("timestamp", 0), tz=timezone.utc
+            )
+            url = event_data.get("url", "")
+            useragent = event_data.get("useragent", "")
+            # Find the user by email address in your custom user model
+            try:
+                user = CustomUser.objects.get(email=email)
+            except CustomUser.DoesNotExist:
+                user = None
+            username = user.username if user else None
+            # Create and save the EmailEvent instance
+            event = EmailEvent(
+                email=email,
+                event=event,
+                ip=ip,
+                sg_event_id=sg_event_id,
+                sg_message_id=sg_message_id,
+                sg_template_id=sg_template_id,
+                sg_template_name=sg_template_name,
+                timestamp=timestamp,
+                url=url,
+                user=user,  # Set the user associated with this email event
+                username=username,
+                useragent=useragent,
+            )
+            event.save()
+        return "Sendgrid Webhook Entry Made"
+    except Exception as e:
+        return str(e)
