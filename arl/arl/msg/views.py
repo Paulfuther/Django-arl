@@ -3,13 +3,15 @@ import logging
 
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.mixins import UserPassesTestMixin
+from django.contrib.auth.models import Group
 from django.db.models import Q
 from django.http import JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic.edit import FormView
+from arl.msg.models import EmailTemplate
 
 from arl.tasks import (
     process_sendgrid_webhook,
@@ -41,38 +43,49 @@ class SendSMSView(UserPassesTestMixin, FormView):
     def test_func(self):
         return is_member_of_msg_group(self.request.user)
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['active_users'] = CustomUser.objects.filter(is_active=True)
-        return context
-
     def form_valid(self, form):
-        selected_users = form.cleaned_data["selected_users"]
+        selected_group_id = form.cleaned_data["selected_group"].id  # Fetch the ID
         message = form.cleaned_data["message"]
         
-        # Call the send_sms_task asynchronously for selected users
-        for user in selected_users:
-            #send_sms_task.delay(user.phone_number, message)
-            print(user.phone_number, user.username)
+        # Retrieve the selected group using its ID
+        selected_group = get_object_or_404(Group, pk=selected_group_id)
 
+        # Retrieve users from the selected group
+        selected_users = selected_group.user_set.filter(is_active=True)
+        # Call the task to send sms.
+        send_template_email_task(to_email, subject, name, template_id)
+     
         return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['groups'] = Group.objects.all()  # Provide groups for form dropdown
+        return context
+
 
 class SendTemplateEmailView(UserPassesTestMixin, FormView):
     form_class = TemplateEmailForm
     template_name = "msg/template_email_form.html"
-    success_url = reverse_lazy("sms_success")  # URL name for success page
+    success_url = reverse_lazy("template_email_success")  # URL name for success page
 
     def test_func(self):
         return is_member_of_msg_group(self.request.user)
 
     def form_valid(self, form):
-        to_email = form.cleaned_data["to_email"]
         subject = form.cleaned_data["subject"]
-        name = form.cleaned_data["name"]
-        template_id = form.cleaned_data["template_id"]
-        send_template_email_task.delay(to_email, subject, name, template_id)
-        return super().form_valid(form)
+        selected_group_id = form.cleaned_data["selected_group"].id
+        sendgrid_template = form.cleaned_data["sendgrid_id"]
+        
+        # Fetch the group and sendgrid_id
+        group = get_object_or_404(Group, pk=selected_group_id)
+        group_id = group.id
+        sendgrid_id = sendgrid_template.sendgrid_id  # Assuming sendgrid_id is a field in the EmailTemplate model
+        
+        # Now you have both the group_id and the corresponding sendgrid_id
+        # Use these to send emails to the entire group
+        send_template_email_task.delay(group_id, subject, sendgrid_id)
 
+        return super().form_valid(form)
 
 class SendEmailView(UserPassesTestMixin, FormView):
     form_class = EmailForm
@@ -107,3 +120,6 @@ def sendgrid_webhook(request):
 
 def sms_success_view(request):
     return render(request, "msg/sms_success.html")
+
+def template_email_success_view(request):
+    return render(request, "msg/template_email_success.html")

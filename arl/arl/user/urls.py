@@ -1,10 +1,6 @@
 from django.contrib.auth import views as auth_views
 from django.urls import path
 
-from arl.msg.views import (
-    sms_success_view,
-)
-
 from .views import (
     CheckPhoneNumberUniqueView,
     admin_verification_page,
@@ -60,6 +56,4 @@ urlpatterns = [
         name="password_reset_complete",
     ),
     path("home/", home_view, name="home"),
-    path("sms-success/", sms_success_view, name="sms_success"),
-    
 ]

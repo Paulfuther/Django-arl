@@ -31,18 +31,30 @@ def create_envelope(request):
         # i cut here.
 
 
+
 def docusign_webhook(request):
-    if request.method == "POST":
-        data = json.loads(request.body)
-        print(data)
-        # Extract envelope status and signer information from the data
-        envelope_status = data["envelopeStatus"]
-        signer_email = data["signerEmail"]
-        signer_name = data["signerName"]
-        # Send a Twilio SMS if the envelope status changes to completed
-        if envelope_status == "Completed":
-            print("Email :", signer_email, "Name :", signer_name)
+    payload = json.loads(request.body.decode('utf-8'))
 
-            return JsonResponse({"message": "Twilio SMS sent."})
+    # Extract necessary information from the payload
+    if 'data' in payload and 'envelopeSummary' in payload['data']:
+        envelope_summary = payload['data']['envelopeSummary']
+        status = envelope_summary.get('status')
 
-    return JsonResponse({"message": "Invalid request."})
+        if status == 'sent':
+            # Document sent to new hire
+            send_sms_to_hr('Document sent to new hire. Check your email.')
+
+        elif status == 'completed':
+            # Document signed
+            send_sms_to_hr('Document signed by new hire. Check your email.')
+
+            # Retrieve the document file
+            document_id = envelope_summary.get('documents')[0].get('documentId')
+            file_url = f'https://demo.docusign.net/restapi/v2.1/accounts/{YOUR_ACCOUNT_ID}/envelopes/{envelope_summary["envelopeId"]}/documents/{document_id}'
+            
+            # Email the document to HR
+            send_email_to_hr(file_url)
+
+    return JsonResponse({'message': 'Webhook processed successfully'})
+
+

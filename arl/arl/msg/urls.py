@@ -5,6 +5,8 @@ from arl.msg.views import (
     SendSMSView,
     SendTemplateEmailView,
     sendgrid_webhook,
+    sms_success_view,
+    template_email_success_view
 )
 
 urlpatterns = [
@@ -16,4 +18,6 @@ urlpatterns = [
         name="send_template_email_view",
     ),
     path("sendgrid_hook/", sendgrid_webhook, name="sendgrid_webhook"),
+    path("sms-success/", sms_success_view, name="sms_success"),
+    path("template-email-success/", template_email_success_view, name="template_email_success"),
 ]

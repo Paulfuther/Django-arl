@@ -55,7 +55,14 @@ def create_tobacco_email(to_email, name):
                 f"Failed to send email to {to_email}. Error code: {response.status_code}"
             )
     except Exception as e:
-        logger.error(f"An error occurred while sending email to {to_email}: {str(e)}")
+        error_message = f"An error occurred while sending email to {to_email}: {str(e)}"
+        logger.error(error_message)
+
+        if hasattr(e, 'response') and e.response is not None:
+            response_body = e.response.body
+            response_status = e.response.status_code
+            logger.error(f"SendGrid response status code: {response_status}")
+            logger.error(f"SendGrid response body: {response_body}")
 
 
 def create_email(to_email, subject, name, template_id):
@@ -162,10 +169,10 @@ def send_sms_model(phone_number, message):
     return None
 
 
-def send_sms(phone_number):
+def send_sms(phone_number, body):
     try:
         message = client.messages.create(
-            body="Hello from me, dude! Its Sunday again",
+            body=body,
             from_=twilio_from,
             to=phone_number,
         )
