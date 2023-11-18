@@ -51,3 +51,10 @@ class SmsLog(models.Model):
 
     def __str__(self):
         return f"{self.timestamp} - {self.level}: {self.message}"
+    
+class EmailTemplate(models.Model):
+    name = models.CharField(max_length=100, null=True)
+    sendgrid_id = models.TextField()
+
+    def __str__(self):
+        return self.name

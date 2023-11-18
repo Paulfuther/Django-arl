@@ -14,23 +14,23 @@
         {% csrf_token %}
 
         <div class="mb-4">
-          <legend>Select Users</legend>
-          {{ form.selected_users }}
+          <legend>Select Group</legend>
+          {{ form.selected_group }}
         </div>
 
         <div class="mb-4">
           <small class="form-text text-muted">{{ form.message.help_text }}</small>
         </div>
+
         <div class="mb-4">
           {{ form.message }}
-
         </div>
 
         <button type="submit" class="btn btn-primary">Send SMS</button>
       </div>
     </div>
   </div>
-</form>
+</form>m>
 
 
 

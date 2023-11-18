@@ -6,6 +6,7 @@ from io import BytesIO
 import pdfkit
 from celery.exceptions import SoftTimeLimitExceeded
 from celery.utils.log import get_task_logger
+from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist
 from django.template.loader import render_to_string
 from django.utils import timezone
@@ -26,7 +27,7 @@ from arl.msg.helpers import (
     send_monthly_store_phonecall,
     send_sms_model,
 )
-from arl.msg.models import EmailEvent, SmsLog
+from arl.msg.models import EmailEvent, EmailTemplate, SmsLog
 from arl.user.models import CustomUser, Store
 
 logger = get_task_logger(__name__)
@@ -44,30 +45,43 @@ def send_sms_task(phone_number, message):
         return "Text message sent successfully"
     except Exception as e:
         return str(e)
-    # return send_sms(phone_number)
 
 
 @app.task(name="send_weekly_tobacco_email")
 def send_weekly_tobacco_email():
+    success_message = "Weekly Tobacco Emails Sent Successfully"
     try:
         active_users = CustomUser.objects.filter(is_active=True)
         for user in active_users:
             create_tobacco_email(user.email, user.username)
-        return "Weekly Tobacco Emails Sent Successfully"
+        return success_message
+    except CustomUser.DoesNotExist:
+        logger.warning("No active users found to send tobacco emails.")
+        return success_message
+
     except Exception as e:
-        logger.error(f"An error occurred: {str(e)}")
-        return f"Failed to send tobacco emails. Error: {str(e)}"
+        error_message = f"Failed to send tobacco emails. Error: {str(e)}"
+        logger.error(error_message)
+        return error_message
 
 
+# this task is for emails with a template id from sendgrid.
 @app.task(name="send_template_email")
-def send_template_email_task(to_email, subject, name, template_id):
+def send_template_email_task(group_id, subject, sendgrid_id):
     try:
-        create_email(to_email, subject, name, template_id)
-        logger.info(f"Template email sent successfully to {to_email}")
-        return "Template Email Sent Successfully"
+        # Retrieve all users within the group
+        group = Group.objects.get(pk=group_id)
+        users_in_group = group.user_set.all()
+        # Retrieve the template name based on the sendgrid_id
+        template = EmailTemplate.objects.get(sendgrid_id=sendgrid_id)
+        template_name = template.name
+        for user in users_in_group:
+            create_email(user.email, subject, user.first_name, sendgrid_id)  
+
+        return f"Template '{template_name}' Emails Sent Successfully"
+
     except Exception as e:
-        logger.error(f"Error sending template email to {to_email}: {str(e)}")
-        return f"Error sending template email: {str(e)}"
+        return str(e)
 
 
 @app.task(name="send_email")
@@ -182,7 +196,9 @@ def create_newhiredata_email(**email_data):
         logger.info(f"New hire email created successfully for {email_data['email']}")
         return "New hire email created successfully"
     except Exception as e:
-        logger.error(f"Error creating new hire email for {email_data['email']}: {str(e)}")
+        logger.error(
+            f"Error creating new hire email for {email_data['email']}: {str(e)}"
+        )
         return f"Error creating new hire email: {str(e)}"
 
 
@@ -194,6 +210,9 @@ def process_sendgrid_webhook(payload):
             email = event_data.get("email", "")
             event = event_data.get("event", "")
             ip = event_data.get("ip", "")
+            # Handle missing 'ip' value with a placeholder or default value
+            if not ip:
+                ip = "192.0.2.0"
             sg_event_id = event_data.get("sg_event_id", "")
             sg_message_id = event_data.get("sg_message_id", "")
             sg_template_id = event_data.get("sg_template_id", "")
