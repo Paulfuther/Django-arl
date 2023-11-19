@@ -4,10 +4,13 @@ import json
 from io import BytesIO
 
 import pdfkit
+import requests
 from celery.exceptions import SoftTimeLimitExceeded
 from celery.utils.log import get_task_logger
+from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Q
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.text import slugify
@@ -76,7 +79,7 @@ def send_template_email_task(group_id, subject, sendgrid_id):
         template = EmailTemplate.objects.get(sendgrid_id=sendgrid_id)
         template_name = template.name
         for user in users_in_group:
-            create_email(user.email, subject, user.first_name, sendgrid_id)  
+            create_email(user.email, subject, user.first_name, sendgrid_id)
 
         return f"Template '{template_name}' Emails Sent Successfully"
 
@@ -247,3 +250,42 @@ def process_sendgrid_webhook(payload):
         return "Sendgrid Webhook Entry Made"
     except Exception as e:
         return str(e)
+
+
+@app.task(name="docusign_webhook")
+def process_docusign_webhook(payload):
+    try:
+        if "data" in payload and "envelopeSummary" in payload["data"]:
+            envelope_summary = payload["data"]["envelopeSummary"]
+            status = envelope_summary.get("status")
+            if status == "sent":
+                recipients = envelope_summary.get("recipients", {})
+                signers = recipients.get("signers", [])
+
+                if signers:
+                    recipient = signers[0]  # Assuming first signer is the recipient
+                    recipient_name = recipient.get("name", "")
+                    recipient_email = recipient.get("email", "")
+                    hr_users = CustomUser.objects.filter(
+                        Q(is_active=True) & Q(groups__name="HR")
+                    ).values_list("phone_number", flat=True)
+                    message_body = f"New Hire File sent to recipient: {recipient_name} ({recipient_email})"
+                    send_bulk_sms(hr_users, message_body)
+                    logger.info(f"Sent SMS for 'sent' status to HR: {message_body}")
+                    return f"Sent SMS for 'sent' status to HR: {message_body}"
+            elif status == "completed":
+                recipients = envelope_summary.get("recipients", {})
+                signers = recipients.get("signers", [])
+
+                if signers:
+                    recipient = signers[0]  # Assuming first signer is the recipient
+                    recipient_name = recipient.get("name", "")
+                    recipient_email = recipient.get("email", "")
+                    hr_users = CustomUser.objects.filter(
+                        Q(is_active=True) & Q(groups__name="HR")
+                    ).values_list("phone_number", flat=True)
+                    message_body = f"New Hire File completed by: {recipient_name} ({recipient_email})"
+                    send_bulk_sms(hr_users, message_body)
+                    return f"Sent SMS for 'completed' status to HR: {message_body}"
+    except Exception as e:
+        logger.error(f"Error processing DocuSign webhook: {str(e)}")

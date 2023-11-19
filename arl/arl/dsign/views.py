@@ -1,12 +1,18 @@
 import json
+import logging
 
 from django.conf import settings
 from django.contrib import messages
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.views.decorators.csrf import csrf_exempt
+
+from arl.tasks import create_docusign_envelope_task, process_docusign_webhook
 
 from .forms import NameEmailForm
-from arl.tasks import create_docusign_envelope_task
+
+logger = logging.getLogger(__name__)
+
 
 def create_envelope(request):
     if request.method == "POST":
@@ -23,38 +29,32 @@ def create_envelope(request):
             }
             create_docusign_envelope_task.delay(envelope_args)
 
-            messages.success(request, 'Thank you for registering. Please check your email for your New Hire File from Docusign.')
-            return redirect('home')
+            messages.success(
+                request,
+                "Thank you for registering. Please check your email for your New Hire File from Docusign.",
+            )
+            return redirect("home")
     else:
         form = NameEmailForm()
         return render(request, "dsign/name_email_form.html", {"form": form})
         # i cut here.
 
 
-
+@csrf_exempt  # In production, use proper CSRF protection.
 def docusign_webhook(request):
-    payload = json.loads(request.body.decode('utf-8'))
+    if request.method == "POST":
+        try:
+            payload = json.loads(request.body.decode("utf-8"))
+            process_docusign_webhook.delay(payload)
+            return JsonResponse({"message": "Webhook processed successfully"})
 
-    # Extract necessary information from the payload
-    if 'data' in payload and 'envelopeSummary' in payload['data']:
-        envelope_summary = payload['data']['envelopeSummary']
-        status = envelope_summary.get('status')
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON payload")
+            return JsonResponse({"error": "Invalid JSON payload"}, status=400)
 
-        if status == 'sent':
-            # Document sent to new hire
-            send_sms_to_hr('Document sent to new hire. Check your email.')
+        except Exception as e:
+            logger.error(f"Error processing DocuSign webhook: {str(e)}")
+            return JsonResponse({"error": f"Error processing DocuSign webhook: {str(e)}"}, status=500)
 
-        elif status == 'completed':
-            # Document signed
-            send_sms_to_hr('Document signed by new hire. Check your email.')
-
-            # Retrieve the document file
-            document_id = envelope_summary.get('documents')[0].get('documentId')
-            file_url = f'https://demo.docusign.net/restapi/v2.1/accounts/{YOUR_ACCOUNT_ID}/envelopes/{envelope_summary["envelopeId"]}/documents/{document_id}'
-            
-            # Email the document to HR
-            send_email_to_hr(file_url)
-
-    return JsonResponse({'message': 'Webhook processed successfully'})
-
-
+    else:
+        return JsonResponse({"error": "Only POST requests are allowed"}, status=405)
