@@ -1,0 +1,70 @@
+{% extends "../base/base.html" %}
+{% block title %}Index{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+
+<head>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" type="text/css"
+        href="https://cdn.datatables.net/v/dt/jq-3.6.0/jszip-2.5.0/dt-1.12.1/b-2.2.3/b-html5-2.2.3/b-print-2.2.3/r-2.3.0/datatables.min.css" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/pdfmake.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/vfs_fonts.js"></script>
+    <script type="text/javascript"
+        src="https://cdn.datatables.net/v/dt/jq-3.6.0/jszip-2.5.0/dt-1.12.1/b-2.2.3/b-html5-2.2.3/b-print-2.2.3/r-2.3.0/datatables.min.js"></script>
+
+</head>
+
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-10 col-md-8 col-lg-10 col-xl-10">
+            <legend class="border-bottom mb-4">SMS Data</legend>
+
+
+            <table id="table_sms" class="display">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>To</th>
+                        <th>Name</th>
+                        <th>Body</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sms in sms_data %}
+                    <tr>
+                        <td>{{ sms.date_sent|date:"Y-m-d" }}</td>
+                        <td>{{ sms.date_sent|date:"H:i" }}</td>
+                        <td>{{ sms.to }}</td>
+                        <td>{{sms.username}}</td>
+                        <td>{{ sms.body }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+
+    $(document).ready(function () {
+        $('#table_sms').DataTable(
+            {
+                dom: 'Bfrtip',
+                responsive: true,
+                buttons: ['copy', 'excel', 'pdf'],
+                order: [[0, 'desc']]
+
+            },
+        );
+    });
+
+</script>
+
+{% endblock %}
