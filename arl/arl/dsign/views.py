@@ -57,4 +57,4 @@ def docusign_webhook(request):
             return JsonResponse({"error": f"Error processing DocuSign webhook: {str(e)}"}, status=500)
 
     else:
-        return JsonResponse({"error": "Only POST requests are allowed"}, status=405)
+        return JsonResponse({"error": "Only POST requests are allowed"}, status=405) 
