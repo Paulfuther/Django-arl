@@ -139,7 +139,7 @@ def fetch_twilio(request):
         truncated_body = msg.body[:50]
         # Fetch user data based on the phone number
         user = CustomUser.objects.filter(phone_number=msg.to).first()
-        username = user.first_name if user else None  # Get the username
+        username = user.username if user else None  # Get the username
         # if user exists
         msg_data = {
             "sid": msg.sid,
