@@ -16,7 +16,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from arl.celery import app
-from arl.dsign.helpers import create_docusign_envelope
+from arl.dsign.helpers import create_docusign_envelope, get_docusign_envelope
 from arl.helpers import get_s3_images_for_incident, upload_to_linode_object_storage
 from arl.incident.models import Incident
 from arl.msg.helpers import (
@@ -269,10 +269,10 @@ def process_docusign_webhook(payload):
                     hr_users = CustomUser.objects.filter(
                         Q(is_active=True) & Q(groups__name="HR")
                     ).values_list("phone_number", flat=True)
-                    message_body = f"New Hire File sent to recipient: {recipient_name} ({recipient_email})"
+                    message_body = f"New Hire File sent to recipient: {recipient_name} {recipient_email}"
                     send_bulk_sms(hr_users, message_body)
-                    logger.info(f"Sent SMS for 'sent' status to HR: {message_body}")
-                    return f"Sent SMS for 'sent' status to HR: {message_body}"
+                    logger.info(f"Sent SMS for 'sent' status to HR:{recipient_name} {message_body}")
+                    return f"Sent SMS for 'sent' status to HR: {recipient_name} {message_body}"
             elif status == "completed":
                 recipients = envelope_summary.get("recipients", {})
                 signers = recipients.get("signers", [])
@@ -284,8 +284,11 @@ def process_docusign_webhook(payload):
                     hr_users = CustomUser.objects.filter(
                         Q(is_active=True) & Q(groups__name="HR")
                     ).values_list("phone_number", flat=True)
-                    message_body = f"New Hire File completed by: {recipient_name} ({recipient_email})"
+                    message_body = f"New Hire File completed by:{recipient_name} {recipient_email}"
                     send_bulk_sms(hr_users, message_body)
-                    return f"Sent SMS for 'completed' status to HR: {message_body}"
+                    envelope_id = envelope_summary.get("envelopeId")
+                    get_docusign_envelope(envelope_id)
+                    return f"Sent SMS for 'completed' status to HR:{recipient_name} {message_body}"
     except Exception as e:
         logger.error(f"Error processing DocuSign webhook: {str(e)}")
+        return f"Error processing DocuSign webhook: {str(e)}"
