@@ -3,10 +3,11 @@ import logging
 
 from django.conf import settings
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.csrf import csrf_exempt
 
+from arl.dsign.helpers import get_docusign_envelope, list_all_docusign_envelopes
 from arl.tasks import create_docusign_envelope_task, process_docusign_webhook
 
 from .forms import NameEmailForm
@@ -20,7 +21,7 @@ def create_envelope(request):
         if form.is_valid():
             d_name = form.cleaned_data["name"]
             d_email = form.cleaned_data["email"]
-            ds_template = settings.DOCUSIGN_TEMPLATE_ID
+            ds_template = settings.DOCUSIGN_TEST_TEMPLATE_ID
             # print(ds_template)
             envelope_args = {
                 "signer_email": d_email,
@@ -54,7 +55,24 @@ def docusign_webhook(request):
 
         except Exception as e:
             logger.error(f"Error processing DocuSign webhook: {str(e)}")
-            return JsonResponse({"error": f"Error processing DocuSign webhook: {str(e)}"}, status=500)
+            return JsonResponse(
+                {"error": f"Error processing DocuSign webhook: {str(e)}"}, status=500
+            )
 
     else:
-        return JsonResponse({"error": "Only POST requests are allowed"}, status=405) 
+        return JsonResponse({"error": "Only POST requests are allowed"}, status=405)
+
+
+def retrieve_docusign_envelope(request):
+    try:
+        get_docusign_envelope()
+        messages.success(request, "Docusign Document Has Been Emailed.")
+    except Exception as e:
+        messages.error(request, f"Process failed: {str(e)}")
+
+    return redirect('home')
+
+
+def list_docusign_envelope(request):
+    list_all_docusign_envelopes()
+    return HttpResponse("Process completed successfully.")
