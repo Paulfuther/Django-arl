@@ -21,19 +21,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
 
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-        },
-    },
-    "root": {
-        "handlers": ["console"],
-        "level": "WARNING",
-    },
-}
+
 
 # Application definition
 
@@ -229,6 +217,27 @@ EMAIL_HOST_PASSWORD = SENDGRID_API_KEY
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 DEFAULT_FROM_EMAIL = "paul.futher@outlook.com"
+
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'file_internal_errors': {
+            'level': 'ERROR',
+            'class': 'logging.FileHandler',
+            'filename': '/var/log/django/internal_errors.log',  # Change the path to your log file
+        },
+    },
+    'loggers': {
+        'django.server': {
+            'handlers': ['file_internal_errors'],
+            'level': 'ERROR',
+            'propagate': True,
+        },
+    },
+}
+
 
 try:
     from .local_settings import *
