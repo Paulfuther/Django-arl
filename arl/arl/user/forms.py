@@ -37,12 +37,13 @@ class CustomUserCreationForm(UserCreationForm):
         widgets = {
             'dob': forms.DateInput(attrs={'type': 'date'}),
         }
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["first_name"].required = True
         self.fields["last_name"].required = True
         self.fields["address"].required = True
-        self.fields["address_two"].required = True
+        self.fields["address_two"].required = False
         self.fields["city"].required = True
         self.fields["state_province"].required = True
         self.fields["country"].required = True

@@ -31,14 +31,9 @@ from arl.msg.helpers import (
     send_sms_model,
 )
 from arl.msg.models import EmailEvent, EmailTemplate, SmsLog
-from arl.user.models import CustomUser, Store
+from arl.user.models import CustomUser
 
 logger = get_task_logger(__name__)
-
-
-@app.task(name="add")
-def add(x, y):
-    return x + y
 
 
 @app.task(name="sms")
