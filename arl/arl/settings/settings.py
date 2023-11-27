@@ -219,26 +219,6 @@ EMAIL_USE_TLS = True
 DEFAULT_FROM_EMAIL = "paul.futher@outlook.com"
 
 
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'file_internal_errors': {
-            'level': 'ERROR',
-            'class': 'logging.FileHandler',
-            'filename': '/var/log/django/internal_errors.log',  # Change the path to your log file
-        },
-    },
-    'loggers': {
-        'django.server': {
-            'handlers': ['file_internal_errors'],
-            'level': 'ERROR',
-            'propagate': True,
-        },
-    },
-}
-
-
 try:
     from .local_settings import *
 except ImportError:
