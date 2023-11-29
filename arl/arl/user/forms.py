@@ -26,13 +26,7 @@ class CustomUserCreationForm(UserCreationForm):
             "state_province",
             "country",
             "postal",
-            "mon_avail",
-            "tue_avail",
-            "wed_avail",
-            "thu_avail",
-            "fri_avail",
-            "sat_avail",
-            "sun_avail",
+           
         )
         widgets = {
             'dob': forms.DateInput(attrs={'type': 'date'}),

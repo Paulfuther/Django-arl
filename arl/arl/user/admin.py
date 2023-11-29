@@ -39,13 +39,7 @@ fields[1] = (
             "sin",
             "email",
             "phone_number",
-            "mon_avail",
-            "tue_avail",
-            "wed_avail",
-            "thu_avail",
-            "fri_avail",
-            "sat_avail",
-            "sun_avail",
+            
         )
     },
 )
