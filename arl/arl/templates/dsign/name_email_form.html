@@ -1,7 +1,23 @@
-<!-- name_email_form.html -->
+{% extends "../base/base.html" %}
+{% block title %}Index{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+
+
 <form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Submit</button>
-  </form>
-  
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+        <legend class="border-bottm mb-4">Send A Docusign File</legend>
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary mt-2 mb-1">Submit</button>
+      </div>
+    </div>
+  </div>
+</form>
+
+
+{% endblock %}

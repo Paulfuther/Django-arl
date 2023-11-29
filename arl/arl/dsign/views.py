@@ -3,11 +3,14 @@ import logging
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.mixins import UserPassesTestMixin
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
 from arl.dsign.helpers import get_docusign_envelope, list_all_docusign_envelopes
+from arl.dsign.models import DocuSignTemplate
 from arl.tasks import create_docusign_envelope_task, process_docusign_webhook
 
 from .forms import NameEmailForm
@@ -15,14 +18,32 @@ from .forms import NameEmailForm
 logger = logging.getLogger(__name__)
 
 
-def create_envelope(request):
-    if request.method == "POST":
+def is_member_of_msg_group(user):
+    is_member = user.groups.filter(name="docusign").exists()
+    if is_member:
+        logger.info(f"{user} is a member of 'docusign' group.")
+    else:
+        logger.info(f"{user} is not a member of 'docusign' group.")
+    return is_member
+
+
+class CreateEnvelopeView(UserPassesTestMixin, View):
+    def test_func(self):
+        return is_member_of_msg_group(self.request.user)
+
+    def get(self, request):
+        form = NameEmailForm()
+        return render(request, "dsign/name_email_form.html", {"form": form})
+
+    def post(self, request):
         form = NameEmailForm(request.POST)
         if form.is_valid():
             d_name = form.cleaned_data["name"]
             d_email = form.cleaned_data["email"]
             ds_template = form.cleaned_data.get("template_id")
-            # print(ds_template)
+            # Fetch the template name based on the ID
+            template = get_object_or_404(DocuSignTemplate, template_id=ds_template)
+            template_name = template.template_name if template else "Unknown Template"
             envelope_args = {
                 "signer_email": d_email,
                 "signer_name": d_name,
@@ -32,13 +53,11 @@ def create_envelope(request):
 
             messages.success(
                 request,
-                "Thank you for registering. Please check your email for your New Hire File from Docusign.",
+                f"Thank you. The document '{template_name}' has been sent."
             )
             return redirect("home")
-    else:
-        form = NameEmailForm()
-        return render(request, "dsign/name_email_form.html", {"form": form})
-        # i cut here.
+        else:
+            return render(request, "dsign/name_email_form.html", {"form": form})
 
 
 @csrf_exempt  # In production, use proper CSRF protection.
@@ -70,7 +89,7 @@ def retrieve_docusign_envelope(request):
     except Exception as e:
         messages.error(request, f"Process failed: {str(e)}")
 
-    return redirect('home')
+    return redirect("home")
 
 
 def list_docusign_envelope(request):

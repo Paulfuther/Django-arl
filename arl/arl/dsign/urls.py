@@ -1,14 +1,14 @@
 from django.urls import path
 
 from arl.dsign.views import (
-    create_envelope,
+    CreateEnvelopeView,
     docusign_webhook,
     retrieve_docusign_envelope,
     list_docusign_envelope,
 )
 
 urlpatterns = [
-    path("docsign/", create_envelope, name="Create Envelope"),
+    path("docsign/", CreateEnvelopeView.as_view(), name="Create Envelope"),
     path("docusign-webhook/", docusign_webhook, name="webhook"),
     path("docusign-envelope/", retrieve_docusign_envelope,
          name="docusign_envlope"),
