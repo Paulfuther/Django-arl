@@ -1,13 +1,9 @@
 from __future__ import absolute_import, unicode_literals
 
-import json
 from io import BytesIO
 
 import pdfkit
-import requests
-from celery.exceptions import SoftTimeLimitExceeded
 from celery.utils.log import get_task_logger
-from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
@@ -20,12 +16,10 @@ from arl.dsign.helpers import create_docusign_envelope, get_docusign_envelope
 from arl.helpers import get_s3_images_for_incident, upload_to_linode_object_storage
 from arl.incident.models import Incident
 from arl.msg.helpers import (
-    client,
     create_email,
     create_hr_newhire_email,
     create_single_email,
     create_tobacco_email,
-    notify_service_sid,
     send_bulk_sms,
     send_monthly_store_phonecall,
     send_sms_model,
@@ -266,7 +260,9 @@ def process_docusign_webhook(payload):
                     ).values_list("phone_number", flat=True)
                     message_body = f"New Hire File sent to recipient: {recipient_name} {recipient_email}"
                     send_bulk_sms(hr_users, message_body)
-                    logger.info(f"Sent SMS for 'sent' status to HR:{recipient_name} {message_body}")
+                    logger.info(
+                        f"Sent SMS for 'sent' status to HR:{recipient_name} {message_body}"
+                    )
                     return f"Sent SMS for 'sent' status to HR: {recipient_name} {message_body}"
             elif status == "completed":
                 recipients = envelope_summary.get("recipients", {})
@@ -279,7 +275,9 @@ def process_docusign_webhook(payload):
                     hr_users = CustomUser.objects.filter(
                         Q(is_active=True) & Q(groups__name="HR")
                     ).values_list("phone_number", flat=True)
-                    message_body = f"New Hire File completed by:{recipient_name} {recipient_email}"
+                    message_body = (
+                        f"New Hire File completed by:{recipient_name} {recipient_email}"
+                    )
                     send_bulk_sms(hr_users, message_body)
                     envelope_id = envelope_summary.get("envelopeId")
                     get_docusign_envelope(envelope_id)
