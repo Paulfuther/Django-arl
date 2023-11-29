@@ -15,7 +15,7 @@ from twilio.base.exceptions import TwilioException
 
 from arl.incident.models import Incident
 from arl.msg.helpers import request_verification_token
-from arl.msg.models import BulkEmailSendgrid, Twimlmessages, EmailTemplate
+from arl.msg.models import BulkEmailSendgrid, EmailTemplate, Twimlmessages
 
 from .models import CustomUser, Employer, Store
 from .views import CustomAdminLoginView
@@ -50,7 +50,7 @@ class CustomUserAdmin(UserAdmin):
         "is_active",
         "get_groups",
     )  # Customize the fields you want to display
-    list_filter = ("is_active","groups")  # Add any filters you need
+    list_filter = ("is_active", "groups")  # Add any filters you need
     actions = ["print_user_details"]
 
     def print_user_details(self, request, queryset):
@@ -71,7 +71,20 @@ class CustomUserAdmin(UserAdmin):
         sheet = workbook.active
 
         # Create the headers
-        headers = ["Username", "Email", "First Name", "Last Name", "Phone Number"]
+        headers = [
+            "Username",
+            "Email",
+            "First Name",
+            "Last Name",
+            "Phone Number",
+            "address",
+            "address_two",
+            "city",
+            "state_province",
+            "postal",
+            "sin",
+            "dob",
+        ]
         sheet.append(headers)
 
         for user in queryset:
@@ -81,6 +94,13 @@ class CustomUserAdmin(UserAdmin):
                 user.first_name,
                 user.last_name,
                 user.phone_number,
+                user.address,
+                user.address_two,
+                user.city,
+                user.state_province,
+                user.postal,
+                user.sin,
+                user.dob,
             ]
             sheet.append(data)
 
