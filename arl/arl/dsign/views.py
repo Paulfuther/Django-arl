@@ -21,7 +21,7 @@ def create_envelope(request):
         if form.is_valid():
             d_name = form.cleaned_data["name"]
             d_email = form.cleaned_data["email"]
-            ds_template = settings.DOCUSIGN_TEMPLATE_ID
+            ds_template = form.template_id
             # print(ds_template)
             envelope_args = {
                 "signer_email": d_email,

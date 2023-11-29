@@ -281,7 +281,7 @@ def process_docusign_webhook(payload):
                     send_bulk_sms(hr_users, message_body)
                     envelope_id = envelope_summary.get("envelopeId")
                     get_docusign_envelope(envelope_id)
-                    return f"Sent SMS for 'completed' status to HR:{recipient_name} {message_body}"
+                    return f"Sent SMS for 'completed' status to HR:{recipient_name} {message_body}  {envelope_id}"
     except Exception as e:
         logger.error(f"Error processing DocuSign webhook: {str(e)}")
         return f"Error processing DocuSign webhook: {str(e)}"
