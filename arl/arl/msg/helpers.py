@@ -263,6 +263,7 @@ def send_docusign_email_with_attachment(to_email, subject, body, file_path):
     try:
         response = sg.send(message)
         if response.status_code == 202:
+            print("Sent file by email", response.status_code)
             return True
         else:
             print("Failed to send email. Error code:", response.status_code)

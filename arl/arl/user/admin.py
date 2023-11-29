@@ -16,6 +16,7 @@ from twilio.base.exceptions import TwilioException
 from arl.incident.models import Incident
 from arl.msg.helpers import request_verification_token
 from arl.msg.models import BulkEmailSendgrid, EmailTemplate, Twimlmessages
+from arl.dsign.models import DocuSignTemplate
 
 from .models import CustomUser, Employer, Store
 from .views import CustomAdminLoginView
@@ -131,4 +132,5 @@ admin.site.register(BulkEmailSendgrid)
 admin.site.register(Store)
 admin.site.register(Incident)
 admin.site.register(EmailTemplate)
+admin.site.register(DocuSignTemplate)
 admin.site.register(CustomUser, CustomUserAdmin)
