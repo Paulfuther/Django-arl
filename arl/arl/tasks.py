@@ -26,6 +26,7 @@ from arl.msg.helpers import (
 )
 from arl.msg.models import EmailEvent, EmailTemplate, SmsLog
 from arl.user.models import CustomUser
+from arl.dsign.models import DocuSignTemplate
 
 logger = get_task_logger(__name__)
 
@@ -241,6 +242,13 @@ def process_sendgrid_webhook(payload):
         return str(e)
 
 
+def get_template_name(template_id):
+    try:
+        template = DocuSignTemplate.objects.get(template_id=template_id)
+        return template.template_name
+    except DocuSignTemplate.DoesNotExist:
+        return None
+
 @app.task(name="docusign_webhook")
 def process_docusign_webhook(payload):
     try:
@@ -253,35 +261,39 @@ def process_docusign_webhook(payload):
 
                 if signers:
                     recipient = signers[0]  # Assuming first signer is the recipient
+                    template_id = recipient.get("templateId", "")  # Assuming template ID is in the recipient payload
+                    # Fetch the template name
+                    template_name = get_template_name(template_id)
                     recipient_name = recipient.get("name", "")
                     recipient_email = recipient.get("email", "")
                     hr_users = CustomUser.objects.filter(
                         Q(is_active=True) & Q(groups__name="HR")
                     ).values_list("phone_number", flat=True)
-                    message_body = f"New Hire File sent to recipient: {recipient_name} {recipient_email}"
+                    message_body = f"Docusign File {template_name} sent to: {recipient_name} {recipient_email}"
                     send_bulk_sms(hr_users, message_body)
                     logger.info(
                         f"Sent SMS for 'sent' status to HR:{recipient_name} {message_body}"
                     )
-                    return f"Sent SMS for 'sent' status to HR: {recipient_name} {message_body}"
+                    return f"Sent SMS for 'sent' status to HR: {recipient_name} {template_name} {message_body}"
             elif status == "completed":
                 recipients = envelope_summary.get("recipients", {})
                 signers = recipients.get("signers", [])
 
                 if signers:
                     recipient = signers[0]  # Assuming first signer is the recipient
+                    template_id = recipient.get("templateId", "")  # Assuming template ID is in the recipient payload
+                    # Fetch the template name
+                    template_name = get_template_name(template_id)
                     recipient_name = recipient.get("name", "")
                     recipient_email = recipient.get("email", "")
                     hr_users = CustomUser.objects.filter(
                         Q(is_active=True) & Q(groups__name="HR")
                     ).values_list("phone_number", flat=True)
-                    message_body = (
-                        f"New Hire File completed by:{recipient_name} {recipient_email}"
-                    )
+                    message_body = f"Docusign File {template_name} completed by: {recipient_name} {recipient_email}"
                     send_bulk_sms(hr_users, message_body)
                     envelope_id = envelope_summary.get("envelopeId")
                     get_docusign_envelope(envelope_id)
-                    return f"Sent SMS for 'completed' status to HR:{recipient_name} {message_body}  {envelope_id}"
+                    return f"Sent SMS for 'completed' status to HR:{recipient_name} {message_body} {template_name} {envelope_id}"
     except Exception as e:
         logger.error(f"Error processing DocuSign webhook: {str(e)}")
         return f"Error processing DocuSign webhook: {str(e)}"
