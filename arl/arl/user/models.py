@@ -1,7 +1,9 @@
-
 from django.contrib.auth.models import AbstractUser
-from django.core.validators import (MaxLengthValidator, MinLengthValidator,
-                                    RegexValidator)
+from django.core.validators import (
+    MaxLengthValidator,
+    MinLengthValidator,
+    RegexValidator,
+)
 from django.db import models
 from django_countries.fields import CountryField
 from phonenumber_field.modelfields import PhoneNumberField
@@ -30,25 +32,17 @@ class CustomUser(AbstractUser):
         validators=[
             MinLengthValidator(9),
             MaxLengthValidator(9),
-            RegexValidator(r'^\d{9}$', 'SIN number must be 9 digits')
-        ], null=True
+            RegexValidator(r"^\d{9}$", "SIN number must be 9 digits"),
+        ],
+        null=True,
     )
-    dob = models.DateField(blank=True, null=True, verbose_name='Date of Birth')
+    dob = models.DateField(blank=True, null=True, verbose_name="Date of Birth")
     address = models.CharField(max_length=100, null=True)
-    address_two = models.CharField(max_length=100, null=True)
+    address_two = models.CharField(max_length=100, null=True, blank=True)
     city = models.CharField(max_length=100, null=True)
     state_province = models.CharField(max_length=100, null=True)
     country = CountryField(null=True)
-    postal = models.CharField(max_length=7,null=True)
-    mon_avail = models.CharField(max_length=20, null=True)
-    tue_avail = models.CharField(max_length=20, null=True)
-    wed_avail = models.CharField(max_length=20, null=True)
-    thu_avail = models.CharField(max_length=20, null=True)
-    fri_avail = models.CharField(max_length=20, null=True)
-    sat_avail = models.CharField(max_length=20, null=True)
-    sun_avail = models.CharField(max_length=20, null=True)
-    # Any additional fields or methods you need
-
+    postal = models.CharField(max_length=7, null=True)
     employer = models.ForeignKey(Employer, on_delete=models.SET_NULL, null=True)
 
     def __str__(self):
@@ -67,8 +61,9 @@ class Store(models.Model):
     created = models.DateTimeField(auto_now_add=True, null=True)
     updated = models.DateTimeField(auto_now=True, null=True)
 
-    employer = models.ForeignKey(Employer, on_delete=models.CASCADE,
-                                 null=True, related_name='stores')
+    employer = models.ForeignKey(
+        Employer, on_delete=models.CASCADE, null=True, related_name="stores"
+    )
 
     def __str__(self):
         if self.employer:
