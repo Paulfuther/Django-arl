@@ -29,6 +29,13 @@ fields[1] = (
             "employer",
             "first_name",
             "last_name",
+            "address",
+            "address_two",
+            "city",
+            "state_province",
+            "postal",
+            "country",
+            "dob",
             "sin",
             "email",
             "phone_number",
@@ -83,12 +90,14 @@ class CustomUserAdmin(UserAdmin):
             "city",
             "state_province",
             "postal",
+            "country",
             "sin",
             "dob",
         ]
         sheet.append(headers)
 
         for user in queryset:
+            country = user.country.name if user.country else None
             data = [
                 user.username,
                 user.email,
@@ -100,6 +109,7 @@ class CustomUserAdmin(UserAdmin):
                 user.city,
                 user.state_province,
                 user.postal,
+                country,
                 user.sin,
                 user.dob,
             ]
