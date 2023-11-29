@@ -11,7 +11,7 @@ from docusign_esign import (
     TemplateRole,
 )
 from docusign_esign.client.api_exception import ApiException
-
+from arl.dsign.models import DocuSignTemplate
 from arl.msg.helpers import create_single_email, send_docusign_email_with_attachment
 
 SCOPES = ["signature impersonation"]
@@ -112,7 +112,9 @@ def create_docusign_envelope(envelope_args):
         ],
     }
 
-    email_subject = f"{envelope_args['signer_name']} - {'New Hire File'}"
+    template = DocuSignTemplate.objects.get(template_id=envelope_args["template_id"])
+    template_name = template.template_name if template else "Default Template Name"
+    email_subject = f"{envelope_args['signer_name']} - {template_name}"
     # print(email_subject)
     # Create the envelope definition
     envelope_definition = EnvelopeDefinition(
