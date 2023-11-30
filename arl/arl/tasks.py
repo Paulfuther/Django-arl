@@ -249,6 +249,7 @@ def get_template_name(template_id):
     except DocuSignTemplate.DoesNotExist:
         return None
 
+
 @app.task(name="docusign_webhook")
 def process_docusign_webhook(payload):
     try:
@@ -271,7 +272,7 @@ def process_docusign_webhook(payload):
                     recipient_name = recipient.get("name", "")
                     recipient_email = recipient.get("email", "")
                     hr_users = CustomUser.objects.filter(
-                        Q(is_active=True) & Q(groups__name="HR")
+                        Q(is_active=True) & Q(groups__name="dsign_sms")
                     ).values_list("phone_number", flat=True)
                     message_body = f"Docusign File {document_name} sent to: {recipient_name} {recipient_email}"
                     send_bulk_sms(hr_users, message_body)
@@ -288,12 +289,12 @@ def process_docusign_webhook(payload):
                     recipient_name = recipient.get("name", "")
                     recipient_email = recipient.get("email", "")
                     hr_users = CustomUser.objects.filter(
-                        Q(is_active=True) & Q(groups__name="HR")
+                        Q(is_active=True) & Q(groups__name="dsign_sms")
                     ).values_list("phone_number", flat=True)
                     message_body = f"Docusign File {document_name} completed by: {recipient_name} {recipient_email}"
                     send_bulk_sms(hr_users, message_body)
                     envelope_id = envelope_summary.get("envelopeId")
-                    get_docusign_envelope(envelope_id)
+                    get_docusign_envelope(envelope_id, recipient_name, document_name)
                     return f"Sent SMS for 'completed' status to HR:{recipient_name} {message_body} {document_name} {envelope_id}"
     except Exception as e:
         logger.error(f"Error processing DocuSign webhook: {str(e)}")
