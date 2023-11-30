@@ -70,3 +70,11 @@ class Store(models.Model):
             return f"Store {self.number} - {self.employer.name}"
         else:
             return f"Store {self.number}"
+
+
+class ErrorLog(models.Model):
+    timestamp = models.DateTimeField(auto_now_add=True)
+    path = models.CharField(max_length=255)
+    method = models.CharField(max_length=10)
+    status_code = models.IntegerField()
+    error_message = models.TextField()

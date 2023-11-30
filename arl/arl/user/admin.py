@@ -13,10 +13,10 @@ from openpyxl import Workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 from twilio.base.exceptions import TwilioException
 
+from arl.dsign.models import DocuSignTemplate
 from arl.incident.models import Incident
 from arl.msg.helpers import request_verification_token
 from arl.msg.models import BulkEmailSendgrid, EmailTemplate, Twimlmessages
-from arl.dsign.models import DocuSignTemplate
 
 from .models import CustomUser, Employer, Store
 from .views import CustomAdminLoginView
@@ -39,7 +39,6 @@ fields[1] = (
             "sin",
             "email",
             "phone_number",
-            
         )
     },
 )
