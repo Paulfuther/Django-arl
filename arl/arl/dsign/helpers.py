@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 from django.conf import settings
+from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from docusign_esign import (
     ApiClient,
@@ -11,8 +12,10 @@ from docusign_esign import (
     TemplateRole,
 )
 from docusign_esign.client.api_exception import ApiException
+
 from arl.dsign.models import DocuSignTemplate
 from arl.msg.helpers import create_single_email, send_docusign_email_with_attachment
+from arl.user.models import CustomUser
 
 SCOPES = ["signature impersonation"]
 
@@ -184,8 +187,11 @@ def create_docusign_envelope(envelope_args):
         return JsonResponse({"error": str(e)}), 500
 
 
-def get_docusign_envelope(envelope_id):
+def get_docusign_envelope(envelope_id, recipient_name, document_name):
     try:
+        hr_users_emails = CustomUser.objects.filter(
+            Q(is_active=True) & Q(groups__name="dsign_email")
+        ).values_list("email", flat=True)
         access_token = get_access_token()
         access_token = access_token.access_token
         api_client = ApiClient()
@@ -195,18 +201,19 @@ def get_docusign_envelope(envelope_id):
 
         account_id = settings.DOCUSIGN_ACCOUNT_ID
         envelope_type = "archive"
-        #envelope_id = "5d106d50-565e-4d70-85a4-0d1e29ff3abe"
+        # envelope_id = "5d106d50-565e-4d70-85a4-0d1e29ff3abe"
 
         temp_file = envelopes_api.get_document(account_id, envelope_type, envelope_id)
         print(temp_file)
 
         # Process the temp_file or perform actions like sending an email
         # Example: Sending an email with the retrieved document attached
-        email_subject = "Subject of the email"
-        email_body = "Body of the email"
-        recipient_email = "paul.futher@gmail.com"
-        send_docusign_email_with_attachment(recipient_email, email_subject,
-                                            email_body, temp_file)
+        email_subject = f"{document_name} completed for {recipient_name}"
+        email_body = f"Hello, this email contains a zip file that includes the {document_name} for {recipient_name} completed through docusign"
+
+        send_docusign_email_with_attachment(
+            hr_users_emails, email_subject, email_body, temp_file
+        )
 
         return HttpResponse("Process completed successfully.")
 

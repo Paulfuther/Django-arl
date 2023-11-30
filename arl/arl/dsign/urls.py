@@ -8,7 +8,7 @@ from arl.dsign.views import (
 )
 
 urlpatterns = [
-    path("docsign/", CreateEnvelopeView.as_view(), name="Create Envelope"),
+    path("docsign/", CreateEnvelopeView.as_view(), name="CreateEnvelope"),
     path("docusign-webhook/", docusign_webhook, name="webhook"),
     path("docusign-envelope/", retrieve_docusign_envelope,
          name="docusign_envlope"),

@@ -239,35 +239,34 @@ def send_monthly_store_phonecall():
     return HttpResponse("Call initiated!")
 
 
-def send_docusign_email_with_attachment(to_email, subject, body, file_path):
-    message = Mail(
-        from_email=settings.MAIL_DEFAULT_SENDER,
-        to_emails=to_email,
-        subject=subject,
-        html_content=body,
-    )
-
-    with open(file_path, "rb") as file:
-        attachment_content = file.read()
-        encoded_content = base64.b64encode(attachment_content).decode()
-
-    attachment = Attachment()
-    attachment.file_content = FileContent(encoded_content)
-    attachment.file_name = FileName(file_path.split("/")[-1])
-    attachment.file_type = FileType("application/zip")
-    attachment.disposition = Disposition("attachment")
-    attachment.content_id = ContentId("Attachment")
-
-    message.attachment = attachment
-
+def send_docusign_email_with_attachment(to_emails, subject, body, file_path):
     try:
-        response = sg.send(message)
-        if response.status_code == 202:
-            print("Sent file by email", response.status_code)
-            return True
-        else:
-            print("Failed to send email. Error code:", response.status_code)
-            return False
+        for to_email in to_emails:
+            message = Mail(
+                from_email=settings.MAIL_DEFAULT_SENDER,
+                to_emails=to_email,
+                subject=subject,
+                html_content=body,
+            )
+
+            with open(file_path, "rb") as file:
+                attachment_content = file.read()
+                encoded_content = base64.b64encode(attachment_content).decode()
+
+            attachment = Attachment()
+            attachment.file_content = FileContent(encoded_content)
+            attachment.file_name = FileName(file_path.split("/")[-1])
+            attachment.file_type = FileType("application/zip")
+            attachment.disposition = Disposition("attachment")
+            attachment.content_id = ContentId("Attachment")
+
+            message.attachment = attachment
+
+            response = sg.send(message)
+            if response.status_code == 202:
+                print(f"Sent file by email to {to_email}", response.status_code)
+            else:
+                print(f"Failed to send email to {to_email}. Error code:", response.status_code)
+
     except Exception as e:
         print("Error sending email:", str(e))
-        return False
