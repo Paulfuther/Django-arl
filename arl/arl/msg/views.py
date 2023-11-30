@@ -136,7 +136,7 @@ def fetch_twilio(request):
     sms = fetch_sms()
     truncated_sms = []
     for msg in sms:
-        truncated_body = msg.body[:50]
+        truncated_body = msg.body[:250]
         # Fetch user data based on the phone number
         user = CustomUser.objects.filter(phone_number=msg.to).first()
         username = f"{user.first_name} {user.last_name}" if user else None

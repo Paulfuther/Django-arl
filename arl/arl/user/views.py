@@ -309,3 +309,5 @@ class CustomAdminLoginView(LoginView):
                     # Redirect back to the login page (you may need to specify the correct URL name)
                     return redirect(reverse("custom_admin_login"))
             return redirect("admin:index")
+
+
