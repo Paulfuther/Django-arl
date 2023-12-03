@@ -12,7 +12,7 @@ from docusign_esign import (
     TemplateRole,
 )
 from docusign_esign.client.api_exception import ApiException
-
+from arl.dbox.helpers import upload_to_dropbox
 from arl.dsign.models import DocuSignTemplate
 from arl.msg.helpers import create_single_email, send_docusign_email_with_attachment
 from arl.user.models import CustomUser
@@ -197,7 +197,7 @@ def get_docusign_envelope(envelope_id, recipient_name, document_name):
 
         temp_file = envelopes_api.get_document(account_id, envelope_type, envelope_id)
         print(temp_file)
-
+        upload_to_dropbox(temp_file) 
         # Process the temp_file or perform actions like sending an email
         # Example: Sending an email with the retrieved document attached
         email_subject = f"{document_name} completed for {recipient_name}"

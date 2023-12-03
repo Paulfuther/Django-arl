@@ -21,23 +21,27 @@ app_secret = settings.DROP_BOX_SECRET
 @login_required
 def dropbox_auth(request):
     # Replace with your actual app key and secret
-    auth_flow = DropboxOAuth2FlowNoRedirect(app_key, app_secret, token_access_type='offline')
+    auth_flow = DropboxOAuth2FlowNoRedirect(
+        app_key, app_secret, token_access_type="offline"
+    )
 
     authorize_url = auth_flow.start()
     # Print the URL or redirect the user to this URL
     print("1. Go to: " + authorize_url)
-    print("2. Click \"Allow\" (you might have to log in first).")
+    print('2. Click "Allow" (you might have to log in first).')
     print("3. After authorization, you will be redirected to the redirect URL.")
     return HttpResponse("Authorization URL printed to console.")
 
 
-@login_required(login_url='login')
+@login_required(login_url="login")
 def use_dropbox(request):
     # Replace with your actual app key and secret
     # Use the authorization code to obtain tokens
     authorization_code = settings.DROP_BOX_AUTHORIZATION_CODE  # Replace with the actual
     # authorization code
-    auth_flow = DropboxOAuth2FlowNoRedirect(app_key, app_secret, token_access_type='offline')
+    auth_flow = DropboxOAuth2FlowNoRedirect(
+        app_key, app_secret, token_access_type="offline"
+    )
     oauth_result = auth_flow.finish(authorization_code)
     # Access token allows access to the user's Dropbox account
     access_token = oauth_result.access_token
@@ -51,12 +55,14 @@ def use_dropbox(request):
     dbx = dropbox.Dropbox(oauth2_access_token=access_token)
     try:
         account_info = dbx.users_get_current_account()
-        return HttpResponse(f"Successfully authenticated as {account_info.name.display_name}.")
+        return HttpResponse(
+            f"Successfully authenticated as {account_info.name.display_name}."
+        )
     except dropbox.exceptions.AuthError as e:
         return HttpResponse("Authentication failed: " + str(e))
 
 
-@login_required(login_url='login')
+@login_required(login_url="login")
 def list_folders(request):
     new_access_token = generate_new_access_token()
     if new_access_token:
@@ -64,9 +70,16 @@ def list_folders(request):
         dbx = dropbox.Dropbox(new_access_token)
         try:
             folder_list = dbx.files_list_folder(path="")
-            folders = [entry for entry in folder_list.entries if isinstance(entry, FolderMetadata)]
-            return render(request, 'dbox/list_folders.html', {'folder_list':
-                                                              folder_list, 'folders': folders})
+            folders = [
+                entry
+                for entry in folder_list.entries
+                if isinstance(entry, FolderMetadata)
+            ]
+            return render(
+                request,
+                "dbox/list_folders.html",
+                {"folder_list": folder_list, "folders": folders},
+            )
         except dropbox.exceptions.AuthError as e:
             return HttpResponse("API request failed. Authentication error: " + str(e))
         except dropbox.exceptions.ApiError as e:
@@ -77,7 +90,7 @@ def list_folders(request):
         return HttpResponse("Refresh token not found in .env file.", status=500)
 
 
-@login_required(login_url='login')
+@login_required(login_url="login")
 def list_files(request, folder_name):
     new_access_token = generate_new_access_token()
     if new_access_token:
@@ -88,12 +101,15 @@ def list_files(request, folder_name):
             file_list = dbx.files_list_folder(path=folder_path)
             if isinstance(file_list, ListFolderResult):
                 file_names = [
-                    entry.name for entry in file_list.entries if isinstance(entry,
-                                                                            dropbox.files.
-                                                                            FileMetadata)
+                    entry.name
+                    for entry in file_list.entries
+                    if isinstance(entry, dropbox.files.FileMetadata)
                 ]
-                return render(request, 'list_files.html', {'folder_name': folder_name,
-                                                           'file_names': file_names})
+                return render(
+                    request,
+                    "list_files.html",
+                    {"folder_name": folder_name, "file_names": file_names},
+                )
             else:
                 return HttpResponse("API request failed. Invalid response format.")
         except dropbox.exceptions.AuthError as e:
@@ -106,9 +122,9 @@ def list_files(request, folder_name):
         return HttpResponse("Refresh token not found in .env file.", status=500)
 
 
-@login_required(login_url='login')
+@login_required(login_url="login")
 def download_file(request):
-    file_path = request.GET.get('path', '')
+    file_path = request.GET.get("path", "")
 
     if not file_path:
         return HttpResponse("File path is missing.", status=400)
@@ -117,13 +133,15 @@ def download_file(request):
         dbx = dropbox.Dropbox(access_token)
         metadata, response = dbx.files_download(file_path)
         response = HttpResponse(content=response.content)
-        response['Content-Disposition'] = f'attachment; filename="{os.path.basename(file_path)}"'
+        response[
+            "Content-Disposition"
+        ] = f'attachment; filename="{os.path.basename(file_path)}"'
         return response
     except ApiError as e:
         return HttpResponse(f"Failed to download file: {str(e)}", status=500)
 
 
-@login_required(login_url='login')
+@login_required(login_url="login")
 def view_folder(request):
     new_access_token = generate_new_access_token()
     if new_access_token:
@@ -135,11 +153,11 @@ def view_folder(request):
             folder_list = dbx.files_list_folder(path="")
             if isinstance(folder_list, ListFolderResult):
                 folders = [
-                    entry for entry in folder_list.entries if isinstance(entry,
-                                                                         dropbox.
-                                                                         files.FolderMetadata)
+                    entry
+                    for entry in folder_list.entries
+                    if isinstance(entry, dropbox.files.FolderMetadata)
                 ]
-                return render(request, 'list_folders.html', {'folders': folders})
+                return render(request, "list_folders.html", {"folders": folders})
             else:
                 return HttpResponse("API request failed. Invalid response format.")
         except dropbox.exceptions.AuthError as e:
@@ -152,8 +170,8 @@ def view_folder(request):
         return HttpResponse("Refresh token not found in .env file.", status=500)
 
 
-@login_required(login_url='login')
-def list_folder_contents(request, path=''):
+@login_required(login_url="login")
+def list_folder_contents(request, path=""):
     new_access_token = generate_new_access_token()
     if new_access_token:
         dbx = dropbox.Dropbox(new_access_token)
@@ -162,11 +180,15 @@ def list_folder_contents(request, path=''):
             folder_list = dbx.files_list_folder(path)
             if isinstance(folder_list, dropbox.files.ListFolderResult):
                 files = [
-                    entry for entry in folder_list.entries
+                    entry
+                    for entry in folder_list.entries
                     if isinstance(entry, dropbox.files.FileMetadata)
                 ]
-                return render(request, 'dbox/list_folder_contents.html', {'files': files,
-                                                                          'folder_path': path})
+                return render(
+                    request,
+                    "dbox/list_folder_contents.html",
+                    {"files": files, "folder_path": path},
+                )
             else:
                 return HttpResponse("API request failed. Invalid response format.")
         except dropbox.exceptions.AuthError as e:
@@ -179,68 +201,83 @@ def list_folder_contents(request, path=''):
         return HttpResponse("Refresh token not found in .env file.", status=500)
 
 
-@login_required(login_url='login')
+@login_required(login_url="login")
 def upload_file(request):
-    if request.method == 'POST':
+    if request.method == "POST":
         new_access_token = generate_new_access_token()
         if new_access_token:
             dbx = dropbox.Dropbox(new_access_token)
             try:
                 # Fetch the list of folders from Dropbox
-                folder_list = dbx.files_list_folder(path='')
-                folders = [entry for entry in folder_list.entries if
-                           isinstance(entry, FolderMetadata)]
+                folder_list = dbx.files_list_folder(path="")
+                folders = [
+                    entry
+                    for entry in folder_list.entries
+                    if isinstance(entry, FolderMetadata)
+                ]
 
-                folder_path = request.POST.get('folder_path', '')
+                folder_path = request.POST.get("folder_path", "")
                 # Get the selected folder path from the form
-                uploaded_file = request.FILES['file']
+                uploaded_file = request.FILES["file"]
                 # print(uploaded_file)
                 file_path = os.path.join(folder_path, uploaded_file.name)
                 # Upload the file to Dropbox
                 with uploaded_file.open() as f:
                     dbx.files_upload(f.read(), file_path)
                 # Redirect to list_folder_contents view
-                return redirect('list_folder_contents', path=quote(folder_path))
+                return redirect("list_folder_contents", path=quote(folder_path))
             except ApiError as e:
-                return render(request, 'error.html', {'error_message': str(e)})
+                return render(request, "error.html", {"error_message": str(e)})
             except Exception as e:
-                return render(request, 'error.html', {'error_message': str(e)})
+                return render(request, "error.html", {"error_message": str(e)})
         else:
-            return render(request, 'error.html', {'error_message':
-                                                  "Refresh token not found in .env file."})
+            return render(
+                request,
+                "error.html",
+                {"error_message": "Refresh token not found in .env file."},
+            )
     else:
         new_access_token = generate_new_access_token()
         if new_access_token:
             dbx = dropbox.Dropbox(new_access_token)
             try:
                 # Fetch the list of folders from Dropbox
-                folder_list = dbx.files_list_folder(path='')
-                folders = [entry for entry in folder_list.entries
-                           if isinstance(entry, FolderMetadata)]
-                return render(request, 'dbox/dbx_upload.html', {'folders': folders})
+                folder_list = dbx.files_list_folder(path="")
+                folders = [
+                    entry
+                    for entry in folder_list.entries
+                    if isinstance(entry, FolderMetadata)
+                ]
+                return render(request, "dbox/dbx_upload.html", {"folders": folders})
             except ApiError as e:
-                return render(request, 'error.html', {'error_message': str(e)})
+                return render(request, "error.html", {"error_message": str(e)})
             except Exception as e:
-                return render(request, 'error.html', {'error_message': str(e)})
+                return render(request, "error.html", {"error_message": str(e)})
         else:
-            return render(request, 'error.html', {'error_message':
-                                                  "Refresh token not found in .env file."})
+            return render(
+                request,
+                "error.html",
+                {"error_message": "Refresh token not found in .env file."},
+            )
 
 
-@login_required(login_url='login')
+@login_required(login_url="login")
 def delete_file(request):
-    if request.method == 'GET':
+    if request.method == "GET":
         try:
-            file_path = request.GET.get('path', '')
+            file_path = request.GET.get("path", "")
             new_access_token = generate_new_access_token()
             if new_access_token:
                 dbx = dropbox.Dropbox(new_access_token)
                 dbx.files_delete_v2(file_path)
-                return redirect('list_folder_contents', path=os.path.dirname(file_path))
+                return redirect("list_folder_contents", path=os.path.dirname(file_path))
             else:
-                return render(request, 'error.html', {'error_message':
-                                                      "Refresh token not found in .env file."})
+                return render(
+                    request,
+                    "error.html",
+                    {"error_message": "Refresh token not found in .env file."},
+                )
         except ApiError as e:
-            return render(request, 'error.html', {'error_message': str(e)})
+            return render(request, "error.html", {"error_message": str(e)})
         except Exception as e:
-            return render(request, 'error.html', {'error_message': str(e)})
+            return render(request, "error.html", {"error_message": str(e)})
