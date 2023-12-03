@@ -71,20 +71,12 @@ def get_access_token():
 
 
 def create_docusign_envelope(envelope_args):
-    access_token = get_access_token()
-    access_token = access_token.access_token
-    args = {
-        "base_path": settings.DOCUSIGN_BASE_PATH,
-        "ds_access_token": access_token,
-        "account_id": settings.DOCUSIGN_ACCOUNT_ID,
-        "envelope_args": envelope_args,
-    }
-    # print(args)
-
-    # Specify your webhook URL where you want to receive the event notifications
-    webhook_url = "https://www.arla0061.com/docusign-webhook"
-
+    access_token = get_access_token().access_token
     # Construct the eventNotification
+    # Note. We do not need this if we set the webhook notifications in the coe.
+    # However, if we ever wanted to overide the notifications then we can
+    # do so in the code.
+    webhook_url = "https://www.arla0061.com/docusign-webhook"
     event_notification = {
         "URL": webhook_url,
         "loggingEnabled": "true",

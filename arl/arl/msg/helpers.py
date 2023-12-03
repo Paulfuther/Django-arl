@@ -1,8 +1,12 @@
 import base64
 import json
 
+import requests
 from celery.utils.log import get_task_logger
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.core.mail import send_mail
 from django.core.mail.backends.base import BaseEmailBackend
 from django.http import HttpResponse
 from sendgrid import SendGridAPIClient
@@ -17,9 +21,7 @@ from sendgrid.helpers.mail import (
 )
 from twilio.base.exceptions import TwilioException
 from twilio.rest import Client
-from django.contrib.auth.models import Group
-from django.contrib.auth import get_user_model
-from django.core.mail import send_mail
+
 from arl.user.models import Store
 
 logger = get_task_logger(__name__)
@@ -58,7 +60,7 @@ def create_tobacco_email(to_email, name):
         error_message = f"An error occurred while sending email to {to_email}: {str(e)}"
         logger.error(error_message)
 
-        if hasattr(e, 'response') and e.response is not None:
+        if hasattr(e, "response") and e.response is not None:
             response_body = e.response.body
             response_status = e.response.status_code
             logger.error(f"SendGrid response status code: {response_status}")
@@ -85,7 +87,7 @@ def create_email(to_email, subject, name, template_id):
 
 def create_hr_newhire_email(**kwargs):
     CustomUser = get_user_model()
-    hr_group = Group.objects.get(name='HR')
+    hr_group = Group.objects.get(name="HR")
 
     # Get all active users in the 'hr' group
     hr_users = CustomUser.objects.filter(groups=hr_group, is_active=True)
@@ -266,7 +268,10 @@ def send_docusign_email_with_attachment(to_emails, subject, body, file_path):
             if response.status_code == 202:
                 print(f"Sent file by email to {to_email}", response.status_code)
             else:
-                print(f"Failed to send email to {to_email}. Error code:", response.status_code)
+                print(
+                    f"Failed to send email to {to_email}. Error code:",
+                    response.status_code,
+                )
 
     except Exception as e:
         print("Error sending email:", str(e))
