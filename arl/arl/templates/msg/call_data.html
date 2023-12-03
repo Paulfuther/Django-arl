@@ -22,7 +22,7 @@
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-12 col-sm-10 col-md-8 col-lg-10 col-xl-10">
-            <legend class="border-bottom mb-4">Text Logs</legend>
+            <legend class="border-bottom mb-4">Programmed Call Logs</legend>
 
 
             <table id="table_sms" class="display">
@@ -32,17 +32,15 @@
                         <th>Time</th>
                         <th>To</th>
                         <th>Name</th>
-                        <th>Body</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for sms in sms_data %}
+                    {% for sms in call_data %}
                     <tr>
-                        <td>{{ sms.date_sent|date:"Y-m-d" }}</td>
-                        <td>{{ sms.date_sent|date:"H:i" }}</td>
+                        <td>{{ sms.date_created|date:"Y-m-d" }}</td>
+                        <td>{{ sms.date_created|date:"H:i" }}</td>
                         <td>{{ sms.to }}</td>
-                        <td>{{ sms.username}}</td>
-                        <td>{{ sms.body }}</td>
+                        <td>{{ sms.store_number}}</td>
                     </tr>
                     {% endfor %}
                 </tbody>

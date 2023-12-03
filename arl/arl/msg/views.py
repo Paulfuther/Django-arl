@@ -1,12 +1,13 @@
 import json
 import logging
 
-from django.contrib.auth.mixins import UserPassesTestMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import Group
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse_lazy
 from django.views.decorators.csrf import csrf_exempt
+from django.views.generic import TemplateView
 from django.views.generic.edit import FormView
 
 from arl.msg.helpers import client
@@ -15,7 +16,7 @@ from arl.tasks import (
     send_email_task,
     send_template_email_task,
 )
-from arl.user.models import CustomUser
+from arl.user.models import CustomUser, Store
 
 from .forms import EmailForm, SMSForm, TemplateEmailForm
 
@@ -31,7 +32,7 @@ def is_member_of_msg_group(user):
     return is_member
 
 
-class SendSMSView(UserPassesTestMixin, FormView):
+class SendSMSView(LoginRequiredMixin, UserPassesTestMixin, FormView):
     form_class = SMSForm
     template_name = "msg/sms_form.html"
     success_url = reverse_lazy("sms_success")  # URL name for success page
@@ -61,7 +62,7 @@ class SendSMSView(UserPassesTestMixin, FormView):
         return context
 
 
-class SendTemplateEmailView(UserPassesTestMixin, FormView):
+class SendTemplateEmailView(LoginRequiredMixin, UserPassesTestMixin, FormView):
     form_class = TemplateEmailForm
     template_name = "msg/template_email_form.html"
     # URL name for success page
@@ -89,7 +90,7 @@ class SendTemplateEmailView(UserPassesTestMixin, FormView):
         return super().form_valid(form)
 
 
-class SendEmailView(UserPassesTestMixin, FormView):
+class SendEmailView(LoginRequiredMixin, UserPassesTestMixin, FormView):
     form_class = EmailForm
     template_name = "msg/email_form.html"
     success_url = reverse_lazy("sms_success")  # URL name for success page
@@ -132,23 +133,78 @@ def fetch_sms():
     return client.messages.list(limit=200)
 
 
-def fetch_twilio(request):
-    sms = fetch_sms()
-    truncated_sms = []
-    for msg in sms:
-        truncated_body = msg.body[:250]
-        # Fetch user data based on the phone number
-        user = CustomUser.objects.filter(phone_number=msg.to).first()
-        username = f"{user.first_name} {user.last_name}" if user else None
-        # if user exists
-        msg_data = {
-            "sid": msg.sid,
-            "date_sent": msg.date_sent,
-            "from": msg.from_,
-            "to": msg.to,
-            "body": truncated_body,
-            "username": username,  # Add the username to the SMS data
-            # Add more fields as needed
-        }
-        truncated_sms.append(msg_data)
-    return render(request, "msg/sms_data.html", {"sms_data": truncated_sms})
+class FetchTwilioView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
+    template_name = "msg/sms_data.html"
+
+    def test_func(self):
+        return is_member_of_msg_group(self.request.user)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        sms = fetch_sms()
+        truncated_sms = []
+        for msg in sms:
+            truncated_body = msg.body[:250]
+            # Fetch user data based on the phone number
+            user = CustomUser.objects.filter(phone_number=msg.to).first()
+            username = f"{user.first_name} {user.last_name}" if user else None
+            # if user exists
+            msg_data = {
+                "sid": msg.sid,
+                "date_sent": msg.date_sent,
+                "from": msg.from_,
+                "to": msg.to,
+                "body": truncated_body,
+                "username": username,  # Add the username to the SMS data
+                # Add more fields as needed
+            }
+            truncated_sms.append(msg_data)
+        context["sms_data"] = truncated_sms
+        return context
+
+
+def fetch_calls():
+    return client.calls.list(limit=20)
+
+
+class FetchTwilioCallsView(LoginRequiredMixin,
+                           UserPassesTestMixin, TemplateView):
+    template_name = "msg/call_data.html"
+
+    def test_func(self):
+        return is_member_of_msg_group(self.request.user)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        calls = fetch_calls()
+        if calls is None:
+            # Set an error message in the context
+            context[
+                "error_message"
+            ] = "Failed to fetch call logs. Please try again later."
+            return context
+
+        truncated_calls = []
+        for call in calls:
+            twilio_to_number = str(call.to)
+            store = Store.objects.filter(phone_number=str(twilio_to_number)).first()
+            store_phone_number = (
+                str(store.phone_number)
+                if store and store.phone_number else None
+            )
+            store_number = store.number if store and store.number else None
+            call_data = {
+                "date_created": call.date_created,
+                "to": twilio_to_number,
+                "duration": call.duration,
+                "store_phone_number": store_phone_number
+                if store_phone_number
+                else "Unknown Phone Number",
+                "store_number": store_number
+                if store_number else "Unknown Store Number"
+                # Add more fields as needed
+            }
+            truncated_calls.append(call_data)
+
+        context["call_data"] = truncated_calls
+        return context
