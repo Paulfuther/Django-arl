@@ -20,5 +20,5 @@ urlpatterns = [
     path("list_folder_contents/<path:path>/", list_folder_contents, name="list_folder_contents"),
     path("download_file/", download_file, name="download_file"),
     path("upload_file/", upload_file, name="upload_file"),
-    path("delete_file/", delete_file, name="delete_file"),
+    path("delete_file/", delete_file, name="delete_file")
 ]
