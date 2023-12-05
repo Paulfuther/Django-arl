@@ -63,22 +63,53 @@ def use_dropbox(request):
 
 
 @login_required(login_url="login")
-def list_folders(request):
+def list_folders(request, path=""):
     new_access_token = generate_new_access_token()
     if new_access_token:
         # Use the new access token to create the Dropbox client
         dbx = dropbox.Dropbox(new_access_token)
+        if request.method == "POST":
+            # Handle file upload
+            folder_path = request.POST.get("folder_name")
+            uploaded_file = request.FILES.get("file")
+
+            if folder_path and uploaded_file:
+                try:
+                    # Specify the path where the file will be uploaded
+                    upload_path = f"/{folder_path}/{uploaded_file.name}"
+
+                    # Save the file in Dropbox
+                    dbx.files_upload(uploaded_file.read(), upload_path)
+
+                    # Redirect to the same page after successful upload
+                    return redirect("list_folders", path=folder_path)
+                except Exception as e:
+                    return HttpResponse("Error uploading file: " + str(e))
         try:
-            folder_list = dbx.files_list_folder(path="")
+            folder_list = dbx.files_list_folder(path=path)
+            #print(folder_list)
             folders = [
                 entry
                 for entry in folder_list.entries
-                if isinstance(entry, FolderMetadata)
+                
+                if isinstance(entry, dropbox.files.FolderMetadata)
+                
             ]
+            files = [
+                entry
+                for entry in folder_list.entries
+                if isinstance(entry, dropbox.files.FileMetadata)
+            ]
+
             return render(
                 request,
                 "dbox/list_folders.html",
-                {"folder_list": folder_list, "folders": folders},
+                {
+                    "folder_list": folder_list,
+                    "folders": folders,
+                    "files": files,
+                    "current_path": path,
+                },
             )
         except dropbox.exceptions.AuthError as e:
             return HttpResponse("API request failed. Authentication error: " + str(e))
@@ -88,7 +119,6 @@ def list_folders(request):
             return HttpResponse("API request failed. Error: " + str(e))
     else:
         return HttpResponse("Refresh token not found in .env file.", status=500)
-
 
 @login_required(login_url="login")
 def list_files(request, folder_name):
@@ -105,6 +135,13 @@ def list_files(request, folder_name):
                     for entry in file_list.entries
                     if isinstance(entry, dropbox.files.FileMetadata)
                 ]
+                if request.method == 'POST' and 'file' in request.FILES:
+                    file_to_upload = request.FILES['file']
+                    upload_path = f"{folder_path}/{file_to_upload.name}"
+                    
+                    with file_to_upload.open() as file:
+                        dbx.files_upload(file.read(), upload_path)
+
                 return render(
                     request,
                     "list_files.html",
@@ -132,12 +169,16 @@ def download_file(request):
     try:
         dbx = dropbox.Dropbox(access_token)
         metadata, response = dbx.files_download(file_path)
-        response = HttpResponse(content=response.content)
-        response[
-            "Content-Disposition"
-        ] = f'attachment; filename="{os.path.basename(file_path)}"'
-        return response
+        file_content = response.content
+
+        # Set up the response as a downloadable file
+        http_response = HttpResponse(content_type='application/force-download')
+        http_response['Content-Disposition'] = f'attachment; filename="{os.path.basename(file_path)}"'
+        http_response.write(file_content)
+        return http_response
     except ApiError as e:
+        return HttpResponse(f"Failed to download file: {str(e)}", status=500)
+    except Exception as e:
         return HttpResponse(f"Failed to download file: {str(e)}", status=500)
 
 

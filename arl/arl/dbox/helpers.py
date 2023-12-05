@@ -29,7 +29,7 @@ def generate_new_access_token():
     if response.status_code == 200:
         response_data = response.json()
         new_access_token = response_data.get("access_token")
-        print("New Access Token: ", new_access_token)
+        #print("New Access Token: ", new_access_token)
         return new_access_token
     else:
         # Handle error response
