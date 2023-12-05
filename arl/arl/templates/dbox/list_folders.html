@@ -5,27 +5,43 @@
 {% include "../base/navbar.html" %}
 {% load crispy_forms_tags %}
 <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.25/css/jquery.dataTables.min.css">
-
+<style>
+    /* Adjust button widths to be the same */
+    .btn-primary,
+    .btn-success {
+        width: 100px; /* Change the width as needed */
+    }
+</style>
 <div class="container mb-2">
     <div class="row justify-content-center">
         <div class="col-12 col-sm-10 col-md-8 col-lg-8 col-xl-8">
 
-            <legend class="border-bottm mb-4 mt-4">Contents of Folder: {{ folder_path|slice:"1:" }}</legend>
-             
+            <legend class="border-bottm mb-4 mt-4">Contents of Folder: {{ current_path|default:"" }}</legend>
+            <a href="{% url 'list_folders' %}" class="btn btn-secondary mb-2">Back</a>
             <table id="fileTable">
                 <thead>
                     <tr>
-                        <th>Folder</th>
+                        <th>Name</th>
+                        <th>Type</th>
                         <th>Select</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for folder in folders %}
+
                     <tr>
                         <td>{{ folder.name }}</td>
-                        <td><a href="{% url 'list_folder_contents' path=folder.path_display %}">Select</a>
-                        </td>
-                        {% endfor %}
+                        <td>Folder</td>
+                        <td><a href="{% url 'list_folders' path=folder.path_lower %}"class="btn btn-primary">Select</a></td>
+                    </tr>
+                    {% endfor %}
+                    {% for file in files %}
+                    <tr>
+                        <td>{{ file.name }}</td>
+                        <td>File</td>
+                        <td><a href="{% url 'download_file' %}?path={{ file.path_display|urlencode }}" class="btn btn-success">Download</a></td>
+                    </tr>
+                    {% endfor %}
                 </tbody>
             </table>
         </div>
