@@ -1,6 +1,7 @@
 # your_app_name/views.py
 
 import os
+from datetime import datetime
 from urllib.parse import quote
 
 import dropbox
@@ -66,34 +67,34 @@ def use_dropbox(request):
 def list_folders(request, path=""):
     new_access_token = generate_new_access_token()
     if new_access_token:
-        # Use the new access token to create the Dropbox client
-        dbx = dropbox.Dropbox(new_access_token)
-        if request.method == "POST":
-            # Handle file upload
-            folder_path = request.POST.get("folder_name")
-            uploaded_file = request.FILES.get("file")
-
-            if folder_path and uploaded_file:
-                try:
-                    # Specify the path where the file will be uploaded
-                    upload_path = f"/{folder_path}/{uploaded_file.name}"
-
-                    # Save the file in Dropbox
-                    dbx.files_upload(uploaded_file.read(), upload_path)
-
-                    # Redirect to the same page after successful upload
-                    return redirect("list_folders", path=folder_path)
-                except Exception as e:
-                    return HttpResponse("Error uploading file: " + str(e))
         try:
+            # Use the new access token to create the Dropbox client
+            dbx = dropbox.Dropbox(new_access_token)
+
+            if request.method == "POST":
+                # Handle file upload
+                folder_path = request.POST.get("folder_name")
+                uploaded_file = request.FILES.get("file")
+
+                if folder_path and uploaded_file:
+                    try:
+                        # Specify the path where the file will be uploaded
+                        upload_path = f"/{folder_path}/{uploaded_file.name}"
+
+                        # Save the file in Dropbox
+                        dbx.files_upload(uploaded_file.read(), upload_path)
+
+                        # Redirect to the same page after successful upload
+                        return redirect("list_folders", path=folder_path)
+                    except Exception as e:
+                        return HttpResponse("Error uploading file: " + str(e))
+
+            # Fetch metadata for files and folders
             folder_list = dbx.files_list_folder(path=path)
-            #print(folder_list)
             folders = [
                 entry
                 for entry in folder_list.entries
-                
                 if isinstance(entry, dropbox.files.FolderMetadata)
-                
             ]
             files = [
                 entry
@@ -101,13 +102,38 @@ def list_folders(request, path=""):
                 if isinstance(entry, dropbox.files.FileMetadata)
             ]
 
+            # Retrieve last modified dates for files
+            file_data = [
+                {
+                    "metadata": file_metadata,
+                    "extension": file_metadata.name.split(".")[-1],
+                }
+                for file_metadata in files
+            ]
+
+            # Calculate an estimated last modified date for folders based on contained files
+            folder_last_modified = {}
+            for folder in folders:
+                folder_files = [
+                    entry
+                    for entry in folder_list.entries
+                    if isinstance(entry, dropbox.files.FileMetadata)
+                    and entry.path_lower.startswith(folder.path_lower)
+                ]
+                last_modified_files = [file.server_modified for file in folder_files]
+                if last_modified_files:
+                    folder_last_modified[folder.path_lower] = max(last_modified_files)
+                else:
+                    folder_last_modified[folder.path_lower] = datetime.now().isoformat()
+
             return render(
                 request,
                 "dbox/list_folders.html",
                 {
                     "folder_list": folder_list,
                     "folders": folders,
-                    "files": files,
+                    "files": file_data,
+                    "folder_last_modified": folder_last_modified,
                     "current_path": path,
                 },
             )
@@ -120,6 +146,7 @@ def list_folders(request, path=""):
     else:
         return HttpResponse("Refresh token not found in .env file.", status=500)
 
+
 @login_required(login_url="login")
 def list_files(request, folder_name):
     new_access_token = generate_new_access_token()
@@ -129,16 +156,25 @@ def list_files(request, folder_name):
             # Make API request to list files within the specified folder
             folder_path = f"/{folder_name}"
             file_list = dbx.files_list_folder(path=folder_path)
-            if isinstance(file_list, ListFolderResult):
-                file_names = [
-                    entry.name
-                    for entry in file_list.entries
-                    if isinstance(entry, dropbox.files.FileMetadata)
-                ]
-                if request.method == 'POST' and 'file' in request.FILES:
-                    file_to_upload = request.FILES['file']
+            if isinstance(file_list, dropbox.files.ListFolderResult):
+                file_info_list = []
+                for entry in file_list.entries:
+                    file_name = entry.name
+                    if isinstance(entry, dropbox.files.FileMetadata):
+                        # Extract file type information, adjust this based on Dropbox API response
+                        file_type = (
+                            entry.media_info.get_metadata(".tag")
+                            if entry.media_info
+                            else None
+                        )
+
+                        # Append file information to the list
+                        file_info = {"name": file_name, "type": file_type}
+                        file_info_list.append(file_info)
+                if request.method == "POST" and "file" in request.FILES:
+                    file_to_upload = request.FILES["file"]
                     upload_path = f"{folder_path}/{file_to_upload.name}"
-                    
+
                     with file_to_upload.open() as file:
                         dbx.files_upload(file.read(), upload_path)
 
@@ -172,8 +208,10 @@ def download_file(request):
         file_content = response.content
 
         # Set up the response as a downloadable file
-        http_response = HttpResponse(content_type='application/force-download')
-        http_response['Content-Disposition'] = f'attachment; filename="{os.path.basename(file_path)}"'
+        http_response = HttpResponse(content_type="application/force-download")
+        http_response[
+            "Content-Disposition"
+        ] = f'attachment; filename="{os.path.basename(file_path)}"'
         http_response.write(file_content)
         return http_response
     except ApiError as e:

@@ -5,13 +5,17 @@
 {% include "../base/navbar.html" %}
 {% load crispy_forms_tags %}
 <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.25/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
 <style>
     /* Adjust button widths to be the same */
     .btn-primary,
     .btn-success {
-        width: 100px; /* Change the width as needed */
+        width: 100px;
+        /* Change the width as needed */
     }
 </style>
+
 <div class="container mb-2">
     <div class="row justify-content-center">
         <div class="col-12 col-sm-10 col-md-8 col-lg-8 col-xl-8">
@@ -22,25 +26,41 @@
                 <thead>
                     <tr>
                         <th>Name</th>
-                        <th>Type</th>
-                        <th>Select</th>
+                        <th>Modified</th>
+                 
                     </tr>
                 </thead>
                 <tbody>
                     {% for folder in folders %}
-
-                    <tr>
-                        <td>{{ folder.name }}</td>
-                        <td>Folder</td>
-                        <td><a href="{% url 'list_folders' path=folder.path_lower %}"class="btn btn-primary">Select</a></td>
-                    </tr>
+                        <tr>
+                            <td style="padding-right: 10px;">
+                                <i class="fas fa-folder" style="color: #0c91ea; padding-right: 5px;"></i>
+                                <a href="{% url 'list_folders' path=folder.path_lower %}">{{ folder.name }}</a>
+                            </td>
+                            <td></td>
+                       
+                        </tr>
                     {% endfor %}
-                    {% for file in files %}
-                    <tr>
-                        <td>{{ file.name }}</td>
-                        <td>File</td>
-                        <td><a href="{% url 'download_file' %}?path={{ file.path_display|urlencode }}" class="btn btn-success">Download</a></td>
-                    </tr>
+                
+                    {% for file_data in files %}
+                        <tr>
+                            <td style="padding-right: 10px;">
+                                {% if file_data.extension|lower == 'pdf' %}
+                                    <i class="fas fa-file-pdf" style="color: red; padding-right: 5px;"></i> <!-- PDF file icon in red -->
+                                {% elif file_data.extension|lower == 'xlsx' %}
+                                    <i class="fas fa-file-excel" style="color: green; padding-right: 5px;"></i> <!-- XLSX file icon in green -->
+                                {% elif file_data.extension|lower == 'jpg' %}
+                                    <i class="fas fa-file-image" style="color: blue; padding-right: 5px;"></i> <!-- JPG file icon in blue -->
+                                {% elif file_data.extension|lower == 'mp4' %}
+                                    <i class="fas fa-file-video" style="color: purple; padding-right: 5px;"></i> <!-- MP4 file icon in purple -->
+                                {% else %}
+                                    <i class="fas fa-file-pdf" style="color: red; padding-right: 5px;"></i> <!-- Default file icon in red -->
+                                {% endif %}
+                                <a href="{% url 'download_file' %}?path={{ file_data.metadata.path_display|urlencode }}">{{ file_data.metadata.name }}</a>
+                                <td>{{ file_data.metadata.client_modified|date:"Y-m-d H:i:s" }}</td>
+                            </td>
+                            <td></td>
+                        </tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -59,6 +79,7 @@
 <script>
     $(document).ready(function () {
         $('#fileTable').DataTable();
+        responsive: true;
     });
 </script>
 
