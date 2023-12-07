@@ -46,15 +46,13 @@
                         <tr>
                             <td style="padding-right: 10px;">
                                 {% if file_data.extension|lower == 'pdf' %}
-                                    <i class="fas fa-file-pdf" style="color: red; padding-right: 5px;"></i> <!-- PDF file icon in red -->
+                                    <i class="far fa-file-pdf" style="color: red; padding-right: 5px;"></i> <!-- PDF file icon in red -->
                                 {% elif file_data.extension|lower == 'xlsx' %}
-                                    <i class="fas fa-file-excel" style="color: green; padding-right: 5px;"></i> <!-- XLSX file icon in green -->
-                                {% elif file_data.extension|lower == 'jpg' %}
-                                    <i class="fas fa-file-image" style="color: blue; padding-right: 5px;"></i> <!-- JPG file icon in blue -->
+                                    <i class="far fa-file-excel" style="color: green; padding-right: 5px;"></i> <!-- XLSX file icon in green -->
+                                    {% elif file_data.extension|lower == 'jpg' or file_data.extension|lower == 'jpeg'  or file_data.extension|lower == 'png' %}
+                                    <i class="far fa-file-image" style="color: blue; padding-right: 5px;"></i> <!-- JPG file icon in blue -->
                                 {% elif file_data.extension|lower == 'mp4' %}
-                                    <i class="fas fa-file-video" style="color: purple; padding-right: 5px;"></i> <!-- MP4 file icon in purple -->
-                                {% else %}
-                                    <i class="fas fa-file-pdf" style="color: red; padding-right: 5px;"></i> <!-- Default file icon in red -->
+                                    <i class="far fa-file-video" style="color: purple; padding-right: 5px;"></i> <!-- MP4 file icon in purple -->
                                 {% endif %}
                                 <a href="{% url 'download_file' %}?path={{ file_data.metadata.path_display|urlencode }}">{{ file_data.metadata.name }}</a>
                                 <td>{{ file_data.metadata.client_modified|date:"Y-m-d H:i:s" }}</td>
