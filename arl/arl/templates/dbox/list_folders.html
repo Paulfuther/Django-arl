@@ -45,7 +45,7 @@
                     {% for folder in folders %}
                         <tr>
                             <td style="padding-right: 10px;">
-                                <i class="fas fa-folder" style="color: #0c91ea; padding-right: 5px;"></i>
+                                <i class="fas fa-folder" style="color: #0c91ea; font-size: 24px; padding-right: 5px;"></i>
                                 <a href="{% url 'list_folders' path=folder.path_lower %}">{{ folder.name|truncate_folder_name:12 }}</a>
                             </td>
                             <td></td>
@@ -57,15 +57,17 @@
             <tr>
                 <td style="padding-right: 10px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                     {% if file_data.extension|lower == 'pdf' %}
-                        <i class="far fa-file-pdf" style="color: red; padding-right: 5px;"></i> <!-- PDF file icon in red -->
+                        <i class="far fa-file-pdf" style="color: red; font-size: 24px; padding-right: 5px;"></i> <!-- PDF file icon in red -->
                     {% elif file_data.extension|lower == 'xlsx' %}
-                        <i class="far fa-file-excel" style="color: green; padding-right: 5px;"></i> <!-- XLSX file icon in green -->
+                        <i class="far fa-file-excel" style="color: green;font-size: 24px; padding-right: 5px;"></i> <!-- XLSX file icon in green -->
                     {% elif file_data.extension|lower in 'jpg' %}
-                        <i class="far fa-file-image" style="color: blue; padding-right: 5px;"></i> <!-- Image file icon in blue -->
+                        <i class="far fa-file-image" style="color: blue;font-size: 24px; padding-right: 5px;"></i> <!-- Image file icon in blue -->
                     {% elif file_data.extension|lower == 'mp4' %}
-                        <i class="far fa-file-video" style="color: purple; padding-right: 5px;"></i> <!-- MP4 file icon in purple -->
+                        <i class="far fa-file-video" style="color: purple; font-size: 24px;padding-right: 5px;"></i> <!-- MP4 file icon in purple -->
+                    {% elif file_data.extension|lower == 'zip'%}
+                       <i class="far fa-file-archive" style="color: rgb(14, 14, 14); font-size: 24px;padding-right: 5px;"></i> <!-- Default file icon in red -->
                     {% else %}
-                        <i class="far fa-file-pdf" style="color: red; padding-right: 5px;"></i> <!-- Default file icon in red -->
+                       <i class="far fa-file-pdf" style="color: red; font-size: 24px;padding-right: 5px;"></i> <!-- Default file icon in red -->
                     {% endif %}
                     <a href="{% url 'download_file' %}?path={{ file_data.metadata.path_display|urlencode }}">
                         {{ file_data.metadata.name|truncate_middle:20 }} <!-- Adjust the length as needed -->
