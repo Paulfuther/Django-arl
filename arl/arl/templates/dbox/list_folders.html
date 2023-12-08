@@ -18,11 +18,14 @@
     }
 
     .custom-legend {
-        font-size: 1.2em; /* Adjust the font size */
-        font-weight: normal; /* Make the font weight lighter */
-        color:  #555;; /* Use a softer color */
+        font-size: 1.2em;
+        /* Adjust the font size */
+        font-weight: normal;
+        /* Make the font weight lighter */
+        color: #555;
+        ;
+        /* Use a softer color */
     }
-
 </style>
 
 <div class="container mb-2" style="height: 95vh;">
@@ -30,52 +33,72 @@
         <div class="col-12 col-sm-10 col-md-8 col-lg-8 col-xl-8">
 
             <legend class="border-bottm mb-4 mt-4 custom-legend">
-                Contents of Folder: {{  current_path|default:""|truncate_legend:20 }}
+                Contents of Folder: {{ current_path|default:""|truncate_folder_name:20 }}
             </legend>
             <a href="{% url 'list_folders' %}" class="btn btn-secondary mb-2">Back</a>
             <table id="fileTable">
                 <thead>
                     <tr>
                         <th>Name</th>
-                        <th>Modified</th>
-                 
+
+
                     </tr>
                 </thead>
                 <tbody>
                     {% for folder in folders %}
-                        <tr>
-                            <td style="padding-right: 10px;">
-                                <i class="fas fa-folder" style="color: #0c91ea; font-size: 24px; padding-right: 5px;"></i>
-                                <a href="{% url 'list_folders' path=folder.path_lower %}">{{ folder.name|truncate_folder_name:12 }}</a>
-                            </td>
-                            <td></td>
-                       
-                        </tr>
+                    <tr>
+                        <td style="padding-right: 10px;">
+                            <i class="fas fa-folder" style="color: #0c91ea; font-size: 24px; padding-right: 5px;"></i>
+                            <a href="{% url 'list_folders' path=folder.path_lower %}">
+                               {{ folder.name|extract_filename }}</a>
+                        </td>
+
+
+                    </tr>
                     {% endfor %}
-                
+
                     {% for file_data in files %}
-            <tr>
-                <td style="padding-right: 10px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                    {% if file_data.extension|lower == 'pdf' %}
-                        <i class="far fa-file-pdf" style="color: red; font-size: 24px; padding-right: 5px;"></i> <!-- PDF file icon in red -->
-                    {% elif file_data.extension|lower == 'xlsx' %}
-                        <i class="far fa-file-excel" style="color: green;font-size: 24px; padding-right: 5px;"></i> <!-- XLSX file icon in green -->
-                    {% elif file_data.extension|lower in 'jpg' %}
-                        <i class="far fa-file-image" style="color: blue;font-size: 24px; padding-right: 5px;"></i> <!-- Image file icon in blue -->
-                    {% elif file_data.extension|lower == 'mp4' %}
-                        <i class="far fa-file-video" style="color: purple; font-size: 24px;padding-right: 5px;"></i> <!-- MP4 file icon in purple -->
-                    {% elif file_data.extension|lower == 'zip'%}
-                       <i class="far fa-file-archive" style="color: rgb(14, 14, 14); font-size: 24px;padding-right: 5px;"></i> <!-- Default file icon in red -->
-                    {% else %}
-                       <i class="far fa-file-pdf" style="color: red; font-size: 24px;padding-right: 5px;"></i> <!-- Default file icon in red -->
-                    {% endif %}
-                    <a href="{% url 'download_file' %}?path={{ file_data.metadata.path_display|urlencode }}">
-                        {{ file_data.metadata.name|truncate_middle:20 }} <!-- Adjust the length as needed -->
-                    </a>
-                </td>
-                <td>{{ file_data.metadata.client_modified|date:"Y-m-d H:i:s" }}</td>
-            </tr>
-        {% endfor %}
+                    <tr>
+                        <td style="padding-right: 10px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            <div style="display: flex; align-items: center;">
+                                {% if file_data.extension|lower == 'pdf' %}
+                                <i class="far fa-file-pdf" style="color: red; font-size: 24px; padding-right: 5px;"></i>
+                                <!-- PDF file icon in red -->
+                                {% elif file_data.extension|lower == 'xlsx' or file_data.extension|lower == 'xls' %}
+                                <i class="far fa-file-excel" style="color: green; font-size: 24px; padding-right: 5px;"></i>
+                                <!-- XLSX file icon in green -->
+                                {% elif file_data.extension|lower == 'jpg' or file_data.extension|lower == 'jpeg' %}
+                                <i class="far fa-file-image" style="color: blue; font-size: 24px; padding-right: 5px;"></i>
+                                <!-- Image file icon in blue -->
+                                {% elif file_data.extension|lower == 'mp4' %}
+                                <i class="far fa-file-video" style="color: purple; font-size: 24px; padding-right: 5px;"></i>
+                                <!-- MP4 file icon in purple -->
+                                {% elif file_data.extension|lower == 'zip' %}
+                                <i class="far fa-file-archive" style="color: rgb(14, 14, 14); font-size: 24px; padding-right: 5px;"></i>
+                                <!-- ZIP file icon in default color -->
+                                {% elif file_data.extension|lower == 'docx' %}
+                                <i class="far fa-file-word" style="color: blue; font-size: 24px; padding-right: 5px;"></i>
+                                <!-- DOCX file icon in blue -->
+                                {% else %}
+                                <i class="far fa-file-pdf" style="color: red; font-size: 24px; padding-right: 5px;"></i>
+                                <!-- Default file icon in red -->
+                                {% endif %}
+                                <!-- File details -->
+                                <div style="display: flex; flex-direction: column; justify-content: flex-start; overflow: hidden;">
+                                    <!-- File name -->
+                                    <a href="{% url 'download_file' %}?path={{ file_data.metadata.path_display|urlencode }}"
+                                        style="text-overflow: ellipsis; overflow: hidden;">
+                                        {{ file_data.metadata.name|extract_filename }}
+                                        <!-- Adjust the length as needed -->
+                                    </a>
+                                    <!-- Modified date -->
+                                    <div style="font-size: 12px; color: #888; margin-left: 5px;">
+                                       {{ file_data.metadata.client_modified|date:"Y-m-d H:i:s" }}</div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
                 </tbody>
             </table>
         </div>
@@ -91,11 +114,11 @@
 
 <!-- Initialize DataTables on the table -->
 <script>
+    
     $(document).ready(function () {
         $('#fileTable').DataTable({
-            
-        responsive: true,
-        "pageLength": 10,
+            responsive: true,
+            "pageLength": 10,
         })
     });
 </script>
