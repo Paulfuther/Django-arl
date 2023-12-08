@@ -64,8 +64,10 @@
                         <i class="far fa-file-image" style="color: blue; padding-right: 5px;"></i> <!-- Image file icon in blue -->
                     {% elif file_data.extension|lower == 'mp4' %}
                         <i class="far fa-file-video" style="color: purple; padding-right: 5px;"></i> <!-- MP4 file icon in purple -->
+                    {% elif file_data.extension|lower == 'zip'%}
+                       <i class="far fa-file-archive" style="color: rgb(14, 14, 14); padding-right: 5px;"></i> <!-- Default file icon in red -->
                     {% else %}
-                        <i class="far fa-file-pdf" style="color: red; padding-right: 5px;"></i> <!-- Default file icon in red -->
+                       <i class="far fa-file-pdf" style="color: red; padding-right: 5px;"></i> <!-- Default file icon in red -->
                     {% endif %}
                     <a href="{% url 'download_file' %}?path={{ file_data.metadata.path_display|urlencode }}">
                         {{ file_data.metadata.name|truncate_middle:20 }} <!-- Adjust the length as needed -->
