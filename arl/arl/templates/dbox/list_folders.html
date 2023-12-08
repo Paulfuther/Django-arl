@@ -4,6 +4,8 @@
 {% block template %}
 {% include "../base/navbar.html" %}
 {% load crispy_forms_tags %}
+{% load filters %}
+
 <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.25/css/jquery.dataTables.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
@@ -14,13 +16,22 @@
         width: 100px;
         /* Change the width as needed */
     }
+
+    .custom-legend {
+        font-size: 1.2em; /* Adjust the font size */
+        font-weight: normal; /* Make the font weight lighter */
+        color:  #555;; /* Use a softer color */
+    }
+
 </style>
 
-<div class="container mb-2">
+<div class="container mb-2" style="height: 95vh;">
     <div class="row justify-content-center">
         <div class="col-12 col-sm-10 col-md-8 col-lg-8 col-xl-8">
 
-            <legend class="border-bottm mb-4 mt-4">Contents of Folder: {{ current_path|default:"" }}</legend>
+            <legend class="border-bottm mb-4 mt-4 custom-legend">
+                Contents of Folder: {{  current_path|default:""|truncate_legend:20 }}
+            </legend>
             <a href="{% url 'list_folders' %}" class="btn btn-secondary mb-2">Back</a>
             <table id="fileTable">
                 <thead>
@@ -35,7 +46,7 @@
                         <tr>
                             <td style="padding-right: 10px;">
                                 <i class="fas fa-folder" style="color: #0c91ea; padding-right: 5px;"></i>
-                                <a href="{% url 'list_folders' path=folder.path_lower %}">{{ folder.name }}</a>
+                                <a href="{% url 'list_folders' path=folder.path_lower %}">{{ folder.name|truncate_folder_name:12 }}</a>
                             </td>
                             <td></td>
                        
@@ -43,23 +54,26 @@
                     {% endfor %}
                 
                     {% for file_data in files %}
-                        <tr>
-                            <td style="padding-right: 10px;">
-                                {% if file_data.extension|lower == 'pdf' %}
-                                    <i class="far fa-file-pdf" style="color: red; padding-right: 5px;"></i> <!-- PDF file icon in red -->
-                                {% elif file_data.extension|lower == 'xlsx' %}
-                                    <i class="far fa-file-excel" style="color: green; padding-right: 5px;"></i> <!-- XLSX file icon in green -->
-                                    {% elif file_data.extension|lower == 'jpg' or file_data.extension|lower == 'jpeg'  or file_data.extension|lower == 'png' %}
-                                    <i class="far fa-file-image" style="color: blue; padding-right: 5px;"></i> <!-- JPG file icon in blue -->
-                                {% elif file_data.extension|lower == 'mp4' %}
-                                    <i class="far fa-file-video" style="color: purple; padding-right: 5px;"></i> <!-- MP4 file icon in purple -->
-                                {% endif %}
-                                <a href="{% url 'download_file' %}?path={{ file_data.metadata.path_display|urlencode }}">{{ file_data.metadata.name }}</a>
-                                <td>{{ file_data.metadata.client_modified|date:"Y-m-d H:i:s" }}</td>
-                            </td>
-                            <td></td>
-                        </tr>
-                    {% endfor %}
+            <tr>
+                <td style="padding-right: 10px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    {% if file_data.extension|lower == 'pdf' %}
+                        <i class="far fa-file-pdf" style="color: red; padding-right: 5px;"></i> <!-- PDF file icon in red -->
+                    {% elif file_data.extension|lower == 'xlsx' %}
+                        <i class="far fa-file-excel" style="color: green; padding-right: 5px;"></i> <!-- XLSX file icon in green -->
+                    {% elif file_data.extension|lower in 'jpg' %}
+                        <i class="far fa-file-image" style="color: blue; padding-right: 5px;"></i> <!-- Image file icon in blue -->
+                    {% elif file_data.extension|lower == 'mp4' %}
+                        <i class="far fa-file-video" style="color: purple; padding-right: 5px;"></i> <!-- MP4 file icon in purple -->
+                    {% else %}
+                        <i class="far fa-file-pdf" style="color: red; padding-right: 5px;"></i> <!-- Default file icon in red -->
+                    {% endif %}
+                    <a href="{% url 'download_file' %}?path={{ file_data.metadata.path_display|urlencode }}">
+                        {{ file_data.metadata.name|truncate_middle:20 }} <!-- Adjust the length as needed -->
+                    </a>
+                </td>
+                <td>{{ file_data.metadata.client_modified|date:"Y-m-d H:i:s" }}</td>
+            </tr>
+        {% endfor %}
                 </tbody>
             </table>
         </div>
@@ -76,8 +90,11 @@
 <!-- Initialize DataTables on the table -->
 <script>
     $(document).ready(function () {
-        $('#fileTable').DataTable();
-        responsive: true;
+        $('#fileTable').DataTable({
+            
+        responsive: true,
+        "pageLength": 10,
+        })
     });
 </script>
 
