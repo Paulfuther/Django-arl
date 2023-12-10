@@ -7,8 +7,6 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.min.js"></script>
 
     <style type="text/css" media="screen">
-       
-
         table td {
             border: 1px solid black;
             padding: 20 0 10 10;
@@ -93,8 +91,6 @@
             text-align: left;
             border-bottom: none;
         }
-
-        
     </style>
 </head>
 
@@ -181,7 +177,8 @@
 
         <table style="width: 100%; table-layout: fixed; border: 1px solid black;">
             <tr>
-                <td style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top; border-bottom: none;">
+                <td
+                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top; border-bottom: none;">
                     Location
                 </td>
                 <td style="width: 75%; text-align: left; vertical-align: top; border-bottom: none;">
@@ -189,7 +186,8 @@
                 </td>
             </tr>
             <tr>
-                <td style="width: 25%; height: 300px; background-color: lightgray; text-align: left; vertical-align: top;">
+                <td
+                    style="width: 25%; height: 300px; background-color: lightgray; text-align: left; vertical-align: top;">
                     Event Details
                 </td>
                 <td style="width: 75%; height: 300px; text-align: left; vertical-align: top;">
@@ -198,76 +196,96 @@
             </tr>
         </table>
 
-        <table>
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black;">
             <tr>
-                <td style="background-color: lightgray; width:25%">Event Date </td>
-                <td style="width:25%; height:100%">{{incident.eventdate}} </td>
-                <td style="background-color: lightgray; width:25%"> Event Time </td>
-                <td style="width:25%; height: 100%">{{incident.eventtime}} </td>
+                <td
+                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;border: 1px solid black;">
+                    Event Date </td>
+                <td style="width: 25%; text-align: left; vertical-align: top; border: 1px solid black;">
+                    {{incident.eventdate}} </td>
+                <td
+                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top; border: 1px solid black;">
+                    Event Time </td>
+                <td style="width: 25%; text-align: left; vertical-align: top; border: 1px solid black;">
+                    {{incident.eventtime}} </td>
             </tr>
         </table>
 
-
-        <table>
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black;">
             <tr>
-                <td style="background-color: lightgray; width:25%">Reported By: </td>
-                <td style="width:25%; height:100%">{{incident.reportedby}} </td>
-                <td style="background-color: lightgray; width:25%">Phone Number: </td>
-                <td style="width:25%">{{incident.reportedbynumber}} </td>
+                <td
+                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;border: 1px solid black;">
+                    Reported By: </td>
+                <td style="width: 25%; text-align: left; vertical-align: top; border: 1px solid black;">
+                    {{incident.reportedby}} </td>
+                <td style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;border: 1px solid black;"">Phone Number: </td>
+                <td style=" width: 25%; text-align: left; vertical-align: top; border: 1px solid black;">
+                    {{incident.reportedbynumber}} </td>
             </tr>
 
         </table>
 
-        <table>
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black;">
             <tr>
-                <td style="background-color: lightgray; width:25%">Is The Person A:</td>
+                <td
+                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;border: 1px solid black;">
+                    Is The Person A:</td>
 
                 {% if incident.suncoremployee %}
-                <td> <i class="far fa-check-square"></i> Suncor Emp </td>
+                <td style="width: 15%; text-align: left; vertical-align: top; border: 1px solid black;"> <i
+                        class="far fa-check-square"></i> Suncor Emp </td>
                 {% else %}
-                <td><i class="far fa-square"></i> Suncor Emp </td>
+                <td style="width: 15%; text-align: left; vertical-align: top; border: 1px solid black;"><i
+                        class="far fa-square"></i> Suncor Emp </td>
                 {% endif %}
 
                 {% if incident.contractor %}
-                <td> <i class="far fa-check-square"></i> Contractor</td>
+                <td style="width: 15%; text-align: left; vertical-align: top; border: 1px solid black;"> <i
+                        class="far fa-check-square"></i> Contractor</td>
                 {% else %}
-                <td><i class="far fa-square"></i> Contractor </td>
+                <td style="width: 15%; text-align: left; vertical-align: top; border: 1px solid black;"><i
+                        class="far fa-square"></i> Contractor </td>
                 {% endif %}
 
                 {% if incident.associate %}
-                <td><i class="far fa-check-square"></i> Associate </td>
+                <td style="width: 15%; text-align: left; vertical-align: top; border: 1px solid black;"><i
+                        class="far fa-check-square"></i> Associate </td>
                 {% else %}
-                <td><i class="far fa-square"></i> Associate </td>
+                <td style="width: 15%; text-align: left; vertical-align: top; border: 1px solid black;"><i
+                        class="far fa-square"></i> Associate </td>
                 {% endif %}
 
                 {% if incident.generalpublic %}
-                <td> <i class="far fa-check-square"></i> General Public</td>
+                <td style="width: 25%; text-align: left; vertical-align: top; border: 1px solid black;"> <i
+                        class="far fa-check-square"></i> General Public</td>
                 {% else %}
-                <td><i class="far fa-square"></i> General Public </td>
+                <td style="width: 25%; text-align: left; vertical-align: top; border: 1px solid black;"><i
+                        class="far fa-square"></i> General Public </td>
                 {% endif %}
 
                 {% if incident.other %}
-                <td><i class="far fa-check-square"></i> Other: {{incident.othertext}}</td>
+                <td style="width: 15%; text-align: left; vertical-align: top; border: 1px solid black;"><i
+                        class="far fa-check-square"></i> Other: {{incident.othertext}}</td>
                 {% else %}
-                <td><i class="far fa-square"></i> Other: {{incident.othertext}} </td>
+                <td style="width: 15%; text-align: left; vertical-align: top; border: 1px solid black;"><i
+                        class="far fa-square"></i> Other: {{incident.othertext}} </td>
                 {% endif %}
             </tr>
 
         </table>
 
-        <table>
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black;">
             <tr>
-                <td
-                    style="background-color: lightgray; width:25%; text-align:left; vertical-align:top; border-bottom: none">
+                <td style="width: 25%; height: 300px; background-color: lightgray; text-align: left; vertical-align: top;">
                     Immediate Actions Taken</td>
-                <td style=" width:75%; height:150px; text-align:left; vertical-align:top; border-bottom: none ">
+                <td style="width: 75%; height: 300px; text-align: left; vertical-align: top;">
                     {{incident.actionstaken}} </td>
             </tr>
             <tr>
                 <td
-                    style="background-color: lightgray; width:25%; text-align:left; vertical-align:top; border-bottom: none">
+                    style="width: 25%; height: 300px; background-color: lightgray; text-align: left; vertical-align: top;">
                     Corrective Actions Taken</td>
-                <td style=" width:75%; height:150px; text-align:left; vertical-align:top; border-bottom: none ">
+                <td style="width: 75%; height: 300px; text-align: left; vertical-align: top;">
                     {{incident.correctiveactions}} </td>
             </tr>
         </table>
