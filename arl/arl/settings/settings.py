@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "arl.blog",
     "django_htmx",
+    "wkhtmltopdf",
     "taggit",
     "arl.user",
     "intl_tel_input",
@@ -133,7 +134,7 @@ USE_I18N = True
 
 USE_TZ = True
 
-WKHTMLTOPDF_CMD = '/usr/local/bin/wkhtmltopdf'
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/

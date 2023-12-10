@@ -6,7 +6,6 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
-from django.template.loader import render_to_string
 from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic.edit import CreateView, UpdateView
@@ -168,7 +167,6 @@ def generate_pdf(request, incident_id):
 
 def generate_pdf_web(request, incident_id):
     # Fetch incident data based on incident_id
-    incident_form = IncidentForm()
     try:
         incident = Incident.objects.get(pk=incident_id)
     except ObjectDoesNotExist:
