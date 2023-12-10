@@ -129,12 +129,8 @@ def generate_pdf_task(incident_id, user_email):
         context = {"incident": incident, "images": images}
         html_content = render_to_string("incident/incident_form_pdf.html", context)
         #  Generate the PDF using pdfkit
-        options = {
-            "enable-local-file-access": None,
-            "--keep-relative-links": "",
-            "encoding": "UTF-8",
-        }
-        pdf = pdfkit.from_string(html_content, False, options)
+       
+        pdf = pdfkit.from_string(html_content)
         #  Create a BytesIO object to store the PDF content
         pdf_buffer = BytesIO(pdf)
         # Create a unique file name for the PDF
