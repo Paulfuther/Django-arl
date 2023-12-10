@@ -38,7 +38,6 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "arl.blog",
     "django_htmx",
-    "wkhtmltopdf",
     "taggit",
     "arl.user",
     "intl_tel_input",
