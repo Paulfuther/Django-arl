@@ -6,6 +6,7 @@ from arl.incident.views import (
     IncidentUpdateView,
     ProcessIncidentImagesView,
     generate_pdf,
+    generate_pdf_web,
 )
 
 urlpatterns = [
@@ -17,5 +18,6 @@ urlpatterns = [
         name="incident_upload"
     ),
     path("generate-pdf/<int:incident_id>/", generate_pdf, name="generate_pdf"),
+    path("generate-pdf-web/<int:incident_id>/", generate_pdf_web, name="generate_pdf"),
     path("incident_list/", IncidentListView.as_view(), name="incident_list"),
 ]
