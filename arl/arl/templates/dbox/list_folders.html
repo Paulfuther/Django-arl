@@ -17,6 +17,11 @@
         /* Change the width as needed */
     }
 
+    #fileTable td {
+        padding: 2px;
+        /* Adjust the padding as needed */
+    }
+
     .custom-legend {
         font-size: 1.2em;
         /* Adjust the font size */
@@ -26,6 +31,7 @@
         ;
         /* Use a softer color */
     }
+   
 </style>
 
 <div class="container mb-2" style="height: 95vh;">
@@ -50,7 +56,7 @@
                         <td style="padding-right: 10px;">
                             <i class="fas fa-folder" style="color: #0c91ea; font-size: 24px; padding-right: 5px;"></i>
                             <a href="{% url 'list_folders' path=folder.path_lower %}">
-                               {{ folder.name|extract_filename }}</a>
+                                {{ folder.name|extract_filename }}</a>
                         </td>
 
 
@@ -59,32 +65,41 @@
 
                     {% for file_data in files %}
                     <tr>
-                        <td style="padding-right: 10px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        <td
+                            style="padding-right: 10px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                             <div style="display: flex; align-items: center;">
                                 {% if file_data.extension|lower == 'pdf' %}
-                                <i class="far fa-file-pdf" style="color: red; font-size: 24px; padding-right: 5px;"></i>
+                                <i class="far fa-file-pdf"
+                                    style="color: red; font-size: 22px; padding-right: 16px;"></i>
                                 <!-- PDF file icon in red -->
                                 {% elif file_data.extension|lower == 'xlsx' or file_data.extension|lower == 'xls' %}
-                                <i class="far fa-file-excel" style="color: green; font-size: 24px; padding-right: 5px;"></i>
+                                <i class="far fa-file-excel"
+                                    style="color: green; font-size: 22px; padding-right: 16px;"></i>
                                 <!-- XLSX file icon in green -->
                                 {% elif file_data.extension|lower == 'jpg' or file_data.extension|lower == 'jpeg' %}
-                                <i class="far fa-file-image" style="color: blue; font-size: 24px; padding-right: 5px;"></i>
+                                <i class="far fa-file-image"
+                                    style="color: blue; font-size: 22px; padding-right: 16px;"></i>
                                 <!-- Image file icon in blue -->
                                 {% elif file_data.extension|lower == 'mp4' %}
-                                <i class="far fa-file-video" style="color: purple; font-size: 24px; padding-right: 5px;"></i>
+                                <i class="far fa-file-video"
+                                    style="color: purple; font-size: 22px; padding-right: 16px;"></i>
                                 <!-- MP4 file icon in purple -->
                                 {% elif file_data.extension|lower == 'zip' %}
-                                <i class="far fa-file-archive" style="color: rgb(14, 14, 14); font-size: 24px; padding-right: 5px;"></i>
+                                <i class="far fa-file-archive"
+                                    style="color: rgb(14, 14, 14); font-size: 22px; padding-right: 16px;"></i>
                                 <!-- ZIP file icon in default color -->
                                 {% elif file_data.extension|lower == 'docx' %}
-                                <i class="far fa-file-word" style="color: blue; font-size: 24px; padding-right: 5px;"></i>
+                                <i class="far fa-file-word"
+                                    style="color: blue; font-size: 24px; padding-right: 16px;"></i>
                                 <!-- DOCX file icon in blue -->
                                 {% else %}
-                                <i class="far fa-file-pdf" style="color: red; font-size: 24px; padding-right: 5px;"></i>
+                                <i class="far fa-file-pdf"
+                                    style="color: red; font-size: 22px; padding-right: 16px;"></i>
                                 <!-- Default file icon in red -->
                                 {% endif %}
                                 <!-- File details -->
-                                <div style="display: flex; flex-direction: column; justify-content: flex-start; overflow: hidden;">
+                                <div
+                                    style="display: flex; flex-direction: column; justify-content: flex-start; overflow: hidden;">
                                     <!-- File name -->
                                     <a href="{% url 'download_file' %}?path={{ file_data.metadata.path_display|urlencode }}"
                                         style="text-overflow: ellipsis; overflow: hidden;">
@@ -93,7 +108,7 @@
                                     </a>
                                     <!-- Modified date -->
                                     <div style="font-size: 12px; color: #888; margin-left: 5px;">
-                                       {{ file_data.metadata.client_modified|date:"Y-m-d H:i:s" }}</div>
+                                        {{ file_data.metadata.client_modified|date:"Y-m-d H:i:s" }}</div>
                                 </div>
                             </div>
                         </td>
@@ -114,12 +129,24 @@
 
 <!-- Initialize DataTables on the table -->
 <script>
-    
+
     $(document).ready(function () {
         $('#fileTable').DataTable({
+            language: { search: "" },
             responsive: true,
             "pageLength": 10,
         })
+       
+        // Set the placeholder without the word "Search"
+        $('.dataTables_filter input[type="search"]').attr('placeholder', 'Search...');
+
+        // Apply custom CSS styles to align the search box to the left
+        $('.dataTables_filter input[type="search"]').css({
+            'text-align': 'left', // Align the text to the left
+            'border-radius': '10px', // Adjust the border-radius as needed
+            'padding-left': '10px' // Add padding to the left for the text
+        });
+
     });
 </script>
 

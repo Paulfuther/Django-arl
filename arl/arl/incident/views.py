@@ -2,8 +2,11 @@ from io import BytesIO
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Q
 from django.http import JsonResponse
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic.edit import CreateView, UpdateView
@@ -45,7 +48,8 @@ class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView
         generate_pdf_task.delay(self.object.id, self.request.user.email)
 
         messages.success(
-            self.request, "PDF generation started. Check your email. The file is attached."
+            self.request,
+            "PDF generation started. Check your email. The file is attached.",
         )
         return redirect("home")
 
@@ -154,12 +158,25 @@ class ProcessIncidentImagesView(PermissionRequiredMixin, LoginRequiredMixin, Vie
 
 
 def generate_pdf(request, incident_id):
-    user_email = request.user.email 
+    user_email = request.user.email
     generate_pdf_task.delay(incident_id, user_email)
     messages.success(
         request, "PDF generation started. Check your email. The file is attached."
     )
     return redirect("home")
+
+
+def generate_pdf_web(request, incident_id):
+    # Fetch incident data based on incident_id
+    incident_form = IncidentForm()
+    try:
+        incident = Incident.objects.get(pk=incident_id)
+    except ObjectDoesNotExist:
+        raise ValueError("Incident with ID {} does not exist.".format(incident_id))
+
+    images = get_s3_images_for_incident(incident.image_folder, incident.user_employer)
+    context = {"incident": incident, "images": images}
+    return render(request, "incident/incident_form_pdf.html", context)
 
 
 class IncidentListView(PermissionRequiredMixin, ListView):
