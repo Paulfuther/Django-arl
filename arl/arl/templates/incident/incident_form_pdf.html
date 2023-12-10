@@ -107,7 +107,9 @@
         <table style="width: 100%; table-layout: fixed;">>
 
 
-            <div class="incheader"> Primary Incident Type </div>
+            <tr>
+                <td colspan="7" class="incheader" style="font-size: 20px; text-align: left;">Primary Incident Type</td>
+            </tr>
 
             <tr>
                 {% if incident.injuryorillness %}
@@ -170,29 +172,29 @@
 
         </table>
 
-
-
-        <table class="increporthr">
+        <table style="width: 100%; table-layout: fixed;">
             <tr>
                 <td style="background-color: lightgray;"> SECTION 1 - INCIDENT INFORMATION -(always
                     complete this section)</td>
             </tr>
         </table>
 
-        <table>
-
+        <table style="width: 100%; table-layout: fixed;">
             <tr>
-                <td
-                    style="background-color: lightgray; width:25%; text-align:left; vertical-align:top; border-bottom: none">
-                    Location</td>
-                <td style=" width:75%; height:100%; text-align:left; vertical-align:top; border-bottom: none ">
-                    {{incident.store}} </td>
+                <td style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top; border-bottom: none;">
+                    Location
+                </td>
+                <td style="width: 75%; text-align: left; vertical-align: top; border-bottom: none;">
+                    {{incident.store}}
+                </td>
             </tr>
             <tr>
-                <td style="background-color: lightgray; text-align: left; vertical-align: top"> Event
-                    Details </td>
-                <td style="height:300px; text-align:left; vertical-align:top; border-bottom: none ">
-                    {{incident.eventdetails}} </td>
+                <td style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;">
+                    Event Details
+                </td>
+                <td style="width: 75%; text-align: left; vertical-align: top;">
+                    {{incident.eventdetails}}
+                </td>
             </tr>
         </table>
 
