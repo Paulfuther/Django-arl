@@ -7,12 +7,7 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.min.js"></script>
 
     <style type="text/css" media="screen">
-        table {
-            border-collapse: collapse;
-            border: 1px solid black;
-            table-layout: fixed;
-            width: 100%
-        }
+       
 
         table td {
             border: 1px solid black;
@@ -78,12 +73,6 @@
             height: 50px !important;
         }
 
-        .increporthr {
-            width: 100%;
-            padding: 10 0 10 0;
-            border-bottom: none;
-        }
-
         .increporthr td {
             width: 100%;
             padding: 10 0 10 0;
@@ -115,7 +104,7 @@
 
     <main role="main" class="container">
 
-        <table class="increport">
+        <table style="width: 100%; table-layout: fixed;">>
 
 
             <div class="incheader"> Primary Incident Type </div>
@@ -289,7 +278,7 @@
         </table>
 
 
-        <table>
+        <table style="width: 100%; table-layout: fixed;">
             <tr>
                 <td rowspan="3"
                     style="background-color: lightgray; width:25%; text-align:left; vertical-align:top; border-bottom: none">
@@ -566,7 +555,7 @@
             </tr>
         </table>
 
-        <table>
+        <table style="width: 100%; table-layout: fixed;">
 
             <tr>
                 <td>Height: {{incident.height}} </td>
@@ -605,6 +594,7 @@
 
 
         </table>
+
         <table>
 
 
