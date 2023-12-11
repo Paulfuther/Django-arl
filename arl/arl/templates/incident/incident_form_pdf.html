@@ -6,206 +6,249 @@
         crossorigin="anonymous" referrerpolicy="no-referrer" />
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.min.js"></script>
 
-    
+
 </head>
 
 {% block content%}
 
 <body>
 
-    <main role="main" class="container">
+    <main role="main" class="container" style="width: 80%; margin: 0 auto;">
 
-        <table style="width: 100%; table-layout: fixed; border: 1px solid black;">
-
-
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
             <tr>
-                <td colspan="7" class="incheader" style="font-size: 20px; text-align: left;">Primary Incident Type</td>
+                <td colspan="7" class="incheader" style="font-size: 20px; text-align: left; padding: 5px;">Primary
+                    Incident Type</td>
             </tr>
 
             <tr>
                 {% if incident.injuryorillness %}
-                <td> <i class="far fa-check-square"></i> Injury or</td>
+                <td style="padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;;"><i
+                        class="far fa-check-square"></i> Injury or</td>
                 {% else %}
-                <td><i class="far fa-square"></i> Injury or </td>
+                <td style="padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;;"><i
+                        class="far fa-square"></i> Injury or </td>
                 {% endif %}
-
-
 
                 {% if incident.environmental %}
-                <td><i class="far fa-check-square"></i> </td>
+                <td style="padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;;"><i
+                        class="far fa-check-square"></i> </td>
                 {% else %}
-                <td><i class="far fa-square"></i> </td>
+                <td style="padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;;"><i
+                        class="far fa-square"></i> </td>
                 {% endif %}
 
-
                 {% if incident.regulatory %}
-                <td><i class="far fa-check-square"></i> </td>
+                <td style="padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;;"><i
+                        class="far fa-check-square"></i> </td>
                 {% else %}
-                <td><i class="far fa-square"></i> </td>
+                <td style="padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;;"><i
+                        class="far fa-square"></i> </td>
                 {% endif %}
 
                 {% if incident.economicdamage %}
-
-                <td><i class="far fa-check-square"></i> Economic/</td>
+                <td style="padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;;"><i
+                        class="far fa-check-square"></i> Economic/</td>
                 {% else %}
-                <td><i class="far fa-square"></i> Economic/ </td>
+                <td style="padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;;"><i
+                        class="far fa-square"></i> Economic/ </td>
                 {% endif %}
 
                 {% if incident.reputation %}
-
-                <td><i class="far fa-check-square"></i> </td>
+                <td style="padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;;"><i
+                        class="far fa-check-square"></i> </td>
                 {% else %}
-                <td><i class="far fa-square"></i> </td>
+                <td style="padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;;"><i
+                        class="far fa-square"></i> </td>
                 {% endif %}
 
                 {% if incident.security %}
-
-                <td><i class="far fa-check-square"></i> </td>
+                <td style="padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;;"><i
+                        class="far fa-check-square"></i> </td>
                 {% else %}
-                <td><i class="far fa-square"></i> </td>
+                <td style="padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;;"><i
+                        class="far fa-square"></i> </td>
                 {% endif %}
 
                 {% if incident.fire %}
-                <td><i class="far fa-check-square"></i> </td>
+                <td style="padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;;"><i
+                        class="far fa-check-square"></i> </td>
                 {% else %}
-                <td><i class="far fa-square"></i> </td>
+                <td style="padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;;"><i
+                        class="far fa-square"></i> </td>
                 {% endif %}
             </tr>
             <tr>
-                <td>Illnes</td>
-                <td>Environmental</td>
-                <td>Regulatory</td>
-                <td>Damage</td>
-                <td>Reputation</td>
-                <td>Security</td>
-                <td>Fire</td>
+                <td style="padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;;">Illnes</td>
+                <td style="padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;;">Environmental
+                </td>
+                <td style="padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;;">Regulatory
+                </td>
+                <td style="padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;;">Damage</td>
+                <td style="padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;;">Reputation
+                </td>
+                <td style="padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;;">Security</td>
+                <td style="padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;;">Fire</td>
             </tr>
-
         </table>
 
-        <table style="width: 100%; table-layout: fixed; border: 1px solid black;">
+
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
             <tr>
                 <td style="background-color: lightgray;"> SECTION 1 - INCIDENT INFORMATION -(always
                     complete this section)</td>
             </tr>
         </table>
 
-        <table style="width: 100%; table-layout: fixed; border: 1px solid black;">
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
             <tr>
                 <td
-                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top; border-bottom: none;">
+                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top; border-bottom: none; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
                     Location
                 </td>
-                <td style="width: 75%; text-align: left; vertical-align: top; border-bottom: none;">
+                <td
+                    style="width: 75%; text-align: left; vertical-align: top; border-bottom: none; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
                     {{incident.store}}
                 </td>
             </tr>
             <tr>
                 <td
-                    style="width: 25%; height: 300px; background-color: lightgray; text-align: left; vertical-align: top;">
+                    style="width: 25%; height: 300px; background-color: lightgray; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
                     Event Details
                 </td>
-                <td style="width: 75%; height: 300px; text-align: left; vertical-align: top;">
+                <td
+                    style="width: 75%; height: 300px; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
                     {{incident.eventdetails}}
                 </td>
             </tr>
         </table>
 
-        <table style="width: 100%; table-layout: fixed; border: 1px solid black;">
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif; ">
             <tr>
                 <td
-                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;border: 1px solid black;">
+                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
                     Event Date </td>
-                <td style="width: 25%; text-align: left; vertical-align: top; border: 1px solid black;">
+                <td
+                    style="width: 25%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
                     {{incident.eventdate}} </td>
                 <td
-                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top; border: 1px solid black;">
+                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
                     Event Time </td>
-                <td style="width: 25%; text-align: left; vertical-align: top; border: 1px solid black;">
+                <td
+                    style="width: 25%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
                     {{incident.eventtime}} </td>
             </tr>
         </table>
 
-        <table style="width: 100%; table-layout: fixed; border: 1px solid black;">
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
             <tr>
                 <td
-                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;border: 1px solid black;">
+                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
                     Reported By: </td>
-                <td style="width: 25%; text-align: left; vertical-align: top; border: 1px solid black;">
+                <td
+                    style="width: 25%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
                     {{incident.reportedby}} </td>
-                <td style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;border: 1px solid black;"">Phone Number: </td>
-                <td style=" width: 25%; text-align: left; vertical-align: top; border: 1px solid black;">
+                <td
+                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    Phone
+                    Number: </td>
+                <td
+                    style=" width: 25%; text-align: left; vertical-align: top;padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%; ">
                     {{incident.reportedbynumber}} </td>
             </tr>
 
         </table>
 
-        <table style="width: 100%; table-layout: fixed; border: 1px solid black;">
-            <tr style= "border: 1px solid black;">
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
+            <tr style="border: 1px solid black;">
                 <td
-                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;">
+                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
                     Is The Person A:</td>
 
                 {% if incident.suncoremployee %}
-                <td style="width: 15%; text-align: left; vertical-align: top;"> <i
-                        class="far fa-check-square"></i> Suncor Emp </td>
+                <td
+                    style="width: 15%; text-align: left; vertical-align: top;padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-check-square"></i>
+                    Suncor Emp </td>
                 {% else %}
-                <td style="width: 15%; text-align: left; vertical-align: top; "><i
-                        class="far fa-square"></i> Suncor Emp </td>
+                <td
+                    style="width: 15%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-square"></i> Suncor Emp
+                </td>
                 {% endif %}
 
                 {% if incident.contractor %}
-                <td style="width: 15%; text-align: left; vertical-align: top; "> <i
-                        class="far fa-check-square"></i> Contractor</td>
+                <td
+                    style="width: 15%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-check-square"></i>
+                    Contractor</td>
                 {% else %}
-                <td style="width: 15%; text-align: left; vertical-align: top;"><i
-                        class="far fa-square"></i> Contractor </td>
+                <td
+                    style="width: 15%; text-align: left; vertical-align: top;padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-square"></i> Contractor
+                </td>
                 {% endif %}
 
                 {% if incident.associate %}
-                <td style="width: 15%; text-align: left; vertical-align: top; "><i
-                        class="far fa-check-square"></i> Associate </td>
+                <td
+                    style="width: 15%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-check-square"></i>
+                    Associate </td>
                 {% else %}
-                <td style="width: 15%; text-align: left; vertical-align: top; "><i
-                        class="far fa-square"></i> Associate </td>
+                <td
+                    style="width: 15%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-square"></i> Associate
+                </td>
                 {% endif %}
 
                 {% if incident.generalpublic %}
-                <td style="width: 15%; text-align: left; vertical-align: top; "> <i
-                        class="far fa-check-square"></i> General Public</td>
+                <td
+                    style="width: 15%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-check-square"></i>
+                    General Public</td>
                 {% else %}
-                <td style="width: 15%; text-align: left; vertical-align: top;"><i
-                        class="far fa-square"></i> General Public </td>
+                <td
+                    style="width: 15%; text-align: left; vertical-align: top;padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-square"></i> General
+                    Public </td>
                 {% endif %}
 
                 {% if incident.other %}
-                <td style="width: 15%; text-align: left; vertical-align: top; "><i
-                        class="far fa-check-square"></i> Other: {{incident.othertext}}</td>
+                <td
+                    style="width: 15%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-check-square"></i>
+                    Other: {{incident.othertext}}</td>
                 {% else %}
-                <td style="width: 15%; text-align: left; vertical-align: top; "><i
-                        class="far fa-square"></i> Other: {{incident.othertext}} </td>
+                <td
+                    style="width: 15%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-square"></i> Other:
+                    {{incident.othertext}} </td>
                 {% endif %}
             </tr>
 
         </table>
 
-        <table style="width: 100%; table-layout: fixed; border: 1px solid black;">
-            <tr>
-                <td style="width: 25%; height: 300px; background-color: lightgray; text-align: left; vertical-align: top; border: 1px solid black;">
-                    Immediate Actions Taken</td>
-                <td style="width: 75%; height: 300px; text-align: left; vertical-align: top; border: 1px solid black;">
-                    {{incident.actionstaken}} </td>
-            </tr>
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
             <tr>
                 <td
-                    style="width: 25%; height: 300px; background-color: lightgray; text-align: left; vertical-align: top; border: 1px solid black;">
+                    style="width: 25%; height: 300px; background-color: lightgray; text-align: left; vertical-align: top; border: 1px solid black; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    Immediate Actions Taken</td>
+                <td
+                    style="width: 75%; height: 300px; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    {{incident.actionstaken}} </td>
+            </tr>
+
+            <tr style="border-top: 1px solid black;">
+                <td
+                    style="width: 25%; height: 300px; background-color: lightgray; text-align: left; vertical-align: top; border: 1px solid black;padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
                     Corrective Actions Taken</td>
-                <td style="width: 75%; height: 300px; text-align: left; vertical-align: top; border: 1px solid black;">
+                <td
+                    style="width: 75%; height: 300px; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
                     {{incident.correctiveactions}} </td>
             </tr>
         </table>
 
-        <table style="width: 100%; table-layout: fixed; border: 1px solid black;">
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
             <tr>
                 <td style="background-color: lightgray; width:25%;"> SECTION 2 - SPILLS - (complete only if spill
                     occured)</td>
@@ -213,11 +256,13 @@
         </table>
 
 
-        <table style="width: 100%; table-layout: fixed;">
+        <table style="width: 100%; table-layout: fixed; font-family: sans-serif;">
             <tr>
-                <td style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;border: 1px solid black;">
+                <td rowspan="6"
+                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;border: 1px solid black;padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
                     Off Property Impact</td>
-                <td style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;">
+                <td
+                    style="width: 25%;  text-align: left; vertical-align: top;padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
                     {% if incident.sno %}
                     <i class="far fa-check-square"></i> no
                     {% else %}
@@ -235,12 +280,12 @@
                     {% endif %}
                 </td>
 
-                <td
-                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;border: 1px solid black;">
+                <td rowspan="6"
+                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;border: 1px solid black;padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%">
                     Regulatory Authorities Notified?</td>
-                <td style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;"">
+                <td style="width: 25%;  text-align: left; vertical-align: top;">
                     {% if incident.rno %}
-                    <i class="far fa-check-square"></i>no
+                    <i class=" far fa-check-square"></i>no
                     {% else %}
                     <i class="far fa-square"></i> no
                     {% endif %}
@@ -255,124 +300,135 @@
 
 
             <tr>
-                <td> comment </td>
-                <td style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;border: 1px solid black;"></td>
-                <td> comment </td>
+                <td style="width: 25%;"> comment </td>
+
+                <td style="width: 25%;"> comment </td>
 
             </tr>
 
             <tr>
-                <td style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;border: 1px solid black;">
+                <td style="width: 25%; height: 50px; text-align: left; vertical-align: top;border: 1px solid black;">
                     </tdstyle>{{incident.scomment}}</td>
-                <td style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;border: 1px solid black;"></td>
-                <td style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;border: 1px solid black;">
+
+                <td style="width: 25%; height: 50px; text-align: left; vertical-align: top; border: 1px solid black;">
                     </tdstyle>{{incident.rcomment }}</td>
             </tr>
 
         </table>
 
-        <table>
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
             <tr>
-                <td rowspan="3"
-                    style="background-color: lightgray; width:25%; text-align:left; vertical-align:top; border-bottom: none">
+                <td rowspan="6"
+                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;border: 1px solid black;padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%">
                     Product Spilled</td>
                 {% if incident.gas %}
-                <td><i class="far fa-check-square"></i> Gas </td>
+                <td style="width: 25%"><i class="far fa-check-square"></i> Gas </td>
                 {% else %}
-                <td><i class="far fa-square"></i> Gas </td>
+                <td style="width: 25%"><i class="far fa-square"></i> Gas </td>
                 {% endif %}
                 {% if incident.diesel %}
-                <td><i class="far fa-check-square"></i> Diesel </td>
+                <td style="width: 25%"><i class="far fa-check-square"></i> Diesel </td>
                 {% else %}
-                <td><i class="far fa-square"></i> Diesel </td>
+                <td style="width: 25%"><i class="far fa-square"></i> Diesel </td>
                 {% endif %}
                 {% if incident.deiselexhaustfluid %}
-                <td><i class="far fa-check-square"></i> Diesel Exhaust </td>
+                <td style="width: 25%"><i class="far fa-check-square"></i> Diesel Exhaust </td>
                 {% else %}
-                <td><i class="far fa-square"></i> Diesel Exhaust</td>
+                <td style="width: 25%"><i class="far fa-square"></i> Diesel Exhaust</td>
                 {% endif %}
-                <td></td>
+
             </tr>
 
 
             <tr>
                 {% if incident.sewage %}
-                <td><i class="far fa-check-square"></i> Sewage </td>
+                <td style="width: 25%"><i class="far fa-check-square"></i> Sewage </td>
                 {% else %}
-                <td><i class="far fa-square"></i> Sewage</td>
+                <td style="width: 25%"><i class="far fa-square"></i> Sewage</td>
                 {% endif %}
                 {% if incident.chemical %}
-                <td><i class="far fa-check-square"></i> Chemical </td>
+                <td style="width: 25%"><i class="far fa-check-square"></i> Chemical </td>
                 {% else %}
-                <td><i class="far fa-square"></i> Chemical</td>
+                <td style="width: 25%"><i class="far fa-square"></i> Chemical</td>
                 {% endif %}
 
                 {% if incident.other %}
-                <td><i class="far fa-check-square"></i> Other </td>
+                <td style="width: 25%"><i class="far fa-check-square"></i> Other </td>
                 {% else %}
-                <td><i class="far fa-square"></i> Other</td>
+                <td style="width: 25%"><i class="far fa-square"></i> Other</td>
                 {% endif %}
-                <td></td>
+                <td style="width: 25%"></td>
             </tr>
             <tr>
+                <td></td>
                 <td>(Please Specify Chemical) </td>
-                <td>{{incident.chemcomment}} </td>
-
-
                 <td>(Please Specify) </td>
+            </tr>
+            <tr style="border: 1px solid black;">
+                <td></td>
+                <td>{{incident.chemcomment}} </td>
                 <td>{{incident.s2comment}} </td>
             </tr>
+
         </table>
 
-        <table>
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black;">
             <tr>
                 <td rowspan="2"
-                    style="background-color: lightgray; width:25%; text-align:left; vertical-align:top; border-bottom: none">
+                    style="background-color: lightgray; width:25%; text-align:left; vertical-align:top; border-bottom: none; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%">
                     Source Impacted </td>
 
                 {% if incident.air %}
-                <td><i class="far fa-check-square"></i> Air </td>
+                <td style="width: 25%; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%><i class="
+                    far fa-check-square"></i> Air </td>
                 {% else %}
-                <td><i class="far fa-square"></i> Air</td>
+                <td style="width: 25%; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%"><i
+                        class="far fa-square"></i> Air</td>
                 {% endif %}
                 {% if incident.water %}
-                <td><i class="far fa-check-square"></i> Water</td>
+                <td style="width: 25%; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%"><i
+                        class="far fa-check-square"></i> Water</td>
                 {% else %}
-                <td><i class="far fa-square"></i> Water</td>
+                <td style="width: 25%; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%"><i
+                        class="far fa-square"></i> Water</td>
                 {% endif %}
 
-                <td>Volume Release Estimate </td>
-                <td>{{incident.volumerelease}} </td>
+                <td style="width: 25%; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%">
+                    Volume Release Estimate </td>
+
             </tr>
 
             <tr>
                 {% if incident.wildlife %}
-                <td><i class="far fa-check-square"></i> Wildlife </td>
+                <td style="width: 25%; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%"><i
+                        class="far fa-check-square"></i> Wildlife </td>
                 {% else %}
-                <td><i class="far fa-square"></i> Wildlife</td>
+                <td style="width: 25%; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%"><i
+                        class="far fa-square"></i> Wildlife</td>
                 {% endif %}
                 {%if incident.land %}
-                <td><i class="far fa-check-square"></i> Land</td>
+                <td style="width: 25%; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%"><i
+                        class="far fa-check-square"></i> Land</td>
                 {% else %}
-                <td><i class="far fa-square"></i> Land</td>
+                <td style="width: 25%; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%"><i
+                        class="far fa-square"></i> Land</td>
                 {% endif %}
-
-                <td></td>
-                <td></td>
+                <td style="width: 25%; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%">
+                    {{incident.volumerelease}} </td>
             </tr>
         </table>
 
 
-        <table class="increporthr">
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
             <tr>
-                <td style="background-color: lightgray; width:25%;"> SECTION 3 SECURITY - (complete only for security
+                <td style="background-color: lightgray;"> SECTION 3 SECURITY - (complete only for security
                     such as a theft, robbery,
                     break & enter or drive off)</td>
             </tr>
         </table>
 
 
-        <table>
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
             <tr>
                 <td rowspan="8"
                     style="background-color: lightgray; width:25%; text-align:left; vertical-align:top; border-bottom: none">
@@ -487,47 +543,70 @@
             </tr>
         </table>
 
-        <table style="width: 100%; table-layout: fixed;">
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
 
             <tr>
-                <td>Height: {{incident.height}} </td>
-                <td style="width:25%; text-align:right; padding-right:10px">{{incident.tatoos}} :Tatoos </td>
+                <td style="width:25%; border: 1px solid black; font-family: sans-serif;">Height: {{incident.height}}
+                </td>
+                <td
+                    style="width:25%; text-align:right; padding-right:10px ;border: 1px solid black; font-family: sans-serif;">
+                    {{incident.tatoos}} :Tatoos </td>
             </tr>
             <tr>
-                <td>Weight: {{incident.weight}} </td>
-                <td style="width:25%; text-align:right; padding-right:10px">{{incident.hat}} :Type of Hat </td>
+                <td style="width:25%; border: 1px solid black; font-family: sans-serif;">Weight: {{incident.weight}}
+                </td>
+                <td
+                    style="width:25%; text-align:right; padding-right:10px  ;border: 1px solid black; font-family: sans-serif;">
+                    {{incident.hat}} :Type of Hat </td>
             </tr>
             <tr>
-                <td>Hair Color/Cut: {{incident.haircolor}} </td>
-                <td style="width:25%; text-align:right; padding-right:10px">{{incident.shirt}} :Shirt/Coat </td>
+                <td style="width:25%; border: 1px solid black; font-family: sans-serif;">Hair Color/Cut:
+                    {{incident.haircolor}} </td>
+                <td
+                    style="width:25%; text-align:right; padding-right:10px  ;border: 1px solid black; font-family: sans-serif;">
+                    {{incident.shirt}} :Shirt/Coat </td>
             </tr>
             <tr>
-                <td>Complexion: {{incident.complexion}} </td>
-                <td style="width:25%; text-align:right; padding-right:10px">{{incident.shoes}} :Shoes </td>
+                <td style="width:25%; border: 1px solid black; font-family: sans-serif;">Complexion:
+                    {{incident.complexion}} </td>
+                <td
+                    style="width:25%; text-align:right; padding-right:10px ;border: 1px solid black; font-family: sans-serif;">
+                    {{incident.shoes}} :Shoes </td>
             </tr>
             <tr>
-                <td>Eye/Eyeglasses: {{incident.eyeeyeglasses}} </td>
-                <td style="width:25%; text-align:right; padding-right:10px">{{incident.voice}} :Voice </td>
+                <td style="width:25%; border: 1px solid black; font-family: sans-serif;">Eye/Eyeglasses:
+                    {{incident.eyeeyeglasses}} </td>
+                <td
+                    style="width:25%; text-align:right; padding-right:10px ;border: 1px solid black; font-family: sans-serif;">
+                    {{incident.voice}} :Voice </td>
             </tr>
             <tr>
-                <td>Licence # : {{incident.licencenumber}} </td>
-                <td style="width:25%; text-align:right; padding-right:10px">{{incident.bumpersticker}} :Bumper Sticker
+                <td style="width:25%; border: 1px solid black; font-family: sans-serif;">Licence # :
+                    {{incident.licencenumber}} </td>
+                <td
+                    style="width:25%; text-align:right; padding-right:10px ;border: 1px solid black; font-family: sans-serif;">
+                    {{incident.bumpersticker}} :Bumper Sticker
                 </td>
             </tr>
             <tr>
-                <td>Make/Model: {{incident.makemodel}} </td>
-                <td style="width:25%; text-align:right; padding-right:10px">{{incident.direction}} :Direction of Travel
+                <td style="width:25%; border: 1px solid black; font-family: sans-serif;">Make/Model:
+                    {{incident.makemodel}} </td>
+                <td
+                    style="width:25%; text-align:right; padding-right:10px ;border: 1px solid black; font-family: sans-serif;">
+                    {{incident.direction}} :Direction of Travel
                 </td>
             </tr>
             <tr>
-                <td>Color: {{incident.color}} </td>
-                <td style="width:25%; text-align:right; padding-right:10px"> {{incident.damage}} :Damage/Rust </td>
+                <td style="width:25%; border: 1px solid black; font-family: sans-serif;">Color: {{incident.color}} </td>
+                <td
+                    style="width:25%; text-align:right; padding-right:10px ;border: 1px solid black; font-family: sans-serif;">
+                    {{incident.damage}} :Damage/Rust </td>
             </tr>
 
 
         </table>
 
-        <table>
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
 
 
 
