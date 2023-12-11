@@ -177,6 +177,18 @@ def generate_pdf_web(request, incident_id):
     return render(request, "incident/incident_form_pdf.html", context)
 
 
+def generate_pdf2(request, incident_id):
+    # Fetch incident data based on incident_id
+    try:
+        incident = Incident.objects.get(pk=incident_id)
+    except ObjectDoesNotExist:
+        raise ValueError("Incident with ID {} does not exist.".format(incident_id))
+
+    images = get_s3_images_for_incident(incident.image_folder, incident.user_employer)
+    context = {"incident": incident, "images": images}
+    return render(request, "incident/incident_form_pdf.html", context)
+
+
 class IncidentListView(PermissionRequiredMixin, ListView):
     model = Incident
     template_name = "incident/incident_list.html"
