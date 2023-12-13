@@ -19,7 +19,7 @@
 
 </head>
 
-<div class="container">
+<div class="container" >
     <div class="row justify-content-center">
         <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
             <table id="table_id" class="display">
@@ -28,6 +28,7 @@
                         <th>ID</th>
                         <th>Store</th>
                         <th>Description</th>
+                        <th>Date</th>
                         <th>Edit</th>
                         <th>PDF</th>
                     </tr>
@@ -38,6 +39,7 @@
                         <td>{{ incident.id }}</td>
                         <td>{{ incident.store.number }}</td>
                         <td>{{ incident.brief_description }}</td>
+                        <td>{{ incident.eventdate }}</td>
                         <td>
                             <a href="{% url 'update_incident' pk=incident.id %}" class="btn btn-primary">Edit</a>
                         </td>
@@ -57,10 +59,7 @@
 <script>
     $(document).ready(function () {
         $('#table_id').DataTable({
-
-            dom: 'Bfrtip',
             responsive: true,
-
         });
     });
 </script>
