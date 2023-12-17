@@ -3,7 +3,7 @@ from __future__ import absolute_import, unicode_literals
 import io
 import os
 import subprocess
-from datetime import datetime, date
+from datetime import date, datetime
 from io import BytesIO
 
 import pdfkit
@@ -19,7 +19,11 @@ from django.utils.text import slugify
 from arl.celery import app
 from arl.dsign.helpers import create_docusign_envelope, get_docusign_envelope
 from arl.dsign.models import DocuSignTemplate
-from arl.helpers import get_s3_images_for_incident, upload_to_linode_object_storage, conn
+from arl.helpers import (
+    get_s3_images_for_incident,
+    remove_old_backups,
+    upload_to_linode_object_storage,
+)
 from arl.incident.models import Incident
 from arl.msg.helpers import (
     create_email,
@@ -308,27 +312,6 @@ def process_docusign_webhook(payload):
         return f"Error processing DocuSign webhook: {str(e)}"
 
 
-@app.task(name="postgress_cleanup")
-def remove_old_backups():
-    bucket_name = settings.LINODE_BUCKET_NAME
-    folder_path = 'POSTGRESS/'
-    today = date.today()
-    try:
-        bucket = conn.get_bucket(bucket_name)
-        objects = bucket.list(prefix=folder_path)
-        for obj in objects:
-            modified_time = obj.last_modified.date()
-            age_in_days = (today - modified_time).days
-
-            if age_in_days > 7:
-                conn.delete_object(obj, bucket_name=bucket_name)
-
-        return "Old backups removed successfully"
-
-    except Exception as e:
-        return f"Error occurred during backup cleanup: {e}"
-
-
 @app.task(name="postgress_backup")
 def create_db_backup_and_upload():
     database_name = settings.DATABASES["default"]["NAME"]
@@ -351,7 +334,7 @@ def create_db_backup_and_upload():
         # Upload the in-memory backup file to Linode Object Storage
         object_key = f"POSTGRES/postgres_{current_date}.sql"
         upload_to_linode_object_storage(in_memory_backup, object_key)
-        remove_old_backups.apply_async()
+        remove_old_backups()
         return f"Database backup created and uploaded successfully: {object_key}"
 
     except subprocess.CalledProcessError as e:
