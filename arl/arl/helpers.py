@@ -1,3 +1,5 @@
+from datetime import date
+
 import boto
 import boto.s3.connection
 from django.conf import settings
@@ -10,12 +12,12 @@ LINODE_URL = settings.LINODE_URL
 
 try:
     conn = boto.connect_s3(
-            aws_access_key_id=LINODE_ACCESS_KEY,
-            aws_secret_access_key=LINODE_SECRET_KEY,
-            host=LINODE_REGION,
-            # is_secure=False,               # uncomment if you are not using ssl
-            calling_format=boto.s3.connection.OrdinaryCallingFormat(),
-            )
+        aws_access_key_id=LINODE_ACCESS_KEY,
+        aws_secret_access_key=LINODE_SECRET_KEY,
+        host=LINODE_REGION,
+        # is_secure=False,               # uncomment if you are not using ssl
+        calling_format=boto.s3.connection.OrdinaryCallingFormat(),
+    )
 except Exception as e:
     print("An error occurred while connecting to S3:", e)
 
@@ -23,7 +25,7 @@ except Exception as e:
 def upload_to_linode_object_storage(file_obj, object_key):
     # Connect to Linode Object Storage
     # Get the bucket
-    bucket = conn.get_bucket('paulfuther')
+    bucket = conn.get_bucket("paulfuther")
     # Create the S3 key
     key = bucket.new_key(object_key)
     # Set the key's contents from the file object
@@ -34,17 +36,38 @@ def upload_to_linode_object_storage(file_obj, object_key):
 
 def get_s3_images_for_incident(image_folder, employer):
     bucket_name = LINODE_BUCKET_NAME
-    folder_path = f'SITEINCIDENT/{employer}/{image_folder}/'
+    folder_path = f"SITEINCIDENT/{employer}/{image_folder}/"
     images = []
     try:
         bucket = conn.get_bucket(bucket_name)
         objects = bucket.list(prefix=folder_path)
         for obj in objects:
-            if obj.key.endswith(('jpg', 'jpeg', 'png', 'gif')):
+            if obj.key.endswith(("jpg", "jpeg", "png", "gif")):
                 image_key = obj.key
-                image_url = conn.generate_url(expires_in=3600, method='GET',
-                                              bucket=bucket_name, key=image_key)
+                image_url = conn.generate_url(
+                    expires_in=3600, method="GET", bucket=bucket_name, key=image_key
+                )
                 images.append(image_url)
     except Exception as e:
         print("An error occurred:", e)
     return images
+
+
+def remove_old_backups():
+    bucket_name = settings.LINODE_BUCKET_NAME
+    folder_path = "POSTGRESS/"
+    today = date.today()
+    try:
+        bucket = conn.get_bucket(bucket_name)
+        objects = bucket.list(prefix=folder_path)
+        for obj in objects:
+            modified_time = obj.last_modified.date()
+            age_in_days = (today - modified_time).days
+
+            if age_in_days > 7:
+                conn.delete_object(obj, bucket_name=bucket_name)
+
+        return "Old backups removed successfully"
+
+    except Exception as e:
+        return f"Error occurred during backup cleanup: {e}"

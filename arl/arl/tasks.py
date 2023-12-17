@@ -1,9 +1,14 @@
 from __future__ import absolute_import, unicode_literals
 
+import io
+import os
+import subprocess
+from datetime import date, datetime
 from io import BytesIO
 
 import pdfkit
 from celery.utils.log import get_task_logger
+from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
@@ -13,7 +18,12 @@ from django.utils.text import slugify
 
 from arl.celery import app
 from arl.dsign.helpers import create_docusign_envelope, get_docusign_envelope
-from arl.helpers import get_s3_images_for_incident, upload_to_linode_object_storage
+from arl.dsign.models import DocuSignTemplate
+from arl.helpers import (
+    get_s3_images_for_incident,
+    remove_old_backups,
+    upload_to_linode_object_storage,
+)
 from arl.incident.models import Incident
 from arl.msg.helpers import (
     create_email,
@@ -26,7 +36,6 @@ from arl.msg.helpers import (
 )
 from arl.msg.models import EmailEvent, EmailTemplate, SmsLog
 from arl.user.models import CustomUser
-from arl.dsign.models import DocuSignTemplate
 
 logger = get_task_logger(__name__)
 
@@ -261,7 +270,9 @@ def process_docusign_webhook(payload):
             if "envelopeDocuments" in envelope_summary:
                 envelope_documents = envelope_summary["envelopeDocuments"]
                 if envelope_documents:
-                    document = envelope_documents[0]  # Assuming the document of interest is the first one
+                    document = envelope_documents[
+                        0
+                    ]  # Assuming the document of interest is the first one
                     document_name = document.get("name", "")
             if status == "sent":
                 recipients = envelope_summary.get("recipients", {})
@@ -299,3 +310,33 @@ def process_docusign_webhook(payload):
     except Exception as e:
         logger.error(f"Error processing DocuSign webhook: {str(e)}")
         return f"Error processing DocuSign webhook: {str(e)}"
+
+
+@app.task(name="postgress_backup")
+def create_db_backup_and_upload():
+    database_name = settings.DATABASES["default"]["NAME"]
+    database_user = settings.DATABASES["default"]["USER"]
+    # backup_file = settings.BACKUP_FILE_PATH_DEV
+    pg_dump_path = settings.BACKUP_DUMP_PATH_DEV
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    # Run PostgreSQL pg_dump command and capture output in memory
+    dump_command = f"{pg_dump_path} -U {database_user} -d {database_name}"
+    try:
+        # Run the command and capture the output
+        backup_output = subprocess.check_output(dump_command, shell=True)
+
+        # Create an in-memory buffer and write the output to it
+        in_memory_backup = io.BytesIO(backup_output)
+
+        # Reset the pointer to the beginning of the in-memory file
+        in_memory_backup.seek(0)
+
+        # Upload the in-memory backup file to Linode Object Storage
+        object_key = f"POSTGRES/postgres_{current_date}.sql"
+        upload_to_linode_object_storage(in_memory_backup, object_key)
+        remove_old_backups()
+        return f"Database backup created and uploaded successfully: {object_key}"
+
+    except subprocess.CalledProcessError as e:
+        print(f"An error occurred during backup or upload: {e}")
+        return f"An error occurred during backup or upload: {e}"
