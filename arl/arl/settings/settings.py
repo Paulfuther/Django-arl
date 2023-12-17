@@ -222,8 +222,10 @@ EMAIL_HOST_USER = "apikey"  # this is exactly the value 'apikey'
 EMAIL_HOST_PASSWORD = SENDGRID_API_KEY
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-DEFAULT_FROM_EMAIL = "paul.futher@outlook.com"
 
+
+BACKUP_FILE_PATH_DEV = os.environ.get('BACKUP_FILE_PATH_DEV')
+BACKUP_DUMP_PATH_DEV = os.environ.get('BACKUP_DUMP_PATH_DEV')
 
 try:
     from .local_settings import *
