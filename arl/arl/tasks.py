@@ -317,7 +317,7 @@ def create_db_backup_and_upload():
     database_name = settings.DATABASES["default"]["NAME"]
     database_user = settings.DATABASES["default"]["USER"]
     # backup_file = settings.BACKUP_FILE_PATH_DEV
-    pg_dump_path = settings.BACKUP_DUMP_PATH_DEV
+    pg_dump_path = settings.BACKUP_DUMP_PATH
     current_date = datetime.now().strftime("%Y-%m-%d")
     # Run PostgreSQL pg_dump command and capture output in memory
     dump_command = f"{pg_dump_path} -U {database_user} -d {database_name}"
