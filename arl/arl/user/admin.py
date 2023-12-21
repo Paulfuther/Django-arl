@@ -1,27 +1,18 @@
 import io
 
-import openpyxl
 from django.contrib import admin
-from django.contrib.admin import AdminSite
-from django.contrib.auth import login
 from django.contrib.auth.admin import UserAdmin
-from django.contrib.auth.models import Group
 from django.http import HttpResponse
-from django.shortcuts import redirect, render
-from django.views import View
 from openpyxl import Workbook
-from openpyxl.utils.dataframe import dataframe_to_rows
-from twilio.base.exceptions import TwilioException
 
 from arl.dsign.models import DocuSignTemplate
 from arl.incident.models import Incident
-from arl.msg.helpers import request_verification_token
 from arl.msg.models import BulkEmailSendgrid, EmailTemplate, Twimlmessages
 
 from .models import CustomUser, Employer, Store
-from .views import CustomAdminLoginView
 
 fields = list(UserAdmin.fieldsets)
+
 fields[1] = (
     "Personal Info",
     {
