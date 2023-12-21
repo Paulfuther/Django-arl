@@ -73,7 +73,7 @@ def send_template_email_task(group_id, subject, sendgrid_id):
     try:
         # Retrieve all users within the group
         group = Group.objects.get(pk=group_id)
-        users_in_group = group.user_set.all()
+        users_in_group = group.user_set.filter(is_active=True)
         # Retrieve the template name based on the sendgrid_id
         template = EmailTemplate.objects.get(sendgrid_id=sendgrid_id)
         template_name = template.name
