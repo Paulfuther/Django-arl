@@ -1,5 +1,5 @@
 <nav class="navbar navbar-expand-lg bg-body-tertiary">
-  <div class="container">
+  <div class="container justify-content-center">
     <a class="navbar-brand fs-3" href="#">ARL</a>
 
 
@@ -9,7 +9,7 @@
     </button>
 
 
-    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+    <div class="collapse navbar-collapse flex-grow-0" id="navbarSupportedContent">
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
         <li class="nav-item">
           <a class="nav-link active" aria-current="page" href="{% url 'home' %}">Home</a>
@@ -23,13 +23,23 @@
 
             <li><a class="dropdown-item" href="{% url 'logout' %}">Logout</a></li>
             <li><a class="dropdown-item" href="{% url 'register' %}">Register</a></li>
+            {% if user.is_dropbox %}
             <li><a class="dropdown-item" href="{% url 'list_folders' %}">Drop Box</a></li>
+            {% endif %}
+         
             <li><a class="dropdown-item" href="{% url 'create_incident' %}">Make Incident Form</a></li>
             <li><a class="dropdown-item" href="{% url 'incident_list' %}">View/Edit Incident Form</a></li>
+         
+            {% if user.is_template_email %}
             <li><a class="dropdown-item" href="{% url 'send_template_email_view' %}">Send Template Email</a></li>
+            {% endif %}
+            {% if user.is_docusign %}
             <li><a class="dropdown-item" href="{% url 'CreateEnvelope' %}">Send Docusign Doc</a></li>
+            {% endif %}
+            {% if user.is_comms %}
             <li><a class="dropdown-item" href="{% url 'fetch_twilio' %}">SMS Logs</a></li>
             <li><a class="dropdown-item" href="{% url 'fetch_twilio_calls' %}">Call Logs</a></li>
+            {% endif %}
             <li>
               <hr class="dropdown-divider">
             </li>

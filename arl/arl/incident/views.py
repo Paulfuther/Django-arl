@@ -1,10 +1,14 @@
 from io import BytesIO
 
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth.mixins import (
+    LoginRequiredMixin,
+    PermissionRequiredMixin,
+    UserPassesTestMixin,
+)
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.views import View
@@ -22,13 +26,24 @@ from .models import Incident
 class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView):
     model = Incident
     login_url = "/login/"
-    permission_required = "incident.can_add_incident"
-    raise_exception = True  # Raise exception when no access
-    # instead of redirect
-    permission_denied_message = "You are not allowed to add incidents."
+    permission_required = "incident.add_incident"
     form_class = IncidentForm
     template_name = "incident/create_incident.html"
     success_url = reverse_lazy("home")
+    # permission_denied_message = "You are not allowed to add incidents."
+
+    def handle_no_permission(self):
+        # Render the custom 403.html template for permission denial
+        return render(self.request, "incident/403.html", status=403)
+
+    def dispatch(self, request, *args, **kwargs):
+        try:
+            # Your print statement for debugging
+            print("Dispatch method called.")
+            return super().dispatch(request, *args, **kwargs)
+        except Exception as e:
+            print(f"Exception occurred: {e}")
+            raise
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -59,13 +74,23 @@ class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView
 class IncidentUpdateView(PermissionRequiredMixin, LoginRequiredMixin, UpdateView):
     model = Incident
     login_url = "/login/"
-    permission_required = "incident.can_add_incident"
-    raise_exception = True  # Raise exception when
-    # no access instead of redirect
-    permission_denied_message = "You are not allowed to add incidents."
+    permission_required = "incident.add_incident"
     form_class = IncidentForm
     template_name = "incident/create_incident.html"
     success_url = reverse_lazy("incident_list")
+
+    def handle_no_permission(self):
+        # Render the custom 403.html template for permission denial
+        return render(self.request, "incident/403.html", status=403)
+
+    def dispatch(self, request, *args, **kwargs):
+        try:
+            # Your print statement for debugging
+            print("Dispatch method called.")
+            return super().dispatch(request, *args, **kwargs)
+        except Exception as e:
+            print(f"Exception occurred: {e}")
+            raise
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
@@ -105,7 +130,7 @@ class IncidentUpdateView(PermissionRequiredMixin, LoginRequiredMixin, UpdateView
 
 class ProcessIncidentImagesView(PermissionRequiredMixin, LoginRequiredMixin, View):
     login_url = "/login/"
-    permission_required = "incident.can_add_incident"
+    permission_required = "incident.add_incident"
     raise_exception = True  # Raise exception when no access
     # instead of redirect
     permission_denied_message = "You are not allowed to add incidents."
@@ -181,6 +206,11 @@ class IncidentListView(PermissionRequiredMixin, ListView):
     model = Incident
     template_name = "incident/incident_list.html"
     context_object_name = "incidents"
-    permission_required = "incident.can_view_incident"
+    permission_required = "incident.view_incident"
     raise_exception = True
     permission_denied_message = "You are not allowed to view incidents."
+
+
+def Permission_Denied_View(request, exception):
+    def get(self, request, exception):
+        return render(request, "incident/403.html", status=403)
