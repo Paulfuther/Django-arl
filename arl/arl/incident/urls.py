@@ -5,6 +5,7 @@ from arl.incident.views import (
     IncidentListView,
     IncidentUpdateView,
     ProcessIncidentImagesView,
+    Permission_Denied_View,
     generate_pdf,
 )
 
@@ -18,4 +19,7 @@ urlpatterns = [
     ),
     path("generate-pdf/<int:incident_id>/", generate_pdf, name="generate_pdf"),
     path("incident_list/", IncidentListView.as_view(), name="incident_list"),
+    path('403/', Permission_Denied_View, name='permission_denied'),
 ]
+
+handler403 = 'arl.incident.views.Permission_Denied_View'

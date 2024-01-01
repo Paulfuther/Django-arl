@@ -48,6 +48,26 @@ class CustomUser(AbstractUser):
     def __str__(self):
         return self.first_name
 
+    @property
+    def is_docusign(self):
+        return self.groups.filter(name='docusign').exists()
+
+    @property
+    def is_dropbox(self):
+        return self.groups.filter(name='dropbox').exists()
+
+    @property
+    def is_incident_form(self):
+        return self.groups.filter(name='incident_form').exists()
+
+    @property
+    def is_comms(self):
+        return self.groups.filter(name='comms').exists()
+
+    @property
+    def is_template_email(self):
+        return self.groups.filter(name='template_email').exists()
+
 
 class Store(models.Model):
     number = models.IntegerField()
