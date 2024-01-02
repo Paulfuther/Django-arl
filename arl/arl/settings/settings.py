@@ -202,6 +202,7 @@ LINODE_NAME = os.environ.get("LINODE_BUCKET_NAME")
 LINODE_URL = os.environ.get("LINODE_BUCKET_URL")
 LINODE_REGION = os.environ.get("LINODE_REGION")
 LINODE_BUCKET_NAME = os.environ.get("LINODE_BUCKET_NAME")
+LINODE_S3_POSTGRES_FOLDER = os.environ.get("LINODE_S3_POSTGRES_FOLDER")
 
 # twillio variables
 
