@@ -3,12 +3,10 @@ from io import BytesIO
 from django.contrib import messages
 from django.contrib.auth.mixins import (
     LoginRequiredMixin,
-    PermissionRequiredMixin,
-    UserPassesTestMixin,
+    PermissionRequiredMixin
 )
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Q
-from django.http import HttpResponseForbidden, JsonResponse
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.views import View
