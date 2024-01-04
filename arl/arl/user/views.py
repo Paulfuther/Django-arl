@@ -1,24 +1,26 @@
+import traceback
+
 from django.conf import settings
-from django.contrib import admin, messages
-from django.contrib.admin import AdminSite
-from django.contrib.auth import authenticate, login, logout
+from django.contrib import messages
+from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import Group
-from django.contrib.auth.views import LoginView, PasswordResetView
-from django.contrib.messages.views import SuccessMessageMixin
+from django.contrib.auth.views import LoginView
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
-from django.urls import reverse, reverse_lazy
+from django.urls import reverse
 from django.views import View
 from twilio.base.exceptions import TwilioException
 
 from arl.msg.helpers import check_verification_token, request_verification_token
 from arl.tasks import (
     create_docusign_envelope_task,
-    create_newhiredata_email,
+    create_newhire_data_email,
+    send_newhire_template_email_task,
     send_sms_task,
-    send_template_email_task,
 )
 
 from .forms import CustomUserCreationForm, TwoFactorAuthenticationForm
@@ -26,68 +28,94 @@ from .models import CustomUser, Employer
 
 
 def register(request):
-    employers = Employer.objects.all()  # Retrieve all employers from the database
+    employers = Employer.objects.all()
     if request.method == "POST":
         form = CustomUserCreationForm(request.POST)
-        # print(form.data)
-        if form.is_valid():
-            verified_phone_number = request.POST.get("phone_number")
-            if verified_phone_number is None:
-                raise Http404("Phone number not found in form data.")
-            # print(verified_phone_number)
-            user = form.save(commit=False)
-            user.phone_number = verified_phone_number
-            user.save()
-            # send welcome email
-            send_template_email_task.delay(
-                user.email,
-                "Welcome Aboard",
-                user.first_name,
-                settings.SENDGRID_NEWHIRE_ID,
-            )
-            # assign to group GSA
-            gsa_group_name = "GSA"
-            gsa_group, created = Group.objects.get_or_create(name=gsa_group_name)
-            user.groups.add(gsa_group)
-            # create docusign newhire file
-            d_name = form.cleaned_data["username"]
-            d_email = form.cleaned_data["email"]
-            ds_template = settings.DOCUSIGN_TEMPLATE_ID
-            envelope_args = {
-                "signer_email": d_email,
-                "signer_name": d_name,
-                "template_id": ds_template,
-            }
-            create_docusign_envelope_task.delay(envelope_args)
-            # create HR new hire email
-            date_obj = form.cleaned_data["dob"]
-            serialized_date = date_obj.isoformat()
-            email_data = {
-                "firstname": form.cleaned_data["first_name"],
-                "lastname": form.cleaned_data["last_name"],
-                "email": form.cleaned_data["email"],
-                "mobilephone": verified_phone_number,
-                "addressone": form.cleaned_data["address"],
-                "addresstwo": form.cleaned_data["address_two"],
-                "city": form.cleaned_data["city"],
-                "province": form.cleaned_data["state_province"],
-                "postal": form.cleaned_data["postal"],
-                "country": form.cleaned_data["country"],
-                "sin_number": form.cleaned_data["sin"],
-                "dob": serialized_date,
-            }
-            print(email_data)
-            create_newhiredata_email.delay(**email_data)
-            # complete registration and redirect to home with a message.
-            messages.success(
-                request,
-                "Thank you for registering. Please check your email for your New Hire File from Docusign.",
-            )
-            return redirect("home")
+        try:
+            if form.is_valid():
+                verified_phone_number = request.POST.get("phone_number")
+                if verified_phone_number is None:
+                    raise Http404("Phone number not found in form data.")
+
+                user = form.save(commit=False)
+                user.phone_number = verified_phone_number
+                user.save()
+                messages.success(
+                    request,
+                    "Thank you for registering. Please check your email for your New Hire File from Docusign.",
+                )
+                return redirect("home")
+        except Exception as e:
+            # Handle exceptions during form processing
+            print(f"An error occurred during registration: {e}")
+            traceback.print_exc()
+            messages.error(request, "An error occurred during registration.")
+            return redirect("home")  # Redirect to home page with error message
+            # You may add more detailed error handling or redirect to an error page
     else:
         form = CustomUserCreationForm()
         print(form.errors)
     return render(request, "user/index.html", {"form": form, "Employer": employers})
+
+
+# signal to trigger events post save of new use.
+@receiver(post_save, sender=CustomUser)
+def handle_new_hire_registration(sender, instance, created, **kwargs):
+    if created:
+        try:
+            send_newhire_template_email_task.delay(
+                instance.email,
+                "Welcome Aboard",
+                instance.first_name,
+                settings.SENDGRID_NEWHIRE_ID,
+            )
+
+            # Assign user to group GSA
+            gsa_group_name = "GSA"
+            gsa_group, created = Group.objects.get_or_create(name=gsa_group_name)
+            instance.groups.add(gsa_group)
+
+            # Create Docusign new hire file
+            envelope_args = {
+                "signer_email": instance.email,
+                "signer_name": instance.username,
+                "template_id": settings.DOCUSIGN_TEMPLATE_ID,
+            }
+            create_docusign_envelope_task.delay(envelope_args)
+
+            # Create HR new hire email
+            country_code = instance.country.code if instance.country else None
+            # Convert dob to a string in ISO 8601 format
+            dob_serializable = (
+                instance.dob.strftime("%Y-%m-%d") if instance.dob else None
+            )
+
+            email_data = {
+                "firstname": instance.first_name,
+                "lastname": instance.last_name,
+                "email": instance.email,
+                "mobilephone": instance.phone_number,
+                "addressone": instance.address,
+                "addresstwo": instance.address_two,
+                "city": instance.city,
+                "province": instance.state_province,
+                "postal": instance.postal,
+                "country": country_code,
+                "sin_number": instance.sin,
+                "dob": dob_serializable,
+            }
+            print(email_data)
+            create_newhire_data_email.delay(**email_data)
+
+            # Send SMS to the newly registered user
+            send_sms_task.delay(
+                instance.phone_number,
+                "Welcome Aboard! Thank you for registering. Check your email for a link to Docusign to complete your new hire file",
+            )
+
+        except Exception as e:
+            # Handle exceptions or errors
+            print(f"Error during new hire registration: {e}")
 
 
 class CheckPhoneNumberUniqueView(View):
@@ -309,5 +337,3 @@ class CustomAdminLoginView(LoginView):
                     # Redirect back to the login page (you may need to specify the correct URL name)
                     return redirect(reverse("custom_admin_login"))
             return redirect("admin:index")
-
-

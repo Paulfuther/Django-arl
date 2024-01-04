@@ -1,13 +1,10 @@
 import base64
 import json
 
-import requests
 from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
-from django.core.mail import send_mail
-from django.core.mail.backends.base import BaseEmailBackend
+from django.db.models import Q
 from django.http import HttpResponse
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import (
@@ -87,13 +84,15 @@ def create_email(to_email, subject, name, template_id):
 
 def create_hr_newhire_email(**kwargs):
     CustomUser = get_user_model()
-    hr_group = Group.objects.get(name="HR")
 
     # Get all active users in the 'hr' group
-    hr_users = CustomUser.objects.filter(groups=hr_group, is_active=True)
-
+    hr_users = CustomUser.objects.filter(
+        Q(is_active=True) & Q(groups__name="new_hire_data_email")
+    )
     # Extract email addresses from the CustomUser objects
     to_emails = [user.email for user in hr_users]
+
+    # Prepare Email
     message = Mail(
         from_email=settings.MAIL_DEFAULT_SENDER,
         to_emails=to_emails,
@@ -114,13 +113,19 @@ def create_hr_newhire_email(**kwargs):
         "dob": kwargs["dob"],
     }
     message.template_id = "d-d0806dff1e62449d9ba8cfcb481accaa"
-    response = sg.send(message)
 
-    # Handle the response and return an appropriate value based on your requirements
-    if response.status_code == 202:
-        return True
-    else:
-        print("Failed to send email. Error code:", response.status_code)
+    try:
+        response = sg.send(message)
+
+        # Handle the response and return an appropriate value based on your requirements
+        if response.status_code == 202:
+            return True
+        else:
+            print("Failed to send email. Error code:", response.status_code)
+            return False
+
+    except Exception as e:
+        print("Error sending email:", e)
         return False
 
 
