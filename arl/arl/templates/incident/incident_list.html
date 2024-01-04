@@ -57,11 +57,15 @@
 </div>
 
 <script>
-    $(document).ready(function () {
-        $('#table_id').DataTable({
-            responsive: true,
-        });
+    $(document).ready(function() {
+    $('#table_id').DataTable({
+        deferRender: {% if defer_render %} true {% else %} false {% endif %},
+        initComplete: function(settings, json) {
+            $('#table_id').css('opacity', '1');
+        }
+        // Other DataTables options...
     });
+});
 </script>
 
 {% endblock %}

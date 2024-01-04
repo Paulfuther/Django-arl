@@ -1,9 +1,9 @@
 from __future__ import absolute_import, unicode_literals
 
+import imaplib
 import io
-import os
 import subprocess
-from datetime import date, datetime
+from datetime import datetime
 from io import BytesIO
 
 import pdfkit
@@ -79,6 +79,20 @@ def send_template_email_task(group_id, subject, sendgrid_id):
         template_name = template.name
         for user in users_in_group:
             create_email(user.email, subject, user.first_name, sendgrid_id)
+
+        return f"Template '{template_name}' Emails Sent Successfully"
+
+    except Exception as e:
+        return str(e)
+
+
+@app.task(name="send_newhire_template_email")
+def send_newhire_template_email_task(user_email, subject, user_first_name, sendgrid_id):
+    try:
+        # Retrieve the template name based on the sendgrid_id
+        template = EmailTemplate.objects.get(sendgrid_id=sendgrid_id)
+        template_name = template.name
+        create_email(user_email, subject, user_first_name, sendgrid_id)
 
         return f"Template '{template_name}' Emails Sent Successfully"
 
@@ -192,7 +206,7 @@ def create_docusign_envelope_task(envelope_args):
 
 
 @app.task(name="create_hr_newhire_email")
-def create_newhiredata_email(**email_data):
+def create_newhire_data_email(**email_data):
     try:
         create_hr_newhire_email(**email_data)
         logger.info(f"New hire email created successfully for {email_data['email']}")
@@ -340,3 +354,28 @@ def create_db_backup_and_upload():
     except subprocess.CalledProcessError as e:
         print(f"An error occurred during backup or upload: {e}")
         return f"An error occurred during backup or upload: {e}"
+
+    # Connect to the IMAP server
+    mail = imaplib.IMAP4_SSL("outlook.office365.com", 993)
+
+    # Login to the server
+    mail.login("hr@1553690ontarioinc.com", "qivjed-Cakqys-7jyvwy")
+
+    # Select a mailbox (inbox, for example)
+    mail.select("inbox")
+
+    # Search for unseen emails
+    result, data = mail.search(None, "UNSEEN")
+
+    # Process retrieved emails
+    for num in data[0].split():
+        result, data = mail.fetch(num, "(RFC822)")
+        email_data = data[0][1]  # Raw email content
+
+        # Process email content here
+        # Example: Print email subject
+        print(email_data)
+
+    # Close the connection
+    mail.close()
+    mail.logout()
