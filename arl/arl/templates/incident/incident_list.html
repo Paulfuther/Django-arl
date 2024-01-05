@@ -19,53 +19,55 @@
 
 </head>
 
-<div class="container" >
-    <div class="row justify-content-center">
-        <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
-            <table id="table_id" class="display">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Store</th>
-                        <th>Description</th>
-                        <th>Date</th>
-                        <th>Edit</th>
-                        <th>PDF</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for incident in incidents %}
-                    <tr>
-                        <td>{{ incident.id }}</td>
-                        <td>{{ incident.store.number }}</td>
-                        <td>{{ incident.brief_description }}</td>
-                        <td>{{ incident.eventdate }}</td>
-                        <td>
-                            <a href="{% url 'update_incident' pk=incident.id %}" class="btn btn-primary">Edit</a>
-                        </td>
-                        <td>
-                            <a href="{% url 'generate_pdf' incident.id %}" class="fa fa-file-pdf-o"
-                                style="font-size:36px;color:red"></a>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+                <table id="table_id" class="display">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Store</th>
+                            <th>Description</th>
+                            <th>Date</th>
+                            <th>Edit</th>
+                            <th>PDF</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for incident in incidents %}
+                        <tr>
+                            <td>{{ incident.id }}</td>
+                            <td>{{ incident.store.number }}</td>
+                            <td>{{ incident.brief_description }}</td>
+                            <td>{{ incident.eventdate }}</td>
+                            <td>
+                                <a href="{% url 'update_incident' pk=incident.id %}" class="btn btn-primary">Edit</a>
+                            </td>
+                            <td>
+                                <a href="{% url 'generate_pdf' incident.id %}" class="fa fa-file-pdf-o"
+                                    style="font-size:36px;color:red"></a>
 
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
-</div>
+</body>
 
 <script>
-    $(document).ready(function() {
-    $('#table_id').DataTable({
-        deferRender: {% if defer_render %} true {% else %} false {% endif %},
-        initComplete: function(settings, json) {
-            $('#table_id').css('opacity', '1');
-        }
-        // Other DataTables options...
+    $(document).ready(function () {
+        $('#table_id').DataTable(
+            {
+                responsive: true,
+                order: [[0, 'desc']]
+
+            },
+        );
     });
-});
 </script>
 
 {% endblock %}
