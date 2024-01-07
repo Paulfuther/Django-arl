@@ -26,7 +26,7 @@
                 <table id="table_id" class="display">
                     <thead>
                         <tr>
-                           
+
                             <th>Store</th>
                             <th>Description</th>
                             <th>Date</th>
@@ -37,16 +37,17 @@
                     <tbody>
                         {% for incident in incidents %}
                         <tr>
-                          
+
                             <td>{{ incident.store.number }}</td>
                             <td>{{ incident.brief_description }}</td>
                             <td>{{ incident.eventdate }}</td>
                             <td>
-                                <a href="{% url 'update_incident' pk=incident.id %}" class="btn btn-primary">Edit</a>
+                                <a href="{% url 'update_incident' pk=incident.id %}" id="edit-button" class="fa fa-edit"
+                                    style="font-size:22px;color:blue"></a>
                             </td>
                             <td>
-                                <a href="{% url 'generate_pdf' incident.id %}" class="fa fa-file-pdf-o"
-                                    style="font-size:36px;color:red"></a>
+                                <a href="{% url 'generate_pdf' incident.id %}" id="pdf-button" class="fa fa-file-pdf-o"
+                                    style="font-size:22px;color:red"></a>
 
                             </td>
                         </tr>
@@ -59,15 +60,14 @@
 </body>
 
 <script>
-    $(document).ready(function () {
-        $('#table_id').DataTable(
-            {
-                responsive: true,
-                order: [[0, 'desc']]
-
-            },
-        );
+    // Initialize DataTable
+    var table = $('#table_id').DataTable({
+        // Your DataTable configurations
+        responsive: true,
+        order: [[0, 'desc']]
     });
+
+
 </script>
 
 {% endblock %}
