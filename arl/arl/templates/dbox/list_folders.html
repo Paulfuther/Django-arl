@@ -31,17 +31,27 @@
         ;
         /* Use a softer color */
     }
-   
 </style>
 
 <div class="container mb-2" style="height: 95vh;">
     <div class="row justify-content-center">
         <div class="col-12 col-sm-10 col-md-8 col-lg-8 col-xl-8">
 
-            <legend class="border-bottm mb-4 mt-4 custom-legend">
-                Contents of Folder: {{ current_path|default:""|truncate_folder_name:20 }}
-            </legend>
-            <a href="{% url 'list_folders' %}" class="btn btn-secondary mb-2">Back</a>
+            <div class="border-bottm mb-2 mt-2">
+                <div class="align-items-start">
+                    <div class="mr-2 mb-2">
+                        <a href="{% url 'list_folders' %}" class="fa fa-home" style="font-size:22px;color:#0c91ea"></a>
+                    </div>
+                    <div>
+                        <span class="mb-0">
+                            Contents of Folder: {{ current_path|default:"Home"|truncate_folder_name:20 }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            
+
             <table id="fileTable">
                 <thead>
                     <tr>
@@ -136,7 +146,7 @@
             responsive: true,
             "pageLength": 10,
         })
-       
+
         // Set the placeholder without the word "Search"
         $('.dataTables_filter input[type="search"]').attr('placeholder', 'Search...');
 
