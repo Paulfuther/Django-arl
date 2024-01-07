@@ -1,0 +1,55 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+{% load static %}
+{% block extrastyle %}
+{{ block.super }}
+<!-- Include CSS for intl-tel-input -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/css/intlTelInput.min.css">
+
+<style>
+    /* Your custom styling */
+    .custom-column {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+
+    /* Adjust the width or other styles for specific fields if needed */
+    #phone {
+        width: 200px;
+        /* Example width */
+    }
+</style>
+{% endblock %}
+
+{% block extrahead %}
+
+{{ block.super }}
+<!-- Include JS for intl-tel-input -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/intlTelInput.min.js"></script>
+<script src="{% static '/utils/admin_helper.js' %}"></script>
+<script>
+    const checkPhoneNumberUniqueURL = "{% url 'check_phone_number_unique' %}";
+    initializePhoneNumberVerification();
+</script>
+{% endblock %}
+
+{% block form_top %}
+
+<fieldset class="module aligned wide">
+    <div class="form-row custom-column">
+        <label for="phone">Phone Number:</label>
+        <div class="phone-input-container">
+            <input type="tel" id="phone" name="phone" placeholder="Enter phone number" required>
+            <button id="verify-button" type="button">Verify</button>
+            <p id="verification-message"></p>
+        </div>
+    </div>
+    <input type="hidden" id="hidden-phone" name="hidden_phone">
+</fieldset>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+
+
+{% endblock %}

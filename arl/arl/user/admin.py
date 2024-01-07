@@ -9,32 +9,12 @@ from .models import CustomUser, Employer, Store
 
 fields = list(UserAdmin.fieldsets)
 
-fields[1] = (
-    "Personal Info",
-    {
-        "fields": (
-            "employer",
-            "first_name",
-            "last_name",
-            "address",
-            "address_two",
-            "city",
-            "state_province",
-            "postal",
-            "country",
-            "dob",
-            "sin",
-            "email",
-            "phone_number",
-        )
-    },
-)
-
 
 class CustomUserAdmin(UserAdmin):
     list_display = (
         "username",
         "email",
+        "phone_number",
         "is_active",
         "get_groups",
     )  # Customize the fields you want to display
@@ -92,6 +72,11 @@ class CustomUserAdmin(UserAdmin):
             },
         ),
     )
+
+    def save_model(self, request, obj, form, change):
+        # Ensure 'phone_number' is saved when creating/updating a user
+        obj.phone_number = form.cleaned_data.get("phone_number", "")
+        super().save_model(request, obj, form, change)
 
 
 UserAdmin.fieldsets = tuple(fields)

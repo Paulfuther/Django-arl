@@ -1,7 +1,7 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
 from django import forms
-from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+from django.contrib.auth.forms import UserCreationForm
 from django.urls import reverse_lazy
 
 from .models import CustomUser
@@ -26,7 +26,6 @@ class CustomUserCreationForm(UserCreationForm):
             "state_province",
             "country",
             "postal",
-           
         )
         widgets = {
             'dob': forms.DateInput(attrs={'type': 'date'}),
@@ -79,4 +78,4 @@ class TwoFactorAuthenticationForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super(TwoFactorAuthenticationForm, self).__init__(*args, **kwargs)
-        self.fields['verification_code'].widget.attrs.update({'style': 'margin: 10px 0;'})  
+        self.fields['verification_code'].widget.attrs.update({'style': 'margin: 10px 0;'})

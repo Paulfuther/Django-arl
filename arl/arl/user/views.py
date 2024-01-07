@@ -259,7 +259,6 @@ def logout_view(request):
     )  # Replace 'home' with your desired URL name for the homepage\
 
 
-# @ratelimit(key='user_or_ip', rate='5/m')
 def home_view(request):
     return render(request, "user/home.html")
 
