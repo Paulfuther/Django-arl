@@ -207,7 +207,7 @@ def login_view(request):
             #             "user/login.html",
             #             {"form": form, "verification_error": True},
             #         )
-
+            login(request, user)
             return redirect("home")  # Replace 'home' with your desired URL name for the homepage
 
     else:
