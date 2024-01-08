@@ -181,34 +181,33 @@ def check_verification(request):
 
 def login_view(request):
     if request.user.is_authenticated:
-        # If the user is already logged in, redirect them to the homepage or any other URL.
+        # If the user is already logged in, 
+        # redirect them to the homepage or any other URL.
         return redirect("home")
     if request.method == "POST":
         form = AuthenticationForm(request, request.POST)
         if form.is_valid():
             user = form.get_user()
-            
             # Commented out the two-factor authentication section for now
-            # if user.phone_number:
-            #     print(user.phone_number)
-            #     try:
-            #         phone_number = user.phone_number
-            #         request.session["user_id"] = user.id
-            #         # Request the verification code from Twilio
-            #         request_verification_token(phone_number)
-            #         request.session["phone_number"] = phone_number
-            #         # Verification request successful
-            #         # Redirect to the verification page
-            #         return redirect("verification_page")
-            #     except TwilioException:
-            #         # Handle TwilioException if verification request fails
-            #         return render(
-            #             request,
-            #             "user/login.html",
-            #             {"form": form, "verification_error": True},
-            #         )
-            login(request, user)
-            return redirect("home")  # Replace 'home' with your desired URL name for the homepage
+            if user.phone_number:
+                print(user.phone_number)
+                try:
+                    phone_number = user.phone_number
+                    request.session["user_id"] = user.id
+                    # Request the verification code from Twilio
+                    request_verification_token(phone_number)
+                    request.session["phone_number"] = phone_number
+                    # Verification request successful
+                    # Redirect to the verification page
+                    return redirect("verification_page")
+                except TwilioException:
+                    # Handle TwilioException if verification request fails
+                    return render(
+                        request,
+                        "user/login.html",
+                        {"form": form, "verification_error": True},
+                    )
+            return redirect("home")
 
     else:
         form = AuthenticationForm(request)
