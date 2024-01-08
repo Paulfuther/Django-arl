@@ -187,27 +187,29 @@ def login_view(request):
         form = AuthenticationForm(request, request.POST)
         if form.is_valid():
             user = form.get_user()
-            if user.phone_number:
-                print(user.phone_number)
-                try:
-                    phone_number = user.phone_number
-                    request.session["user_id"] = user.id
-                    # Request the verification code from Twilio
-                    request_verification_token(phone_number)
-                    request.session["phone_number"] = phone_number
-                    # Verification request successful
-                    # Redirect to the verification page
-                    return redirect("verification_page")
-                except TwilioException:
-                    # Handle TwilioException if verification request fails
-                    return render(
-                        request,
-                        "user/login.html",
-                        {"form": form, "verification_error": True},
-                    )
-            return redirect(
-                "home"
-            )  # Replace 'home' with your desired URL name for the homepage
+            
+            # Commented out the two-factor authentication section for now
+            # if user.phone_number:
+            #     print(user.phone_number)
+            #     try:
+            #         phone_number = user.phone_number
+            #         request.session["user_id"] = user.id
+            #         # Request the verification code from Twilio
+            #         request_verification_token(phone_number)
+            #         request.session["phone_number"] = phone_number
+            #         # Verification request successful
+            #         # Redirect to the verification page
+            #         return redirect("verification_page")
+            #     except TwilioException:
+            #         # Handle TwilioException if verification request fails
+            #         return render(
+            #             request,
+            #             "user/login.html",
+            #             {"form": form, "verification_error": True},
+            #         )
+
+            return redirect("home")  # Replace 'home' with your desired URL name for the homepage
+
     else:
         form = AuthenticationForm(request)
     return render(request, "user/login.html", {"form": form})
