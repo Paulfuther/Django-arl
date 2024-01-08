@@ -45,102 +45,55 @@
 </body>
 <script>
 
-    document.addEventListener('DOMContentLoaded', function () {
-        const phoneInputField = document.querySelector("#phone");
-        const phoneInput = window.intlTelInput(phoneInputField, {
-            utilsScript:
-                "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js",
-        });
-        var verifyButton = document.querySelector('#verify-button');
-        verifyButton.addEventListener('click', function () {
-            // Do something when the button is clicked
-            event.preventDefault();
-            const phoneNumber = phoneInput.getNumber();
-            console.log('Verify button clicked!');
-            $("#phone-number").val(phoneNumber);
+                document.addEventListener('DOMContentLoaded', function () {
+                    const phoneInputField = document.querySelector("#phone");
+                    const phoneInput = window.intlTelInput(phoneInputField, {
+                        utilsScript:
+                            "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js",
+                    });
+                    var verifyButton = document.querySelector('#verify-button');
+                    verifyButton.addEventListener('click', function () {
+                        // Do something when the button is clicked
+                        event.preventDefault();
+                        const phoneNumber = phoneInput.getNumber();
+                        console.log('Verify button clicked!');
+                        $("#phone-number").val(phoneNumber);
 
-            var csrftoken = getCookie('csrftoken');
+                        var csrftoken = getCookie('csrftoken');
 
-            // Perform AJAX request to check the uniqueness of the phone number
-            $.ajax({
-                url: "{% url 'check_phone_number_unique' %}",
-                type: 'POST',
-                data: { 'phone_number': phoneNumber },
-                headers: { 'X-CSRFToken': csrftoken },  // Include the CSRF token in the request headers
-                success: function (response) {
-                    if (response.exists) {
-                        // Phone number is not unique, display error message
-                        alert('This phone number is in use or invalid')
-
-                        //$('#phone_number').siblings('.error-message').text('This phone number is already in use.');
-                       // $('#phone_number_error').removeClass('alert-info').addClass('alert-danger').text('This phone number is in use or invalid.').show();
-                        console.log("used")
-                        $('#register_button').prop('disabled', true);
-                    } else {
-                        // Phone number is unique, enable register button and submit form
-                        $('#phone_number').val(phoneNumber);
-                        // Phone number is unique, display success message
-                        //$('#phone_number_error').removeClass('alert-danger').addClass('alert-info').text('Phone number is valid.').show();
-                        console.log("good")
-
-
-
-                        // Request verification code from Twilio
+                        // Perform AJAX request to check the uniqueness of the phone number
                         $.ajax({
-                        url: '/request-verification/',
-                        type: 'POST',
-                        data: { 'phone_number': phoneNumber },
-                        headers: { 'X-CSRFToken': csrftoken },
-                        success: function (response) {
-                            if (response.success) {
-                                // Verification request successful
-                                var verificationCode = prompt('Enter the verification code:');
-                                if (verificationCode) {
-                                    // Send the verification code to the server for verification
-                                    $.ajax({
-                                        url: '/check-verification/',
-                                        type: 'POST',
-                                        data: {
-                                            'phone_number': phoneNumber,
-                                            'verification_code': verificationCode
-                                        },
-                                        headers: { 'X-CSRFToken': csrftoken },  // Include the CSRF token in the request headers
-                                        success: function (response) {
-                                            if (response.success) {
-                                                // Verification successful, enable the submit button
-                                                 // Verification successful, show pop-up message
-                                                 alert('Phone number verified. Complete the form and click Register');
-                                                document.getElementById('register_button').disabled = false;
-                                            } else {
-                                                // Verification failed, display an error message
-                                                alert('Invalid verification code. Please try again.');
-                                            }
-                                        },
-                                        error: function () {
-                                            // Handle error case
-                                        }
-                                    });
+                            url: "{% url 'check_phone_number_unique' %}",
+                            type: 'POST',
+                            data: { 'phone_number': phoneNumber },
+                            headers: { 'X-CSRFToken': csrftoken },  // Include the CSRF token in the request headers
+                            success: function (response) {
+                                if (response.exists) {
+                                    // Phone number is not unique, display error message
+                                    alert('This phone number is in use or invalid')
+
+                                    //$('#phone_number').siblings('.error-message').text('This phone number is already in use.');
+                                // $('#phone_number_error').removeClass('alert-info').addClass('alert-danger').text('This phone number is in use or invalid.').show();
+                                    console.log("used")
+                                    $('#register_button').prop('disabled', true);
                                 } else {
-                                    // Verification code not entered, display an error message
-                                    alert('Verification code is required. Please try again.');
-                                }
-                            } else {
-                                // Verification request failed
-                                alert('Failed to request verification code. Please try again.');
+                                    // Phone number is unique, enable register button and submit form
+                                    $('#phone_number').val(phoneNumber);
+                                    // Phone number is unique, display success message
+                                    //$('#phone_number_error').removeClass('alert-danger').addClass('alert-info').text('Phone number is valid.').show();
+                                    console.log("good")
+                                    alert('Phone number verified. Complete the form and click Register');
+                                    document.getElementById('register_button').disabled = false;
+
+                                    
                             }
                         },
                         error: function () {
                             // Handle error case
                         }
                     });
-                }
-            },
-            error: function () {
-                // Handle error case
-            }
-        });
-    });
-});
+                });
+            });
 
 
 
