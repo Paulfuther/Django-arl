@@ -20,18 +20,10 @@ class BulkEmailSendgrid(models.Model):
 
 
 class EmailEvent(models.Model):
-    EVENT_CHOICES = (
-        ('click', 'Click'),
-        ('delivered', 'Delivered'),
-        ('open', 'Open'),
-        ('processed', 'Processed'),
-        ('deferred', 'Deferred'),
-        ('dropped', 'Dropped'),
-    )
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True, blank=True)
     username = models.CharField(max_length=150, default='unknown')
     email = models.EmailField()
-    event = models.CharField(max_length=10, choices=EVENT_CHOICES)
+    event = models.CharField(max_length=10)
     ip = models.GenericIPAddressField()
     sg_event_id = models.CharField(max_length=255)
     sg_message_id = models.CharField(max_length=255)
