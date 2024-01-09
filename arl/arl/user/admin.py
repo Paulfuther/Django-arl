@@ -21,6 +21,9 @@ class CustomUserAdmin(UserAdmin):
     )  # Customize the fields you want to display
     list_filter = ("is_active", "groups")  # Add any filters you need
 
+    def has_delete_permission(self, request, obj=None):
+        return False  # Disables the ability to delete users
+
     def get_groups(self, obj):
         return ", ".join([group.name for group in obj.groups.all()])
 
@@ -34,6 +37,7 @@ class CustomUserAdmin(UserAdmin):
                 "employer",
                 "first_name",
                 "last_name",
+                "email",
                 "address",
                 "address_two",
                 "city",
