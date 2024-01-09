@@ -176,7 +176,7 @@ def generate_pdf_task(incident_id, user_email):
         upload_to_linode_object_storage(pdf_buffer, object_key)
 
         # Upload the PDF to Dropbox
-        #upload_incident_file_to_dropbox(pdf, pdf_filename)
+        upload_incident_file_to_dropbox(pdf, pdf_filename)
         # Set the BytesIO buffer's position to the beginning
         pdf_buffer.seek(0)
 
