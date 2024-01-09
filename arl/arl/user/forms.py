@@ -57,6 +57,10 @@ class CustomUserCreationForm(UserCreationForm):
             self.fields[field_name].widget.attrs["class"] = "mt-1"  # Apply margin-top
             self.fields[field_name].widget.attrs["class"] = "mb-2"  # Apply margin-bottom
 
+    def clean_email(self):
+        email = self.cleaned_data['email']
+        return email.lower()  # Convert email to lowercase
+
     def clean(self):
         cleaned_data = super().clean()
         phone_number = cleaned_data.get("phone_number")
