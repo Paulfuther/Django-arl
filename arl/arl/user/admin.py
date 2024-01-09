@@ -15,6 +15,7 @@ class CustomUserAdmin(UserAdmin):
         "username",
         "email",
         "phone_number",
+        "last_login",
         "is_active",
         "get_groups",
     )  # Customize the fields you want to display

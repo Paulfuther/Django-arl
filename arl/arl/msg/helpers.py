@@ -280,3 +280,34 @@ def send_docusign_email_with_attachment(to_emails, subject, body, file_path):
 
     except Exception as e:
         print("Error sending email:", str(e))
+
+
+def create_incident_file_email(to_emails, subject, body, attachment_buffer=None, attachment_filename=None):
+    try:
+        for to_email in to_emails:
+            message = Mail(
+                from_email=settings.MAIL_DEFAULT_SENDER,
+                to_emails=to_email,
+                subject=subject,
+                html_content=body,
+            )
+            print(to_email)
+            if attachment_buffer and attachment_filename:
+                attachment = Attachment()
+                attachment.file_content = FileContent(
+                    base64.b64encode(attachment_buffer.read()).decode()
+                )
+                attachment.file_name = FileName(attachment_filename)
+                attachment.file_type = FileType("application/pdf")
+                attachment.disposition = Disposition("attachment")
+                attachment.content_id = ContentId("Attachment")
+
+                message.attachment = attachment
+            response = sg.send(message)
+
+            if response.status_code != 202:
+                print("Failed to send email to", to_email, "Error code:", response.status_code)
+
+    except Exception as e:
+        print("Error sending email:", str(e))
+        return False
