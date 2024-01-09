@@ -213,12 +213,6 @@ class FetchTwilioCallsView(LoginRequiredMixin, UserPassesTestMixin, TemplateView
         return context
 
 
-@waffle_flag('email_api')
+@waffle_flag("email_api")
 def EmailEventList(request):
-    if request.waffle.email_api.is_active(request):
-        return HttpResponse("This view is controlled by an active feature flag.")
-    else:
-        # Logic for granting access to the API when the flag is inactive
-        queryset = EmailEvent.objects.all()  # Query the data you want to serialize
-        serializer = EmailEventSerializer(queryset, many=True)
-        return JsonResponse(serializer.data, safe=False)
+    return HttpResponse("This view is controlled by a feature flag.")
