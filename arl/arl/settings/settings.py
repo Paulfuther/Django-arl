@@ -64,6 +64,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
     "arl.user.middleware.ErrorLoggingMiddleware",
+    'waffle.middleware.WaffleMiddleware',
 ]
 
 ROOT_URLCONF = "arl.urls"
