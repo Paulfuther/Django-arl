@@ -24,6 +24,9 @@ class EmailEvent(models.Model):
         ('click', 'Click'),
         ('delivered', 'Delivered'),
         ('open', 'Open'),
+        ('processed', 'Processed'),
+        ('deferred', 'Deferred'),
+        ('dropped', 'Dropped'),
     )
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True, blank=True)
     username = models.CharField(max_length=150, default='unknown')
