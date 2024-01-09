@@ -3,7 +3,7 @@ from __future__ import absolute_import, unicode_literals
 import imaplib
 import io
 import subprocess
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import BytesIO
 
 import pdfkit
@@ -252,7 +252,7 @@ def generate_pdf_email_to_user_task(incident_id, user_email):
         # Close the BytesIO buffer to free up resources
         # Then email to the current user
 
-        subject = "Your Incident Report"
+        subject = f"Your Incident Report {pdf_filename}"
         body = "Thank you for using our services. Attached is your incident report."
         # attachment_data = pdf_buffer.getvalue()
 
@@ -299,6 +299,7 @@ def process_sendgrid_webhook(payload):
     try:
         if isinstance(payload, list) and len(payload) > 0:
             event_data = payload[0]
+            print(event_data)
             email = event_data.get("email", "")
             event = event_data.get("event", "")
             ip = event_data.get("ip", "")
@@ -311,7 +312,7 @@ def process_sendgrid_webhook(payload):
             sg_template_name = event_data.get("sg_template_name", "")
             timestamp = timezone.datetime.fromtimestamp(
                 event_data.get("timestamp", 0), tz=timezone.utc
-            )
+            ) - timedelta(hours=5)
             url = event_data.get("url", "")
             useragent = event_data.get("useragent", "")
             # Find the user by email address in your custom user model
