@@ -66,6 +66,9 @@ class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView
         return self.render_to_response({"form": form})
 
 
+
+
+
 class IncidentUpdateView(PermissionRequiredMixin, LoginRequiredMixin, UpdateView):
     model = Incident
     login_url = "/login/"

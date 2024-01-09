@@ -3,6 +3,7 @@ from __future__ import absolute_import, unicode_literals
 import imaplib
 import io
 import subprocess
+from collections import defaultdict
 from datetime import datetime
 from io import BytesIO
 
@@ -17,6 +18,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from arl.celery import app
+from arl.dbox.helpers import upload_incident_file_to_dropbox
 from arl.dsign.helpers import create_docusign_envelope, get_docusign_envelope
 from arl.dsign.models import DocuSignTemplate
 from arl.helpers import (
@@ -28,6 +30,7 @@ from arl.incident.models import Incident
 from arl.msg.helpers import (
     create_email,
     create_hr_newhire_email,
+    create_incident_file_email,
     create_single_email,
     create_tobacco_email,
     send_bulk_sms,
@@ -162,27 +165,39 @@ def generate_pdf_task(incident_id, user_email):
         pdf_buffer = BytesIO(pdf)
         # Create a unique file name for the PDF
         store_number = incident.store.number  # Replace with your actual attribute name
-        brief_description = (
-            incident.brief_description
-        )  # Replace with your actual attribute name
+        brief_description = incident.brief_description
         # Create a unique file name for the PDF using store number and brief description
         pdf_filename = f"{store_number}_{slugify(brief_description)}_report.pdf"
-        # Save the PDF to a temporary location
-        # with open(pdf_filename, "wb") as pdf_file:
-        #    pdf_file.write(pdf_buffer.getvalue())
+
         # Close the BytesIO buffer to free up resources
-        #  Set the BytesIO buffer's position to the beginning
+        # Set the BytesIO buffer's position to the beginning
         # Upload the PDF to Linode Object Storage
         object_key = f"SITEINCIDENT/{incident.user_employer}/INCIDENTPDF/{pdf_filename}"
         upload_to_linode_object_storage(pdf_buffer, object_key)
+
+        # Upload the PDF to Dropbox
+        #upload_incident_file_to_dropbox(pdf, pdf_filename)
+        # Set the BytesIO buffer's position to the beginning
         pdf_buffer.seek(0)
-        #  Close the BytesIO buffer to free up resources
+
+        # Close the BytesIO buffer to free up resources
+        # Then email to the current user and all users in
+        # the group incident_form_email
+
         subject = "Your Incident Report"
         body = "Thank you for using our services. Attached is your incident report."
-        attachment_data = pdf_buffer.getvalue()
+        # attachment_data = pdf_buffer.getvalue()
 
-        # Call the create_single_email function with user_email and other details
-        create_single_email(user_email, subject, body, pdf_buffer, pdf_filename)
+        # Call the create_single_email function with
+        # user_email and other details
+
+        to_emails = CustomUser.objects.filter(
+            Q(is_active=True) & Q(groups__name="incident_form_email")
+        ).values_list("email", flat=True)
+
+        create_incident_file_email(
+            to_emails, subject, body, pdf_buffer,
+            pdf_filename)
         # create_single_email(user_email, subject, body, pdf_buffer)
 
         return {

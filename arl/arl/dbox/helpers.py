@@ -1,3 +1,4 @@
+import logging
 import os
 
 import dropbox
@@ -29,7 +30,7 @@ def generate_new_access_token():
     if response.status_code == 200:
         response_data = response.json()
         new_access_token = response_data.get("access_token")
-        #print("New Access Token: ", new_access_token)
+        # print("New Access Token: ", new_access_token)
         return new_access_token
     else:
         # Handle error response
@@ -63,4 +64,24 @@ def upload_to_dropbox(uploaded_file):
     except ApiError as e:
         return False, f"Dropbox API Error: {str(e)}"
     except Exception as e:
+        return False, f"Error: {str(e)}"
+
+
+def upload_incident_file_to_dropbox(file_content, file_name):
+    try:
+        new_access_token = generate_new_access_token()
+        if new_access_token:
+            dbx = dropbox.Dropbox(new_access_token)
+            # Upload the file content to Dropbox
+            dbx.files_upload(
+                file_content, f"/SITEINCIDENTS/{file_name}", mode=WriteMode("overwrite")
+            )
+            return True, f"Uploaded file: {file_name} to Dropbox."
+        else:
+            return False, "Refresh token not found in .env file."
+    except dropbox.exceptions.ApiError as e:
+        logging.error(f"Dropbox API Error: {str(e)}")
+        return False, f"Dropbox API Error: {str(e)}"
+    except Exception as e:
+        logging.error(f"Error: {str(e)}")
         return False, f"Error: {str(e)}"
