@@ -4,13 +4,14 @@ import logging
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import Group
 from django.core.exceptions import PermissionDenied
-from django.http import HttpResponseForbidden, JsonResponse
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse_lazy
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormView
 from rest_framework import generics
+from waffle.decorators import waffle_flag
 from waffle.mixins import WaffleFlagMixin
 
 from arl.msg.helpers import client
@@ -212,16 +213,12 @@ class FetchTwilioCallsView(LoginRequiredMixin, UserPassesTestMixin, TemplateView
         return context
 
 
-class EmailEventListView(WaffleFlagMixin, generics.ListAPIView):
-    waffle_flag = "email_api"  # Specify the flag name
-    queryset = EmailEvent.objects.all()
-    serializer_class = EmailEventSerializer
-
-    def handle_no_permission(self):
-        if not self.flag_conditions_met(self.request):
-            return HttpResponseForbidden(
-                content=TemplateView.as_view(template_name="incident/403.html")(
-                    self.request
-                )
-            )
-        raise PermissionDenied()
+@waffle_flag('email_api')
+def EmailEventList(request):
+    if request.waffle.email_api.is_active(request):
+        return HttpResponse("This view is controlled by an active feature flag.")
+    else:
+        # Logic for granting access to the API when the flag is inactive
+        queryset = EmailEvent.objects.all()  # Query the data you want to serialize
+        serializer = EmailEventSerializer(queryset, many=True)
+        return JsonResponse(serializer.data, safe=False)
