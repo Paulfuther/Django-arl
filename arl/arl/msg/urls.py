@@ -1,6 +1,7 @@
 from django.urls import path
 
 from arl.msg.views import (
+    EmailEventListView,
     FetchTwilioCallsView,
     FetchTwilioView,
     SendEmailView,
@@ -30,4 +31,5 @@ urlpatterns = [
     path(
         "fetch-twilio-calls/", FetchTwilioCallsView.as_view(), name="fetch_twilio_calls"
     ),
+    path("api/data/", EmailEventListView.as_view(), name="data-list"),
 ]

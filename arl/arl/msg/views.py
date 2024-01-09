@@ -3,12 +3,15 @@ import logging
 
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import Group
-from django.http import HttpResponse, JsonResponse
+from django.core.exceptions import PermissionDenied
+from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse_lazy
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormView
+from rest_framework import generics
+from waffle.mixins import WaffleFlagMixin
 
 from arl.msg.helpers import client
 from arl.tasks import (
@@ -19,6 +22,8 @@ from arl.tasks import (
 from arl.user.models import CustomUser, Store
 
 from .forms import EmailForm, SMSForm, TemplateEmailForm
+from .models import EmailEvent
+from .serializers import EmailEventSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -167,8 +172,7 @@ def fetch_calls():
     return client.calls.list(limit=20)
 
 
-class FetchTwilioCallsView(LoginRequiredMixin,
-                           UserPassesTestMixin, TemplateView):
+class FetchTwilioCallsView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
     template_name = "msg/call_data.html"
 
     def test_func(self):
@@ -189,8 +193,7 @@ class FetchTwilioCallsView(LoginRequiredMixin,
             twilio_to_number = str(call.to)
             store = Store.objects.filter(phone_number=str(twilio_to_number)).first()
             store_phone_number = (
-                str(store.phone_number)
-                if store and store.phone_number else None
+                str(store.phone_number) if store and store.phone_number else None
             )
             store_number = store.number if store and store.number else None
             call_data = {
@@ -200,11 +203,25 @@ class FetchTwilioCallsView(LoginRequiredMixin,
                 "store_phone_number": store_phone_number
                 if store_phone_number
                 else "Unknown Phone Number",
-                "store_number": store_number
-                if store_number else "Unknown Store Number"
+                "store_number": store_number if store_number else "Unknown Store Number"
                 # Add more fields as needed
             }
             truncated_calls.append(call_data)
 
         context["call_data"] = truncated_calls
         return context
+
+
+class EmailEventListView(WaffleFlagMixin, generics.ListAPIView):
+    waffle_flag = "email_api"  # Specify the flag name
+    queryset = EmailEvent.objects.all()
+    serializer_class = EmailEventSerializer
+
+    def handle_no_permission(self):
+        if not self.flag_conditions_met(self.request):
+            return HttpResponseForbidden(
+                content=TemplateView.as_view(template_name="incident/403.html")(
+                    self.request
+                )
+            )
+        raise PermissionDenied()

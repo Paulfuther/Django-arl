@@ -21,13 +21,10 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
 ADMINS = [
-    ('Paul Futher', 'paul.futher@gmail.com'),
+    ("Paul Futher", "paul.futher@gmail.com"),
     # Add more admins if needed
 ]
 
-
-
-# Application definition
 
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
@@ -36,6 +33,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "rest_framework",
+    'waffle',
     "arl.blog",
     "django_htmx",
     "taggit",
@@ -64,7 +63,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
-    'arl.user.middleware.ErrorLoggingMiddleware',
+    "arl.user.middleware.ErrorLoggingMiddleware",
 ]
 
 ROOT_URLCONF = "arl.urls"
@@ -132,7 +131,6 @@ TIME_ZONE = "America/New_York"
 USE_I18N = True
 
 USE_TZ = True
-
 
 
 # Static files (CSS, JavaScript, Images)
@@ -225,9 +223,8 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 
 
-BACKUP_FILE_PATH = os.environ.get('BACKUP_FILE_PATH_DEV')
-BACKUP_DUMP_PATH = os.environ.get('BACKUP_DUMP_PATH_DEV')
-
+BACKUP_FILE_PATH = os.environ.get("BACKUP_FILE_PATH_DEV")
+BACKUP_DUMP_PATH = os.environ.get("BACKUP_DUMP_PATH_DEV")
 
 
 try:
