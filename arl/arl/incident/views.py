@@ -12,7 +12,7 @@ from django.views.generic.list import ListView
 from PIL import Image
 
 from arl.helpers import get_s3_images_for_incident, upload_to_linode_object_storage
-from arl.tasks import generate_pdf_task
+from arl.tasks import generate_pdf_task, generate_pdf_email_to_user_task
 
 from .forms import IncidentForm
 from .models import Incident
@@ -64,9 +64,6 @@ class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView
 
     def form_invalid(self, form):
         return self.render_to_response({"form": form})
-
-
-
 
 
 class IncidentUpdateView(PermissionRequiredMixin, LoginRequiredMixin, UpdateView):
@@ -178,10 +175,26 @@ class ProcessIncidentImagesView(PermissionRequiredMixin, LoginRequiredMixin, Vie
             # Handle GET request or other methods
             return JsonResponse({"message": "Invalid request method"})
 
+# This route is used to generate a pdf from a newly created
+# incident form. It calls a task to upload and email
+# the incident form
+
 
 def generate_pdf(request, incident_id):
     user_email = request.user.email
     generate_pdf_task.delay(incident_id, user_email)
+    messages.success(
+        request, "PDF generation started. HR will receive copy"
+    )
+    return redirect("home")
+
+# This route is used to generate a pdf and
+# email it to the user
+
+
+def generate_incident_pdf_email(request, incident_id):
+    user_email = request.user.email
+    generate_pdf_email_to_user_task.delay(incident_id, user_email)
     messages.success(
         request, "PDF generation started. Check your email. The file is attached."
     )

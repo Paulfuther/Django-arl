@@ -43,10 +43,10 @@
                             <td>{{ incident.eventdate }}</td>
                             <td>
                                 <a href="{% url 'update_incident' pk=incident.id %}" id="edit-button" class="fa fa-edit"
-                                    style="font-size:22px;color:#0c91ea"></a>
+                                    style="font-size:22px;color:blue"></a>
                             </td>
                             <td>
-                                <a href="#" id="pdf-button" class="fa fa-file-pdf-o"
+                                <a href="{% url 'tester' incident.id %}" id="pdf-button" class="fa fa-file-pdf-o"
                                     style="font-size:22px;color:red"></a>
 
                             </td>
