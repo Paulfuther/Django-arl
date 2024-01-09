@@ -299,7 +299,7 @@ def process_sendgrid_webhook(payload):
     try:
         if isinstance(payload, list) and len(payload) > 0:
             event_data = payload[0]
-            print(event_data)
+            # print(event_data)
             email = event_data.get("email", "")
             event = event_data.get("event", "")
             ip = event_data.get("ip", "")
