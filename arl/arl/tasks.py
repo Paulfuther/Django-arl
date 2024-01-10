@@ -190,7 +190,7 @@ def generate_pdf_task(incident_id):
         # Then email to the current user and all users in
         # the group incident_form_email
 
-        subject = "Your Incident Report"
+        subject = "A New Incident Report Has Been Created"
         body = "Thank you for using our services. Attached is your incident report."
         # attachment_data = pdf_buffer.getvalue()
 
