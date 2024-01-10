@@ -281,6 +281,9 @@ def send_docusign_email_with_attachment(to_emails, subject, body, file_path):
     except Exception as e:
         print("Error sending email:", str(e))
 
+# sends a single email to the user with a pdf of
+# the incident file attached.
+
 
 def create_incident_file_email(to_email, subject, body, attachment_buffer=None, attachment_filename=None):
     try:
@@ -307,6 +310,47 @@ def create_incident_file_email(to_email, subject, body, attachment_buffer=None, 
 
         if response.status_code != 202:
             print("Failed to send email to", to_email, "Error code:", response.status_code)
+
+    except Exception as e:
+        error_message = f"An error occurred while sending email to {to_email}: {str(e)}"
+        logger.error(error_message)
+
+        if hasattr(e, "response") and e.response is not None:
+            response_body = e.response.body
+            response_status = e.response.status_code
+            logger.error(f"SendGrid response status code: {response_status}")
+            logger.error(f"SendGrid response body: {response_body}")
+
+# sends new icident pdf to users with the rule
+# incident_email
+
+
+def create_incident_file_email_by_rule(to_emails, subject, body, attachment_buffer=None, attachment_filename=None):
+    try:
+        for to_email in to_emails:
+            message = Mail(
+                from_email=settings.MAIL_DEFAULT_SENDER,
+                to_emails=to_email,
+                subject=subject,
+                html_content=body,
+            )
+            print(to_email)
+            if attachment_buffer and attachment_filename:
+                attachment_buffer.seek(0)  # Ensure the buffer is at the beginning
+                attachment_content = base64.b64encode(attachment_buffer.read()).decode()
+                attachment = Attachment()
+                attachment.file_content = FileContent(attachment_content)
+                attachment.file_name = FileName(attachment_filename)
+                attachment.file_type = FileType("application/pdf")
+                attachment.disposition = Disposition("attachment")
+                attachment.content_id = ContentId("Attachment")
+
+                message.attachment = attachment
+
+            response = sg.send(message)
+
+            if response.status_code != 202:
+                print("Failed to send email to", to_email, "Error code:", response.status_code)
 
     except Exception as e:
         error_message = f"An error occurred while sending email to {to_email}: {str(e)}"
