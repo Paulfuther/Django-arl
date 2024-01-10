@@ -3,6 +3,8 @@ from io import BytesIO
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
@@ -12,7 +14,7 @@ from django.views.generic.list import ListView
 from PIL import Image
 
 from arl.helpers import get_s3_images_for_incident, upload_to_linode_object_storage
-from arl.tasks import generate_pdf_task, generate_pdf_email_to_user_task
+from arl.tasks import generate_pdf_email_to_user_task, generate_pdf_task
 
 from .forms import IncidentForm
 from .models import Incident
@@ -52,10 +54,6 @@ class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView
     def form_valid(self, form):
         form.instance.user_employer = self.request.user.employer
         response = super().form_valid(form)
-
-        # Trigger the create_pdf_file_task asynchronously
-        generate_pdf_task.delay(self.object.id, self.request.user.email)
-
         messages.success(
             self.request,
             "PDF generation started. Check your email. The file is attached.",
@@ -64,6 +62,18 @@ class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView
 
     def form_invalid(self, form):
         return self.render_to_response({"form": form})
+
+# siganl to trigger an event post save of 
+# a new incident form.
+
+
+@receiver(post_save, sender=Incident)
+def handle_new_incident_form_creation(sender, instance, created, **kwargs):
+    if created:
+        try:
+            generate_pdf_task.delay(instance.id)
+        except Exception as e:
+            print(f"An error occurred: {e}")
 
 
 class IncidentUpdateView(PermissionRequiredMixin, LoginRequiredMixin, UpdateView):
@@ -175,6 +185,7 @@ class ProcessIncidentImagesView(PermissionRequiredMixin, LoginRequiredMixin, Vie
             # Handle GET request or other methods
             return JsonResponse({"message": "Invalid request method"})
 
+
 # This route is used to generate a pdf from a newly created
 # incident form. It calls a task to upload and email
 # the incident form
@@ -183,10 +194,9 @@ class ProcessIncidentImagesView(PermissionRequiredMixin, LoginRequiredMixin, Vie
 def generate_pdf(request, incident_id):
     user_email = request.user.email
     generate_pdf_task.delay(incident_id, user_email)
-    messages.success(
-        request, "PDF generation started. HR will receive copy"
-    )
+    messages.success(request, "PDF generation started. HR will receive copy")
     return redirect("home")
+
 
 # This route is used to generate a pdf and
 # email it to the user
@@ -223,7 +233,7 @@ class IncidentListView(PermissionRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['defer_render'] = True  # Pass defer_render as context to the template
+        context["defer_render"] = True  # Pass defer_render as context to the template
         return context
 
 

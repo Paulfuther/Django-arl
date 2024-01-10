@@ -30,6 +30,7 @@ from arl.msg.helpers import (
     create_email,
     create_hr_newhire_email,
     create_incident_file_email,
+    create_incident_file_email_by_rule,
     create_single_email,
     create_tobacco_email,
     send_bulk_sms,
@@ -146,7 +147,7 @@ def monthly_store_calls_task():
 
 
 @app.task(name="create_incident_pdf")
-def generate_pdf_task(incident_id, user_email):
+def generate_pdf_task(incident_id):
     try:
         # Fetch incident data based on incident_id
         try:
@@ -193,15 +194,14 @@ def generate_pdf_task(incident_id, user_email):
         body = "Thank you for using our services. Attached is your incident report."
         # attachment_data = pdf_buffer.getvalue()
 
-        # Call the create_single_email function with
+        # Call the create_incident_file_email_by_rule
         # user_email and other details
 
         to_emails = CustomUser.objects.filter(
             Q(is_active=True) & Q(groups__name="incident_form_email")
         ).values_list("email", flat=True)
 
-        create_incident_file_email(to_emails, subject, body, pdf_buffer, pdf_filename)
-        # create_single_email(user_email, subject, body, pdf_buffer)
+        create_incident_file_email_by_rule(to_emails, subject, body, pdf_buffer, pdf_filename)
 
         return {
             "status": "success",
@@ -216,8 +216,6 @@ def generate_pdf_task(incident_id, user_email):
 # Then emails the form to the user.
 # This is called from the list of incidents
 # when you click the pdf button
-
-
 @app.task(name="email_updated_incident_pdf")
 def generate_pdf_email_to_user_task(incident_id, user_email):
     try:
