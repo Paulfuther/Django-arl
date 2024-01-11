@@ -6,6 +6,7 @@ from arl.incident.models import Incident
 from arl.msg.models import BulkEmailSendgrid, EmailTemplate, Twimlmessages
 
 from .models import CustomUser, Employer, Store
+from arl.incident.models import Incident
 
 fields = list(UserAdmin.fieldsets)
 
@@ -84,12 +85,18 @@ class CustomUserAdmin(UserAdmin):
         super().save_model(request, obj, form, change)
 
 
+class IncidentAdmin(admin.ModelAdmin):
+    list_display = ('store', 'brief_description', 'eventdate')
+    search_fields = ('store__number', 'brief_description')
+    list_filter = ('eventdate', )
+
+
 UserAdmin.fieldsets = tuple(fields)
 admin.site.register(Employer)
 admin.site.register(Twimlmessages)
 admin.site.register(BulkEmailSendgrid)
 admin.site.register(Store)
-admin.site.register(Incident)
+admin.site.register(Incident, IncidentAdmin)
 admin.site.register(EmailTemplate)
 admin.site.register(DocuSignTemplate)
 admin.site.register(CustomUser, CustomUserAdmin)
