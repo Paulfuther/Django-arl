@@ -216,3 +216,7 @@ class FetchTwilioCallsView(LoginRequiredMixin, UserPassesTestMixin, TemplateView
 @waffle_flag("email_api")
 def EmailEventList(request):
     return HttpResponse("This view is controlled by a feature flag.")
+
+
+def click_thank_you(request):
+    return render(request, 'msg/thank_you.html')
