@@ -1,17 +1,34 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
+# from import_export.formats import base_formats
+from django.http import HttpResponse, response
+from import_export import resources
+from import_export.admin import ExportActionMixin
+
 from arl.dsign.models import DocuSignTemplate
 from arl.incident.models import Incident
 from arl.msg.models import BulkEmailSendgrid, EmailTemplate, Twimlmessages
 
 from .models import CustomUser, Employer, Store
-from arl.incident.models import Incident
 
 fields = list(UserAdmin.fieldsets)
 
 
-class CustomUserAdmin(UserAdmin):
+class UserResource(resources.ModelResource):
+    class Meta:
+        model = CustomUser
+        fields = (
+            "username",
+            "first_name",
+            "last_name",
+            "email",
+            "phone_number",
+        )
+
+
+class CustomUserAdmin(ExportActionMixin, UserAdmin):
+    resource_class = UserResource
     list_display = (
         "username",
         "email",
@@ -86,9 +103,9 @@ class CustomUserAdmin(UserAdmin):
 
 
 class IncidentAdmin(admin.ModelAdmin):
-    list_display = ('store', 'brief_description', 'eventdate')
-    search_fields = ('store__number', 'brief_description')
-    list_filter = ('eventdate', )
+    list_display = ("store", "brief_description", "eventdate")
+    search_fields = ("store__number", "brief_description")
+    list_filter = ("eventdate",)
 
 
 UserAdmin.fieldsets = tuple(fields)

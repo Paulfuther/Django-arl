@@ -34,7 +34,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
-    'waffle',
+    "waffle",
     "arl.blog",
     "django_htmx",
     "taggit",
@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "arl.dsign",
     "arl.dbox",
     "arl.incident",
+    "arl.bucket",
 ]
 
 
@@ -64,7 +65,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
     "arl.user.middleware.ErrorLoggingMiddleware",
-    'waffle.middleware.WaffleMiddleware',
+    "waffle.middleware.WaffleMiddleware",
 ]
 
 ROOT_URLCONF = "arl.urls"

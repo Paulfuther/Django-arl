@@ -13,6 +13,7 @@ urlpatterns = [
     path("", include("arl.incident.urls")),
     path("", include("arl.dsign.urls")),
     path("", include("arl.msg.urls")),
+    path("", include("arl.bucket.urls")),
 ]
 
 handler403 = "arl.views.error_403"

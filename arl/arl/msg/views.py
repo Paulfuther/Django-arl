@@ -14,11 +14,12 @@ from rest_framework import generics
 from waffle.decorators import waffle_flag
 from waffle.mixins import WaffleFlagMixin
 
-from arl.msg.helpers import client
+from arl.msg.helpers import client, sg
 from arl.tasks import (
     process_sendgrid_webhook,
     send_email_task,
     send_template_email_task,
+    
 )
 from arl.user.models import CustomUser, Store
 
@@ -220,3 +221,4 @@ def EmailEventList(request):
 
 def click_thank_you(request):
     return render(request, 'msg/thank_you.html')
+

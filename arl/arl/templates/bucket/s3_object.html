@@ -1,0 +1,94 @@
+{% extends "../base/base.html" %}
+{% block title %}Index{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+
+<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.25/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S3 Objects</title>
+
+    <!-- Include jQuery (required by DataTables) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+
+<body>
+
+    <div class="container mb-2" style="height: 95vh;">
+        <div class="row justify-content-center">
+            <div class="col-12 col-sm-10 col-md-8 col-lg-8 col-xl-8">
+
+                <div class="border-bottm mb-2 mt-2">
+                    <div class="align-items-start">
+                        <div class="mr-2 mb-2">
+                            <table id="fileTable">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for file_data in filtered_keys %}
+                                        <tr>
+                                            <td>
+                                                <i class="fas fa-file-pdf"></i>
+                                                {% if file_data.name|length > 40 %}
+                                                    {{ file_data.name|slice:":40" }}...
+                                                {% else %}
+                                                    {{ file_data.name }}
+                                                {% endif %}
+                                                <button class="btn btn-link download-btn" data-link="{{ file_data.link }}">
+                                                    <i class="fas fa-download"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include DataTables JS -->
+    <script type="text/javascript" src="https://cdn.datatables.net/1.10.25/js/jquery.dataTables.min.js"></script>
+
+    <!-- Initialize DataTables on the table -->
+    <script>
+        $(document).ready(function () {
+            $('#fileTable').DataTable({
+                language: { search: "" },
+                responsive: true,
+                "pageLength": 10,
+            });
+
+            // Set the placeholder without the word "Search"
+            $('.dataTables_filter input[type="search"]').attr('placeholder', 'Search...');
+
+            // Apply custom CSS styles to align the search box to the left
+            $('.dataTables_filter input[type="search"]').css({
+                'text-align': 'left', // Align the text to the left
+                'border-radius': '10px', // Adjust the border-radius as needed
+                'padding-left': '10px' // Add padding to the left for the text
+            });
+
+            // Handle download button click
+            $('.download-btn').click(function() {
+                var link = $(this).data('link');
+                window.open(link, '_blank');
+            });
+        });
+    </script>
+
+</body>
+
+{% endblock %}
+
