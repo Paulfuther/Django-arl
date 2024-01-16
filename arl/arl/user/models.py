@@ -50,23 +50,27 @@ class CustomUser(AbstractUser):
 
     @property
     def is_docusign(self):
-        return self.groups.filter(name='docusign').exists()
+        return self.groups.filter(name="docusign").exists()
 
     @property
     def is_dropbox(self):
-        return self.groups.filter(name='dropbox').exists()
+        return self.groups.filter(name="dropbox").exists()
 
     @property
     def is_incident_form(self):
-        return self.groups.filter(name='incident_form').exists()
+        return self.groups.filter(name="incident_form").exists()
 
     @property
     def is_comms(self):
-        return self.groups.filter(name='comms').exists()
+        return self.groups.filter(name="comms").exists()
 
     @property
     def is_template_email(self):
-        return self.groups.filter(name='template_email').exists()
+        return self.groups.filter(name="template_email").exists()
+
+    @property
+    def is_storage(self):
+        return self.groups.filter(name="storage").exists()
 
 
 class Store(models.Model):
