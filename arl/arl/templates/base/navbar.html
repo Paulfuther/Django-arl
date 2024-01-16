@@ -24,9 +24,11 @@
             <li><a class="dropdown-item" href="{% url 'logout' %}">Logout</a></li>
             <li><a class="dropdown-item" href="{% url 'register' %}">Register</a></li>
             {% if user.is_dropbox %}
+            <li><a class="dropdown-item" href="{% url 'list_folders' %}">Dropbox</a></li>
+            {% endif %}
+            {% if user.is_storage %}
             <li><a class="dropdown-item" href="{% url 'list_s3_objects' %}">Storage</a></li>
             {% endif %}
-
             <li><a class="dropdown-item" href="{% url 'create_incident' %}">Make Incident Form</a></li>
             <li><a class="dropdown-item" href="{% url 'incident_list' %}">View/Edit Incident Form</a></li>
          

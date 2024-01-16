@@ -1,6 +1,6 @@
 {% extends "../base/base.html" %}
 {% block title %}Index{% endblock %}
-
+{% load static %}
 {% block template %}
 {% include "../base/navbar.html" %}
 {% load crispy_forms_tags %}
@@ -8,18 +8,13 @@
 
 <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.25/css/jquery.dataTables.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-
+<link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}">
 <style>
     /* Adjust button widths to be the same */
     .btn-primary,
     .btn-success {
         width: 100px;
         /* Change the width as needed */
-    }
-
-    #fileTable td {
-        padding: 2px;
-        /* Adjust the padding as needed */
     }
 
     .custom-legend {
@@ -44,13 +39,13 @@
                     </div>
                     <div>
                         <span class="mb-0">
-                            Contents of Folder: {{ current_path|default:"Home"|truncate_folder_name:20 }}
+                            Contents of Folder: {{ current_path|default:"Home" }}
                         </span>
                     </div>
                 </div>
             </div>
-            
-            
+
+
 
             <table id="fileTable">
                 <thead>
@@ -66,7 +61,7 @@
                         <td style="padding-right: 10px;">
                             <i class="fas fa-folder" style="color: #0c91ea; font-size: 24px; padding-right: 5px;"></i>
                             <a href="{% url 'list_folders' path=folder.path_lower %}">
-                                {{ folder.name|extract_filename }}</a>
+                                {{ folder.name}}</a>
                         </td>
 
 
@@ -113,7 +108,7 @@
                                     <!-- File name -->
                                     <a href="{% url 'download_file' %}?path={{ file_data.metadata.path_display|urlencode }}"
                                         style="text-overflow: ellipsis; overflow: hidden;">
-                                        {{ file_data.metadata.name|extract_filename }}
+                                        {{ file_data.metadata.name }}
                                         <!-- Adjust the length as needed -->
                                     </a>
                                     <!-- Modified date -->
