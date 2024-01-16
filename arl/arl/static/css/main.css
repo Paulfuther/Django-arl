@@ -27,8 +27,14 @@
     letter-spacing: -0.6px;
 }
 
-@media only screen and (max-width: 768px){
+#fileTable td {
+    max-width: 200px; /* Adjust the value as needed */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 
+@media only screen and (max-width: 768px){
     .infscroll h1 {
         font-size: 0.9375rem;
         letter-spacing: -0.0px;
@@ -36,6 +42,6 @@
     .infscroll-author, 
     .infscroll-date {
         font-size: 0.0123rem;
-
     }
+
 }
