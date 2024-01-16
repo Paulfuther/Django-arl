@@ -68,8 +68,7 @@ def handle_new_hire_registration(sender, instance, created, **kwargs):
                 "Welcome Aboard",
                 instance.first_name,
                 settings.SENDGRID_NEWHIRE_ID,
-            )
-
+            ) 
             # Assign user to group GSA
             gsa_group_name = "GSA"
             gsa_group, created = Group.objects.get_or_create(name=gsa_group_name)

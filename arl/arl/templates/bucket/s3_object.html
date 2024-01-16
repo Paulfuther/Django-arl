@@ -1,12 +1,9 @@
 {% extends "../base/base.html" %}
 {% block title %}Index{% endblock %}
-
+{% load static %}
 {% block template %}
 {% include "../base/navbar.html" %}
 {% load crispy_forms_tags %}
-
-<link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.25/css/jquery.dataTables.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
 <head>
     <meta charset="UTF-8">
@@ -16,6 +13,11 @@
 
     <!-- Include jQuery (required by DataTables) -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <!-- Include your custom CSS file -->
+    <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}">
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.25/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
 
 <body>
@@ -27,7 +29,7 @@
                 <div class="border-bottm mb-2 mt-2">
                     <div class="align-items-start">
                         <div class="mr-2 mb-2">
-                            <table id="fileTable">
+                            <table id="fileTable" class=" table-sm" cellspacing="0" width="100%">
                                 <thead>
                                     <tr>
                                         <th>Name</th>
@@ -35,19 +37,25 @@
                                 </thead>
                                 <tbody>
                                     {% for file_data in filtered_keys %}
-                                        <tr>
-                                            <td>
-                                                <i class="fas fa-file-pdf"></i>
-                                                {% if file_data.name|length > 40 %}
-                                                    {{ file_data.name|slice:":40" }}...
-                                                {% else %}
-                                                    {{ file_data.name }}
-                                                {% endif %}
-                                                <button class="btn btn-link download-btn" data-link="{{ file_data.link }}">
-                                                    <i class="fas fa-download"></i>
-                                                </button>
-                                            </td>
-                                        </tr>
+                                    <tr>
+                                        <td>
+                                            {% if file_data.link %}
+                                            <!-- It's a folder -->
+                                            <i class="fas fa-file-signature"
+                                                style="color: #0c91ea; font-size: 24px; padding-right: 5px;"></i>
+                                            <a href="{{ file_data.link }}">{{ file_data.name }}</a>
+                                            {% else %}
+                                            <!-- It's a file -->
+                                            <i class="fas fa-file-pdf"></i>
+                                            {% if file_data.name|length > 40 %}
+                                            {{ file_data.name|slice:":40" }}...
+                                            {% else %}
+                                            {{ file_data.name }}
+                                            {% endif %}
+
+                                            {% endif %}
+                                        </td>
+                                    </tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
@@ -81,14 +89,13 @@
             });
 
             // Handle download button click
-            $('.download-btn').click(function() {
-                var link = $(this).data('link');
-                window.open(link, '_blank');
-            });
+            //$('.download-btn').click(function() {
+            //   var link = $(this).data('link');
+            //   window.open(link, '_blank');
+            // });
         });
     </script>
 
 </body>
 
 {% endblock %}
-
