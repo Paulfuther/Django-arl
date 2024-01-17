@@ -34,7 +34,26 @@
     white-space: nowrap;
 }
 
+ /* Adjust button widths to be the same */
+ .btn-primary,
+ .btn-success {
+     width: 100px;
+     /* Change the width as needed */
+ }
+
+ .custom-legend {
+     font-size: 1.2em;
+     /* Adjust the font size */
+     font-weight: normal;
+     /* Make the font weight lighter */
+     color: #555;
+     ;
+     /* Use a softer color */
+ }
+
+
 @media only screen and (max-width: 768px){
+    
     .infscroll h1 {
         font-size: 0.9375rem;
         letter-spacing: -0.0px;
@@ -45,3 +64,5 @@
     }
 
 }
+
+
