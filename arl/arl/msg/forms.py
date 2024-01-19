@@ -1,11 +1,12 @@
 from django import forms
 from arl.user.models import CustomUser
-from django.contrib.auth.models import Group 
+from django.contrib.auth.models import Group
 from arl.msg.models import EmailTemplate
+
 
 class SMSForm(forms.Form):
     message = forms.CharField(
-        max_length=100,
+        max_length=1000,
         widget=forms.Textarea(attrs={"rows": 4}),
         help_text="Enter a message (max 200 characters)",
     )
@@ -16,6 +17,7 @@ class SMSForm(forms.Form):
         required=False,
         label="Select Group to Send SMS"
     )
+
 
 class TemplateEmailForm(forms.Form):
     sendgrid_id = forms.ModelChoiceField(queryset=EmailTemplate.objects.all(), label='Select Template')
