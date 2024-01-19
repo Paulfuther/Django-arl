@@ -131,6 +131,23 @@ def send_bulk_sms_task():
         logger.error(f"An error occurred: {str(e)}")
 
 
+@app.task(name="one_off_bulk_sms")
+def send_one_off_bulk_sms_task(group_id, message):
+    try:
+        group = Group.objects.get(pk=group_id)
+        users_in_group = group.user_set.filter(is_active=True)
+        gsat = [user.phone_number for user in users_in_group]
+        message = message
+        send_bulk_sms(gsat, message)
+        # Log the result
+        logger.info("Bulk SMS task completed successfully")
+        log_message = f"Bulk SMS sent successfully to {', '.join(gsat)}"
+        log_entry = SmsLog(level="INFO", message=log_message)
+        log_entry.save()
+    except Exception as e:
+        # Log or handle other exceptions
+        logger.error(f"An error occurred: {str(e)}")
+
 @app.task(name="monthly_store_calls")
 def monthly_store_calls_task():
     try:

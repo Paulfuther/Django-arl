@@ -7,10 +7,10 @@ from arl.msg.views import (
     SendEmailView,
     SendSMSView,
     SendTemplateEmailView,
+    click_thank_you,
     sendgrid_webhook,
     sms_success_view,
     template_email_success_view,
-    click_thank_you,
 )
 
 urlpatterns = [
@@ -21,6 +21,7 @@ urlpatterns = [
         SendTemplateEmailView.as_view(),
         name="send_template_email_view",
     ),
+    path("send-one-off-sms/", SendSMSView.as_view(), name="send_one_off_sms_view"),
     path("sendgrid_hook/", sendgrid_webhook, name="sendgrid_webhook"),
     path("sms-success/", sms_success_view, name="sms_success"),
     path(
@@ -33,5 +34,5 @@ urlpatterns = [
         "fetch-twilio-calls/", FetchTwilioCallsView.as_view(), name="fetch_twilio_calls"
     ),
     path("api/data/", EmailEventList, name="data-list"),
-    path("thank-you/", click_thank_you, name="thank_you")
+    path("thank-you/", click_thank_you, name="thank_you"),
 ]

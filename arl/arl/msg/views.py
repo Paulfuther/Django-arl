@@ -3,29 +3,25 @@ import logging
 
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import Group
-from django.core.exceptions import PermissionDenied
-from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse_lazy
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormView
-from rest_framework import generics
 from waffle.decorators import waffle_flag
 from waffle.mixins import WaffleFlagMixin
 
-from arl.msg.helpers import client, sg
+from arl.msg.helpers import client
 from arl.tasks import (
     process_sendgrid_webhook,
     send_email_task,
+    send_one_off_bulk_sms_task,
     send_template_email_task,
-    
 )
 from arl.user.models import CustomUser, Store
 
 from .forms import EmailForm, SMSForm, TemplateEmailForm
-from .models import EmailEvent
-from .serializers import EmailEventSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -53,12 +49,11 @@ class SendSMSView(LoginRequiredMixin, UserPassesTestMixin, FormView):
         message = form.cleaned_data["message"]
 
         # Retrieve the selected group using its ID
-        selected_group = get_object_or_404(Group, pk=selected_group_id)
+        group = get_object_or_404(Group, pk=selected_group_id)
+        group_id = group.id
 
-        # Retrieve users from the selected group
-        selected_users = selected_group.user_set.filter(is_active=True)
         # Call the task to send sms.
-        send_template_email_task(to_email, subject, name, template_id)
+        send_one_off_bulk_sms_task.delay(group_id, message)
 
         return super().form_valid(form)
 
@@ -220,5 +215,4 @@ def EmailEventList(request):
 
 
 def click_thank_you(request):
-    return render(request, 'msg/thank_you.html')
-
+    return render(request, "msg/thank_you.html")
