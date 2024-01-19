@@ -34,6 +34,7 @@
          
             {% if user.is_template_email %}
             <li><a class="dropdown-item" href="{% url 'send_template_email_view' %}">Send Template Email</a></li>
+            <li><a class="dropdown-item" href="{% url 'send_one_off_sms_view' %}">Send One Off Text</a></li>
             {% endif %}
             {% if user.is_docusign %}
             <li><a class="dropdown-item" href="{% url 'CreateEnvelope' %}">Send Docusign Doc</a></li>
