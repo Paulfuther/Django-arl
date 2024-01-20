@@ -18,7 +18,7 @@
 }
 
 .fw-500 {
-    font-weight:500;
+    font-weight: 500;
 }
 
 
@@ -28,41 +28,65 @@
 }
 
 #fileTable td {
-    max-width: 200px; /* Adjust the value as needed */
+    max-width: 200px;
+    /* Adjust the value as needed */
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
- /* Adjust button widths to be the same */
- .btn-primary,
- .btn-success {
-     width: 100px;
-     /* Change the width as needed */
- }
-
- .custom-legend {
-     font-size: 1.2em;
-     /* Adjust the font size */
-     font-weight: normal;
-     /* Make the font weight lighter */
-     color: #555;
-     ;
-     /* Use a softer color */
- }
+/* Adjust button widths to be the same */
+.btn-primary,
+.btn-success {
+    width: 100px;
+    /* Change the width as needed */
+}
 
 
-@media only screen and (max-width: 768px){
-    
+.custom-input {
+    /* Add other styles as needed */
+    width: 100%;
+    /* Ensure the input takes up the full width of the container */
+    margin-bottom: 10px;
+}
+
+.tabs {
+   
+    margin-bottom: 20px; /* Optional: Add margin at the bottom for spacing */
+}
+
+
+
+.tab-btn {
+    padding: 10px;
+    background-color: rgb(2, 117, 216); /* Set the background color to blue */
+    color: white;
+    border: none;
+    -webkit-border-top-left-radius: 8px;
+    -webkit-border-top-right-radius: 8px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    cursor: pointer;
+}
+
+
+
+
+.form-content {
+    display: inline-block; /* Ensure it's an inline block to center horizontally */
+    /* Add any other specific styles for the form content */
+}
+
+@media only screen and (max-width: 768px) {
+
     .infscroll h1 {
         font-size: 0.9375rem;
         letter-spacing: -0.0px;
     }
-    .infscroll-author, 
+
+    .infscroll-author,
     .infscroll-date {
         font-size: 0.0123rem;
     }
 
 }
-
-
