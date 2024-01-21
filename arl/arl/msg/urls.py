@@ -11,6 +11,7 @@ from arl.msg.views import (
     sendgrid_webhook,
     sms_success_view,
     template_email_success_view,
+    comms,
 )
 
 urlpatterns = [
@@ -35,4 +36,5 @@ urlpatterns = [
     ),
     path("api/data/", EmailEventList, name="data-list"),
     path("thank-you/", click_thank_you, name="thank_you"),
+    path("comms/", comms, name="comms")
 ]

@@ -2,7 +2,7 @@
 {% block title %}Index{% endblock %}
 
 {% block template %}
-{% include "../base/navbar.html" %}
+
 {% load crispy_forms_tags %}
 
 
@@ -10,26 +10,14 @@
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
-        <legend class="border-bottom mb-4">Send Text Message</legend>
+        <legend class="border-bottm mb-4">Send SMS By Group</legend>
         {% csrf_token %}
-
-        <div class="mb-4">
-          <legend>Select Group</legend>
-          {{ form.selected_group }}
-        </div>
-
-        <div class="mb-4">
-          <small class="form-text text-muted">{{ form.message.help_text }}</small>
-        </div>
-
-        <div class="mb-4">
-          {{ form.message }}
-        </div>
-
-        <button type="submit" class="btn btn-primary">Send SMS</button>
+        {{ form|crispy }}
+        <button type="submit" class="btn btn-primary mt-2 mb-1">Send</button>
       </div>
     </div>
   </div>
+
 </form>
 
 

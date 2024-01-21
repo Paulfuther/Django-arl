@@ -1,5 +1,5 @@
 <nav class="navbar navbar-expand-lg bg-body-tertiary">
-  <div class="container justify-content-center">
+  <div class="container justify-content-left">
     <a class="navbar-brand fs-3" href="#">ARL</a>
 
 
@@ -9,7 +9,7 @@
     </button>
 
 
-    <div class="collapse navbar-collapse flex-grow-0" id="navbarSupportedContent">
+    <div class="collapse navbar-collapse flex-grow-0 mx-auto" id="navbarSupportedContent">
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
         <li class="nav-item">
           <a class="nav-link active" aria-current="page" href="{% url 'home' %}">Home</a>
@@ -32,9 +32,8 @@
             <li><a class="dropdown-item" href="{% url 'create_incident' %}">Make Incident Form</a></li>
             <li><a class="dropdown-item" href="{% url 'incident_list' %}">View/Edit Incident Form</a></li>
          
-            {% if user.is_template_email %}
-            <li><a class="dropdown-item" href="{% url 'send_template_email_view' %}">Send Template Email</a></li>
-            <li><a class="dropdown-item" href="{% url 'send_one_off_sms_view' %}">Send One Off Text</a></li>
+            {% if user.is_comms %}
+            <li><a class="dropdown-item" href="{% url 'comms' %}">comms</a></li>
             {% endif %}
             {% if user.is_docusign %}
             <li><a class="dropdown-item" href="{% url 'CreateEnvelope' %}">Send Docusign Doc</a></li>
