@@ -1,16 +1,13 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-
-# from import_export.formats import base_formats
-from django.http import HttpResponse, response
 from import_export import resources
 from import_export.admin import ExportActionMixin
 
-from arl.dsign.models import DocuSignTemplate
+from arl.dsign.models import DocuSignTemplate, ProcessedDocsignDocument
 from arl.incident.models import Incident
 from arl.msg.models import BulkEmailSendgrid, EmailTemplate, Twimlmessages
 
-from .models import CustomUser, Employer, Store
+from .models import CustomUser, Employer, Store, UserManager
 
 fields = list(UserAdmin.fieldsets)
 
@@ -39,8 +36,8 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
     )  # Customize the fields you want to display
     list_filter = ("is_active", "groups")  # Add any filters you need
 
-    def has_delete_permission(self, request, obj=None):
-        return False  # Disables the ability to delete users
+    # def has_delete_permission(self, request, obj=None):
+    #    return False  # Disables the ability to delete users
 
     def get_groups(self, obj):
         return ", ".join([group.name for group in obj.groups.all()])
@@ -116,4 +113,6 @@ admin.site.register(Store)
 admin.site.register(Incident, IncidentAdmin)
 admin.site.register(EmailTemplate)
 admin.site.register(DocuSignTemplate)
+admin.site.register(ProcessedDocsignDocument)
 admin.site.register(CustomUser, CustomUserAdmin)
+admin.site.register(UserManager)

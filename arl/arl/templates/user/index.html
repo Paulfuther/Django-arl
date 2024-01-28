@@ -2,6 +2,7 @@
 {% block title %}Index{% endblock %}
 
 {% block template %}
+{% load static %}
 {% include "../base/navbar.html" %}
 {% load crispy_forms_tags %}
 <!DOCTYPE html>
@@ -15,6 +16,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/css/intlTelInput.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/intlTelInput.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <!-- Add these script tags to include jQuery and jQuery UI -->
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
 
 </head>
 
@@ -25,9 +29,12 @@
                 <form id="login" method="post">
                     {% csrf_token %}
                     <legend class="border-bottm mb-4">Join Today</legend>
+                   
                     {{ form|crispy }}
+                    
+                    
                     <fieldset class="form-group mt-3">
-                        <input class="form-control" id="phone" type="tel" name="phone" />
+                        <input class="form-control" id="phone" type="tel" name="phone" value="{{ form.phone_number }}" />
                         <button type="submit" class="btn btn-primary" id="verify-button" value="Verify">Verify</button>
                     </fieldset>
                     <button type="submit" id="register_button" class="btn btn-primary mt-1 mb-1"
@@ -43,123 +50,38 @@
 
 
 </body>
-<script>
 
+<script src="{% static '/utils/verification.js' %}"></script>
+
+<script>
+const checkPhoneNumberUniqueURL = "{% url 'check_phone_number_unique' %}";
+const twilioVerificationCheckURL = "/check-verification/"
+const twilioVerificationRequestURL = "/request-verification/"
+    
+</script>
+
+
+
+<script>
+  // initializeManagerDropdown()
+</script>
+
+<script>
     document.addEventListener('DOMContentLoaded', function () {
+        // Retrieve the original phone number value from the hidden input
+        const originalPhoneNumber = document.getElementById('phone-number').value;
+
+        // Initialize the intlTelInput library
         const phoneInputField = document.querySelector("#phone");
         const phoneInput = window.intlTelInput(phoneInputField, {
-            utilsScript:
-                "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js",
+            utilsScript: "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js",
         });
-        var verifyButton = document.querySelector('#verify-button');
-        verifyButton.addEventListener('click', function () {
-            // Do something when the button is clicked
-            event.preventDefault();
-            const phoneNumber = phoneInput.getNumber();
-            console.log('Verify button clicked!');
-            $("#phone-number").val(phoneNumber);
 
-            var csrftoken = getCookie('csrftoken');
-
-            // Perform AJAX request to check the uniqueness of the phone number
-            $.ajax({
-                url: "{% url 'check_phone_number_unique' %}",
-                type: 'POST',
-                data: { 'phone_number': phoneNumber },
-                headers: { 'X-CSRFToken': csrftoken },  // Include the CSRF token in the request headers
-                success: function (response) {
-                    if (response.exists) {
-                        // Phone number is not unique, display error message
-                        alert('This phone number is in use or invalid')
-
-                        //$('#phone_number').siblings('.error-message').text('This phone number is already in use.');
-                        // $('#phone_number_error').removeClass('alert-info').addClass('alert-danger').text('This phone number is in use or invalid.').show();
-                        console.log("used")
-                        $('#register_button').prop('disabled', true);
-                    } else {
-                        // Phone number is unique, enable register button and submit form
-                        $('#phone_number').val(phoneNumber);
-                        // Phone number is unique, display success message
-                        //$('#phone_number_error').removeClass('alert-danger').addClass('alert-info').text('Phone number is valid.').show();
-                        console.log("good")
-
-
-
-                        // Request verification code from Twilio
-                        $.ajax({
-                            url: '/request-verification/',
-                            type: 'POST',
-                            data: { 'phone_number': phoneNumber },
-                            headers: { 'X-CSRFToken': csrftoken },
-                            success: function (response) {
-                                if (response.success) {
-                                    // Verification request successful
-                                    var verificationCode = prompt('Enter the verification code:');
-                                    if (verificationCode) {
-                                        // Send the verification code to the server for verification
-                                        $.ajax({
-                                            url: '/check-verification/',
-                                            type: 'POST',
-                                            data: {
-                                                'phone_number': phoneNumber,
-                                                'verification_code': verificationCode
-                                            },
-                                            headers: { 'X-CSRFToken': csrftoken },  // Include the CSRF token in the request headers
-                                            success: function (response) {
-                                                if (response.success) {
-                                                    // Verification successful, enable the submit button
-                                                    // Verification successful, show pop-up message
-                                                    alert('Phone number verified. Complete the form and click Register');
-                                                    document.getElementById('register_button').disabled = false;
-                                                } else {
-                                                    // Verification failed, display an error message
-                                                    alert('Invalid verification code. Please try again.');
-                                                }
-                                            },
-                                            error: function () {
-                                                // Handle error case
-                                            }
-                                        });
-                                    } else {
-                                        // Verification code not entered, display an error message
-                                        alert('Verification code is required. Please try again.');
-                                    }
-                                } else {
-                                    // Verification request failed
-                                    alert('Failed to request verification code. Please try again.');
-                                }
-                            },
-                            error: function () {
-                                // Handle error case
-                            }
-                        });
-                    }
-                },
-                error: function () {
-                    // Handle error case
-                }
-            });
-        });
+        // Set the original phone number as the value of the #phone input
+        phoneInput.setNumber(originalPhoneNumber);
     });
-
-
-    // Helper function to retrieve the CSRF token from the cookies
-    function getCookie(name) {
-        var cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            var cookies = document.cookie.split(';');
-            for (var i = 0; i < cookies.length; i++) {
-                var cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
-
 </script>
+
 
 </html>
 

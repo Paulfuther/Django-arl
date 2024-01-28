@@ -3,19 +3,20 @@ from django.urls import path
 
 from .views import (
     CheckPhoneNumberUniqueView,
+    RegisterView,
     admin_verification_page,
     check_verification,
+    fetch_managers,
     home_view,
     login_view,
     logout_view,
-    register,
     request_verification,
     verification_page,
 )
 
 urlpatterns = [
     path("", login_view, name="home"),
-    path("register", register, name="register"),
+    path("register", RegisterView.as_view(), name="register"),
     path(
         "check_phone_number_unique/",
         CheckPhoneNumberUniqueView.as_view(),
@@ -56,4 +57,5 @@ urlpatterns = [
         name="password_reset_complete",
     ),
     path("home/", home_view, name="home"),
+    path("fetch_managers/", fetch_managers, name="fetch_managers"),
 ]

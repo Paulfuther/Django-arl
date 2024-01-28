@@ -8,8 +8,9 @@ from .models import Incident
 
 
 class IncidentForm(forms.ModelForm):
-    #user_employer = forms.ChoiceField(choices=[], required=False)
+    # user_employer = forms.ChoiceField(choices=[], required=False)
     image_folder = forms.CharField(widget=forms.TextInput(attrs={'style': 'display:none;'}))
+    
     class Meta:
         model = Incident
         fields = "__all__"

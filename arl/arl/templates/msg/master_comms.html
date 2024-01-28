@@ -1,62 +1,46 @@
 {% extends "../base/base.html" %}
-{% block title %}Index{% endblock %}
-
 {% block template %}
+{% load static %}
 {% include "../base/navbar.html" %}
 {% load crispy_forms_tags %}
+
+
+<head>
+    <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}">
+   
+</head>
 
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
 
-            <div class="tabs mt-3 mb-3">
-                <button class="tab-btn btn-info" data-form-url="{% url 'send_template_email_view' %}">Email</button>
-                <button class="tab-btn btn-info" data-form-url="{% url 'send_one_off_sms_view' %}">SMS</button>
-                <button class="tab-btn btn-info" data-form-url="{% url 'CreateEnvelope' %}">DSign</button>
+            <div class="radio-navigation mt-3 mb-3">
+                <input type="radio" id="tab1" name="tab" data-form-url="{% url 'send_template_email_view' %}">
+                <label for="tab1">Email</label>
+
+                <input type="radio" id="tab2" name="tab" data-form-url="{% url 'send_one_off_sms_view' %}">
+                <label for="tab2">SMS</label>
+
+                <input type="radio" id="tab3" name="tab" data-form-url="{% url 'CreateEnvelope' %}">
+                <label for="tab3">DSign</label>
             </div>
         </div>
     </div>
 </div>
+
 <div class="form-container">
-    <div id="form-container" >
+    <div id="form-container">
         <!-- Form content will be dynamically loaded here -->
     </div>
 </div>
 
 
-
-<script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+<script src="{% static '/utils/comms.js' %}"></script>
 <script>
-    $(document).ready(function () {
-        // Initial setup
-        $(".tab-btn:first").addClass("active");
-        loadForm($(".tab-btn:first").data("form-url"));
-
-        // Switching between tabs
-        $(".tab-btn").on("click", function (e) {
-            e.preventDefault();  // Prevent default action for anchor links
-            $(".tab-btn").removeClass("active");
-            $(this).addClass("active");
-
-            var formUrl = $(this).data("form-url");
-            loadForm(formUrl);
-        });
-
-        function loadForm(url) {
-            $.ajax({
-                url: url,
-                method: "GET",
-                success: function (response) {
-                    $("#form-container").html(response);
-                },
-                error: function (xhr, status, error) {
-                    console.error("Error loading form:", status, error);
-                }
-            });
-        }
-    });
+   $(document).ready(function () {
+    // Call the initTabs function from helper.js
+    initTabs();
+});
 </script>
-
-
 
 {% endblock %}

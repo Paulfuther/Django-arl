@@ -8,10 +8,18 @@ from .models import CustomUser
 
 
 class CustomUserCreationForm(UserCreationForm):
+    manager_dropdown = forms.ModelChoiceField(
+        queryset=CustomUser.objects.filter(groups__name='Manager'),
+        empty_label="Select a manager",
+        required=True,
+        widget=forms.Select(attrs={'class': 'form-control'})  # Add class for styling
+    )
+
     class Meta(UserCreationForm.Meta):
         model = CustomUser
         fields = (
             "employer",
+            "manager_dropdown",
             "username",
             "password1",
             "password2",
@@ -45,6 +53,10 @@ class CustomUserCreationForm(UserCreationForm):
         self.fields["sin"].required = True
         self.fields['dob'].required = True
         self.fields['postal'].required = True
+        # Populate choices for manager_dropdown
+        managers = CustomUser.objects.filter(groups__name='Manager')
+        manager_choices = [(manager.id, manager.username) for manager in managers]
+        self.fields['manager_dropdown'].choices = [('', 'Select a manager')] + manager_choices
         self.helper = FormHelper()
         self.helper.form_method = "post"
         self.helper.add_input(Submit("submit", "Register"))
@@ -71,6 +83,21 @@ class CustomUserCreationForm(UserCreationForm):
             self.add_error("email", "This email is already in use")
 
         return cleaned_data
+
+    def clean_manager_dropdown(self):
+        manager = self.cleaned_data.get('manager_dropdown')
+        if manager is None:
+            raise forms.ValidationError('Invalid manager selection.')
+
+        # Here, we extract the ID from the selected manager
+        manager_id = manager.id
+        print(f'Manager ID from clean_manager_dropdown: {manager_id}')
+        valid_manager_ids = [manager.id for manager in CustomUser.objects.filter(groups__name='Manager')]
+        if manager_id not in valid_manager_ids:
+            raise forms.ValidationError('Invalid manager selection.')
+
+        # Return the manager's ID
+        return manager_id
 
 
 class TwoFactorAuthenticationForm(forms.Form):

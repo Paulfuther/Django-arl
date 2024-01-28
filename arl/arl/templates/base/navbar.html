@@ -1,55 +1,63 @@
 <nav class="navbar navbar-expand-lg bg-body-tertiary">
-  <div class="container justify-content-left">
+  <div class="container">
     <a class="navbar-brand fs-3" href="#">ARL</a>
-
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
       aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
 
-
-    <div class="collapse navbar-collapse flex-grow-0 mx-auto" id="navbarSupportedContent">
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
         <li class="nav-item">
           <a class="nav-link active" aria-current="page" href="{% url 'home' %}">Home</a>
         </li>
+
         {% if user.is_authenticated %}
-        <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-            {{ user.username }}
-          </a>
-          <ul class="dropdown-menu">
-
-            <li><a class="dropdown-item" href="{% url 'logout' %}">Logout</a></li>
-            <li><a class="dropdown-item" href="{% url 'register' %}">Register</a></li>
-            {% if user.is_dropbox %}
-            <li><a class="dropdown-item" href="{% url 'list_folders' %}">Dropbox</a></li>
-            {% endif %}
-            {% if user.is_storage %}
-            <li><a class="dropdown-item" href="{% url 'list_s3_objects' %}">EMP Files</a></li>
-            {% endif %}
-            <li><a class="dropdown-item" href="{% url 'create_incident' %}">Make Incident Form</a></li>
-            <li><a class="dropdown-item" href="{% url 'incident_list' %}">View/Edit Incident Form</a></li>
-         
-            {% if user.is_comms %}
-            <li><a class="dropdown-item" href="{% url 'comms' %}">comms</a></li>
-            {% endif %}
-            {% if user.is_docusign %}
-            <li><a class="dropdown-item" href="{% url 'CreateEnvelope' %}">Send Docusign Doc</a></li>
-            {% endif %}
-            {% if user.is_comms %}
-            <li><a class="dropdown-item" href="{% url 'fetch_twilio' %}">SMS Logs</a></li>
-            <li><a class="dropdown-item" href="{% url 'fetch_twilio_calls' %}">Call Logs</a></li>
-            {% endif %}
-            <li>
-              <hr class="dropdown-divider">
-            </li>
-            <li><a class="dropdown-item" href="{% url 'admin:index' %}">Admin</a></li>
-          </ul>
-
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'logout' %}">Logout</a>
         </li>
-        {% else %}
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'register' %}">Register</a>
+        </li>
+        
+        {% if user.is_dropbox %}
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'list_folders' %}">Dropbox</a>
+        </li>
+        {% endif %}
+
+       
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'create_incident' %}">Make Incident Form</a>
+        </li>
+
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'incident_list' %}">View/Edit Incident Form</a>
+        </li>
+       
+
+        {% if user.is_comms %}
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'comms' %}">comms</a>
+        </li>
+        {% endif %}
+        
+        {% if user.is_comms %}
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'fetch_twilio' %}">SMS Logs</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'fetch_twilio_calls' %}">Call Logs</a>
+        </li>
+        {% endif %}
+        
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'admin:index' %}">Admin</a>
+        </li>
+        {% endif %}
+
+        {% if not user.is_authenticated %}
         <li class="nav-item">
           <a class="nav-link" href="{% url 'login' %}">Login</a>
         </li>
@@ -58,8 +66,6 @@
         </li>
         {% endif %}
       </ul>
-
-
     </div>
   </div>
 </nav>

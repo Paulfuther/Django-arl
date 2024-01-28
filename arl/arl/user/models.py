@@ -73,6 +73,13 @@ class CustomUser(AbstractUser):
         return self.groups.filter(name="storage").exists()
 
 
+class UserManager(models.Model):
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
+    manager = models.ForeignKey(
+        CustomUser, on_delete=models.CASCADE, related_name="managed_users"
+    )
+
+
 class Store(models.Model):
     number = models.IntegerField()
     carwash = models.BooleanField(default=False)
