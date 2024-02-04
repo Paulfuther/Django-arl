@@ -110,6 +110,7 @@ def create_docusign_envelope(envelope_args):
     template = DocuSignTemplate.objects.get(template_id=envelope_args["template_id"])
     template_name = template.template_name if template else "Default Template Name"
     email_subject = f"{envelope_args['signer_name']} - {template_name}"
+    
     # print(email_subject)
     # Create the envelope definition
     envelope_definition = EnvelopeDefinition(
@@ -126,6 +127,8 @@ def create_docusign_envelope(envelope_args):
         role_name="GSA",
         email_notification=RecipientEmailNotification(email_subject=email_subject),
     )
+
+    
 
     attachment_tab1 = SignerAttachment(
         anchor_string="Upload Photo ID picture",

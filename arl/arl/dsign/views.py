@@ -42,6 +42,7 @@ class CreateEnvelopeView(UserPassesTestMixin, View):
             d_name = form.cleaned_data["name"]
             d_email = form.cleaned_data["email"]
             ds_template = form.cleaned_data.get("template_id")
+            print(ds_template)
             # Fetch the template name based on the ID
             template = get_object_or_404(DocuSignTemplate, template_id=ds_template)
             template_name = template.template_name if template else "Unknown Template"

@@ -19,7 +19,7 @@ from django.utils.text import slugify
 from arl.celery import app
 from arl.dbox.helpers import upload_incident_file_to_dropbox
 from arl.dsign.helpers import create_docusign_envelope, get_docusign_envelope
-from arl.dsign.models import DocuSignTemplate
+from arl.dsign.models import DocuSignTemplate, ProcessedDocsignDocument
 from arl.helpers import (
     get_s3_images_for_incident,
     remove_old_backups,
@@ -38,7 +38,7 @@ from arl.msg.helpers import (
     send_sms_model,
 )
 from arl.msg.models import EmailEvent, EmailTemplate, SmsLog
-from arl.user.models import CustomUser
+from arl.user.models import CustomUser, Employer, Store, UserManager
 
 logger = get_task_logger(__name__)
 
@@ -148,6 +148,7 @@ def send_one_off_bulk_sms_task(group_id, message):
         # Log or handle other exceptions
         logger.error(f"An error occurred: {str(e)}")
 
+
 @app.task(name="monthly_store_calls")
 def monthly_store_calls_task():
     try:
@@ -218,7 +219,9 @@ def generate_pdf_task(incident_id):
             Q(is_active=True) & Q(groups__name="incident_form_email")
         ).values_list("email", flat=True)
 
-        create_incident_file_email_by_rule(to_emails, subject, body, pdf_buffer, pdf_filename)
+        create_incident_file_email_by_rule(
+            to_emails, subject, body, pdf_buffer, pdf_filename
+        )
 
         return {
             "status": "success",
@@ -405,6 +408,8 @@ def process_docusign_webhook(payload):
                     recipient = signers[0]  # Assuming first signer is the recipient
                     recipient_name = recipient.get("name", "")
                     recipient_email = recipient.get("email", "")
+                    user = CustomUser.objects.get(email=recipient_email)
+                    new_hire_quizz_id = "c30a27b4-fd10-4fdd-b6e3-78ddd3e06463"
                     hr_users = CustomUser.objects.filter(
                         Q(is_active=True) & Q(groups__name="dsign_sms")
                     ).values_list("phone_number", flat=True)
@@ -412,6 +417,15 @@ def process_docusign_webhook(payload):
                     send_bulk_sms(hr_users, message_body)
                     envelope_id = envelope_summary.get("envelopeId")
                     get_docusign_envelope(envelope_id, recipient_name, document_name)
+                    if not ProcessedDocsignDocument.objects.filter(envelope_id=new_hire_quizz_id, user=user).exists():
+                        ProcessedDocsignDocument.objects.create(envelope_id=new_hire_quizz_id, user=user)
+                        # Launch the function to create a new DocuSign envelope
+                        envelope_args = {
+                            "signer_name": recipient_name,
+                            "signer_email": recipient_email,
+                            "template_id": new_hire_quizz_id,
+                        }
+                        create_docusign_envelope(envelope_args)
                     return f"Sent SMS for 'completed' status to HR:{recipient_name} {message_body} {document_name} {envelope_id}"
     except Exception as e:
         logger.error(f"Error processing DocuSign webhook: {str(e)}")
@@ -471,3 +485,63 @@ def create_db_backup_and_upload():
     # Close the connection
     mail.close()
     mail.logout()
+
+
+@app.task(name="save_inciddent_file")
+def save_incident_file(**kwargs):
+    try:
+        # Extract form data
+        store_id = kwargs.pop("store", None)
+        user_employer_id = kwargs.pop("user_employer", None)
+
+        # Get the Store instance using the store_id
+        store_instance = (
+            Store.objects.get(pk=store_id) if store_id is not None else None
+        )
+        user_employer_instance = (
+            Employer.objects.get(pk=user_employer_id)
+            if user_employer_id is not None
+            else None
+        )
+
+        # Set the Store instance back to the kwargs
+        kwargs["store"] = store_instance
+        kwargs["user_employer"] = user_employer_instance
+
+        # Save the form data to the database
+        incident = Incident.objects.create(**kwargs)
+
+        return {
+            "incident_store": incident.id,
+            "Incident_brief": incident.brief_description,
+            "message": "Incident Saved",
+        }
+    except Exception as e:
+        logger.error(f"Error saving incident: {e}")
+        return {"error": str(e)}
+
+
+@app.task(name="save_user_to_db")
+def save_user_to_db(**kwargs):
+    try:
+        # Create a new CustomUser object and save it to the database
+        # Access the serialized data from kwargs
+        employer_pk = kwargs.get('employer')
+        manager_dropdown_pk = kwargs.get('manager_dropdown')
+        dob_isoformat = kwargs.get('dob')
+        manager_id = kwargs.get('manager_id')
+        # Deserialize the data if needed
+        # Convert employer_pk, manager_dropdown_pk, and dob_isoformat back to their original types
+        # Perform the necessary processing with the data
+        # Update UserManager with user and manager, etc.
+        # Example:
+        user = CustomUser.objects.get(pk=kwargs['user_id'])
+        user.employer = Employer.objects.get(pk=employer_pk)
+        user.manager = CustomUser.objects.get(pk=manager_dropdown_pk)
+        user.dob = datetime.strptime(dob_isoformat, '%Y-%m-%d').date()
+        user.save()
+        # Create a new UserManager object to associate the user with the manager
+        UserManager.objects.create(user=user, manager_id=manager_id)
+    except Exception as e:
+        # Handle any exceptions that may occur during database save
+        print(f"An error occurred during database save: {e}")

@@ -14,7 +14,11 @@ from django.views.generic.list import ListView
 from PIL import Image
 
 from arl.helpers import get_s3_images_for_incident, upload_to_linode_object_storage
-from arl.tasks import generate_pdf_email_to_user_task, generate_pdf_task
+from arl.tasks import (
+    generate_pdf_email_to_user_task,
+    generate_pdf_task,
+    save_incident_file,
+)
 
 from .forms import IncidentForm
 from .models import Incident
@@ -53,7 +57,11 @@ class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView
 
     def form_valid(self, form):
         form.instance.user_employer = self.request.user.employer
-        response = super().form_valid(form)
+        form_data = self.serialize_form_data(form.cleaned_data)
+
+        # Trigger the Celery task to save form data
+        save_incident_file.delay(**form_data)
+
         messages.success(
             self.request,
             "PDF generation started. Check your email. The file is attached.",
@@ -63,8 +71,19 @@ class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView
     def form_invalid(self, form):
         return self.render_to_response({"form": form})
 
-# siganl to trigger an event post save of 
-# a new incident form.
+    def serialize_form_data(self, form_data):
+        # Convert ForeignKey fields to their primary key values
+        form_data["store"] = (
+            form_data["store"].pk
+            if "store" in form_data and form_data["store"] is not None
+            else None
+        )
+        form_data["user_employer"] = (
+            form_data["user_employer"].pk
+            if "user_employer" in form_data and form_data["user_employer"] is not None
+            else None
+        )
+        return form_data
 
 
 @receiver(post_save, sender=Incident)

@@ -6,11 +6,11 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import Group
-from django.contrib.auth.views import LoginView
+from django.contrib.auth.views import FormView, LoginView
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.http import Http404, HttpResponse, JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
 from twilio.base.exceptions import TwilioException
@@ -19,6 +19,7 @@ from arl.msg.helpers import check_verification_token, request_verification_token
 from arl.tasks import (
     create_docusign_envelope_task,
     create_newhire_data_email,
+    save_user_to_db,
     send_newhire_template_email_task,
     send_sms_task,
 )
@@ -27,35 +28,90 @@ from .forms import CustomUserCreationForm, TwoFactorAuthenticationForm
 from .models import CustomUser, Employer
 
 
-def register(request):
-    employers = Employer.objects.all()
-    if request.method == "POST":
-        form = CustomUserCreationForm(request.POST)
-        try:
-            if form.is_valid():
-                verified_phone_number = request.POST.get("phone_number")
-                if verified_phone_number is None:
-                    raise Http404("Phone number not found in form data.")
+class RegisterView(FormView):
+    template_name = "user/index.html"
+    form_class = CustomUserCreationForm
 
-                user = form.save(commit=False)
-                user.phone_number = verified_phone_number
-                user.save()
-                messages.success(
-                    request,
-                    "Thank you for registering. Please check your email for your New Hire File from Docusign.",
-                )
-                return redirect("home")
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["Employer"] = Employer.objects.all()
+        context["Manager"] = CustomUser.objects.filter(groups__name="Manager")
+        return context
+
+    def form_valid(self, form):
+        try:
+            verified_phone_number = self.request.POST.get("phone_number")
+            if verified_phone_number is None:
+                raise Http404("Phone number not found in form data.")
+
+            user = form.save(commit=False)
+            user.phone_number = verified_phone_number
+            manager_id = form.cleaned_data.get("manager_dropdown")
+            # Serialize the form data
+            serialized_data = self.serialize_user_data(form.cleaned_data)
+
+            # Include manager_id in the kwargs dictionary
+            manager_id = form.cleaned_data.get("manager_dropdown")
+            serialized_data["manager_id"] = manager_id
+            # Pass the serialized data as kwargs to the Celery task
+            user = form.save(commit=False)
+            user.save()
+            serialized_data["user_id"] = user.id
+            # Pass the serialized data as kwargs to the Celery task
+            save_user_to_db.delay(**serialized_data)
+            messages.success(
+                self.request,
+                "Thank you for registering. Please check your email for your New Hire File from Docusign.",
+            )
+            return redirect("home")
+
         except Exception as e:
             # Handle exceptions during form processing
             print(f"An error occurred during registration: {e}")
             traceback.print_exc()
-            messages.error(request, "An error occurred during registration.")
-            return redirect("home")  # Redirect to home page with error message
-            # You may add more detailed error handling or redirect to an error page
-    else:
-        form = CustomUserCreationForm()
-        print(form.errors)
-    return render(request, "user/index.html", {"form": form, "Employer": employers})
+            messages.error(self.request, "An error occurred during registration.")
+            return redirect("home")
+
+    def form_invalid(self, form):
+        # Capture the selected manager value
+        selected_manager_id = self.request.POST.get("manager_dropdown")
+        form.initial["manager_dropdown"] = selected_manager_id
+        # Pass the selected manager value back to the form
+        return self.render_to_response(self.get_context_data(form=form))
+
+    def get(self, request, *args, **kwargs):
+        return super().get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        return super().post(request, *args, **kwargs)
+
+    def serialize_user_data(self, form_data):
+        # Convert ForeignKey fields to their primary key values
+        form_data["employer"] = (
+            form_data["employer"].pk
+            if "employer" in form_data and form_data["employer"] is not None
+            else None
+        )
+        # Serialize manager_dropdown (assuming it's a ForeignKey field)
+        form_data["manager_dropdown"] = (
+            form_data["manager_dropdown"]
+            if "manager_dropdown" in form_data
+            and form_data["manager_dropdown"] is not None
+            else None
+        )
+
+        # Serialize dob (assuming it's a DateField)
+        form_data["dob"] = (
+            form_data["dob"].isoformat()
+            if "dob" in form_data and form_data["dob"] is not None
+            else None
+        )
+        # form_data["country"] = (
+        #    form_data["country"].isoformat()
+        #    if "country" in form_data and form_data["country"] is not None
+        #    else None)
+
+        return form_data
 
 
 # signal to trigger events post save of new use.
@@ -68,7 +124,7 @@ def handle_new_hire_registration(sender, instance, created, **kwargs):
                 "Welcome Aboard",
                 instance.first_name,
                 settings.SENDGRID_NEWHIRE_ID,
-            ) 
+            )
             # Assign user to group GSA
             gsa_group_name = "GSA"
             gsa_group, created = Group.objects.get_or_create(name=gsa_group_name)
@@ -180,7 +236,7 @@ def check_verification(request):
 
 def login_view(request):
     if request.user.is_authenticated:
-        # If the user is already logged in, 
+        # If the user is already logged in,
         # redirect them to the homepage or any other URL.
         return redirect("home")
     if request.method == "POST":
@@ -336,3 +392,27 @@ class CustomAdminLoginView(LoginView):
                     # Redirect back to the login page (you may need to specify the correct URL name)
                     return redirect(reverse("custom_admin_login"))
             return redirect("admin:index")
+
+
+def fetch_managers(request):
+    employer_id = request.GET.get("employer", None)
+
+    if employer_id:
+        try:
+            # Get the employer based on the provided ID
+            employer = get_object_or_404(Employer, id=employer_id)
+
+            # Get all active users with the group "Manager" for the selected employer
+            managers = CustomUser.objects.filter(
+                groups__name="Manager", is_active=True, employer=employer
+            )
+
+            # Serialize the manager data with both username and ID
+            manager_data = [
+                {"id": manager.id, "username": manager.username} for manager in managers
+            ]
+            return JsonResponse(manager_data, safe=False)
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+    else:
+        return JsonResponse({"error": "No employer ID provided"}, status=400)
