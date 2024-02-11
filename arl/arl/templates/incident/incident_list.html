@@ -20,7 +20,7 @@
 </head>
 
 <body>
-    <div class="container mb-2" style="height: 95vh;" >
+    <div class="container mb-2" style="height: 95vh;">
         <div class="row justify-content-center">
             <div class="col-12 col-sm-10 col-md-8 col-lg-8 col-xl-8 mt-2">
                 <table id="table_id" class="display">
@@ -40,7 +40,7 @@
 
                             <td>{{ incident.store.number }}</td>
                             <td>{{ incident.brief_description }}</td>
-                            <td>{{ incident.eventdate }}</td>
+                            <td>{{ incident.eventdate|date:"Y-m-d" }}</td>
                             <td>
                                 <a href="{% url 'update_incident' pk=incident.id %}" id="edit-button" class="fa fa-edit"
                                     style="font-size:22px;color:blue"></a>
@@ -60,14 +60,14 @@
 </body>
 
 <script>
-    
+
 
     $(document).ready(function () {
         $('#table_id').DataTable({
             language: { search: "" },
             responsive: true,
             "pageLength": 10,
-            order: [[0, 'desc']]
+            order: [[2, 'desc']]
         })
 
         // Set the placeholder without the word "Search"
@@ -79,7 +79,7 @@
             'border-radius': '10px', // Adjust the border-radius as needed
             'padding-left': '10px' // Add padding to the left for the text
         });
-        
+
     });
 
 
