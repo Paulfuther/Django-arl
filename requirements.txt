@@ -78,7 +78,7 @@ packaging==23.1
 pathspec==0.11.1
 pdfkit==1.0.0
 phonenumbers==8.13.15
-Pillow==10.0.0
+Pillow==10.2.0
 platformdirs==3.8.0
 pluggy==1.2.0
 ply==3.11
