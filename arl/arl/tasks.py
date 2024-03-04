@@ -375,6 +375,7 @@ def get_template_name(template_id):
 @app.task(name="docusign_webhook")
 def process_docusign_webhook(payload):
     try:
+        document = {}  # Initialize document as an empty dictionary
         if "data" in payload and "envelopeSummary" in payload["data"]:
             envelope_summary = payload["data"]["envelopeSummary"]
             status = envelope_summary.get("status")
@@ -415,19 +416,23 @@ def process_docusign_webhook(payload):
             elif status == "completed":
                 recipients = envelope_summary.get("recipients", {})
                 signers = recipients.get("signers", [])
-
+                document_name = document.get("emailSubject", "") if document else ""
                 if signers:
                     envelope_id = envelope_summary.get("envelopeId")
                     recipient = signers[0]  # Assuming first signer is the recipient
                     recipient_name = recipient.get("name", "")
                     recipient_email = recipient.get("email", "")
-                    document_name = document.get("emailSubject", "")
+                    # document_name = document.get("emailSubject", "")
                     template_name = get_docusign_template_name_from_envelope(
                         envelope_id
                     )
                     print(template_name)
                     # this does not work if there is not a user.
-                    user = CustomUser.objects.get(email=recipient_email)
+                    try:
+                        user = CustomUser.objects.get(email=recipient_email)
+                    except CustomUser.DoesNotExist:
+                        logger.error(f"No user found with email: {recipient_email}")
+                        user = None  # Or handle this scenario appropriately
                     print("This is the doc :", template_name)
                     print(user)
                     template_name = get_docusign_template_name_from_envelope(
