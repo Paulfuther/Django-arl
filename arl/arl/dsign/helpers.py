@@ -10,6 +10,7 @@ from docusign_esign import (
     RecipientEmailNotification,
     SignerAttachment,
     TemplateRole,
+    TemplatesApi,
 )
 from docusign_esign.client.api_exception import ApiException
 from arl.dbox.helpers import upload_to_dropbox
@@ -262,3 +263,33 @@ def list_all_docusign_envelopes():
     # email_body = "Body of the email"
     # recipient_email = "paul.futher@gmail.com"
     # create_single_email(recipient_email, email_subject, email_body, temp_file)
+
+
+def get_docusign_template_name_from_envelope(envelope_id):
+    try:
+        # Authenticate with DocuSign API (use your own authentication method)
+        access_token = get_access_token()  # Replace with your authentication method
+        access_token = access_token.access_token
+        api_client = ApiClient()
+        api_client.host = settings.DOCUSIGN_API_CLIENT_HOST
+        api_client.set_default_header("Authorization", "Bearer " + access_token)
+        account_id = settings.DOCUSIGN_ACCOUNT_ID
+        # Create the EnvelopesApi and TemplatesApi objects
+        # Create the TemplatesApi object
+        envelope_api = EnvelopesApi(api_client)
+
+        # Retrieve the envelope details
+        envelope = envelope_api.list_documents(account_id, envelope_id)
+        # print(envelope)
+        if envelope and envelope.envelope_documents:
+            for document in envelope.envelope_documents:
+                if document.name:
+                    print(f"Template used: {document.name}")
+                    template_name = document.name
+                    return template_name
+
+        print("No template found for the given envelope.")
+
+    except Exception as e:
+        print(f"Error retrieving DocuSign template from envelope: {str(e)}")
+        return None

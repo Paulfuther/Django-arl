@@ -36,5 +36,6 @@ urlpatterns = [
     ),
     path("api/data/", EmailEventList, name="data-list"),
     path("thank-you/", click_thank_you, name="thank_you"),
-    path("comms/", comms, name="comms")
+    path("comms/", comms, name="comms"),
+    
 ]

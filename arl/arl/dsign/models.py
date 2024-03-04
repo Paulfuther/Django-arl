@@ -11,7 +11,7 @@ class DocuSignTemplate(models.Model):
     
 
 class ProcessedDocsignDocument(models.Model):
-    envelope_id = models.CharField(max_length=255, unique=True)
+    envelope_id = models.CharField(max_length=255)
     processed_at = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='processed_documents')
 
