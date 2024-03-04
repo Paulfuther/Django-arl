@@ -5,6 +5,7 @@ from arl.dsign.views import (
     docusign_webhook,
     retrieve_docusign_envelope,
     list_docusign_envelope,
+    get_docusign_template,
 )
 
 urlpatterns = [
@@ -14,4 +15,5 @@ urlpatterns = [
          name="docusign_envlope"),
     path("list-docusign-envelope-changes/", list_docusign_envelope,
          name="list_docusign_envlope-changes"),
+    path("list_templates/", get_docusign_template, name='doc_template')
 ]

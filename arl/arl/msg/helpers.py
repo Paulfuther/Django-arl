@@ -33,6 +33,9 @@ client = Client(account_sid, auth_token)
 
 sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
 
+# whatsapp message
+
+
 # function to create an email using sendgrid and tempaltes
 
 

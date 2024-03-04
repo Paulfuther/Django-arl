@@ -165,6 +165,8 @@ BROKER_URL = os.environ.get("CLOUDAMQP_URL")
 
 EMAIL_BACKEND = "arl.msg.helpers.SendGridEmailBackend"
 
+DATA_UPLOAD_MAX_MEMORY_SIZE = 50485760  # 10MB in bytes
+
 
 DOCUSIGN_BASE_PATH = os.environ.get("DOCUSIGN_BASE_PATH_DEV")
 DOCUSIGN_INTEGRATION_KEY = os.environ.get("DOCUSIGN_INTEGRATION_KEY_DEV")

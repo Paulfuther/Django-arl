@@ -9,8 +9,12 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
-from arl.dsign.helpers import get_docusign_envelope, list_all_docusign_envelopes
 from arl.dbox.helpers import upload_to_dropbox
+from arl.dsign.helpers import (
+    get_docusign_envelope,
+    get_docusign_template_name_from_envelope,
+    list_all_docusign_envelopes,
+)
 from arl.dsign.models import DocuSignTemplate
 from arl.tasks import create_docusign_envelope_task, process_docusign_webhook
 
@@ -54,8 +58,7 @@ class CreateEnvelopeView(UserPassesTestMixin, View):
             create_docusign_envelope_task.delay(envelope_args)
 
             messages.success(
-                request,
-                f"Thank you. The document '{template_name}' has been sent."
+                request, f"Thank you. The document '{template_name}' has been sent."
             )
             return redirect("home")
         else:
@@ -97,3 +100,18 @@ def retrieve_docusign_envelope(request):
 def list_docusign_envelope(request):
     list_all_docusign_envelopes()
     return HttpResponse("Process completed successfully.")
+
+
+def get_docusign_template(request):
+    envelope_id = (
+        "db908cae-87ac-4c37-aa67-d5a971ee7da7"  # Replace with your envelope_id
+    )
+    print(envelope_id)
+    template_name = get_docusign_template_name_from_envelope(envelope_id)
+
+    if template_name:
+        return JsonResponse({"template_name": template_name})
+    else:
+        return JsonResponse(
+            {"error": "Template not found in the envelope."}, status=404
+        )

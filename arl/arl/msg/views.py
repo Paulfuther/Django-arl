@@ -1,6 +1,7 @@
 import json
 import logging
 
+from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import Group
 from django.http import HttpResponse, JsonResponse
@@ -180,9 +181,9 @@ class FetchTwilioCallsView(LoginRequiredMixin, UserPassesTestMixin, TemplateView
         calls = fetch_calls()
         if calls is None:
             # Set an error message in the context
-            context[
-                "error_message"
-            ] = "Failed to fetch call logs. Please try again later."
+            context["error_message"] = (
+                "Failed to fetch call logs. Please try again later."
+            )
             return context
 
         truncated_calls = []
@@ -197,10 +198,12 @@ class FetchTwilioCallsView(LoginRequiredMixin, UserPassesTestMixin, TemplateView
                 "date_created": call.date_created,
                 "to": twilio_to_number,
                 "duration": call.duration,
-                "store_phone_number": store_phone_number
-                if store_phone_number
-                else "Unknown Phone Number",
-                "store_number": store_number if store_number else "Unknown Store Number"
+                "store_phone_number": (
+                    store_phone_number if store_phone_number else "Unknown Phone Number"
+                ),
+                "store_number": (
+                    store_number if store_number else "Unknown Store Number"
+                ),
                 # Add more fields as needed
             }
             truncated_calls.append(call_data)
@@ -210,7 +213,7 @@ class FetchTwilioCallsView(LoginRequiredMixin, UserPassesTestMixin, TemplateView
 
 
 def comms(request):
-    return render(request, 'msg/master_comms.html')
+    return render(request, "msg/master_comms.html")
 
 
 @waffle_flag("email_api")

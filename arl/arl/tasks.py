@@ -18,7 +18,11 @@ from django.utils.text import slugify
 
 from arl.celery import app
 from arl.dbox.helpers import upload_incident_file_to_dropbox
-from arl.dsign.helpers import create_docusign_envelope, get_docusign_envelope
+from arl.dsign.helpers import (
+    create_docusign_envelope,
+    get_docusign_envelope,
+    get_docusign_template_name_from_envelope,
+)
 from arl.dsign.models import DocuSignTemplate, ProcessedDocsignDocument
 from arl.helpers import (
     get_s3_images_for_incident,
@@ -379,22 +383,30 @@ def process_docusign_webhook(payload):
             if "envelopeDocuments" in envelope_summary:
                 envelope_documents = envelope_summary["envelopeDocuments"]
                 if envelope_documents:
-                    document = envelope_documents[
-                        0
-                    ]  # Assuming the document of interest is the first one
-                    document_name = document.get("name", "")
+                    document = envelope_documents[0]
+                    # Assuming the document of interest is the first one
+                    document_name = document.get("emailSubject", "")
             if status == "sent":
                 recipients = envelope_summary.get("recipients", {})
                 signers = recipients.get("signers", [])
 
                 if signers:
+                    envelope_id = envelope_summary.get("envelopeId")
+                    template_name = get_docusign_template_name_from_envelope(
+                        envelope_id
+                    )
+                    print(template_name)
                     recipient = signers[0]  # Assuming first signer is the recipient
                     recipient_name = recipient.get("name", "")
                     recipient_email = recipient.get("email", "")
+                    # document_name = document.get("emailSubject", "")
+                    # print("this is the doc : ", document_name)
                     hr_users = CustomUser.objects.filter(
                         Q(is_active=True) & Q(groups__name="dsign_sms")
                     ).values_list("phone_number", flat=True)
-                    message_body = f"Docusign File {document_name} sent to: {recipient_name} {recipient_email}"
+                    message_body = (
+                        f"{template_name} sent to: {recipient_name} {recipient_email}"
+                    )
                     send_bulk_sms(hr_users, message_body)
                     logger.info(
                         f"Sent SMS for 'sent' status to HR:{recipient_name} {message_body}"
@@ -405,27 +417,49 @@ def process_docusign_webhook(payload):
                 signers = recipients.get("signers", [])
 
                 if signers:
+                    envelope_id = envelope_summary.get("envelopeId")
                     recipient = signers[0]  # Assuming first signer is the recipient
                     recipient_name = recipient.get("name", "")
                     recipient_email = recipient.get("email", "")
+                    document_name = document.get("emailSubject", "")
+                    template_name = get_docusign_template_name_from_envelope(
+                        envelope_id
+                    )
+                    print(template_name)
+                    # this does not work if there is not a user.
                     user = CustomUser.objects.get(email=recipient_email)
-                    new_hire_quizz_id = "c30a27b4-fd10-4fdd-b6e3-78ddd3e06463"
+                    print("This is the doc :", template_name)
+                    print(user)
+                    template_name = get_docusign_template_name_from_envelope(
+                        envelope_id
+                    )
+                    print(template_name)
+                    processed_document = ProcessedDocsignDocument(
+                        user=user, envelope_id=template_name
+                    )
+                    processed_document.save()
+                    # new_hire_quiz_id = "c30a27b4-fd10-4fdd-b6e3-78ddd3e06463"
+                    # new_hire_quiz_name = "New Hire Quiz.docx"
                     hr_users = CustomUser.objects.filter(
                         Q(is_active=True) & Q(groups__name="dsign_sms")
                     ).values_list("phone_number", flat=True)
-                    message_body = f"Docusign File {document_name} completed by: {recipient_name} {recipient_email}"
+                    message_body = f"{template_name} completed by: {recipient_name} {recipient_email}"
                     send_bulk_sms(hr_users, message_body)
-                    envelope_id = envelope_summary.get("envelopeId")
+
                     get_docusign_envelope(envelope_id, recipient_name, document_name)
-                    if not ProcessedDocsignDocument.objects.filter(envelope_id=new_hire_quizz_id, user=user).exists():
-                        ProcessedDocsignDocument.objects.create(envelope_id=new_hire_quizz_id, user=user)
-                        # Launch the function to create a new DocuSign envelope
-                        envelope_args = {
-                            "signer_name": recipient_name,
-                            "signer_email": recipient_email,
-                            "template_id": new_hire_quizz_id,
-                        }
-                        create_docusign_envelope(envelope_args)
+                    # if not ProcessedDocsignDocument.objects.filter(
+                    #    envelope_id=new_hire_quiz_name, user=user
+                    # ).exists():
+                    #    ProcessedDocsignDocument.objects.create(
+                    #        envelope_id=new_hire_quiz_name, user=user
+                    #    )
+                    # Launch the function to create a new DocuSign envelope
+                    #    envelope_args = {
+                    #        "signer_name": recipient_name,
+                    #        "signer_email": recipient_email,
+                    #        "template_id": new_hire_quiz_id,
+                    #   }
+                    #    create_docusign_envelope(envelope_args)
                     return f"Sent SMS for 'completed' status to HR:{recipient_name} {message_body} {document_name} {envelope_id}"
     except Exception as e:
         logger.error(f"Error processing DocuSign webhook: {str(e)}")
@@ -526,19 +560,19 @@ def save_user_to_db(**kwargs):
     try:
         # Create a new CustomUser object and save it to the database
         # Access the serialized data from kwargs
-        employer_pk = kwargs.get('employer')
-        manager_dropdown_pk = kwargs.get('manager_dropdown')
-        dob_isoformat = kwargs.get('dob')
-        manager_id = kwargs.get('manager_id')
+        employer_pk = kwargs.get("employer")
+        manager_dropdown_pk = kwargs.get("manager_dropdown")
+        dob_isoformat = kwargs.get("dob")
+        manager_id = kwargs.get("manager_id")
         # Deserialize the data if needed
         # Convert employer_pk, manager_dropdown_pk, and dob_isoformat back to their original types
         # Perform the necessary processing with the data
         # Update UserManager with user and manager, etc.
         # Example:
-        user = CustomUser.objects.get(pk=kwargs['user_id'])
+        user = CustomUser.objects.get(pk=kwargs["user_id"])
         user.employer = Employer.objects.get(pk=employer_pk)
         user.manager = CustomUser.objects.get(pk=manager_dropdown_pk)
-        user.dob = datetime.strptime(dob_isoformat, '%Y-%m-%d').date()
+        user.dob = datetime.strptime(dob_isoformat, "%Y-%m-%d").date()
         user.save()
         # Create a new UserManager object to associate the user with the manager
         UserManager.objects.create(user=user, manager_id=manager_id)
