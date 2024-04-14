@@ -7,11 +7,13 @@ from arl.msg.views import (
     SendEmailView,
     SendSMSView,
     SendTemplateEmailView,
+    SendTemplateWhatsAppView,
     click_thank_you,
+    comms,
     sendgrid_webhook,
     sms_success_view,
     template_email_success_view,
-    comms,
+    template_whats_app_success_view,
 )
 
 urlpatterns = [
@@ -26,9 +28,19 @@ urlpatterns = [
     path("sendgrid_hook/", sendgrid_webhook, name="sendgrid_webhook"),
     path("sms-success/", sms_success_view, name="sms_success"),
     path(
+        "send-whatsapp/",
+        SendTemplateWhatsAppView.as_view(),
+        name="send_whats_app_template_view",
+    ),
+    path(
         "template-email-success/",
         template_email_success_view,
         name="template_email_success",
+    ),
+    path(
+        "template-whats_app-success/",
+        template_whats_app_success_view,
+        name="template_whats_app_success",
     ),
     path("fetch-twilio/", FetchTwilioView.as_view(), name="fetch_twilio"),
     path(
@@ -37,5 +49,4 @@ urlpatterns = [
     path("api/data/", EmailEventList, name="data-list"),
     path("thank-you/", click_thank_you, name="thank_you"),
     path("comms/", comms, name="comms"),
-    
 ]

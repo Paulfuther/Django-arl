@@ -3,7 +3,7 @@ from crispy_forms.layout import Submit
 from django import forms
 from django.contrib.auth.models import Group
 
-from arl.msg.models import EmailTemplate
+from arl.msg.models import EmailTemplate, WhatsAppTemplate
 
 
 class SMSForm(forms.Form):
@@ -77,3 +77,22 @@ class EmailForm(forms.Form):
         widget=forms.TextInput(attrs={"class": "form-control"}),
         help_text="Enter Body of Email",
     )
+
+
+class TemplateWhatsAppForm(forms.Form):
+    whatsapp_id = forms.ModelChoiceField(
+        queryset=WhatsAppTemplate.objects.all(), label="Select Template"
+    )
+
+    selected_group = forms.ModelChoiceField(
+        queryset=Group.objects.all(),
+        required=True,
+        label="Select Group to Send Whatsapp",
+        widget=forms.Select(attrs={"class": "custom-input"}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name, field in self.fields.items():
+            if field_name != 'csrfmiddlewaretoken':  # Skip CSRF token field
+                field.widget.attrs.update({'class': 'custom-input'})

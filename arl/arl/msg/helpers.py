@@ -364,3 +364,27 @@ def create_incident_file_email_by_rule(to_emails, subject, body, attachment_buff
             response_status = e.response.status_code
             logger.error(f"SendGrid response status code: {response_status}")
             logger.error(f"SendGrid response body: {response_body}")
+
+
+def send_whats_app_template(content_sid, from_sid, user_name, to_number):
+    # Ensure phone number is in the correct format
+    whatsapp_number = f'whatsapp:+{to_number}'
+    # Properly format the content variables for the template
+    content_vars = json.dumps({'1': user_name})
+    # Log the variables to debug or verify; consider reducing logging in production
+    print(f"Sending to {whatsapp_number} with name {user_name}")
+
+    try:
+        # Create the message
+        message = client.messages.create(
+            content_sid=content_sid,
+            from_=from_sid,
+            content_variables=content_vars,
+            to=whatsapp_number
+        )
+        # print(f"Message sent with SID: {message.sid}")
+        return message.sid
+    except Exception as e:
+        # Handle errors in message sending
+        print(f"Failed to send message: {str(e)}")
+        return None
