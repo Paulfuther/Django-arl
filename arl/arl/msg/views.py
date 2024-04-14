@@ -14,6 +14,7 @@ from waffle.decorators import waffle_flag
 from waffle.mixins import WaffleFlagMixin
 
 from arl.msg.helpers import client
+from arl.msg.tasks import send_template_whatsapp_task
 from arl.tasks import (
     process_sendgrid_webhook,
     send_email_task,
@@ -22,7 +23,7 @@ from arl.tasks import (
 )
 from arl.user.models import CustomUser, Store
 
-from .forms import EmailForm, SMSForm, TemplateEmailForm
+from .forms import EmailForm, SMSForm, TemplateEmailForm, TemplateWhatsAppForm
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +110,34 @@ class SendEmailView(LoginRequiredMixin, UserPassesTestMixin, FormView):
         return super().form_valid(form)
 
 
+class SendTemplateWhatsAppView(LoginRequiredMixin, UserPassesTestMixin, FormView):
+    form_class = TemplateWhatsAppForm
+    template_name = "msg/whatsapp_form.html"
+    # URL name for success page
+    success_url = reverse_lazy("template_whats_app_success")
+
+    def test_func(self):
+        return is_member_of_msg_group(self.request.user)
+
+    def form_valid(self, form):
+        selected_group_id = form.cleaned_data["selected_group"].id
+        whatsapp_template = form.cleaned_data["whatsapp_id"]
+        from_id = "MGb005e5fe6d147e13d0b2d1322e00b1cb"
+        # Fetch the group and sendgrid_id
+        group = get_object_or_404(Group, pk=selected_group_id)
+        group_id = group.id
+        whatsapp_id = (
+            whatsapp_template.content_sid
+        )  # Assuming sendgrid_id is a field in the EmailTemplate model
+
+        # Now you have both the group_id and the corresponding sendgrid_id
+        # Use these to send emails to the entire group
+        print(group_id)
+        send_template_whatsapp_task.delay(whatsapp_id, from_id, group_id)
+        # print(group_id)
+        return super().form_valid(form)
+
+
 @csrf_exempt  # In production, use proper CSRF protection.
 def sendgrid_webhook(request):
     if request.method == "POST":
@@ -132,8 +161,23 @@ def template_email_success_view(request):
     return render(request, "msg/template_email_success.html")
 
 
+def template_whats_app_success_view(request):
+    return render(request, "msg/template_whats_app_success.html")
+
+
 def fetch_sms():
     return client.messages.list(limit=200)
+
+
+def fetch_whatsapp_messages(account_sid, auth_token):
+    # Fetch messages sent via WhatsApp
+    messages = client.messages.list(limit=20)  # Adjust 'limit' as needed
+
+    for message in messages:
+        if "whatsapp:" in message.from_:  # Filter messages sent from a WhatsApp number
+            print(
+                f"From: {message.from_}, To: {message.to}, Body: {message.body}, Status: {message.status}, Date Sent: {message.date_sent}"
+            )
 
 
 class FetchTwilioView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):

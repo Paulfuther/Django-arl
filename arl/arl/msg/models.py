@@ -55,3 +55,16 @@ class EmailTemplate(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class WhatsAppTemplate(models.Model):
+    name = models.CharField(max_length=255, help_text="Friendly name of the WhatsApp template")
+    content_sid = models.CharField(max_length=255, unique=True, help_text="The unique identifier for the template (e.g., Twilio Content SID)")
+    description = models.TextField(blank=True, help_text="Description of what this template is used for")
+
+    def __str__(self):
+        return f"{self.name} - {self.content_sid}"
+
+    class Meta:
+        verbose_name = "WhatsApp Template"
+        verbose_name_plural = "WhatsApp Templates"

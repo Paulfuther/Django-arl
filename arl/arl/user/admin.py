@@ -5,7 +5,12 @@ from import_export.admin import ExportActionMixin
 
 from arl.dsign.models import DocuSignTemplate, ProcessedDocsignDocument
 from arl.incident.models import Incident
-from arl.msg.models import BulkEmailSendgrid, EmailTemplate, Twimlmessages
+from arl.msg.models import (
+    BulkEmailSendgrid,
+    EmailTemplate,
+    Twimlmessages,
+    WhatsAppTemplate,
+)
 
 from .models import CustomUser, Employer, Store, UserManager
 
@@ -116,3 +121,4 @@ admin.site.register(DocuSignTemplate)
 admin.site.register(ProcessedDocsignDocument)
 admin.site.register(CustomUser, CustomUserAdmin)
 admin.site.register(UserManager)
+admin.site.register(WhatsAppTemplate)
