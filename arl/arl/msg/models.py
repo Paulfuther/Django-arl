@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 from arl.user.models import CustomUser
@@ -8,7 +9,7 @@ class Twimlmessages(models.Model):
     twimlid = models.CharField(max_length=100)
 
     def __str__(self):
-        return '%r' % (self.twimlname)
+        return "%r" % (self.twimlname)
 
 
 class BulkEmailSendgrid(models.Model):
@@ -16,12 +17,14 @@ class BulkEmailSendgrid(models.Model):
     templateid = models.CharField(max_length=100)
 
     def __str__(self):
-        return '%r' % (self.templatename)
+        return "%r" % (self.templatename)
 
 
 class EmailEvent(models.Model):
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True, blank=True)
-    username = models.CharField(max_length=150, default='unknown')
+    user = models.ForeignKey(
+        CustomUser, on_delete=models.CASCADE, null=True, blank=True
+    )
+    username = models.CharField(max_length=150, default="unknown")
     email = models.EmailField()
     event = models.CharField(max_length=10)
     ip = models.GenericIPAddressField()
@@ -34,10 +37,10 @@ class EmailEvent(models.Model):
     useragent = models.TextField()
 
     def __str__(self):
-        return f'{self.email} - {self.event}'
+        return f"{self.email} - {self.event}"
 
     class Meta:
-        ordering = ['-timestamp']
+        ordering = ["-timestamp"]
 
 
 class SmsLog(models.Model):
@@ -58,9 +61,17 @@ class EmailTemplate(models.Model):
 
 
 class WhatsAppTemplate(models.Model):
-    name = models.CharField(max_length=255, help_text="Friendly name of the WhatsApp template")
-    content_sid = models.CharField(max_length=255, unique=True, help_text="The unique identifier for the template (e.g., Twilio Content SID)")
-    description = models.TextField(blank=True, help_text="Description of what this template is used for")
+    name = models.CharField(
+        max_length=255, help_text="Friendly name of the WhatsApp template"
+    )
+    content_sid = models.CharField(
+        max_length=255,
+        unique=True,
+        help_text="The unique identifier for the template (e.g., Twilio Content SID)",
+    )
+    description = models.TextField(
+        blank=True, help_text="Description of what this template is used for"
+    )
 
     def __str__(self):
         return f"{self.name} - {self.content_sid}"
@@ -68,3 +79,31 @@ class WhatsAppTemplate(models.Model):
     class Meta:
         verbose_name = "WhatsApp Template"
         verbose_name_plural = "WhatsApp Templates"
+
+
+class UserConsent(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="consents"
+    )
+    consent_type = models.CharField(
+        max_length=100, help_text="Type of consent, e.g., 'SMS', 'Email'"
+    )
+    is_granted = models.BooleanField(
+        default=False, help_text="Whether the user has granted consent"
+    )
+    granted_on = models.DateTimeField(
+        null=True, blank=True, help_text="When the consent was granted"
+    )
+    revoked_on = models.DateTimeField(
+        null=True, blank=True, help_text="When the consent was revoked, if applicable"
+    )
+
+    def __str__(self):
+        status = "Granted" if self.is_granted else "Revoked"
+        return f"{self.user.username} - {self.consent_type} - {status}"
+
+    class Meta:
+        unique_together = (
+            "user",
+            "consent_type",
+        )  # Ensures uniqueness for the combination of user and consent type

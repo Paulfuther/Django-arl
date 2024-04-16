@@ -9,6 +9,7 @@ from arl.msg.models import (
     BulkEmailSendgrid,
     EmailTemplate,
     Twimlmessages,
+    UserConsent,
     WhatsAppTemplate,
 )
 
@@ -31,6 +32,7 @@ class UserResource(resources.ModelResource):
 
 class CustomUserAdmin(ExportActionMixin, UserAdmin):
     resource_class = UserResource
+    # Customize the fields you want to display
     list_display = (
         "username",
         "email",
@@ -38,7 +40,9 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         "last_login",
         "is_active",
         "get_groups",
-    )  # Customize the fields you want to display
+        "get_manager",
+        "get_consent",
+    )
     list_filter = ("is_active", "groups")  # Add any filters you need
 
     # def has_delete_permission(self, request, obj=None):
@@ -48,6 +52,22 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         return ", ".join([group.name for group in obj.groups.all()])
 
     get_groups.short_description = "Groups"
+
+    def get_manager(self, obj):
+        user_manager = UserManager.objects.filter(user=obj).first()
+        return (
+            user_manager.manager.username
+            if user_manager and user_manager.manager
+            else "None"
+        )
+
+    get_manager.short_description = "Manager"
+
+    def get_consent(self, obj):
+        consent = UserConsent.objects.filter(user=obj, consent_type="WhatsApp").first()
+        return "Granted" if consent and consent.is_granted else "Not Granted"
+
+    get_consent.short_description = "WhatsApp Consent"
 
     fieldsets = list(UserAdmin.fieldsets)
     fieldsets[1] = (
@@ -108,6 +128,13 @@ class IncidentAdmin(admin.ModelAdmin):
     list_display = ("store", "brief_description", "eventdate")
     search_fields = ("store__number", "brief_description")
     list_filter = ("eventdate",)
+
+
+@admin.register(UserConsent)
+class UserConsentAdmin(admin.ModelAdmin):
+    list_display = ("user", "consent_type", "is_granted", "granted_on", "revoked_on")
+    list_filter = ("consent_type", "is_granted")
+    search_fields = ("user__username",)
 
 
 UserAdmin.fieldsets = tuple(fields)
