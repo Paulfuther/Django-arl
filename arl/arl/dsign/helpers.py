@@ -1,5 +1,8 @@
+import json
+import logging
 from datetime import datetime, timedelta
 
+import requests
 from django.conf import settings
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
@@ -13,11 +16,13 @@ from docusign_esign import (
     TemplatesApi,
 )
 from docusign_esign.client.api_exception import ApiException
+
 from arl.dbox.helpers import upload_to_dropbox
 from arl.dsign.models import DocuSignTemplate
-from arl.msg.helpers import create_single_email, send_docusign_email_with_attachment
+from arl.msg.helpers import send_docusign_email_with_attachment
 from arl.user.models import CustomUser
 
+logging.basicConfig(level=logging.INFO)
 SCOPES = ["signature impersonation"]
 
 
@@ -77,47 +82,15 @@ def create_docusign_envelope(envelope_args):
     # Note. We do not need this if we set the webhook notifications in the coe.
     # However, if we ever wanted to overide the notifications then we can
     # do so in the code.
-    webhook_url = "https://www.arla0061.com/docusign-webhook"
-    event_notification = {
-        "URL": webhook_url,
-        "loggingEnabled": "true",
-        "requireAcknowledgment": "true",
-        "useSoapInterface": "false",
-        "includeCertificateWithSoap": "false",
-        "signMessageWithX509Cert": "false",
-        "includeDocuments": "true",
-        "includeEnvelopeVoidReason": "true",
-        "includeTimeZone": "true",
-        "includeSenderAccountAsCustomField": "true",
-        "includeDocumentFields": "true",
-        "includeCertificateOfCompletion": "true",
-        "envelopeEvents": [
-            {"envelopeEventStatusCode": "sent"},
-            {"envelopeEventStatusCode": "delivered"},
-            {"envelopeEventStatusCode": "completed"},
-            {"envelopeEventStatusCode": "declined"},
-            {"envelopeEventStatusCode": "voided"},
-        ],
-        "recipientEvents": [
-            {"recipientEventStatusCode": "Sent"},
-            {"recipientEventStatusCode": "Delivered"},
-            {"recipientEventStatusCode": "Completed"},
-            {"recipientEventStatusCode": "Declined"},
-            {"recipientEventStatusCode": "AuthenticationFailed"},
-            {"recipientEventStatusCode": "AutoResponded"},
-        ],
-    }
 
     template = DocuSignTemplate.objects.get(template_id=envelope_args["template_id"])
     template_name = template.template_name if template else "Default Template Name"
     email_subject = f"{envelope_args['signer_name']} - {template_name}"
-    
-    # print(email_subject)
+
     # Create the envelope definition
     envelope_definition = EnvelopeDefinition(
         status="sent",  # requests that the envelope be created and sent.
         template_id=envelope_args["template_id"],
-        eventNotification=event_notification,
         auto_navigation=False,
     )
 
@@ -128,8 +101,6 @@ def create_docusign_envelope(envelope_args):
         role_name="GSA",
         email_notification=RecipientEmailNotification(email_subject=email_subject),
     )
-
-    
 
     attachment_tab1 = SignerAttachment(
         anchor_string="Upload Photo ID picture",
@@ -166,12 +137,8 @@ def create_docusign_envelope(envelope_args):
     envelope_definition.template_roles = [signer]
     api_client = ApiClient()
     api_client.host = settings.DOCUSIGN_API_CLIENT_HOST
-    # print(api_client.host)
-    # print(settings.DOCUSIGN_ACCOUNT_ID)
     api_client.set_default_header("Authorization", "Bearer " + access_token)
-    # print(api_client)
     envelope_api = EnvelopesApi(api_client)
-    # print(envelope_api)
     try:
         results = envelope_api.create_envelope(
             settings.DOCUSIGN_ACCOUNT_ID, envelope_definition=envelope_definition
@@ -201,7 +168,7 @@ def get_docusign_envelope(envelope_id, recipient_name, document_name):
 
         temp_file = envelopes_api.get_document(account_id, envelope_type, envelope_id)
         print(temp_file)
-        upload_to_dropbox(temp_file) 
+        upload_to_dropbox(temp_file)
         # Process the temp_file or perform actions like sending an email
         # Example: Sending an email with the retrieved document attached
         email_subject = f"{document_name} completed for {recipient_name}"
@@ -265,7 +232,7 @@ def list_all_docusign_envelopes():
     # create_single_email(recipient_email, email_subject, email_body, temp_file)
 
 
-def get_docusign_template_name_from_envelope(envelope_id):
+def get_docusign_template_name_from_template(template_id):
     try:
         # Authenticate with DocuSign API (use your own authentication method)
         access_token = get_access_token()  # Replace with your authentication method
@@ -276,20 +243,156 @@ def get_docusign_template_name_from_envelope(envelope_id):
         account_id = settings.DOCUSIGN_ACCOUNT_ID
         # Create the EnvelopesApi and TemplatesApi objects
         # Create the TemplatesApi object
-        envelope_api = EnvelopesApi(api_client)
+        # Initialize the Templates API
+        templates_api = TemplatesApi(api_client)
 
-        # Retrieve the envelope details
-        envelope = envelope_api.list_documents(account_id, envelope_id)
-        # print(envelope)
-        if envelope and envelope.envelope_documents:
-            for document in envelope.envelope_documents:
-                if document.name:
-                    print(f"Template used: {document.name}")
-                    template_name = document.name
-                    return template_name
+        # Get the template details using the template ID
+        template = templates_api.get(account_id, template_id)
+        template_name = template.name if template else None
 
-        print("No template found for the given envelope.")
+        if template_name:
+            print(f"Template name gdtnfe task: {template_name}")
+            return template_name
+        else:
+            print("Template name not found for the given template ID.")
+            return None
 
     except Exception as e:
-        print(f"Error retrieving DocuSign template from envelope: {str(e)}")
+        print(f"Error retrieving DocuSign template name: {str(e)}")
         return None
+
+
+def fetch_envelope_details(envelope_id):
+    # Example variables - replace with your actual data
+    base_url = "https://demo.docusign.net/restapi"
+    account_id = settings.DOCUSIGN_ACCOUNT_ID
+    access_token = get_access_token()  # Replace with your authentication method
+    access_token = access_token.access_token
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    # Construct the API endpoint URL
+    url = f"{base_url}/v2.1/accounts/{account_id}/envelopes/{envelope_id}"
+
+    # Make the GET request
+    response = requests.get(url, headers=headers)
+
+    if response.status_code == 200:
+        # Assuming the request was successful, parse the response
+        envelope_details = response.json()
+        return envelope_details
+    else:
+        # Handle errors or unsuccessful requests
+        print(f"Failed to fetch envelope details. Status code: {response.status_code}")
+        return None
+
+
+def get_template_id(payload):
+    # Setup for DocuSign API Client
+    api_client = ApiClient()
+    api_client.host = settings.DOCUSIGN_API_CLIENT_HOST
+    access_token = get_access_token()
+    access_token = access_token.access_token
+    api_client.set_default_header("Authorization", f"Bearer {access_token}")
+
+    try:
+        # Extract envelope ID from payload
+        if isinstance(payload, str):
+            payload = json.loads(payload)
+        envelope_id = payload.get("data", {}).get("envelopeId", "")
+        if not envelope_id:
+            logging.error("Envelope ID could not be found in the payload.")
+            return None
+
+        # Fetch templates associated with the envelope
+        envelopes_api = EnvelopesApi(api_client)
+        account_id = (
+            settings.DOCUSIGN_ACCOUNT_ID
+        )  # Replace with your DocuSign account ID
+        templates_response = envelopes_api.list_templates(
+            account_id=account_id, envelope_id=envelope_id
+        )
+
+        # Process the templates response
+        if (
+            templates_response
+            and hasattr(templates_response, "templates")
+            and templates_response.templates
+        ):
+            first_template = templates_response.templates[0]
+            template_id = (
+                first_template.template_id
+                if hasattr(first_template, "template_id")
+                else None
+            )
+            if template_id:
+                logging.info(
+                    f"Template ID for Envelope ID {envelope_id}: {template_id}"
+                )
+                return template_id
+            else:
+                logging.error(
+                    f"No template details found for the Envelope ID {envelope_id}."
+                )
+                return None
+    except ApiException as e:
+        logging.error(f"DocuSign API exception: {e}")
+    except Exception as e:
+        logging.error(f"Error processing webhook payload: {e}")
+    return None
+
+
+def create_docusign_envelope_new_hire_quiz(envelope_args):
+    access_token = get_access_token().access_token
+    # Construct the eventNotification
+    # Note. We do not need this if we set the webhook notifications in the coe.
+    # However, if we ever wanted to overide the notifications then we can
+    # do so in the code.
+
+    template = DocuSignTemplate.objects.get(template_id=envelope_args["template_id"])
+    template_name = template.template_name if template else "Default Template Name"
+    email_subject = (
+        f"{envelope_args['signer_name']} please complete this file - {template_name}"
+    )
+    # Construct the email subject for the second signer
+    email_subject2 = f"{template_name} for {envelope_args['signer_name']} for review by {envelope_args['manager_name']}"
+    # Create the envelope definition
+    envelope_definition = EnvelopeDefinition(
+        status="sent",  # requests that the envelope be created and sent.
+        template_id=envelope_args["template_id"],
+        auto_navigation=False,
+    )
+
+    # Create the signer role
+    signer = TemplateRole(
+        email=envelope_args["signer_email"],
+        name=envelope_args["signer_name"],
+        role_name="GSA",
+        email_notification=RecipientEmailNotification(email_subject=email_subject),
+        recipient_id="1",
+        routing_order="1",
+    )
+
+    signer2 = TemplateRole(
+        email=envelope_args["manager_email"],
+        name=envelope_args["manager_name"],
+        role_name="Manager",  # This should also match the role defined in your DocuSign template
+        email_notification=RecipientEmailNotification(email_subject=email_subject2),
+        recipient_id="2",
+        routing_order="2",
+    )
+
+    # Add the TemplateRole objects to the envelope object
+    envelope_definition.template_roles = [signer, signer2]
+    api_client = ApiClient()
+    api_client.host = settings.DOCUSIGN_API_CLIENT_HOST
+    api_client.set_default_header("Authorization", "Bearer " + access_token)
+    envelope_api = EnvelopesApi(api_client)
+    try:
+        results = envelope_api.create_envelope(
+            settings.DOCUSIGN_ACCOUNT_ID, envelope_definition=envelope_definition
+        )
+        envelope_id = results.envelope_id
+        return JsonResponse({"envelope_id": envelope_id})
+    except Exception as e:
+        print("error")
+        return JsonResponse({"error": str(e)}), 500

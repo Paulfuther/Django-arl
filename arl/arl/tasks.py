@@ -2,6 +2,8 @@ from __future__ import absolute_import, unicode_literals
 
 import imaplib
 import io
+import json
+import logging
 import subprocess
 from datetime import datetime, timedelta
 from io import BytesIO
@@ -15,13 +17,18 @@ from django.db.models import Q
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.text import slugify
+from docusign_esign import ApiClient, ApiException, EnvelopesApi
 
 from arl.celery import app
 from arl.dbox.helpers import upload_incident_file_to_dropbox
 from arl.dsign.helpers import (
     create_docusign_envelope,
+    create_docusign_envelope_new_hire_quiz,
+    fetch_envelope_details,
+    get_access_token,
     get_docusign_envelope,
-    get_docusign_template_name_from_envelope,
+    get_docusign_template_name_from_template,
+    get_template_id,
 )
 from arl.dsign.models import DocuSignTemplate, ProcessedDocsignDocument
 from arl.helpers import (
@@ -41,7 +48,7 @@ from arl.msg.helpers import (
     send_monthly_store_phonecall,
     send_sms_model,
 )
-from arl.msg.models import EmailEvent, EmailTemplate, SmsLog
+from arl.msg.models import EmailEvent, EmailTemplate, SmsLog, WhatsAppTemplate
 from arl.user.models import CustomUser, Employer, Store, UserManager
 
 logger = get_task_logger(__name__)
@@ -374,101 +381,131 @@ def get_template_name(template_id):
 
 @app.task(name="docusign_webhook")
 def process_docusign_webhook(payload):
-    try:
-        document = {}  # Initialize document as an empty dictionary
-        if "data" in payload and "envelopeSummary" in payload["data"]:
-            envelope_summary = payload["data"]["envelopeSummary"]
-            status = envelope_summary.get("status")
-            document_name = None  # Initialize document_name variable
+    envelope_id = payload.get("data", {}).get("envelopeId", "")
+    if not envelope_id:
+        logging.error("Envelope ID not found in the payload.")
+        return
+    # Assuming get_template_id is defined to extract
+    # the template ID from the payload
+    template_id = get_template_id(payload)
+    if not template_id:
+        print("No Template ID found.")
+        return
+    else:
+        print(f"Template ID: {template_id}")
+    # Use the envelopeId to get the template name
+    template_name = get_docusign_template_name_from_template(template_id)
+    print(f"template name is:  {template_name}")
+    # Extract status and envelope summary from the payload
+    status = payload.get("event", "")
+    print(f"Status: {status}")
+    envelope_summary = payload.get("data", {}).get("envelopeSummary", {})
+    recipients = envelope_summary.get("recipients", {})
+    signers = recipients.get("signers", [])
+    recipient = signers[0]  # Assuming the first signer is
+    recipient_email = recipient.get("email", "")
+    if status == "envelope-sent":
 
-            if "envelopeDocuments" in envelope_summary:
-                envelope_documents = envelope_summary["envelopeDocuments"]
-                if envelope_documents:
-                    document = envelope_documents[0]
-                    # Assuming the document of interest is the first one
-                    document_name = document.get("emailSubject", "")
-            if status == "sent":
-                recipients = envelope_summary.get("recipients", {})
-                signers = recipients.get("signers", [])
+        recipients = envelope_summary.get("recipients", {})
+        signers = recipients.get("signers", [])
+        if signers:
+            print(f"Template Name second time: {template_name}")
 
-                if signers:
-                    envelope_id = envelope_summary.get("envelopeId")
-                    template_name = get_docusign_template_name_from_envelope(
-                        envelope_id
-                    )
-                    print(template_name)
-                    recipient = signers[0]  # Assuming first signer is the recipient
-                    recipient_name = recipient.get("name", "")
-                    recipient_email = recipient.get("email", "")
-                    # document_name = document.get("emailSubject", "")
-                    # print("this is the doc : ", document_name)
-                    hr_users = CustomUser.objects.filter(
-                        Q(is_active=True) & Q(groups__name="dsign_sms")
-                    ).values_list("phone_number", flat=True)
-                    message_body = (
-                        f"{template_name} sent to: {recipient_name} {recipient_email}"
-                    )
-                    send_bulk_sms(hr_users, message_body)
-                    logger.info(
-                        f"Sent SMS for 'sent' status to HR:{recipient_name} {message_body}"
-                    )
-                    return f"Sent SMS for 'sent' status to HR: {recipient_name} {document_name} {message_body}"
-            elif status == "completed":
-                recipients = envelope_summary.get("recipients", {})
-                signers = recipients.get("signers", [])
-                document_name = document.get("emailSubject", "") if document else ""
-                if signers:
-                    envelope_id = envelope_summary.get("envelopeId")
-                    recipient = signers[0]  # Assuming first signer is the recipient
-                    recipient_name = recipient.get("name", "")
-                    recipient_email = recipient.get("email", "")
-                    # document_name = document.get("emailSubject", "")
-                    template_name = get_docusign_template_name_from_envelope(
-                        envelope_id
-                    )
-                    print(template_name)
-                    # this does not work if there is not a user.
-                    try:
-                        user = CustomUser.objects.get(email=recipient_email)
-                    except CustomUser.DoesNotExist:
-                        logger.error(f"No user found with email: {recipient_email}")
-                        user = None  # Or handle this scenario appropriately
-                    print("This is the doc :", template_name)
-                    print(user)
-                    template_name = get_docusign_template_name_from_envelope(
-                        envelope_id
-                    )
-                    print(template_name)
-                    processed_document = ProcessedDocsignDocument(
-                        user=user, envelope_id=template_name
-                    )
-                    processed_document.save()
-                    # new_hire_quiz_id = "c30a27b4-fd10-4fdd-b6e3-78ddd3e06463"
-                    # new_hire_quiz_name = "New Hire Quiz.docx"
-                    hr_users = CustomUser.objects.filter(
-                        Q(is_active=True) & Q(groups__name="dsign_sms")
-                    ).values_list("phone_number", flat=True)
-                    message_body = f"{template_name} completed by: {recipient_name} {recipient_email}"
-                    send_bulk_sms(hr_users, message_body)
+            recipient = signers[0]  # Assuming the first signer is
+            # the recipient
+            recipient_email = recipient.get("email", "")
 
-                    get_docusign_envelope(envelope_id, recipient_name, document_name)
-                    # if not ProcessedDocsignDocument.objects.filter(
-                    #    envelope_id=new_hire_quiz_name, user=user
-                    # ).exists():
-                    #    ProcessedDocsignDocument.objects.create(
-                    #        envelope_id=new_hire_quiz_name, user=user
-                    #    )
-                    # Launch the function to create a new DocuSign envelope
-                    #    envelope_args = {
-                    #        "signer_name": recipient_name,
-                    #        "signer_email": recipient_email,
-                    #        "template_id": new_hire_quiz_id,
-                    #   }
-                    #    create_docusign_envelope(envelope_args)
-                    return f"Sent SMS for 'completed' status to HR:{recipient_name} {message_body} {document_name} {envelope_id}"
-    except Exception as e:
-        logger.error(f"Error processing DocuSign webhook: {str(e)}")
-        return f"Error processing DocuSign webhook: {str(e)}"
+            # Optionally, fetch and print the recipient user's details
+            # from CustomUser model
+            try:
+                user = CustomUser.objects.get(email=recipient_email)
+                full_name = user.get_full_name()
+
+                # print("fullname", full_name)
+                # print(f"{template_name} sent to: {full_name} at {recipient_email}")
+                hr_users = CustomUser.objects.filter(
+                    Q(is_active=True) & Q(groups__name="dsign_sms")
+                ).values_list("phone_number", flat=True)
+                message_body = (
+                    f"{template_name} sent to: {full_name} at {recipient_email}"
+                )
+                send_bulk_sms(hr_users, message_body)
+                logger.info(
+                    f"Sent SMS for 'sent' status to HR:{full_name} {message_body}"
+                )
+                return f"Sent SMS for 'sent' status to HR: {full_name} {template_name} {message_body}"
+
+            except CustomUser.DoesNotExist:
+                logging.error(
+                    f"User with email {recipient_email} not found in the database."
+                )
+            except Exception as e:
+                logging.error(f"Error processing recipient data: {e}")
+
+    elif status == "recipient-completed":
+        # print("we are at compelted")
+        user, created = CustomUser.objects.get_or_create(
+            email=recipient_email, defaults={"username": recipient_email}
+        )
+        full_name = user.get_full_name()
+        print(f"Template Name 3: {template_name}")
+
+        if "New Hire File" in template_name:
+            # Check if the user has already completed a new hire file
+            user = CustomUser.objects.get(
+                email=recipient_email
+            )  # Assuming you have the user's email
+            full_name = user.get_full_name()
+            already_completed = ProcessedDocsignDocument.objects.filter(
+                user=user, template_name="New Hire File"
+            ).exists()
+            if not already_completed:
+                # Record this file to the db
+                ProcessedDocsignDocument.objects.create(
+                    user=user, envelope_id=template_id, template_name=template_name
+                )
+                # Logic to send another file called New Hire Quiz
+                # The quiz is not sent here.
+                # it is sent through a post save signal to the documents
+                # model
+                print(f"New Hire Quiz needs to be sent to {user.email}")
+            else:
+                print("User has already completed a New Hire File.")
+
+            hr_users = CustomUser.objects.filter(
+                Q(is_active=True) & Q(groups__name="dsign_sms")
+            ).values_list("phone_number", flat=True)
+
+            message_body = (
+                f"{template_name} completed by: {full_name} at {recipient_email}"
+            )
+            send_bulk_sms(hr_users, message_body)
+            logger.info(
+                f"Sent SMS for 'completed' status to HR:{full_name} {message_body}"
+            )
+            return f"Sent SMS for 'completed' status to HR: {full_name} {template_name} {message_body}"
+        else:
+            # Record the completed non-new-hire file in
+            # ProcessedDocsignDocument
+            user = CustomUser.objects.get(email=recipient_email)
+            print(full_name, recipient_email)
+            ProcessedDocsignDocument.objects.create(
+                user=user, envelope_id=template_id, template_name=template_name
+            )
+            print(f"Recorded completed file {template_name} for {user.email}")
+            hr_users = CustomUser.objects.filter(
+                Q(is_active=True) & Q(groups__name="dsign_sms")
+            ).values_list("phone_number", flat=True)
+            message_body = (
+                f"{template_name} completed by: {full_name} at {recipient_email}"
+            )
+            send_bulk_sms(hr_users, message_body)
+            logger.info(
+                f"Sent SMS for 'completed' status to HR:{full_name} {message_body}"
+            )
+            return f"Sent SMS for 'completed' status to HR: {full_name} {template_name} {message_body}"
+
+    print("Done.")
 
 
 @app.task(name="postgress_backup")
@@ -584,3 +621,14 @@ def save_user_to_db(**kwargs):
     except Exception as e:
         # Handle any exceptions that may occur during database save
         print(f"An error occurred during database save: {e}")
+
+
+@app.task(name="send_new_hire_quiz")
+def send_new_hire_quiz(envelope_args):
+    try:
+        create_docusign_envelope_new_hire_quiz(envelope_args)
+        logger.info("Docusign envelope New Hire Quiz created successfully")
+        return "Docusign envelope New Hire Quiz created successfully"
+    except Exception as e:
+        logger.error(f"Error creating Docusign New Hire Quiz envelope: {str(e)}")
+        return f"Error creating Docusign New Hire Quiz envelope: {str(e)}"

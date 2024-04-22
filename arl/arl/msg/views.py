@@ -1,9 +1,10 @@
 import json
 import logging
+import urllib.parse
 
 from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, User
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse_lazy
@@ -24,6 +25,7 @@ from arl.tasks import (
 from arl.user.models import CustomUser, Store
 
 from .forms import EmailForm, SMSForm, TemplateEmailForm, TemplateWhatsAppForm
+from .models import Message
 
 logger = logging.getLogger(__name__)
 
@@ -267,3 +269,49 @@ def EmailEventList(request):
 
 def click_thank_you(request):
     return render(request, "msg/thank_you.html")
+
+
+@csrf_exempt
+def whatsapp_webhook(request):
+    try:
+        body_unicode = request.body.decode('utf-8')
+        data = urllib.parse.parse_qs(body_unicode)
+
+        # Determine message type
+        message_type = 'SMS' if 'SmsMessageSid' in data else 'WhatsApp'
+
+        # Safely extract sender and receiver
+        sender_raw = data.get('From', [''])[0]
+        receiver_raw = data.get('To', [''])[0]
+        sender = sender_raw.split(':')[1] if ':' in sender_raw else sender_raw
+        receiver = receiver_raw.split(':')[1] if ':' in receiver_raw else receiver_raw
+
+        message_status = data.get('MessageStatus', ['unknown'])[0]
+        template_used = 'TemplateId' in data  # This assumes it's a boolean flag for WhatsApp
+
+        # Fetch user or set to unknown
+        username = "Unknown"
+        if receiver:
+            try:
+                user = CustomUser.objects.get(phone_number=receiver)
+                username = user.username
+            except CustomUser.DoesNotExist:
+                pass  # username remains "Unknown"
+            except Exception as e:
+                logger.error(f"Error fetching user by phone number {receiver}: {e}")
+
+        # Create message record
+        Message.objects.create(
+            sender=sender,
+            receiver=receiver,
+            message_status=message_status,
+            username=username,
+            template_used=template_used,
+            message_type=message_type
+        )
+
+    except Exception as e:
+        logger.error(f"Error processing webhook data: {e}")
+        return JsonResponse({'status': 'error', 'message': 'Internal Server Error'}, status=500)
+
+    return JsonResponse({'status': 'success'}, status=200)

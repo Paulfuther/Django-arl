@@ -1,9 +1,10 @@
 import json
 import logging
 
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import UserPassesTestMixin
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
@@ -12,13 +13,19 @@ from django.views.decorators.csrf import csrf_exempt
 from arl.dbox.helpers import upload_to_dropbox
 from arl.dsign.helpers import (
     get_docusign_envelope,
-    get_docusign_template_name_from_envelope,
+    get_docusign_template_name_from_template,
     list_all_docusign_envelopes,
 )
 from arl.dsign.models import DocuSignTemplate
-from arl.tasks import create_docusign_envelope_task, process_docusign_webhook
+from arl.tasks import (
+    create_docusign_envelope_task,
+    process_docusign_webhook,
+    send_new_hire_quiz,
+)
+from arl.user.models import UserManager
 
 from .forms import NameEmailForm
+from .models import ProcessedDocsignDocument
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +114,7 @@ def get_docusign_template(request):
         "db908cae-87ac-4c37-aa67-d5a971ee7da7"  # Replace with your envelope_id
     )
     print(envelope_id)
-    template_name = get_docusign_template_name_from_envelope(envelope_id)
+    template_name = get_docusign_template_name_from_template(envelope_id)
 
     if template_name:
         return JsonResponse({"template_name": template_name})
@@ -115,3 +122,68 @@ def get_docusign_template(request):
         return JsonResponse(
             {"error": "Template not found in the envelope."}, status=404
         )
+
+
+@receiver(post_save, sender=ProcessedDocsignDocument)
+def post_save_processed_docsign_document(sender, instance, created, **kwargs):
+    if created and instance.template_name == "New Hire File":
+        print("A New Hire File was created")
+
+        # Check if a New Hire Quiz has already been sent to this user
+        if not ProcessedDocsignDocument.objects.filter(
+            user=instance.user, template_name="New_Hire_Quiz"
+        ).exists():
+            try:
+                # Attempt to find the "New_Hire_Quiz" template
+                new_hire_quiz_template = DocuSignTemplate.objects.get(
+                    template_name="New_Hire_Quiz"
+                )
+                new_hire_quiz_template_id = new_hire_quiz_template.template_id
+                print(new_hire_quiz_template_id)
+
+                # Determine the manager's email and name
+                try:
+                    # Fetch the UserManager instance related to the user
+                    user_manager = UserManager.objects.get(user=instance.user)
+
+                    if user_manager and user_manager.manager:
+                        manager_email = user_manager.manager.email
+                        manager_name = user_manager.manager.get_full_name()
+                    else:
+                        # Default manager details if no manager is assigned or UserManager is missing
+                        manager_email = "paul.futher@gmail.com"
+                        manager_name = "Paul Further"
+
+                    print("Manager Email:", manager_email)
+                    print("Manager Name:", manager_name)
+                except UserManager.DoesNotExist:
+                    print("No UserManager instance found for this user.")
+                    # Default manager details if no UserManager instance is found
+                    manager_email = "paul.futher@gmail.com"
+                    manager_name = "Paul Further"
+                    print("Default Manager Email:", manager_email)
+                    print("Default Manager Name:", manager_name)
+                except Exception as e:
+                    print("An unexpected error occurred:", str(e))
+
+                # Construct the envelope_args
+                envelope_args = {
+                    "signer_email": instance.user.email,
+                    "signer_name": instance.user.get_full_name(),
+                    "template_id": new_hire_quiz_template_id,
+                    "manager_email": manager_email,
+                    "manager_name": manager_name,
+                }
+
+                # Call the Celery task with the constructed arguments
+                send_new_hire_quiz.delay(envelope_args)
+            except DocuSignTemplate.DoesNotExist:
+                # Handle the case where the template does not exist
+                print("New Hire Quiz template not found.")
+        else:
+            print(
+                f"User {instance.user.get_full_name()} has already been sent a New Hire Quiz."
+            )
+    else:
+        # If the document is not a New Hire File, exit the function
+        print("The saved document is not a New Hire File. Exiting.")

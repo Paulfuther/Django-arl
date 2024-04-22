@@ -14,6 +14,7 @@ from arl.msg.views import (
     sms_success_view,
     template_email_success_view,
     template_whats_app_success_view,
+    whatsapp_webhook,
 )
 
 urlpatterns = [
@@ -49,4 +50,5 @@ urlpatterns = [
     path("api/data/", EmailEventList, name="data-list"),
     path("thank-you/", click_thank_you, name="thank_you"),
     path("comms/", comms, name="comms"),
+    path('webhook/whatsapp/', whatsapp_webhook, name='whatsapp_webhook'),
 ]

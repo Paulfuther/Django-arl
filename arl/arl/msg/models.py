@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 from arl.user.models import CustomUser
 
@@ -107,3 +108,16 @@ class UserConsent(models.Model):
             "user",
             "consent_type",
         )  # Ensures uniqueness for the combination of user and consent type
+
+
+class Message(models.Model):
+    sender = models.CharField(max_length=20)
+    receiver = models.CharField(max_length=20)
+    message_status = models.CharField(max_length=20)
+    username = models.CharField(max_length=100, blank=True, null=True)
+    action_time = models.DateTimeField(default=timezone.now)
+    template_used = models.BooleanField(default=False)
+    message_type = models.CharField(max_length=10, default='WhatsApp')  # 'WhatsApp' or 'SMS'
+
+    def __str__(self):
+        return f"{self.message_type} message from {self.sender} to {self.receiver}, status {self.message_status}, at {self.action_time}"
