@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from import_export import fields as export_fields
 from import_export import resources
 from import_export.admin import ExportActionMixin
 
@@ -15,10 +16,13 @@ from arl.msg.models import (
 
 from .models import CustomUser, Employer, Store, UserManager
 
-fields = list(UserAdmin.fieldsets)
+# fields = list(UserAdmin.fieldsets)
 
 
 class UserResource(resources.ModelResource):
+    manager = export_fields.Field()
+    whatsapp_consent = export_fields.Field()
+
     class Meta:
         model = CustomUser
         fields = (
@@ -27,7 +31,33 @@ class UserResource(resources.ModelResource):
             "last_name",
             "email",
             "phone_number",
+            "manager",
+            "whatsapp_consent",
         )
+        export_order = (
+            "username",
+            "first_name",
+            "last_name",
+            "email",
+            "phone_number",
+            "manager",
+            "whatsapp_consent",
+        )
+
+    def dehydrate_manager(self, custom_user):
+        # Assuming a reverse ForeignKey from UserManager to CustomUser as 'managed_users'
+        user_manager = UserManager.objects.filter(user=custom_user).first()
+        return (
+            user_manager.manager.username
+            if user_manager and user_manager.manager
+            else "None"
+        )
+
+    def dehydrate_whatsapp_consent(self, custom_user):
+        consent = UserConsent.objects.filter(
+            user=custom_user, consent_type="WhatsApp"
+        ).first()
+        return "Granted" if consent and consent.is_granted else "Not Granted"
 
 
 class CustomUserAdmin(ExportActionMixin, UserAdmin):
@@ -130,6 +160,18 @@ class IncidentAdmin(admin.ModelAdmin):
     list_filter = ("eventdate",)
 
 
+@admin.register(UserManager)
+class UserManagerAdmin(admin.ModelAdmin):
+    list_display = ("user", "get_manager")
+
+    def get_manager(self, obj):
+        return obj.manager.username if obj.manager else "No Manager"
+
+    get_manager.short_description = "Manager"
+
+    search_fields = ["user__username", "manager__username"]
+
+
 @admin.register(UserConsent)
 class UserConsentAdmin(admin.ModelAdmin):
     list_display = ("user", "consent_type", "is_granted", "granted_on", "revoked_on")
@@ -137,7 +179,7 @@ class UserConsentAdmin(admin.ModelAdmin):
     search_fields = ("user__username",)
 
 
-UserAdmin.fieldsets = tuple(fields)
+# UserAdmin.fieldsets = tuple(fields)
 admin.site.register(Employer)
 admin.site.register(Twimlmessages)
 admin.site.register(BulkEmailSendgrid)
@@ -147,5 +189,5 @@ admin.site.register(EmailTemplate)
 admin.site.register(DocuSignTemplate)
 admin.site.register(ProcessedDocsignDocument)
 admin.site.register(CustomUser, CustomUserAdmin)
-admin.site.register(UserManager)
+# admin.site.register(UserManager)
 admin.site.register(WhatsAppTemplate)
