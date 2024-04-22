@@ -231,21 +231,7 @@ BACKUP_FILE_PATH = os.environ.get("BACKUP_FILE_PATH_DEV")
 BACKUP_DUMP_PATH = os.environ.get("BACKUP_DUMP_PATH_DEV")
 
 
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-        },
-    },
-    'loggers': {
-        'django': {
-            'handlers': ['console'],
-            'level': 'INFO',
-        },
-    },
-}
+
 
 try:
     from .local_settings import *
