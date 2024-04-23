@@ -12,6 +12,7 @@ private.key
 *.key
 config.json
 local_settings.py
+db.json
 
 # Django #
 *.log
