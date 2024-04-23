@@ -9,6 +9,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse_lazy
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormView
 from waffle.decorators import waffle_flag
@@ -273,21 +274,25 @@ def click_thank_you(request):
 
 @csrf_exempt
 def whatsapp_webhook(request):
+    if request.method != "POST":
+        return render(request, "incident/405.html", status=405)
     try:
-        body_unicode = request.body.decode('utf-8')
+        body_unicode = request.body.decode("utf-8")
         data = urllib.parse.parse_qs(body_unicode)
 
         # Determine message type
-        message_type = 'SMS' if 'SmsMessageSid' in data else 'WhatsApp'
+        message_type = "SMS" if "SmsMessageSid" in data else "WhatsApp"
 
         # Safely extract sender and receiver
-        sender_raw = data.get('From', [''])[0]
-        receiver_raw = data.get('To', [''])[0]
-        sender = sender_raw.split(':')[1] if ':' in sender_raw else sender_raw
-        receiver = receiver_raw.split(':')[1] if ':' in receiver_raw else receiver_raw
+        sender_raw = data.get("From", [""])[0]
+        receiver_raw = data.get("To", [""])[0]
+        sender = sender_raw.split(":")[1] if ":" in sender_raw else sender_raw
+        receiver = receiver_raw.split(":")[1] if ":" in receiver_raw else receiver_raw
 
-        message_status = data.get('MessageStatus', ['unknown'])[0]
-        template_used = 'TemplateId' in data  # This assumes it's a boolean flag for WhatsApp
+        message_status = data.get("MessageStatus", ["unknown"])[0]
+        template_used = (
+            "TemplateId" in data
+        )  # This assumes it's a boolean flag for WhatsApp
 
         # Fetch user or set to unknown
         username = "Unknown"
@@ -307,11 +312,13 @@ def whatsapp_webhook(request):
             message_status=message_status,
             username=username,
             template_used=template_used,
-            message_type=message_type
+            message_type=message_type,
         )
 
     except Exception as e:
         logger.error(f"Error processing webhook data: {e}")
-        return JsonResponse({'status': 'error', 'message': 'Internal Server Error'}, status=500)
+        return JsonResponse(
+            {"status": "error", "message": "Internal Server Error"}, status=500
+        )
 
-    return JsonResponse({'status': 'success'}, status=200)
+    return JsonResponse({"status": "success"}, status=200)

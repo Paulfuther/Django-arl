@@ -259,3 +259,4 @@ class IncidentListView(PermissionRequiredMixin, ListView):
 def Permission_Denied_View(request, exception):
     def get(self, request, exception):
         return render(request, "incident/403.html", status=403)
+

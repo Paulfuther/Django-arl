@@ -18,6 +18,7 @@ urlpatterns = [
     path("email-incident-pdf/<int:incident_id>", generate_incident_pdf_email, name="tester"),
     path("incident_list/", IncidentListView.as_view(), name="incident_list"),
     path("403/", Permission_Denied_View, name="permission_denied"),
+   
 ]
 
 handler403 = "arl.incident.views.Permission_Denied_View"
