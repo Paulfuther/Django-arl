@@ -18,3 +18,4 @@ urlpatterns = [
 
 handler403 = "arl.views.error_403"
 handler500 = "arl.views.error_500"
+handler405 = "arl.views.error_405"
