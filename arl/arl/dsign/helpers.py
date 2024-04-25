@@ -251,7 +251,7 @@ def get_docusign_template_name_from_template(template_id):
         template_name = template.name if template else None
 
         if template_name:
-            print(f"Template name gdtnfe task: {template_name}")
+            print(f"Template name in hlerp  task: {template_name}")
             return template_name
         else:
             print("Template name not found for the given template ID.")
