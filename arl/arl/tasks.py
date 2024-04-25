@@ -443,10 +443,17 @@ def process_docusign_webhook(payload):
                 logging.error(f"Error processing recipient data: {e}")
 
     elif status == "recipient-completed":
-        # print("we are at compelted")
-        user, created = CustomUser.objects.get_or_create(
-            email=recipient_email, defaults={"username": recipient_email}
-        )
+        # Check if the document is a Standard Release and exit if it is
+        if "Standard Release" in template_name:
+            print(f"Processed Standard Release for {recipient_email}, no further action.")
+            return
+
+        try:
+            user = CustomUser.objects.get(email=recipient_email)
+        except CustomUser.DoesNotExist:
+            logging.error(f"User with email {recipient_email} not found in the database.")
+            return  # Optionally handle the case where the user doesn't exist
+
         full_name = user.get_full_name()
         print(f"Template Name 3: {template_name}")
 
@@ -480,9 +487,7 @@ def process_docusign_webhook(payload):
                 f"{template_name} completed by: {full_name} at {recipient_email}"
             )
             send_bulk_sms(hr_users, message_body)
-            logger.info(
-                f"Sent SMS for 'completed' status to HR:{full_name} {message_body}"
-            )
+            logger.info(f"Sent SMS for 'completed' status to HR: {full_name} {message_body}")
             return f"Sent SMS for 'completed' status to HR: {full_name} {template_name} {message_body}"
         else:
             # Record the completed non-new-hire file in
