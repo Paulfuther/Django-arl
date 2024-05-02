@@ -490,6 +490,7 @@ def process_docusign_webhook(payload):
             logger.info(f"Sent SMS for 'completed' status to HR: {full_name} {message_body}")
             return f"Sent SMS for 'completed' status to HR: {full_name} {template_name} {message_body}"
         else:
+        
             # Record the completed non-new-hire file in
             # ProcessedDocsignDocument
             user = CustomUser.objects.get(email=recipient_email)

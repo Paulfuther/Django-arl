@@ -1,5 +1,6 @@
 import base64
 import json
+import os
 
 from celery.utils.log import get_task_logger
 from django.conf import settings
@@ -284,11 +285,14 @@ def send_docusign_email_with_attachment(to_emails, subject, body, file_path):
     except Exception as e:
         print("Error sending email:", str(e))
 
+
 # sends a single email to the user with a pdf of
 # the incident file attached.
 
 
-def create_incident_file_email(to_email, subject, body, attachment_buffer=None, attachment_filename=None):
+def create_incident_file_email(
+    to_email, subject, body, attachment_buffer=None, attachment_filename=None
+):
     try:
         message = Mail(
             from_email=settings.MAIL_DEFAULT_SENDER,
@@ -312,7 +316,9 @@ def create_incident_file_email(to_email, subject, body, attachment_buffer=None, 
         response = sg.send(message)
 
         if response.status_code != 202:
-            print("Failed to send email to", to_email, "Error code:", response.status_code)
+            print(
+                "Failed to send email to", to_email, "Error code:", response.status_code
+            )
 
     except Exception as e:
         error_message = f"An error occurred while sending email to {to_email}: {str(e)}"
@@ -324,11 +330,14 @@ def create_incident_file_email(to_email, subject, body, attachment_buffer=None, 
             logger.error(f"SendGrid response status code: {response_status}")
             logger.error(f"SendGrid response body: {response_body}")
 
+
 # sends new icident pdf to users with the rule
 # incident_email
 
 
-def create_incident_file_email_by_rule(to_emails, subject, body, attachment_buffer=None, attachment_filename=None):
+def create_incident_file_email_by_rule(
+    to_emails, subject, body, attachment_buffer=None, attachment_filename=None
+):
     try:
         for to_email in to_emails:
             message = Mail(
@@ -353,7 +362,12 @@ def create_incident_file_email_by_rule(to_emails, subject, body, attachment_buff
             response = sg.send(message)
 
             if response.status_code != 202:
-                print("Failed to send email to", to_email, "Error code:", response.status_code)
+                print(
+                    "Failed to send email to",
+                    to_email,
+                    "Error code:",
+                    response.status_code,
+                )
 
     except Exception as e:
         error_message = f"An error occurred while sending email to {to_email}: {str(e)}"
@@ -368,9 +382,9 @@ def create_incident_file_email_by_rule(to_emails, subject, body, attachment_buff
 
 def send_whats_app_template(content_sid, from_sid, user_name, to_number):
     # Ensure phone number is in the correct format
-    whatsapp_number = f'whatsapp:+{to_number}'
+    whatsapp_number = f"whatsapp:+{to_number}"
     # Properly format the content variables for the template
-    content_vars = json.dumps({'1': user_name})
+    content_vars = json.dumps({"1": user_name})
     # Log the variables to debug or verify; consider reducing logging in production
     print(f"Sending to {whatsapp_number} with name {user_name}")
 
@@ -380,7 +394,7 @@ def send_whats_app_template(content_sid, from_sid, user_name, to_number):
             content_sid=content_sid,
             from_=from_sid,
             content_variables=content_vars,
-            to=whatsapp_number
+            to=whatsapp_number,
         )
         # print(f"Message sent with SID: {message.sid}")
         return message.sid
@@ -388,3 +402,31 @@ def send_whats_app_template(content_sid, from_sid, user_name, to_number):
         # Handle errors in message sending
         print(f"Failed to send message: {str(e)}")
         return None
+
+
+def create_single_csv_email(to_email, subject, body, file_path):
+    message = Mail(
+        from_email=settings.MAIL_DEFAULT_SENDER,
+        to_emails=to_email,
+        subject=subject,
+        html_content=body,
+    )
+    if file_path:
+        with open(file_path, "rb") as f:
+            data = f.read()
+            encoded = base64.b64encode(data).decode()
+
+        attachment = Attachment()
+        attachment.file_content = FileContent(encoded)
+        attachment.file_name = FileName(os.path.basename(file_path))
+        attachment.file_type = FileType("text/csv")
+        attachment.disposition = Disposition("attachment")
+        attachment.content_id = ContentId("CSV Attachment")
+        message.attachment = attachment
+
+    response = sg.send(message)
+    if response.status_code == 202:
+        return True
+    else:
+        print("Failed to send email. Status code:", response.status_code)
+        return False
