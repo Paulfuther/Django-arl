@@ -40,9 +40,10 @@ def send_template_whatsapp_task(whatsapp_id, from_id, group_id):
 @app.task(name="tobacco csv report")
 def generate_and_save_csv_report():
     sql_query = """
-    SELECT * FROM msg_emailevent
-    WHERE timestamp BETWEEN '2024-04-01' AND '2024-04-30'
-    AND sg_template_name = 'Tobacco Compliance';
+    SELECT email, event, sg_event_id, username FROM msg_emailevent
+    WHERE timestamp BETWEEN '2023-11-01' AND '2023-11-30'
+    AND sg_template_name = 'Tobacco Compliance'
+    AND event IN ('open', 'click', 'delivered');
     """
     # Path where the CSV will be saved
     file_path = os.path.join(settings.MEDIA_ROOT, "monthly_report.csv")
@@ -65,12 +66,17 @@ def generate_and_save_csv_report():
     pivot_table = pd.pivot_table(
         df,
         values='sg_event_id',
-        index='email',
+        index=['email', 'username'],  # Include username in the index
         columns='event',
         aggfunc='count',
         fill_value=0
     )
-    
+    # Reorder the columns explicitly
+    if 'open' in pivot_table.columns and 'click' in pivot_table.columns:
+        pivot_table = pivot_table[['delivered', 'open', 'click']]
+
+    pivot_table.sort_values(by='click', ascending=True, inplace=True)
+    # Ensure the columns exist to avoid KeyError
     # Save the pivot table to a new CSV file
     pivot_table.to_csv(pivot_file_path)
 
