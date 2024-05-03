@@ -41,7 +41,7 @@ def send_template_whatsapp_task(whatsapp_id, from_id, group_id):
 def generate_and_save_csv_report():
     sql_query = """
     SELECT email, event, sg_event_id, username FROM msg_emailevent
-    WHERE timestamp BETWEEN '2023-11-01' AND '2023-11-30'
+    WHERE timestamp BETWEEN '2024-04-01' AND '2024-04-30'
     AND sg_template_name = 'Tobacco Compliance'
     AND event IN ('open', 'click', 'delivered');
     """
