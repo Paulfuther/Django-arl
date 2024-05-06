@@ -407,7 +407,7 @@ def send_whats_app_template(content_sid, from_sid, user_name, to_number):
 def create_single_csv_email(to_email, subject, body, file_path):
     message = Mail(
         from_email=settings.MAIL_DEFAULT_SENDER,
-        to_emails=to_email,
+        to_emails=[to_email],
         subject=subject,
         html_content=body,
     )
