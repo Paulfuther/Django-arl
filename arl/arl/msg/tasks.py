@@ -2,6 +2,7 @@ from __future__ import absolute_import, unicode_literals
 
 import csv
 import os
+from datetime import datetime, timedelta
 
 import pandas as pd
 from celery.utils.log import get_task_logger
@@ -11,6 +12,7 @@ from django.db import connection
 
 from arl.celery import app
 from arl.msg.helpers import create_single_csv_email, send_whats_app_template
+from arl.user.models import CustomUser
 
 logger = get_task_logger(__name__)
 
@@ -39,9 +41,17 @@ def send_template_whatsapp_task(whatsapp_id, from_id, group_id):
 
 @app.task(name="tobacco csv report")
 def generate_and_save_csv_report():
-    sql_query = """
+    today = datetime.today()
+    first_day_of_current_month = datetime(today.year, today.month, 1)
+    last_day_of_previous_month = first_day_of_current_month - timedelta(days=1)
+    first_day_of_previous_month = datetime(
+        last_day_of_previous_month.year, last_day_of_previous_month.month, 1
+    )
+    start_date = first_day_of_previous_month.strftime("%Y-%m-%d")
+    end_date = last_day_of_previous_month.strftime("%Y-%m-%d")
+    sql_query = f"""
     SELECT email, event, sg_event_id, username FROM msg_emailevent
-    WHERE timestamp BETWEEN '2024-04-01' AND '2024-04-30'
+    WHERE timestamp BETWEEN '{start_date}' AND '{end_date}'
     AND sg_template_name = 'Tobacco Compliance'
     AND event IN ('open', 'click', 'delivered');
     """
@@ -53,42 +63,45 @@ def generate_and_save_csv_report():
         columns = [col[0] for col in cursor.description]
         rows = cursor.fetchall()
 
-        # Write to CSV file
+    try:
         with open(file_path, "w", newline="") as csvfile:
             csvwriter = csv.writer(csvfile)
-            csvwriter.writerow(columns)  # write headers
+            csvwriter.writerow(columns)
             csvwriter.writerows(rows)
 
-    # Read the CSV into a DataFrame
-    df = pd.read_csv(file_path)
-    print(df)
-    # Create a pivot table
-    pivot_table = pd.pivot_table(
-        df,
-        values='sg_event_id',
-        index=['email', 'username'],  # Include username in the index
-        columns='event',
-        aggfunc='count',
-        fill_value=0
-    )
-    # Reorder the columns explicitly
-    if 'open' in pivot_table.columns and 'click' in pivot_table.columns:
-        pivot_table = pivot_table[['delivered', 'open', 'click']]
+        df = pd.read_csv(file_path)
+        pivot_table = pd.pivot_table(
+            df,
+            values="sg_event_id",
+            index=["email", "username"],
+            columns="event",
+            aggfunc="count",
+            fill_value=0,
+        )
+        if {"delivered", "open", "click"}.issubset(pivot_table.columns):
+            pivot_table = pivot_table[["delivered", "open", "click"]]
+        pivot_table.sort_values(by="click", ascending=True, inplace=True)
+        pivot_table.to_csv(pivot_file_path)
 
-    pivot_table.sort_values(by='click', ascending=True, inplace=True)
-    # Ensure the columns exist to avoid KeyError
-    # Save the pivot table to a new CSV file
-    pivot_table.to_csv(pivot_file_path)
+        # Email the report
+        failure_messages = []
+        for recipient in CustomUser.objects.filter(
+            groups__name="email_tobacco_csv", is_active=True
+        ):
+            if not create_single_csv_email(
+                to_email=recipient.email,
+                subject="Monthly Tobacco Compliance Report",
+                body="Attached is the monthly Tobacco Compliance report.",
+                file_path=pivot_file_path,
+            ):
+                failure_messages.append(f"Failed to send report to {recipient.email}")
 
-    # Send the email with the CSV attached
-    email_sent = create_single_csv_email(
-        to_email="paul.futher@gmail.com",
-        subject="Monthly Tobacco Compliance Report",
-        body="Attached is the monthly Tobacco Compliance report.",
-        file_path=pivot_file_path,
-    )
+        if failure_messages:
+            return "\n".join(failure_messages)
 
-    if email_sent:
-        return "Report generated and emailed successfully."
-    else:
-        return "Failed to send report."
+        return f"Tobacco Compliance report generated and emailed successfully to {recipient} at {recipient.email}"
+
+    finally:
+        # Clean up the generated files
+        os.remove(file_path)
+        os.remove(pivot_file_path)
