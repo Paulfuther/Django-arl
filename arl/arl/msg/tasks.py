@@ -55,13 +55,20 @@ def generate_and_save_csv_report():
     AND sg_template_name = 'Tobacco Compliance'
     AND event IN ('open', 'click', 'delivered');
     """
+
+    # Modify the file name to include the date range
+    file_name = f"tobacco_report_{start_date}_to_{end_date}.csv"
     # Path where the CSV will be saved
-    file_path = os.path.join(settings.MEDIA_ROOT, "monthly_report.csv")
-    pivot_file_path = os.path.join(settings.MEDIA_ROOT, "monthly_pivot_report.csv")
+    file_path = os.path.join(settings.MEDIA_ROOT, file_name)
+    pivot_file_name = f"monthly_pivot_report_{start_date}_to_{end_date}.csv"
+    pivot_file_path = os.path.join(settings.MEDIA_ROOT, pivot_file_name)
     with connection.cursor() as cursor:
         cursor.execute(sql_query)
         columns = [col[0] for col in cursor.description]
         rows = cursor.fetchall()
+
+    if not rows:
+        return "No data available for the specified date range."
 
     try:
         with open(file_path, "w", newline="") as csvfile:
@@ -90,7 +97,7 @@ def generate_and_save_csv_report():
         ):
             if not create_single_csv_email(
                 to_email=recipient.email,
-                subject="Monthly Tobacco Compliance Report",
+                subject=f"Monthly Tobacco Compliance Report ({start_date} to {end_date})",
                 body="Attached is the monthly Tobacco Compliance report.",
                 file_path=pivot_file_path,
             ):
