@@ -2,26 +2,25 @@
 {% block title %}Index{% endblock %}
 
 {% block template %}
-{% include "../base/navbar.html" %}
 {% load crispy_forms_tags %}
 
 
 
 
 
-<form method="post" action="">
+<form method="post" action="{% url 'send_email_view' %}" enctype="multipart/form-data">
   <div class="container">
     <div class="row justify-content-center">
       <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
-        <legend class="border-bottm mb-4">Login</legend>
+        <legend class="border-bottom mb-4">Send SMS By Group</legend>
         {% csrf_token %}
         {{ form|crispy }}
-        <button type="submit">Send SMS</button>
+        <button type="submit" class="btn btn-primary mt-2 mb-1">Send</button>
       </div>
     </div>
   </div>
-
 </form>
+
 
 
 

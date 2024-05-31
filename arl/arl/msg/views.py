@@ -106,11 +106,40 @@ class SendEmailView(LoginRequiredMixin, UserPassesTestMixin, FormView):
         return is_member_of_msg_group(self.request.user)
 
     def form_valid(self, form):
-        to_email = form.cleaned_data["to_email"]
-        subject = form.cleaned_data["subject"]
-        body = form.cleaned_data["body"]
-        send_email_task.delay(to_email, subject, body)
-        return super().form_valid(form)
+        try:
+            selected_group_id = form.cleaned_data["selected_group"].id
+            template_id = form.cleaned_data["template_id"].sendgrid_id
+
+            # Debugging: Check if any file is received
+            print("Files received:", self.request.FILES)
+
+            attachment = self.request.FILES.get('attachment')
+
+            # Debugging: Print the name of the attachment
+            if attachment:
+                print("Attachment:", attachment.name)
+                attachment_data = {
+                    'file_name': attachment.name,
+                    'file_type': attachment.content_type,
+                    'file_content': attachment.read()  # Read the file content
+                }
+            else:
+                print("No attachment found")
+                attachment_data = None
+
+            # Use these to send emails to the entire group with the attachment
+            send_email_task.delay(selected_group_id, template_id, attachment_data)
+            return super().form_valid(form)
+
+        except Exception as e:
+            form.add_error(None, f"An error occurred: {str(e)}")
+            return self.form_invalid(form)
+
+    def form_invalid(self, form):
+        # Handle invalid form submission
+        response = super().form_invalid(form)
+        # You can add more custom error handling here if needed
+        return response
 
 
 class SendTemplateWhatsAppView(LoginRequiredMixin, UserPassesTestMixin, FormView):

@@ -133,37 +133,35 @@ def create_hr_newhire_email(**kwargs):
         return False
 
 
-def create_single_email(
-    to_email, subject, body, attachment_buffer=None, attachment_filename=None
-):
-    subject = subject
+def create_single_email(to_email, name, template_id=None, attachment=None):
     message = Mail(
         from_email=settings.MAIL_DEFAULT_SENDER,
         to_emails=to_email,
-        subject=subject,
-        html_content=body,
     )
-    if attachment_buffer and attachment_filename:
-        # Create an attachment
-        attachment = Attachment()
-        attachment.file_content = FileContent(
-            base64.b64encode(attachment_buffer.read()).decode()
+    message.dynamic_template_data = {
+        "name": name,
+    }
+    message.template_id = template_id
+    # Add attachments if any
+    if attachment:
+        encoded_file = base64.b64encode(attachment['file_content']).decode()
+
+        attached_file = Attachment(
+            FileContent(encoded_file),
+            FileName(attachment['file_name']),
+            FileType(attachment['file_type']),
+            Disposition('attachment')
         )
-        attachment.file_name = FileName(attachment_filename)
-        attachment.file_type = FileType("application/pdf")
-        attachment.disposition = Disposition("attachment")
-        attachment.content_id = ContentId("Attachment")
+        message.add_attachment(attached_file)
 
-        # Add the attachment to the message
-        message.attachment = attachment
-
-    response = sg.send(message)
-    # Handle the response and return an appropriate value based on your requirements
-    if response.status_code == 202:
-        return True
-    else:
-        print("Failed to send email. Error code:", response.status_code)
-        return False
+    try:
+        sg = SendGridAPIClient(os.getenv('SENDGRID_API_KEY'))
+        response = sg.send(message)
+        print(response.status_code)
+        print(response.body)
+        print(response.headers)
+    except Exception as e:
+        print(e.message)
 
 
 def send_sms_model(phone_number, message):
