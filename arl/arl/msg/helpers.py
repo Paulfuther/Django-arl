@@ -155,7 +155,6 @@ def create_single_email(to_email, name, template_id=None, attachment=None):
         message.add_attachment(attached_file)
 
     try:
-        sg = SendGridAPIClient(os.getenv('SENDGRID_API_KEY'))
         response = sg.send(message)
         print(response.status_code)
         print(response.body)
