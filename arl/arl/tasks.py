@@ -81,6 +81,7 @@ def send_weekly_tobacco_email():
         return error_message
 
 
+
 # this task is for emails with a template id from sendgrid.
 @app.task(name="send_template_email")
 def send_template_email_task(group_id, subject, sendgrid_id):
@@ -115,9 +116,13 @@ def send_newhire_template_email_task(user_email, subject, user_first_name, sendg
 
 
 @app.task(name="send_email")
-def send_email_task(to_email, subject, name):
+def send_email_task(group_id, template_id, attachment=None):
     try:
-        create_single_email(to_email, subject, name)
+        group = Group.objects.get(pk=group_id)
+        users_in_group = group.user_set.filter(is_active=True)
+        for user in users_in_group:
+            
+            create_single_email(user.email, user.first_name, template_id, attachment)
         return "Email Sent Successfully"
     except Exception as e:
         return str(e)
