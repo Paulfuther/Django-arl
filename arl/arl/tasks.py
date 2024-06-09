@@ -27,6 +27,7 @@ from arl.dsign.helpers import (
     fetch_envelope_details,
     get_access_token,
     get_docusign_envelope,
+    get_docusign_envelope_quiz,
     get_docusign_template_name_from_template,
     get_template_id,
 )
@@ -48,6 +49,7 @@ from arl.msg.helpers import (
     send_monthly_store_phonecall,
     send_sms_model,
 )
+
 from arl.msg.models import EmailEvent, EmailTemplate, SmsLog, WhatsAppTemplate
 from arl.user.models import CustomUser, Employer, Store, UserManager
 
@@ -79,7 +81,6 @@ def send_weekly_tobacco_email():
         error_message = f"Failed to send tobacco emails. Error: {str(e)}"
         logger.error(error_message)
         return error_message
-
 
 
 # this task is for emails with a template id from sendgrid.
@@ -121,7 +122,7 @@ def send_email_task(group_id, template_id, attachment=None):
         group = Group.objects.get(pk=group_id)
         users_in_group = group.user_set.filter(is_active=True)
         for user in users_in_group:
-            
+
             create_single_email(user.email, user.first_name, template_id, attachment)
         return "Email Sent Successfully"
     except Exception as e:
@@ -308,11 +309,16 @@ def generate_pdf_email_to_user_task(incident_id, user_email):
 def create_docusign_envelope_task(envelope_args):
     try:
         create_docusign_envelope(envelope_args)
-        logger.info("Docusign envelope created successfully")
-        return "Docusign envelope created successfully"
+        signer_name = envelope_args.get("signer_name")
+        logger.info(
+            f"Docusign envelope New Hire File for {signer_name} created successfully"
+        )
+        return f"Docusign envelope New Hire File for {signer_name} created successfully"
     except Exception as e:
-        logger.error(f"Error creating Docusign envelope: {str(e)}")
-        return f"Error creating Docusign envelope: {str(e)}"
+        logger.error(
+            f"Error creating Docusign envelope New Hire File for {signer_name}: {str(e)}"
+        )
+        return f"Error creating Docusign envelope New Hire File for {signer_name}: {str(e)}"
 
 
 @app.task(name="create_hr_newhire_email")
@@ -450,13 +456,17 @@ def process_docusign_webhook(payload):
     elif status == "recipient-completed":
         # Check if the document is a Standard Release and exit if it is
         if "Standard Release" in template_name:
-            print(f"Processed Standard Release for {recipient_email}, no further action.")
+            print(
+                f"Processed Standard Release for {recipient_email}, no further action."
+            )
             return
 
         try:
             user = CustomUser.objects.get(email=recipient_email)
         except CustomUser.DoesNotExist:
-            logging.error(f"User with email {recipient_email} not found in the database.")
+            logging.error(
+                f"User with email {recipient_email} not found in the database."
+            )
             return  # Optionally handle the case where the user doesn't exist
 
         full_name = user.get_full_name()
@@ -480,9 +490,14 @@ def process_docusign_webhook(payload):
                 # The quiz is not sent here.
                 # it is sent through a post save signal to the documents
                 # model
+
+                get_docusign_envelope(envelope_id, full_name, template_name)
+
                 print(f"New Hire Quiz needs to be sent to {user.email}")
             else:
                 print("User has already completed a New Hire File.")
+
+            # get the file for uplad
 
             hr_users = CustomUser.objects.filter(
                 Q(is_active=True) & Q(groups__name="dsign_sms")
@@ -492,7 +507,9 @@ def process_docusign_webhook(payload):
                 f"{template_name} completed by: {full_name} at {recipient_email}"
             )
             send_bulk_sms(hr_users, message_body)
-            logger.info(f"Sent SMS for 'completed' status to HR: {full_name} {message_body}")
+            logger.info(
+                f"Sent SMS for 'completed' status to HR: {full_name} {message_body}"
+            )
             return f"Sent SMS for 'completed' status to HR: {full_name} {template_name} {message_body}"
         else:
             # Record the completed non-new-hire file in
@@ -503,6 +520,7 @@ def process_docusign_webhook(payload):
                 user=user, envelope_id=template_id, template_name=template_name
             )
             print(f"Recorded completed file {template_name} for {user.email}")
+            get_docusign_envelope_quiz(envelope_id, full_name, template_name)
             hr_users = CustomUser.objects.filter(
                 Q(is_active=True) & Q(groups__name="dsign_sms")
             ).values_list("phone_number", flat=True)
@@ -637,8 +655,14 @@ def save_user_to_db(**kwargs):
 def send_new_hire_quiz(envelope_args):
     try:
         create_docusign_envelope_new_hire_quiz(envelope_args)
-        logger.info("Docusign envelope New Hire Quiz created successfully")
-        return "Docusign envelope New Hire Quiz created successfully"
+        signer_name = envelope_args.get("signer_name")
+        logger.info(
+            f"Docusign envelope New Hire Quiz for {signer_name} created successfully"
+        )
+
+        return f"Docusign envelope New Hire Quiz for {signer_name} created successfully"
     except Exception as e:
-        logger.error(f"Error creating Docusign New Hire Quiz envelope: {str(e)}")
-        return f"Error creating Docusign New Hire Quiz envelope: {str(e)}"
+        logger.error(
+            f"Error creating Docusign New Hire Quiz for {signer_name} envelope: {str(e)}"
+        )
+        return f"Error creating Docusign New Hire Quiz for {signer_name} envelope: {str(e)}"
