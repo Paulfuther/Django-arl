@@ -55,4 +55,3 @@ def list_all_docusign_envelopes_task():
     except ApiException as e:
         print(f"Exception when calling EnvelopesApi->list_status_changes: {e}")
         return []
-

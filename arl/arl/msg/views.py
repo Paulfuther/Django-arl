@@ -16,17 +16,22 @@ from waffle.decorators import waffle_flag
 from waffle.mixins import WaffleFlagMixin
 
 from arl.msg.helpers import client
-from arl.msg.tasks import send_template_whatsapp_task
+from arl.msg.tasks import (
+    send_template_whatsapp_task, 
+    process_whatsapp_webhook,
+)
 from arl.tasks import (
     process_sendgrid_webhook,
     send_email_task,
     send_one_off_bulk_sms_task,
     send_template_email_task,
+    
 )
 from arl.user.models import CustomUser, Store
 
 from .forms import EmailForm, SMSForm, TemplateEmailForm, TemplateWhatsAppForm
 from .models import Message
+
 
 logger = logging.getLogger(__name__)
 
@@ -306,44 +311,12 @@ def whatsapp_webhook(request):
     if request.method != "POST":
         return render(request, "incident/405.html", status=405)
     try:
+        user = request.POST.get('From')
+        message = request.POST.get('Body')
+        print(f'{user} says {message}')
         body_unicode = request.body.decode("utf-8")
         data = urllib.parse.parse_qs(body_unicode)
-
-        # Determine message type
-        message_type = "SMS" if "SmsMessageSid" in data else "WhatsApp"
-
-        # Safely extract sender and receiver
-        sender_raw = data.get("From", [""])[0]
-        receiver_raw = data.get("To", [""])[0]
-        sender = sender_raw.split(":")[1] if ":" in sender_raw else sender_raw
-        receiver = receiver_raw.split(":")[1] if ":" in receiver_raw else receiver_raw
-
-        message_status = data.get("MessageStatus", ["unknown"])[0]
-        template_used = (
-            "TemplateId" in data
-        )  # This assumes it's a boolean flag for WhatsApp
-
-        # Fetch user or set to unknown
-        username = "Unknown"
-        if receiver:
-            try:
-                user = CustomUser.objects.get(phone_number=receiver)
-                username = user.username
-            except CustomUser.DoesNotExist:
-                pass  # username remains "Unknown"
-            except Exception as e:
-                logger.error(f"Error fetching user by phone number {receiver}: {e}")
-
-        # Create message record
-        Message.objects.create(
-            sender=sender,
-            receiver=receiver,
-            message_status=message_status,
-            username=username,
-            template_used=template_used,
-            message_type=message_type,
-        )
-
+        process_whatsapp_webhook.delay(data)
     except Exception as e:
         logger.error(f"Error processing webhook data: {e}")
         return JsonResponse(

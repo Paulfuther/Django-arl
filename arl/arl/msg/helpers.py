@@ -427,3 +427,24 @@ def create_single_csv_email(to_email, subject, body, file_path):
     else:
         print("Failed to send email. Status code:", response.status_code)
         return False
+
+
+def send_whats_app_template_autoreply(content_sid, from_sid, to_number):
+    # Ensure phone number is in the correct format
+    whatsapp_number = f"whatsapp:+{to_number}"
+    # Log the variables to debug or verify; consider reducing logging in production
+    print(f"Sending to {whatsapp_number} autoreply")
+
+    try:
+        # Create the message
+        message = client.messages.create(
+            content_sid=content_sid,
+            from_=from_sid,
+            to=whatsapp_number,
+        )
+        # print(f"Message sent with SID: {message.sid}")
+        return message.sid
+    except Exception as e:
+        # Handle errors in message sending
+        print(f"Failed to send message: {str(e)}")
+        return None

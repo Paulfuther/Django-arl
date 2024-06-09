@@ -11,8 +11,14 @@ from django.contrib.auth.models import Group
 from django.db import connection
 
 from arl.celery import app
-from arl.msg.helpers import create_single_csv_email, send_whats_app_template
+from arl.msg.helpers import (
+    create_single_csv_email,
+    send_whats_app_template,
+    send_whats_app_template_autoreply,
+)
 from arl.user.models import CustomUser
+
+from .models import Message
 
 logger = get_task_logger(__name__)
 
@@ -112,3 +118,67 @@ def generate_and_save_csv_report():
         # Clean up the generated files
         os.remove(file_path)
         os.remove(pivot_file_path)
+
+
+@app.task(name="send whatsapp autoreply")
+def send_template_whatsapp_autoreply_task(whatsapp_id, from_id, receiver):
+    try:
+        # Retrieve all users within the group
+        print(whatsapp_id)
+        # Retrieve the template name based on the whatsapp_id
+        # template = WhatsAppTemplate.objects.get(whatsapp_id=whatsapp_id)
+        # template_name = template.name
+        send_whats_app_template_autoreply(whatsapp_id, from_id, receiver)
+
+        return f"Whatsapp autoreply Sent Successfully"
+
+    except Exception as e:
+        return str(e)
+
+
+@app.task(name="process_whatsapp_webhook")
+def process_whatsapp_webhook(data):
+    try:
+        # Determine message type
+        message_type = "SMS" if "SmsMessageSid" in data else "WhatsApp"
+
+        # Safely extract sender and receiver
+        sender_raw = data.get("From", [""])[0]
+        receiver_raw = data.get("To", [""])[0]
+        sender = sender_raw.split(":")[1] if ":" in sender_raw else sender_raw
+        receiver = receiver_raw.split(":")[1] if ":" in receiver_raw else receiver_raw
+
+        message_status = data.get("MessageStatus", ["unknown"])[0]
+        template_used = (
+            "TemplateId" in data
+        )  # This assumes it's a boolean flag for WhatsApp
+
+        # Fetch user or set to unknown
+        username = "Unknown"
+        if receiver:
+            try:
+                user = CustomUser.objects.get(phone_number=receiver)
+                username = user.username
+            except CustomUser.DoesNotExist:
+                pass  # username remains "Unknown"
+            except Exception as e:
+                logger.error(f"Error fetching user by phone number {receiver}: {e}")
+
+        # Create message record
+        Message.objects.create(
+            sender=sender,
+            receiver=receiver,
+            message_status=message_status,
+            username=username,
+            template_used=template_used,
+            message_type=message_type,
+        )
+
+        whatsapp_id = "HX36feb0f8f688e6d4d31efa33a31eb2ab"
+        from_id = "MGb005e5fe6d147e13d0b2d1322e00b1cb"
+        send_template_whatsapp_autoreply_task(whatsapp_id, from_id, receiver)
+
+    except Exception as e:
+        logger.error(f"Error processing webhook data: {e}")
+        return {"status": "error", "message": "Internal Server Error"}
+    return {"status": "success"}
