@@ -174,10 +174,6 @@ def process_whatsapp_webhook(data):
             message_type=message_type,
         )
 
-        whatsapp_id = "HX36feb0f8f688e6d4d31efa33a31eb2ab"
-        from_id = "MGb005e5fe6d147e13d0b2d1322e00b1cb"
-        send_template_whatsapp_autoreply_task(whatsapp_id, from_id, receiver)
-
     except Exception as e:
         logger.error(f"Error processing webhook data: {e}")
         return {"status": "error", "message": "Internal Server Error"}
