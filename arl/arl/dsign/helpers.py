@@ -17,7 +17,7 @@ from docusign_esign import (
 )
 from docusign_esign.client.api_exception import ApiException
 
-from arl.dbox.helpers import upload_to_dropbox
+from arl.dbox.helpers import upload_to_dropbox, upload_to_dropbox_quiz
 from arl.dsign.models import DocuSignTemplate
 from arl.msg.helpers import send_docusign_email_with_attachment
 from arl.user.models import CustomUser
@@ -195,43 +195,6 @@ def get_docusign_envelope(envelope_id, recipient_name, document_name):
         )
 
 
-def list_all_docusign_envelopes():
-    access_token = get_access_token()
-    access_token = access_token.access_token
-    api_client = ApiClient()
-    api_client.host = settings.DOCUSIGN_API_CLIENT_HOST
-    api_client.set_default_header("Authorization", "Bearer " + access_token)
-    envelopes_api = EnvelopesApi(api_client)
-    print(envelopes_api)
-    account_id = settings.DOCUSIGN_ACCOUNT_ID
-    # envelope_type = "archive"
-    # envelope_id = (
-    #    "b8ba5457-5f2c-4199-ae64-afc66bd7f845/envelopes/394ab674-2c47-468e-92c5-"
-    # )
-    # temp_file = envelopes_api.get_search_folders(account_id, envelope_type,envelope_id)
-    # temp_file = envelopes_api.get_search_folders(account_id)
-    # print(temp_file)
-    try:
-        # List envelopes
-        one_month_ago = (datetime.now() - timedelta(days=30)).isoformat()
-        results = envelopes_api.list_status_changes(account_id, from_date=one_month_ago)
-
-        # Print envelope information
-        for envelope in results.envelopes:
-            print(
-                f"Envelope ID: {envelope.envelope_id}, Status: {envelope.status}, Sent: {envelope.sent_date_time}"
-            )
-
-    except ApiException as e:
-        print(f"Exception when calling EnvelopesApi->list_status_changes: {e}")
-    # Process the temp_file or perform actions like sending an email
-    # Example: Sending an email with the retrieved document attached
-    # email_subject = "Subject of the email"
-    # email_body = "Body of the email"
-    # recipient_email = "paul.futher@gmail.com"
-    # create_single_email(recipient_email, email_subject, email_body, temp_file)
-
-
 def get_docusign_template_name_from_template(template_id):
     try:
         # Authenticate with DocuSign API (use your own authentication method)
@@ -396,3 +359,71 @@ def create_docusign_envelope_new_hire_quiz(envelope_args):
     except Exception as e:
         print("error")
         return JsonResponse({"error": str(e)}), 500
+
+
+def get_waiting_for_others_envelopes():
+    access_token = get_access_token()
+    access_token = access_token.access_token
+    account_id = settings.DOCUSIGN_ACCOUNT_ID
+    api_client = ApiClient()
+    api_client.host = settings.DOCUSIGN_API_CLIENT_HOST
+    api_client.set_default_header("Authorization", f"Bearer {access_token}")
+
+    envelopes_api = EnvelopesApi(api_client)
+    
+    try:
+        # Fetch envelopes with status 'waiting_for_others'
+        envelopes_list = envelopes_api.list_status_changes(
+            account_id=account_id,
+            from_date='2021-01-01T00:00:00Z',  # Adjust the date as needed
+            status='waiting_for_others'
+        )
+        return envelopes_list.envelopes
+    except ApiException as e:
+        print(f"Exception when calling EnvelopesApi->list_status_changes: {e}")
+        return []
+    
+
+def get_docusign_envelope_quiz(envelope_id, recipient_name, document_name):
+    try:
+        hr_users_emails = CustomUser.objects.filter(
+            Q(is_active=True) & Q(groups__name="dsign_email")
+        ).values_list("email", flat=True)
+        access_token = get_access_token()
+        access_token = access_token.access_token
+        api_client = ApiClient()
+        api_client.host = settings.DOCUSIGN_API_CLIENT_HOST
+        api_client.set_default_header("Authorization", "Bearer " + access_token)
+        envelopes_api = EnvelopesApi(api_client)
+
+        account_id = settings.DOCUSIGN_ACCOUNT_ID
+        envelope_type = "archive"
+        # envelope_id = "5d106d50-565e-4d70-85a4-0d1e29ff3abe"
+
+        temp_file = envelopes_api.get_document(account_id, envelope_type, envelope_id)
+        print(temp_file)
+        upload_to_dropbox_quiz(temp_file)
+        # Process the temp_file or perform actions like sending an email
+        # Example: Sending an email with the retrieved document attached
+        email_subject = f"{document_name} completed for {recipient_name}"
+        email_body = f"Hello, this email contains a zip file that includes the {document_name} for {recipient_name} completed through docusign"
+
+        send_docusign_email_with_attachment(
+            hr_users_emails, email_subject, email_body, temp_file
+        )
+
+        return HttpResponse("Process completed successfully.")
+
+    except ApiException as e:
+        # Handle specific API exceptions here
+        error_message = f"DocuSign API Exception: {e}"
+        print(error_message)
+        return HttpResponse(f"An error occurred: {error_message}", status=500)
+
+    except Exception as ex:
+        # Handle other exceptions here
+        error_message = f"An unexpected error occurred: {ex}"
+        print(error_message)
+        return HttpResponse(
+            f"An unexpected error occurred: {error_message}", status=500
+        )

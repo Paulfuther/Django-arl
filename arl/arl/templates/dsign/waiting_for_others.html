@@ -1,0 +1,32 @@
+{% extends "../base/base.html" %}
+{% block template %}
+{% load static %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+
+<h1>Waiting for Others</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Envelope ID</th>
+                <th>Subject</th>
+                <th>Status</th>
+                <th>Sender</th>
+                <th>Created Date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for envelope in envelopes %}
+            <tr>
+                <td>{{ envelope.envelopeId }}</td>
+                <td>{{ envelope.emailSubject }}</td>
+                <td>{{ envelope.status }}</td>
+                <td>{{ envelope.sender.email }}</td>
+                <td>{{ envelope.createdDateTime }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+
+{% endblock %}
