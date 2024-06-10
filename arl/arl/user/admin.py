@@ -162,12 +162,17 @@ class IncidentAdmin(admin.ModelAdmin):
 
 @admin.register(UserManager)
 class UserManagerAdmin(admin.ModelAdmin):
-    list_display = ("user", "get_manager")
+    list_display = ("user", "get_manager", "user_creation_date")
 
     def get_manager(self, obj):
         return obj.manager.username if obj.manager else "No Manager"
 
     get_manager.short_description = "Manager"
+
+    def user_creation_date(self, obj):
+
+        return obj.user.date_joined.strftime('%Y-%m-%d')
+    user_creation_date.short_description = "User Creation Date"
 
     search_fields = ["user__username", "manager__username"]
 
