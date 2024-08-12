@@ -4,7 +4,7 @@ from .models import DocuSignTemplate
 
 
 class NameEmailForm(forms.Form):
-    name = forms.CharField(max_length=100, label="Subject")
+    name = forms.CharField(max_length=100, label="Name")
     email = forms.EmailField(label='Email')
     template_name = forms.ModelChoiceField(queryset=DocuSignTemplate.objects.all(), label='Template Name')
 

@@ -105,6 +105,8 @@ def create_hr_newhire_email(**kwargs):
     message.dynamic_template_data = {
         "firstname": kwargs["firstname"],
         "lastname": kwargs["lastname"],
+        "store": kwargs["store_number"],
+        "storeaddress": kwargs["store_address"],
         "email": kwargs["email"],
         "mobilephone": kwargs["mobilephone"],
         "addressone": kwargs["addressone"],

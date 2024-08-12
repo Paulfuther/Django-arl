@@ -308,8 +308,10 @@ def generate_pdf_email_to_user_task(incident_id, user_email):
 @app.task(name="create_docusign_envelope")
 def create_docusign_envelope_task(envelope_args):
     try:
-        create_docusign_envelope(envelope_args)
         signer_name = envelope_args.get("signer_name")
+        print(signer_name)
+        create_docusign_envelope(envelope_args)
+        
         logger.info(
             f"Docusign envelope New Hire File for {signer_name} created successfully"
         )
@@ -326,7 +328,7 @@ def create_newhire_data_email(**email_data):
     try:
         create_hr_newhire_email(**email_data)
         logger.info(f"New hire email created successfully for {email_data['email']}")
-        return "New hire email created successfully"
+        return f"New hire email for {email_data['firstname']} - {email_data['lastname']} created successfully"
     except Exception as e:
         logger.error(
             f"Error creating new hire email for {email_data['email']}: {str(e)}"

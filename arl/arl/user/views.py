@@ -25,7 +25,7 @@ from arl.tasks import (
 )
 
 from .forms import CustomUserCreationForm, TwoFactorAuthenticationForm
-from .models import CustomUser, Employer
+from .models import CustomUser, Employer, Store
 
 
 class RegisterView(FormView):
@@ -35,7 +35,7 @@ class RegisterView(FormView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["Employer"] = Employer.objects.all()
-        context["Manager"] = CustomUser.objects.filter(groups__name="Manager")
+        context["Store"] = Store.objects.all()
         return context
 
     def form_valid(self, form):
@@ -46,13 +46,8 @@ class RegisterView(FormView):
 
             user = form.save(commit=False)
             user.phone_number = verified_phone_number
-            manager_id = form.cleaned_data.get("manager_dropdown")
             # Serialize the form data
             serialized_data = self.serialize_user_data(form.cleaned_data)
-
-            # Include manager_id in the kwargs dictionary
-            manager_id = form.cleaned_data.get("manager_dropdown")
-            serialized_data["manager_id"] = manager_id
             # Pass the serialized data as kwargs to the Celery task
             user = form.save(commit=False)
             user.save()
@@ -73,10 +68,6 @@ class RegisterView(FormView):
             return redirect("home")
 
     def form_invalid(self, form):
-        # Capture the selected manager value
-        selected_manager_id = self.request.POST.get("manager_dropdown")
-        form.initial["manager_dropdown"] = selected_manager_id
-        # Pass the selected manager value back to the form
         return self.render_to_response(self.get_context_data(form=form))
 
     def get(self, request, *args, **kwargs):
@@ -92,11 +83,10 @@ class RegisterView(FormView):
             if "employer" in form_data and form_data["employer"] is not None
             else None
         )
-        # Serialize manager_dropdown (assuming it's a ForeignKey field)
-        form_data["manager_dropdown"] = (
-            form_data["manager_dropdown"]
-            if "manager_dropdown" in form_data
-            and form_data["manager_dropdown"] is not None
+        # Serialize store (assuming it's a ForeignKey field)
+        form_data["store"] = (
+            form_data["store"].pk
+            if "store" in form_data and form_data["store"] is not None
             else None
         )
 
@@ -148,6 +138,8 @@ def handle_new_hire_registration(sender, instance, created, **kwargs):
             email_data = {
                 "firstname": instance.first_name,
                 "lastname": instance.last_name,
+                "store_number": instance.store.number if instance.store else None,
+                "store_address": instance.store.address if instance.store else None,
                 "email": instance.email,
                 "mobilephone": instance.phone_number,
                 "addressone": instance.address,
