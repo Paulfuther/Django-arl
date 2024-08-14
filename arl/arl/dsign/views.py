@@ -54,7 +54,7 @@ class CreateEnvelopeView(UserPassesTestMixin, View):
             d_name = form.cleaned_data["name"]
             d_email = form.cleaned_data["email"]
             ds_template = form.cleaned_data.get("template_id")
-            print(ds_template)
+            print(ds_template, d_name, d_email)
             # Fetch the template name based on the ID
             template = get_object_or_404(DocuSignTemplate, template_id=ds_template)
             template_name = template.template_name if template else "Unknown Template"
@@ -63,6 +63,9 @@ class CreateEnvelopeView(UserPassesTestMixin, View):
                 "signer_name": d_name,
                 "template_id": ds_template,
             }
+
+            print("Here are the args:", envelope_args)
+
             create_docusign_envelope_task.delay(envelope_args)
 
             messages.success(
@@ -172,46 +175,46 @@ def post_save_processed_docsign_document(sender, instance, created, **kwargs):
                 )
                 new_hire_quiz_template_id = new_hire_quiz_template.template_id
                 print(new_hire_quiz_template_id)
-
-                # Determine the manager's email and name
-                try:
-                    # Fetch the UserManager instance related to the user
-                    user_manager = UserManager.objects.get(user=instance.user)
-
-                    if user_manager and user_manager.manager:
-                        manager_email = user_manager.manager.email
-                        manager_name = user_manager.manager.get_full_name()
-                    else:
-                        # Default manager details if no manager is assigned or UserManager is missing
-                        manager_email = "paul.futher@gmail.com"
-                        manager_name = "Paul Further"
-
-                    print("Manager Email:", manager_email)
-                    print("Manager Name:", manager_name)
-                except UserManager.DoesNotExist:
-                    print("No UserManager instance found for this user.")
-                    # Default manager details if no UserManager instance is found
-                    manager_email = "paul.futher@gmail.com"
-                    manager_name = "Paul Further"
-                    print("Default Manager Email:", manager_email)
-                    print("Default Manager Name:", manager_name)
-                except Exception as e:
-                    print("An unexpected error occurred:", str(e))
-
-                # Construct the envelope_args
-                envelope_args = {
-                    "signer_email": instance.user.email,
-                    "signer_name": instance.user.get_full_name(),
-                    "template_id": new_hire_quiz_template_id,
-                    "manager_email": manager_email,
-                    "manager_name": manager_name,
-                }
-
-                # Call the Celery task with the constructed arguments
-                send_new_hire_quiz.delay(envelope_args)
             except DocuSignTemplate.DoesNotExist:
                 # Handle the case where the template does not exist
                 print("New Hire Quiz template not found.")
+                return  # Exit the function if the template is not found
+
+            try:
+                # Fetch the Store instance related to the user
+                user_store = instance.user.store
+
+                if user_store and user_store.manager:
+                    manager_email = user_store.manager.email
+                    manager_name = user_store.manager.get_full_name()
+
+                else:
+                    # Default manager details if no manager is assigned to the store
+                    manager_email = "paul.futher@gmail.com"
+                    manager_name = "Paul Futher"
+
+                print("Manager Email:", manager_email)
+                print("Manager Name:", manager_name)
+                print("User Store:", user_store)
+            except Exception as e:
+                print("An unexpected error occurred:", str(e))
+                # Default manager details if an unexpected error occurs
+                manager_email = "paul.futher@gmail.com"
+                manager_name = "Paul Futher"
+                print("Default Manager Email:", manager_email)
+                print("Default Manager Name:", manager_name)
+
+            # Construct the envelope_args
+            envelope_args = {
+                "signer_email": instance.user.email,
+                "signer_name": instance.user.get_full_name(),
+                "template_id": new_hire_quiz_template_id,
+                "manager_email": manager_email,
+                "manager_name": manager_name,
+            }
+            print("Envelope Args:", envelope_args)
+            # Call the Celery task with the constructed arguments
+            send_new_hire_quiz.delay(envelope_args)
         else:
             print(
                 f"User {instance.user.get_full_name()} has already been sent a New Hire Quiz."
@@ -228,3 +231,4 @@ def waiting_for_others_view(request):
         return render(request, 'error.html', {'error': str(e)})
     
     return render(request, 'dsign/waiting_for_others.html', {'envelopes': envelopes})
+

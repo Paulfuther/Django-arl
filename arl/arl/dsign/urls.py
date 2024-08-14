@@ -6,7 +6,7 @@ from arl.dsign.views import (
     retrieve_docusign_envelope,
     list_docusign_envelope,
     get_docusign_template,
-    waiting_for_others_view
+    waiting_for_others_view,
 )
 
 urlpatterns = [

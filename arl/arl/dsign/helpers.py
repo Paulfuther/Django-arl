@@ -23,6 +23,9 @@ from arl.msg.helpers import send_docusign_email_with_attachment
 from arl.user.models import CustomUser
 
 logging.basicConfig(level=logging.INFO)
+
+logger = logging.getLogger(__name__)
+
 SCOPES = ["signature impersonation"]
 
 
@@ -77,77 +80,84 @@ def get_access_token():
 
 
 def create_docusign_envelope(envelope_args):
-    access_token = get_access_token().access_token
-    # Construct the eventNotification
-    # Note. We do not need this if we set the webhook notifications in the coe.
-    # However, if we ever wanted to overide the notifications then we can
-    # do so in the code.
-
-    template = DocuSignTemplate.objects.get(template_id=envelope_args["template_id"])
-    template_name = template.template_name if template else "Default Template Name"
-    email_subject = f"{envelope_args['signer_name']} - {template_name}"
-
-    # Create the envelope definition
-    envelope_definition = EnvelopeDefinition(
-        status="sent",  # requests that the envelope be created and sent.
-        template_id=envelope_args["template_id"],
-        auto_navigation=False,
-    )
-
-    # Create the signer role
-    signer = TemplateRole(
-        email=envelope_args["signer_email"],
-        name=envelope_args["signer_name"],
-        role_name="GSA",
-        email_notification=RecipientEmailNotification(email_subject=email_subject),
-    )
-
-    attachment_tab1 = SignerAttachment(
-        anchor_string="Upload Photo ID picture",
-        anchor_x_offset="0",
-        anchor_y_offset="0",
-        anchor_units="inches",
-        tab_label="ID_Image1",
-        optional="false",
-    )
-
-    attachment_tab2 = SignerAttachment(
-        anchor_string="Upload SIN picture",
-        anchor_x_offset="0",
-        anchor_y_offset="0",
-        anchor_units="inches",
-        tab_label="ID_Image2",
-        optional="false",
-    )
-
-    attachment_tab3 = SignerAttachment(
-        anchor_string="/void ch/",
-        anchor_x_offset="0",
-        anchor_y_offset="0",
-        anchor_units="inches",
-        tab_label="ID_Image3",
-        optional="false",
-    )
-    # Add the SignHere tab to the signer role
-    signer.tabs = {
-        "signerAttachmentTabs": [attachment_tab1, attachment_tab2, attachment_tab3]
-    }
-
-    # Add the TemplateRole objects to the envelope object
-    envelope_definition.template_roles = [signer]
-    api_client = ApiClient()
-    api_client.host = settings.DOCUSIGN_API_CLIENT_HOST
-    api_client.set_default_header("Authorization", "Bearer " + access_token)
-    envelope_api = EnvelopesApi(api_client)
     try:
+        access_token = get_access_token().access_token
+
+        template = DocuSignTemplate.objects.get(
+            template_id=envelope_args["template_id"]
+        )
+        template_name = template.template_name if template else "Default Template Name"
+        email_subject = f"{envelope_args['signer_name']} - {template_name}"
+
+        # Create the envelope definition
+        envelope_definition = EnvelopeDefinition(
+            status="sent",  # requests that the envelope be created and sent.
+            template_id=envelope_args["template_id"],
+            auto_navigation=False,
+        )
+
+        # Create the signer role
+        signer = TemplateRole(
+            email=envelope_args["signer_email"],
+            name=envelope_args["signer_name"],
+            role_name="GSA",
+            email_notification=RecipientEmailNotification(email_subject=email_subject),
+        )
+        print(
+            "Here are the details:",
+            envelope_args["signer_email"],
+            envelope_args["signer_name"],
+        )
+
+        attachment_tab1 = SignerAttachment(
+            anchor_string="Upload Photo ID picture",
+            anchor_x_offset="0",
+            anchor_y_offset="0",
+            anchor_units="inches",
+            tab_label="ID_Image1",
+            optional="false",
+        )
+
+        attachment_tab2 = SignerAttachment(
+            anchor_string="Upload SIN picture",
+            anchor_x_offset="0",
+            anchor_y_offset="0",
+            anchor_units="inches",
+            tab_label="ID_Image2",
+            optional="false",
+        )
+
+        attachment_tab3 = SignerAttachment(
+            anchor_string="/void ch/",
+            anchor_x_offset="0",
+            anchor_y_offset="0",
+            anchor_units="inches",
+            tab_label="ID_Image3",
+            optional="false",
+        )
+        # Add the SignHere tab to the signer role
+        signer.tabs = {
+            "signerAttachmentTabs": [attachment_tab1, attachment_tab2, attachment_tab3]
+        }
+
+        # Add the TemplateRole objects to the envelope object
+        envelope_definition.template_roles = [signer]
+        api_client = ApiClient()
+        api_client.host = settings.DOCUSIGN_API_CLIENT_HOST
+        api_client.set_default_header("Authorization", "Bearer " + access_token)
+        envelope_api = EnvelopesApi(api_client)
+
         results = envelope_api.create_envelope(
             settings.DOCUSIGN_ACCOUNT_ID, envelope_definition=envelope_definition
         )
         envelope_id = results.envelope_id
-        return JsonResponse({"envelope_id": envelope_id})
+        logger.info(
+            f"Docusign envelope {envelope_id} created successfully for {envelope_args['signer_name']}"
+        )
+        return f"Docusign envelope {envelope_id} created successfully for {envelope_args['signer_name']}"
     except Exception as e:
-        print("error")
-        return JsonResponse({"error": str(e)}), 500
+        logger.error(f"Error creating Docusign envelope: {str(e)}")
+        return f"Error creating Docusign envelope: {str(e)}"
 
 
 def get_docusign_envelope(envelope_id, recipient_name, document_name):
@@ -370,19 +380,61 @@ def get_waiting_for_others_envelopes():
     api_client.set_default_header("Authorization", f"Bearer {access_token}")
 
     envelopes_api = EnvelopesApi(api_client)
-    
     try:
-        # Fetch envelopes with status 'waiting_for_others'
+        # Fetch envelopes without specifying the status
+        from_date = (
+            datetime.utcnow() - timedelta(days=60)
+        ).isoformat() + "Z"  # Adjust the date range as needed
         envelopes_list = envelopes_api.list_status_changes(
             account_id=account_id,
-            from_date='2021-01-01T00:00:00Z',  # Adjust the date as needed
-            status='waiting_for_others'
+            from_date=from_date,
         )
-        return envelopes_list.envelopes
+
+        outstanding_envelopes = []
+
+        for envelope in envelopes_list.envelopes:
+            if envelope.status in ["sent", "delivered"]:
+                recipients = envelopes_api.list_recipients(
+                    account_id, envelope.envelope_id
+                )
+                outstanding_signers = [
+                    signer
+                    for signer in recipients.signers
+                    if signer.status in ["sent", "delivered"]
+                ]
+
+                # Fetch the template ID from the custom fields
+                custom_fields = envelopes_api.list_custom_fields(
+                    account_id, envelope.envelope_id
+                )
+                template_id = None
+                for text_custom_field in custom_fields.text_custom_fields:
+                    if text_custom_field.name == "TemplateID":
+                        template_id = text_custom_field.value
+                        print(template_id)
+                        break
+
+                # Fetch the template name using the helper function
+                template_name = (
+                    get_docusign_template_name_from_template(template_id)
+                    if template_id
+                    else "Unknown Template"
+                )
+
+                outstanding_envelopes.append(
+                    {
+                        "template_name": template_name,
+                        "status": envelope.status,
+                        "sent_date_time": envelope.sent_date_time,
+                        "signers": outstanding_signers,
+                    }
+                )
+
+        return outstanding_envelopes
     except ApiException as e:
         print(f"Exception when calling EnvelopesApi->list_status_changes: {e}")
         return []
-    
+
 
 def get_docusign_envelope_quiz(envelope_id, recipient_name, document_name):
     try:

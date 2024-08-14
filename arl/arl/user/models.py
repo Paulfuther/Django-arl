@@ -25,6 +25,31 @@ class Employer(models.Model):
         return self.name
 
 
+class Store(models.Model):
+    number = models.IntegerField()
+    carwash = models.BooleanField(default=False)
+    address = models.CharField(max_length=100, null=True)
+    address_two = models.CharField(max_length=100, blank=True)
+    city = models.CharField(max_length=100, null=True)
+    province = models.CharField(max_length=100, null=True)
+    country = CountryField(null=True)
+    phone_number = PhoneNumberField(null=True)
+    created = models.DateTimeField(auto_now_add=True, null=True)
+    updated = models.DateTimeField(auto_now=True, null=True)
+
+    employer = models.ForeignKey(
+        Employer, on_delete=models.CASCADE, null=True, related_name="stores"
+    )
+    manager = models.ForeignKey('CustomUser', on_delete=models.SET_NULL, null=True, blank=True, related_name='managed_stores')
+
+    def __str__(self):
+        if self.employer:
+            manager_name = self.manager.first_name if self.manager else "No Manager"
+            return f"Store {self.number} - {self.address} - Manager: {manager_name}"
+        else:
+            return f"Store {self.number}"
+
+
 class CustomUser(AbstractUser):
     phone_number = models.CharField(max_length=20)
     sin = models.CharField(
@@ -43,7 +68,9 @@ class CustomUser(AbstractUser):
     state_province = models.CharField(max_length=100, null=True)
     country = CountryField(null=True)
     postal = models.CharField(max_length=7, null=True)
+    store = models.ForeignKey(Store, on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
     employer = models.ForeignKey(Employer, on_delete=models.SET_NULL, null=True)
+    store = models.ForeignKey(Store, on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
 
     def __str__(self):
         return self.first_name
@@ -74,33 +101,13 @@ class CustomUser(AbstractUser):
 
 
 class UserManager(models.Model):
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='user_manager_profile')
     manager = models.ForeignKey(
         CustomUser, on_delete=models.CASCADE, related_name="managed_users"
     )
 
-
-class Store(models.Model):
-    number = models.IntegerField()
-    carwash = models.BooleanField(default=False)
-    address = models.CharField(max_length=100, null=True)
-    address_two = models.CharField(max_length=100, blank=True)
-    city = models.CharField(max_length=100, null=True)
-    province = models.CharField(max_length=100, null=True)
-    country = CountryField(null=True)
-    phone_number = PhoneNumberField(null=True)
-    created = models.DateTimeField(auto_now_add=True, null=True)
-    updated = models.DateTimeField(auto_now=True, null=True)
-
-    employer = models.ForeignKey(
-        Employer, on_delete=models.CASCADE, null=True, related_name="stores"
-    )
-
     def __str__(self):
-        if self.employer:
-            return f"Store {self.number} - {self.employer.name}"
-        else:
-            return f"Store {self.number}"
+        return self.user.username
 
 
 class ErrorLog(models.Model):

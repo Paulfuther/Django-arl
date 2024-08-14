@@ -66,11 +66,11 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
     list_display = (
         "username",
         "email",
+        "store",
         "phone_number",
         "last_login",
         "is_active",
         "get_groups",
-        "get_manager",
         "get_consent",
     )
     list_filter = ("is_active", "groups")  # Add any filters you need
@@ -82,16 +82,6 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         return ", ".join([group.name for group in obj.groups.all()])
 
     get_groups.short_description = "Groups"
-
-    def get_manager(self, obj):
-        user_manager = UserManager.objects.filter(user=obj).first()
-        return (
-            user_manager.manager.username
-            if user_manager and user_manager.manager
-            else "None"
-        )
-
-    get_manager.short_description = "Manager"
 
     def get_consent(self, obj):
         consent = UserConsent.objects.filter(user=obj, consent_type="WhatsApp").first()
@@ -105,6 +95,7 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         {
             "fields": (
                 "employer",
+                "store",
                 "first_name",
                 "last_name",
                 "email",
@@ -128,6 +119,7 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
                 "classes": ("wide",),
                 "fields": (
                     "employer",
+                    "store",
                     "username",
                     "email",
                     "password1",
@@ -162,12 +154,17 @@ class IncidentAdmin(admin.ModelAdmin):
 
 @admin.register(UserManager)
 class UserManagerAdmin(admin.ModelAdmin):
-    list_display = ("user", "get_manager")
+    list_display = ("user", "get_manager", "user_creation_date")
 
     def get_manager(self, obj):
         return obj.manager.username if obj.manager else "No Manager"
 
     get_manager.short_description = "Manager"
+
+    def user_creation_date(self, obj):
+
+        return obj.user.date_joined.strftime('%Y-%m-%d')
+    user_creation_date.short_description = "User Creation Date"
 
     search_fields = ["user__username", "manager__username"]
 
@@ -179,11 +176,16 @@ class UserConsentAdmin(admin.ModelAdmin):
     search_fields = ("user__username",)
 
 
+class StoreAdmin(admin.ModelAdmin):
+    list_display = ('number', 'employer', 'manager')
+    search_fields = ('number', 'employer__name', 'manager__username')
+
+
 # UserAdmin.fieldsets = tuple(fields)
 admin.site.register(Employer)
 admin.site.register(Twimlmessages)
 admin.site.register(BulkEmailSendgrid)
-admin.site.register(Store)
+admin.site.register(Store, StoreAdmin)
 admin.site.register(Incident, IncidentAdmin)
 admin.site.register(EmailTemplate)
 admin.site.register(DocuSignTemplate)

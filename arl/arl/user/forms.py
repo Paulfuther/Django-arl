@@ -4,22 +4,22 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.urls import reverse_lazy
 
-from .models import CustomUser
+from .models import CustomUser, Store
 
 
 class CustomUserCreationForm(UserCreationForm):
-    manager_dropdown = forms.ModelChoiceField(
-        queryset=CustomUser.objects.filter(groups__name='Manager'),
-        empty_label="Select a manager",
+    store = forms.ModelChoiceField(
+        queryset=Store.objects.all(),
+        empty_label="Select a store",
         required=True,
-        widget=forms.Select(attrs={'class': 'form-control'})  # Add class for styling
+        widget=forms.Select(attrs={'class': 'form-control'})
     )
-
+    
     class Meta(UserCreationForm.Meta):
         model = CustomUser
         fields = (
             "employer",
-            "manager_dropdown",
+            "store",
             "username",
             "password1",
             "password2",
@@ -54,16 +54,16 @@ class CustomUserCreationForm(UserCreationForm):
         self.fields['dob'].required = True
         self.fields['postal'].required = True
         # Populate choices for manager_dropdown
-        managers = CustomUser.objects.filter(groups__name='Manager')
-        manager_choices = [(manager.id, manager.username) for manager in managers]
-        self.fields['manager_dropdown'].choices = [('', 'Select a manager')] + manager_choices
+        # managers = CustomUser.objects.filter(groups__name='Manager')
+        # manager_choices = [(manager.id, manager.username) for manager in managers]
+        # self.fields['manager_dropdown'].choices = [('', 'Select a manager')] + manager_choices
         self.helper = FormHelper()
         self.helper.form_method = "post"
         self.helper.add_input(Submit("submit", "Register"))
         self.helper.form_action = reverse_lazy("index")
         # Optionally set an empty label for the dropdown
-        self.fields["employer"].empty_label = "Select an employer"
-        self.fields["employer"].required = True
+        self.fields["store"].empty_label = "Select a Store"
+        self.fields["store"].required = True
         # Apply margin-top or margin-bottom to all fields
         for field_name in self.fields:
             self.fields[field_name].widget.attrs["class"] = "mt-1"  # Apply margin-top
@@ -84,20 +84,20 @@ class CustomUserCreationForm(UserCreationForm):
 
         return cleaned_data
 
-    def clean_manager_dropdown(self):
-        manager = self.cleaned_data.get('manager_dropdown')
-        if manager is None:
-            raise forms.ValidationError('Invalid manager selection.')
+    # def clean_manager_dropdown(self):
+    #  manager = self.cleaned_data.get('manager_dropdown')
+    #  if manager is None:
+    #      raise forms.ValidationError('Invalid manager selection.')
 
         # Here, we extract the ID from the selected manager
-        manager_id = manager.id
-        print(f'Manager ID from clean_manager_dropdown: {manager_id}')
-        valid_manager_ids = [manager.id for manager in CustomUser.objects.filter(groups__name='Manager')]
-        if manager_id not in valid_manager_ids:
-            raise forms.ValidationError('Invalid manager selection.')
+        # manager_id = manager.id
+        # print(f'Manager ID from clean_manager_dropdown: {manager_id}')
+        # valid_manager_ids = [manager.id for manager in CustomUser.objects.filter(groups__name='Manager', is_active=True)]
+        # if manager_id not in valid_manager_ids:
+        #    raise forms.ValidationError('Invalid manager selection.')
 
         # Return the manager's ID
-        return manager_id
+        # return manager_id
 
 
 class TwoFactorAuthenticationForm(forms.Form):
