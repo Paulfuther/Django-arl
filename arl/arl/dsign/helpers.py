@@ -207,6 +207,7 @@ def get_docusign_envelope(envelope_id, recipient_name, document_name):
 
 def get_docusign_template_name_from_template(template_id):
     try:
+        print("template id:", template_id)
         # Authenticate with DocuSign API (use your own authentication method)
         access_token = get_access_token()  # Replace with your authentication method
         access_token = access_token.access_token
@@ -420,7 +421,6 @@ def get_waiting_for_others_envelopes():
                     if template_id
                     else "Unknown Template"
                 )
-
                 outstanding_envelopes.append(
                     {
                         "template_name": template_name,
@@ -429,7 +429,7 @@ def get_waiting_for_others_envelopes():
                         "signers": outstanding_signers,
                     }
                 )
-
+                print("template name:", template_name)
         return outstanding_envelopes
     except ApiException as e:
         print(f"Exception when calling EnvelopesApi->list_status_changes: {e}")

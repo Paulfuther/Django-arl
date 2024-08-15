@@ -1,7 +1,9 @@
 import json
 import logging
 
+from celery.result import AsyncResult
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -9,15 +11,15 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
-from celery.result import AsyncResult
+
 from arl.dbox.helpers import upload_to_dropbox
 from arl.dsign.helpers import (
     get_docusign_envelope,
     get_docusign_template_name_from_template,
     get_waiting_for_others_envelopes,
 )
-from arl.dsign.tasks import list_all_docusign_envelopes_task
 from arl.dsign.models import DocuSignTemplate
+from arl.dsign.tasks import list_all_docusign_envelopes_task
 from arl.tasks import (
     create_docusign_envelope_task,
     process_docusign_webhook,
@@ -110,38 +112,42 @@ def retrieve_docusign_envelope(request):
 
 def list_docusign_envelope(request):
     try:
-        task_id = request.session.get('list_envelopes_task_id')
+        task_id = request.session.get("list_envelopes_task_id")
         if not task_id:
             # Start the task and save the task ID in the session
             task = list_all_docusign_envelopes_task.delay()
-            request.session['list_envelopes_task_id'] = task.id
-            logger.info("Started list_all_docusign_envelopes_task with task_id: %s", task.id)
-            return render(request, 'dsign/loading.html')  # Render a loading template
+            request.session["list_envelopes_task_id"] = task.id
+            logger.info(
+                "Started list_all_docusign_envelopes_task with task_id: %s", task.id
+            )
+            return render(request, "dsign/loading.html")  # Render a loading template
 
         task_result = AsyncResult(task_id)
         logger.info("Task state: %s", task_result.state)
         print("Task sate: ", task_result.state)
-        if task_result.state == 'SUCCESS':
+        if task_result.state == "SUCCESS":
             # Task completed successfully
             envelopes = task_result.result
             # Clear the task ID from the session
-            del request.session['list_envelopes_task_id']
+            del request.session["list_envelopes_task_id"]
             logger.info("Task completed successfully with result: %s", envelopes)
-            return render(request, 'dsign/list_envelopes.html', {'envelopes': envelopes})
-        elif task_result.state == 'FAILURE':
+            return render(
+                request, "dsign/list_envelopes.html", {"envelopes": envelopes}
+            )
+        elif task_result.state == "FAILURE":
             # Task failed
             error_message = str(task_result.result)
             # Clear the task ID from the session
-            del request.session['list_envelopes_task_id']
+            del request.session["list_envelopes_task_id"]
             logger.error("Task failed with error: %s", error_message)
-            return render(request, 'dsign/error.html', {'error': error_message})
+            return render(request, "dsign/error.html", {"error": error_message})
         else:
             # Task is still processing
             logger.info("Task is still processing")
-            return render(request, 'dsign/loading.html')  # Render a loading template
+            return render(request, "dsign/loading.html")  # Render a loading template
     except Exception as e:
         logger.error("An error occurred in list_docusign_envelope: %s", str(e))
-        return render(request, 'dsign/error.html', {'error': str(e)})
+        return render(request, "dsign/error.html", {"error": str(e)})
 
 
 def get_docusign_template(request):
@@ -224,11 +230,10 @@ def post_save_processed_docsign_document(sender, instance, created, **kwargs):
         print("The saved document is not a New Hire File. Exiting.")
 
 
+@login_required
 def waiting_for_others_view(request):
     try:
         envelopes = get_waiting_for_others_envelopes()
     except Exception as e:
-        return render(request, 'error.html', {'error': str(e)})
-    
-    return render(request, 'dsign/waiting_for_others.html', {'envelopes': envelopes})
-
+        return render(request, "error.html", {"error": str(e)})
+    return render(request, "dsign/waiting_for_others.html", {"envelopes": envelopes})
