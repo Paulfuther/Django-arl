@@ -2,7 +2,6 @@ from __future__ import absolute_import, unicode_literals
 
 import imaplib
 import io
-import json
 import logging
 import subprocess
 from datetime import datetime, timedelta
@@ -17,15 +16,12 @@ from django.db.models import Q
 from django.template.loader import render_to_string
 from django.utils import timezone
 from django.utils.text import slugify
-from docusign_esign import ApiClient, ApiException, EnvelopesApi
 
 from arl.celery import app
 from arl.dbox.helpers import upload_incident_file_to_dropbox
 from arl.dsign.helpers import (
     create_docusign_envelope,
     create_docusign_envelope_new_hire_quiz,
-    fetch_envelope_details,
-    get_access_token,
     get_docusign_envelope,
     get_docusign_envelope_quiz,
     get_docusign_template_name_from_template,
@@ -49,8 +45,7 @@ from arl.msg.helpers import (
     send_monthly_store_phonecall,
     send_sms_model,
 )
-
-from arl.msg.models import EmailEvent, EmailTemplate, SmsLog, WhatsAppTemplate
+from arl.msg.models import EmailEvent, EmailTemplate, SmsLog
 from arl.user.models import CustomUser, Employer, Store, UserManager
 
 logger = get_task_logger(__name__)
@@ -103,7 +98,8 @@ def send_template_email_task(group_id, subject, sendgrid_id):
 
 
 @app.task(name="send_newhire_template_email")
-def send_newhire_template_email_task(user_email, subject, user_first_name, sendgrid_id):
+def send_newhire_template_email_task(user_email, subject, user_first_name,
+                                     sendgrid_id):
     try:
         # Retrieve the template name based on the sendgrid_id
         template = EmailTemplate.objects.get(sendgrid_id=sendgrid_id)
@@ -123,7 +119,8 @@ def send_email_task(group_id, template_id, attachment=None):
         users_in_group = group.user_set.filter(is_active=True)
         for user in users_in_group:
 
-            create_single_email(user.email, user.first_name, template_id, attachment)
+            create_single_email(user.email, user.first_name, template_id,
+                                attachment)
         return "Email Sent Successfully"
     except Exception as e:
         return str(e)
@@ -188,13 +185,15 @@ def generate_pdf_task(incident_id):
         try:
             incident = Incident.objects.get(pk=incident_id)
         except ObjectDoesNotExist:
-            raise ValueError("Incident with ID {} does not exist.".format(incident_id))
+            raise ValueError("Incident with ID {} does not exist.".
+                             format(incident_id))
 
         images = get_s3_images_for_incident(
             incident.image_folder, incident.user_employer
         )
         context = {"incident": incident, "images": images}
-        html_content = render_to_string("incident/incident_form_pdf.html", context)
+        html_content = render_to_string("incident/incident_form_pdf.html",
+                                        context)
         #  Generate the PDF using pdfkit
         options = {
             "enable-local-file-access": None,
@@ -205,9 +204,11 @@ def generate_pdf_task(incident_id):
         #  Create a BytesIO object to store the PDF content
         pdf_buffer = BytesIO(pdf)
         # Create a unique file name for the PDF
-        store_number = incident.store.number  # Replace with your actual attribute name
+        store_number = incident.store.number  # Replace with your actual 
+        # attribute name
         brief_description = incident.brief_description
-        # Create a unique file name for the PDF using store number and brief description
+        # Create a unique file name for the PDF using store number and brief 
+        # # description
         pdf_filename = f"{store_number}_{slugify(brief_description)}_report.pdf"
 
         # Close the BytesIO buffer to free up resources
@@ -311,7 +312,7 @@ def create_docusign_envelope_task(envelope_args):
         signer_name = envelope_args.get("signer_name")
         print(signer_name)
         create_docusign_envelope(envelope_args)
-        
+
         logger.info(
             f"Docusign envelope New Hire File for {signer_name} created successfully"
         )
