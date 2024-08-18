@@ -16,16 +16,14 @@ from arl.dbox.helpers import upload_to_dropbox
 from arl.dsign.helpers import (
     get_docusign_envelope,
     get_docusign_template_name_from_template,
-    get_waiting_for_others_envelopes,
 )
 from arl.dsign.models import DocuSignTemplate
-from arl.dsign.tasks import list_all_docusign_envelopes_task
+from arl.dsign.tasks import get_outstanding_docs, list_all_docusign_envelopes_task
 from arl.tasks import (
     create_docusign_envelope_task,
     process_docusign_webhook,
     send_new_hire_quiz,
 )
-from arl.user.models import UserManager
 
 from .forms import NameEmailForm
 from .models import ProcessedDocsignDocument
@@ -232,8 +230,10 @@ def post_save_processed_docsign_document(sender, instance, created, **kwargs):
 
 @login_required
 def waiting_for_others_view(request):
-    try:
-        envelopes = get_waiting_for_others_envelopes()
-    except Exception as e:
-        return render(request, "error.html", {"error": str(e)})
-    return render(request, "dsign/waiting_for_others.html", {"envelopes": envelopes})
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        # Handle the AJAX request to fetch the outstanding documents
+        result = get_outstanding_docs.delay()
+        envelopes = result.get(timeout=10)  # Adjust the timeout as needed
+        return JsonResponse({'outstanding_envelopes': envelopes})
+    # Render the template for the initial page load
+    return render(request, 'dsign/waiting_for_others.html')

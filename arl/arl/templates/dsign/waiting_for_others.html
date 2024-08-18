@@ -17,51 +17,46 @@
 
 </head>
 
-
-
 <div class="container mb-2" style="height: 95vh;">
-    
     <div class="row justify-content-center">
-       
         <div class="col-12 col-sm-10 col-md-8 col-lg-8 col-xl-8 mt-2">
-<table id="table_id" class="display">
-    <thead>
-        <tr>
-            <th>Document Name</th>
-            <th>Status</th>
-            <th>Sent Date</th>
-            <th>Outstanding Signers</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for envelope in envelopes %}
-        <tr>
-            <td>{{ envelope.template_name }}</td>
-            <td>{{ envelope.status }}</td>
-            <td>{{ envelope.sent_date_time }}</td>
-            <td>
-                <ul>
-                    {% for signer in envelope.signers %}
-                    <li>{{ signer.name }} ({{ signer.email }}) - {{ signer.status }}</li>
-                    {% endfor %}
-                </ul>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-</div></div></div>
+
+
+            <!-- Table for outstanding documents -->
+            <table id="table_id" class="display">
+                <thead>
+                    <tr>
+                        <th>Document Name</th>
+                        <th>Status</th>
+                        <th>Sent Date</th>
+                        <th>Outstanding Signers</th>
+                    </tr>
+                </thead>
+                <!-- Loading indicator -->
+                <div id="loading"
+                    style="display: none; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                    <p>Loading outstanding documents, please wait...</p>
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+                <tbody id="outstanding-docs-body">
+                    <!-- Rows will be dynamically added here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 
 <script>
-
-
     $(document).ready(function () {
-        $('#table_id').DataTable({
+        // Initialize DataTable with empty data
+        var table = $('#table_id').DataTable({
             language: { search: "" },
             responsive: true,
             "pageLength": 10,
             order: [[2, 'desc']]
-        })
+        });
 
         // Set the placeholder without the word "Search"
         $('.dataTables_filter input[type="search"]').attr('placeholder', 'Search...');
@@ -73,10 +68,51 @@
             'padding-left': '10px' // Add padding to the left for the text
         });
 
+        // Function to fetch outstanding documents via AJAX
+        function fetchOutstandingDocs() {
+            // Show the loading indicator
+            $('#loading').show();
+
+            // Make the AJAX request
+            $.ajax({
+                url: "{% url 'waiting_for_others' %}",
+                method: "GET",
+                success: function (data) {
+                    // Hide the loading indicator
+                    $('#loading').hide();
+
+                    // Clear the table body
+                    table.clear();
+
+                    // Check if there are outstanding envelopes
+                    if (data.outstanding_envelopes.length > 0) {
+                        // Populate the table with data
+                        data.outstanding_envelopes.forEach(function (envelope) {
+                            var signers = envelope.signers.map(function (signer) {
+                                return signer.name + " (" + signer.email + ") - " + signer.status;
+                            }).join('<br>');
+
+                            table.row.add([
+                                envelope.template_name + ' sent to ' + envelope.primary_recipient,
+                                envelope.status,
+                                envelope.sent_date_time.slice(0, 10),
+                                signers
+                            ]).draw(false);
+                        });
+                    } else {
+                        $('#outstanding-docs-body').append('<tr><td colspan="4">No outstanding documents found.</td></tr>');
+                    }
+                },
+                error: function () {
+                    $('#loading').hide();
+                    $('#outstanding-docs-body').append('<tr><td colspan="4">An error occurred while fetching outstanding documents. Please try again later.</td></tr>');
+                }
+            });
+        }
+
+        // Fetch the outstanding documents when the page loads
+        fetchOutstandingDocs();
     });
-
-
 </script>
-
 
 {% endblock %}

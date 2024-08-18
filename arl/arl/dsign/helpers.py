@@ -2,7 +2,6 @@ import json
 import logging
 from datetime import datetime, timedelta
 
-import requests
 from django.conf import settings
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
@@ -236,30 +235,6 @@ def get_docusign_template_name_from_template(template_id):
         return None
 
 
-def fetch_envelope_details(envelope_id):
-    # Example variables - replace with your actual data
-    base_url = "https://demo.docusign.net/restapi"
-    account_id = settings.DOCUSIGN_ACCOUNT_ID
-    access_token = get_access_token()  # Replace with your authentication method
-    access_token = access_token.access_token
-    headers = {"Authorization": f"Bearer {access_token}"}
-
-    # Construct the API endpoint URL
-    url = f"{base_url}/v2.1/accounts/{account_id}/envelopes/{envelope_id}"
-
-    # Make the GET request
-    response = requests.get(url, headers=headers)
-
-    if response.status_code == 200:
-        # Assuming the request was successful, parse the response
-        envelope_details = response.json()
-        return envelope_details
-    else:
-        # Handle errors or unsuccessful requests
-        print(f"Failed to fetch envelope details. Status code: {response.status_code}")
-        return None
-
-
 def get_template_id(payload):
     # Setup for DocuSign API Client
     api_client = ApiClient()
@@ -372,70 +347,6 @@ def create_docusign_envelope_new_hire_quiz(envelope_args):
         return JsonResponse({"error": str(e)}), 500
 
 
-def get_waiting_for_others_envelopes():
-    access_token = get_access_token()
-    access_token = access_token.access_token
-    account_id = settings.DOCUSIGN_ACCOUNT_ID
-    api_client = ApiClient()
-    api_client.host = settings.DOCUSIGN_API_CLIENT_HOST
-    api_client.set_default_header("Authorization", f"Bearer {access_token}")
-
-    envelopes_api = EnvelopesApi(api_client)
-    try:
-        # Fetch envelopes without specifying the status
-        from_date = (
-            datetime.utcnow() - timedelta(days=60)
-        ).isoformat() + "Z"  # Adjust the date range as needed
-        envelopes_list = envelopes_api.list_status_changes(
-            account_id=account_id,
-            from_date=from_date,
-        )
-
-        outstanding_envelopes = []
-
-        for envelope in envelopes_list.envelopes:
-            if envelope.status in ["sent", "delivered"]:
-                recipients = envelopes_api.list_recipients(
-                    account_id, envelope.envelope_id
-                )
-                outstanding_signers = [
-                    signer
-                    for signer in recipients.signers
-                    if signer.status in ["sent", "delivered"]
-                ]
-
-                # Fetch the template ID from the custom fields
-                custom_fields = envelopes_api.list_custom_fields(
-                    account_id, envelope.envelope_id
-                )
-                template_id = None
-                for text_custom_field in custom_fields.text_custom_fields:
-                    if text_custom_field.name == "TemplateID":
-                        template_id = text_custom_field.value
-                        print(template_id)
-                        break
-
-                # Fetch the template name using the helper function
-                template_name = (
-                    get_docusign_template_name_from_template(template_id)
-                    if template_id
-                    else "Unknown Template"
-                )
-                outstanding_envelopes.append(
-                    {
-                        "template_name": template_name,
-                        "status": envelope.status,
-                        "sent_date_time": envelope.sent_date_time,
-                        "signers": outstanding_signers,
-                    }
-                )
-                print("template name:", template_name)
-        return outstanding_envelopes
-    except ApiException as e:
-        print(f"Exception when calling EnvelopesApi->list_status_changes: {e}")
-        return []
-
-
 def get_docusign_envelope_quiz(envelope_id, recipient_name, document_name):
     try:
         hr_users_emails = CustomUser.objects.filter(
@@ -479,3 +390,109 @@ def get_docusign_envelope_quiz(envelope_id, recipient_name, document_name):
         return HttpResponse(
             f"An unexpected error occurred: {error_message}", status=500
         )
+
+
+def get_waiting_for_others_envelopes():
+    try:
+        access_token = get_access_token().access_token
+        account_id = settings.DOCUSIGN_ACCOUNT_ID
+        api_client = ApiClient()
+        api_client.host = settings.DOCUSIGN_API_CLIENT_HOST
+        api_client.set_default_header("Authorization", f"Bearer {access_token}")
+
+        envelopes_api = EnvelopesApi(api_client)
+
+        # Fetch envelopes created in the last 60 days
+        from_date = (datetime.utcnow() - timedelta(days=100)).isoformat() + "Z"
+        envelopes_list = envelopes_api.list_status_changes(
+            account_id=account_id, from_date=from_date
+        )
+
+        outstanding_envelopes = []
+
+        for envelope in envelopes_list.envelopes:
+            if envelope.status in ["sent", "delivered"]:
+                recipients = envelopes_api.list_recipients(
+                    account_id, envelope.envelope_id
+                )
+                outstanding_signers = [
+                    signer
+                    for signer in recipients.signers
+                    if signer.status in ["sent", "delivered"]
+                ]
+
+                # Retrieve the template name
+                template_name = (
+                    get_template_name_from_envelope(envelope.envelope_id)
+                    or "Unknown Template"
+                )
+                if template_name != "Unknown Template":
+                    print(f"Template name retrieved: {template_name}")
+                else:
+                    print("Template name not found.")
+
+                # Append the details to the list of outstanding envelopes
+                sent_date_time_as_date_time = parse_sent_date_time(envelope.sent_date_time)
+                print(sent_date_time_as_date_time)
+                outstanding_envelopes.append(
+                    {
+                        "template_name": template_name,
+                        "status": envelope.status,
+                        "sent_date_time": envelope.sent_date_time,
+                        "signers": outstanding_signers,
+                    }
+                )
+
+        return outstanding_envelopes
+
+    except ApiException as e:
+        print(f"Exception when calling EnvelopesApi->list_status_changes: {e}")
+        return []
+    except Exception as e:
+        print(f"Unexpected error occurred: {e}")
+        return []
+
+
+def get_template_name_from_envelope(envelope_id):
+    access_token = get_access_token()
+    access_token = access_token.access_token
+    account_id = settings.DOCUSIGN_ACCOUNT_ID
+    api_client = ApiClient()
+    api_client.host = settings.DOCUSIGN_API_CLIENT_HOST
+    api_client.set_default_header("Authorization", f"Bearer {access_token}")
+
+    envelopes_api = EnvelopesApi(api_client)
+    print(envelope_id)
+    try:
+        # Retrieve the list of templates used in the envelope
+        template_data = envelopes_api.list_templates(account_id, envelope_id)
+        # Ensure the response contains templates
+        if hasattr(template_data, "templates") and template_data.templates:
+            first_template = template_data.templates[0]
+            template_name = (
+                first_template.name if hasattr(first_template, "name") else None
+            )
+            if template_name:
+                print(f"Template Name: {template_name}")
+                return template_name
+            else:
+                print("Template Name not found.")
+        else:
+            print("No templates found in the data.")
+            return None
+    except ApiException as e:
+        print(f"Exception when calling EnvelopesApi->list_templates: {e}")
+        return None
+    except Exception as e:
+        print(f"Unexpected error occurred: {e}")
+        return None
+
+
+def parse_sent_date_time(sent_date_time_str):
+    if '.' in sent_date_time_str:
+        sent_date_time_str = sent_date_time_str[:sent_date_time_str.index('Z')]  # Remove the trailing 'Z'
+        date_part, fraction_part = sent_date_time_str.split('.')
+        fraction_part = fraction_part[:6]  # Keep only up to 6 digits for microseconds
+        sent_date_time_str = f"{date_part}.{fraction_part}Z"
+    # Parse the datetime string
+    return datetime.strptime(sent_date_time_str, "%Y-%m-%dT%H:%M:%S.%fZ")

@@ -17,17 +17,15 @@
         <li class="nav-item">
           <a class="nav-link" href="{% url 'logout' %}">Logout</a>
         </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'register' %}">Register</a>
-        </li>
-        
+
         {% if user.is_dropbox %}
         <li class="nav-item">
           <a class="nav-link" href="{% url 'list_folders' %}">Dropbox</a>
         </li>
         {% endif %}
-
-       
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'register' %}">Register</a>
+        </li>
         <li class="nav-item">
           <a class="nav-link" href="{% url 'create_incident' %}">Make Incident Form</a>
         </li>
@@ -35,36 +33,33 @@
         <li class="nav-item">
           <a class="nav-link" href="{% url 'incident_list' %}">View/Edit Incident Form</a>
         </li>
-       
 
         {% if user.is_comms %}
         <li class="nav-item">
-          <a class="nav-link" href="{% url 'comms' %}">comms</a>
+          <a class="nav-link" href="{% url 'comms' %}">Comms</a>
         </li>
-        {% endif %}
-        
-        {% if user.is_comms %}
         <li class="nav-item">
           <a class="nav-link" href="{% url 'fetch_twilio' %}">SMS Logs</a>
         </li>
         <li class="nav-item">
           <a class="nav-link" href="{% url 'fetch_twilio_calls' %}">Call Logs</a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'waiting_for_others' %}">Outstanding Docs</a>
+        </li>
         {% endif %}
         
+        {% if user.is_staff %}
         <li class="nav-item">
           <a class="nav-link" href="{% url 'admin:index' %}">Admin</a>
         </li>
         {% endif %}
-
-        {% if not user.is_authenticated %}
+        {% else %}
         <li class="nav-item">
           <a class="nav-link" href="{% url 'login' %}">Login</a>
         </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'register' %}">Register</a>
-        </li>
         {% endif %}
+       
       </ul>
     </div>
   </div>
