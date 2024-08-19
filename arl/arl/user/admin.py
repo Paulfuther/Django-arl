@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from import_export import fields
 from import_export import fields as export_fields
 from import_export import resources
 from import_export.admin import ExportActionMixin
@@ -22,6 +23,7 @@ from .models import CustomUser, Employer, Store, UserManager
 class UserResource(resources.ModelResource):
     manager = export_fields.Field()
     whatsapp_consent = export_fields.Field()
+    store = fields.Field(column_name="store", readonly=True)
 
     class Meta:
         model = CustomUser
@@ -30,11 +32,13 @@ class UserResource(resources.ModelResource):
             "first_name",
             "last_name",
             "email",
+            "store",
             "phone_number",
             "manager",
             "whatsapp_consent",
         )
         export_order = (
+            "store",
             "username",
             "first_name",
             "last_name",
@@ -58,6 +62,15 @@ class UserResource(resources.ModelResource):
             user=custom_user, consent_type="WhatsApp"
         ).first()
         return "Granted" if consent and consent.is_granted else "Not Granted"
+
+    def dehydrate_store(self, obj):
+        try:
+            store_name = obj.store.number if obj.store else "No Store Assigned"
+            # print(f"Exporting store for user {obj.username}: {store_name}")
+            return store_name
+        except Exception as e:
+            # print(f"Error exporting store for user {obj.username}: {e}")
+            raise e
 
 
 class CustomUserAdmin(ExportActionMixin, UserAdmin):
@@ -163,7 +176,8 @@ class UserManagerAdmin(admin.ModelAdmin):
 
     def user_creation_date(self, obj):
 
-        return obj.user.date_joined.strftime('%Y-%m-%d')
+        return obj.user.date_joined.strftime("%Y-%m-%d")
+
     user_creation_date.short_description = "User Creation Date"
 
     search_fields = ["user__username", "manager__username"]
@@ -177,8 +191,8 @@ class UserConsentAdmin(admin.ModelAdmin):
 
 
 class StoreAdmin(admin.ModelAdmin):
-    list_display = ('number', 'employer', 'manager')
-    search_fields = ('number', 'employer__name', 'manager__username')
+    list_display = ("number", "employer", "manager")
+    search_fields = ("number", "employer__name", "manager__username")
 
 
 # UserAdmin.fieldsets = tuple(fields)
