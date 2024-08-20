@@ -89,14 +89,16 @@
                         // Populate the table with data
                         data.outstanding_envelopes.forEach(function (envelope) {
                             var signers = envelope.signers.map(function (signer) {
-                                return signer.name + " (" + signer.email + ") - " + signer.status;
-                            }).join('<br>');
+                                return signer.name + " (" + signer.email + ") - "+ "<br>Role: " + signer.role + "<br>Status: " + signer.status +
+                                    "<br>Store: " + signer.store + "<br>Address: " + signer.address ;
+                            }).join('<br><br>');
 
                             table.row.add([
-                                envelope.template_name + ' sent to ' + envelope.primary_recipient,
+                                envelope.template_name + ' <br>sent to ' + envelope.primary_recipient,
                                 envelope.status,
                                 envelope.sent_date_time.slice(0, 10),
-                                signers
+                                signers,
+                                
                             ]).draw(false);
                         });
                     } else {
@@ -114,5 +116,6 @@
         fetchOutstandingDocs();
     });
 </script>
+
 
 {% endblock %}

@@ -75,25 +75,49 @@ def check_outstanding_envelopes_task():
     for envelope in outstanding_envelopes:
         sent_date_time = parse_sent_date_time(envelope["sent_date_time"])
         if now - sent_date_time >= timedelta(hours=48):
-            # Get the name of the primary recipient (assuming the first signer is the main recipient)
-            primary_recipient_name = (
-                envelope["signers"][0].name
-                if envelope["signers"]
-                else "Unknown Recipient"
-            )
-            outstanding_signers = [
-                signer.name
-                for signer in envelope["signers"]
-                if signer.status in ["sent", "delivered"]
-            ]
-            signer_list = (
-                ", ".join(outstanding_signers)
-                if outstanding_signers
-                else "No outstanding signers"
-            )
-            # Add to the list of behind documents
+            # Check if there are any signers
+            if envelope["signers"]:
+                # Assuming the primary recipient is the first signer
+                primary_recipient_name = envelope["signers"][0]["name"]
+
+                # Prepare a detailed list of outstanding signers with their role, store, and address
+                outstanding_signers_info = []
+                for signer in envelope["signers"]:
+                    if signer["status"] in ["sent", "delivered"]:
+                        # Query the CustomUser model for store and role based on the signer's email
+                        try:
+                            user = CustomUser.objects.get(email=signer["email"])
+                            store_name = user.store.number if user.store else "No Store Assigned"
+                            store_address = user.store.address if user.store else "No Address Available"
+                            role = user.groups.first().name if user.groups.exists() else "No Role Assigned"
+                        except CustomUser.DoesNotExist:
+                            store_name = "User Not Found"
+                            store_address = "Address Not Found"
+                            role = "Role Not Found"
+
+                        signer_info = (
+                            f"Name: {signer['name']}\n"
+                            f"Email: {signer['email']}\n"
+                            f"Role: {role}\n"
+                            f"Store: {store_name}\n"
+                            f"Address: {store_address}\n"
+                        )
+                        outstanding_signers_info.append(signer_info)
+
+                signer_list = (
+                    "\n".join(outstanding_signers_info)
+                    if outstanding_signers_info
+                    else "No outstanding signers"
+                )
+            else:
+                primary_recipient_name = "Unknown Recipient"
+                signer_list = "No signers available"
+
+            # Add to the list of behind documents with detailed signer information
             behind_docs.append(
-                f"{envelope['template_name']} (Sent to: {primary_recipient_name}; Outstanding Signers: {signer_list})"
+                f"Document: {envelope['template_name']}\n"
+                f"Sent to: {primary_recipient_name}\n"
+                f"Outstanding Signers:\n{signer_list}"
             )
 
     if behind_docs:
@@ -124,20 +148,47 @@ def get_outstanding_docs():
     try:
         # Retrieve the outstanding envelopes
         envelopes = get_waiting_for_others_envelopes()
-
-        # Serialize the envelopes and their signers
         serialized_envelopes = []
+
         for envelope in envelopes:
-            # Assuming the primary recipient is the first signer
-            primary_recipient_name = (
-                envelope["signers"][0].name
-                if envelope["signers"]
-                else "Unknown Recipient"
-            )
-            serialized_signers = [
-                {"name": signer.name, "email": signer.email, "status": signer.status}
-                for signer in envelope["signers"]
-            ]
+            # Check if there are signers
+            if envelope["signers"]:
+                primary_recipient_name = envelope["signers"][0]["name"]
+                serialized_signers = []
+
+                for signer in envelope["signers"]:
+                    # Skip signers that have already completed signing
+                    if signer["status"].lower() == "completed":
+                        continue
+                    # Query the CustomUser model for store and role
+                    try:
+                        user = CustomUser.objects.get(email=signer["email"])
+                        store = user.store.number if user.store else "No Store Assigned"
+                        store_address = user.store.address if user.store else "No Address Available"
+                        role = user.groups.first().name if user.groups.exists() else "No Role Assigned"
+                        print(store, role)
+                    except CustomUser.DoesNotExist:
+                        store = "User Not Found"
+                        store_address = "Address Not Found"
+                        role = "Role Not Found"
+
+                    # Add signer information along with store and role
+                    serialized_signers.append(
+                        {
+                            "name": signer["name"],
+                            "email": signer["email"],
+                            "status": signer["status"],
+                            "store": store,
+                            "address": store_address,
+                            "role": role,
+                        }
+                    )
+
+            else:
+                primary_recipient_name = "Unknown Recipient"
+                serialized_signers = []
+
+            # Append the serialized envelope data
             serialized_envelopes.append(
                 {
                     "template_name": envelope["template_name"],
@@ -155,6 +206,7 @@ def get_outstanding_docs():
             logger.info("No outstanding envelopes found.")
 
         return serialized_envelopes
+
     except Exception as e:
         # Log any errors that occur during the task execution
         logger.error(f"Error occurred in get_outstanding_docs task: {e}", exc_info=True)
