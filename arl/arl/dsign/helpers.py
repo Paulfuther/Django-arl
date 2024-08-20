@@ -403,7 +403,7 @@ def get_waiting_for_others_envelopes():
         envelopes_api = EnvelopesApi(api_client)
 
         # Fetch envelopes created in the last 60 days
-        from_date = (datetime.utcnow() - timedelta(days=100)).isoformat() + "Z"
+        from_date = (datetime.utcnow() - timedelta(days=60)).isoformat() + "Z"
         envelopes_list = envelopes_api.list_status_changes(
             account_id=account_id, from_date=from_date
         )
@@ -415,11 +415,31 @@ def get_waiting_for_others_envelopes():
                 recipients = envelopes_api.list_recipients(
                     account_id, envelope.envelope_id
                 )
-                outstanding_signers = [
-                    signer
-                    for signer in recipients.signers
-                    if signer.status in ["sent", "delivered"]
-                ]
+                # Initialize a list to hold all signers for the current envelope
+                outstanding_signers = []
+
+                # Iterate over all signers and add them to the outstanding_signers list
+                for signer in recipients.signers:
+                    signer_info = {
+                        "name": signer.name,
+                        "email": signer.email,
+                        "status": signer.status,
+                        "recipient_id": signer.recipient_id,
+                        "routing_order": signer.routing_order
+                    }
+                    outstanding_signers.append(signer_info)
+
+                    # Print out the signer's information
+                    print(f"Signer Name: {signer.name}")
+                    print(f"Signer Email: {signer.email}")
+                    print(f"Signer Status: {signer.status}")
+                    print(f"Signer Recipient ID: {signer.recipient_id}")
+                    print(f"Signer Routing Order: {signer.routing_order}")
+                    print("-------------------")
+
+                # Serialize the list of signers to JSON
+                # serialized_signers = json.dumps(outstanding_signers)
+                # print(f"Serialized Signers for envelope {envelope.envelope_id}: {serialized_signers}")
 
                 # Retrieve the template name
                 template_name = (
