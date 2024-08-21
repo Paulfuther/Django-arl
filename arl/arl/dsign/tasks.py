@@ -74,11 +74,18 @@ def check_outstanding_envelopes_task():
 
     for envelope in outstanding_envelopes:
         sent_date_time = parse_sent_date_time(envelope["sent_date_time"])
-        if now - sent_date_time >= timedelta(hours=48):
+        if now - sent_date_time >= timedelta(hours=0):
             # Check if there are any signers
             if envelope["signers"]:
                 # Assuming the primary recipient is the first signer
                 primary_recipient_name = envelope["signers"][0]["name"]
+                # Retrieve the store manager for the primary recipient
+                try:
+                    primary_recipient_email = envelope["signers"][0]["email"]
+                    user = CustomUser.objects.get(email=primary_recipient_email)
+                    store_manager = user.store.manager if user.store and user.store.manager else "No Manager Assigned"
+                except CustomUser.DoesNotExist:
+                    store_manager = "Manager Not Found"
 
                 # Prepare a detailed list of outstanding signers with their role, store, and address
                 outstanding_signers_info = []
@@ -90,10 +97,12 @@ def check_outstanding_envelopes_task():
                             store_name = user.store.number if user.store else "No Store Assigned"
                             store_address = user.store.address if user.store else "No Address Available"
                             role = user.groups.first().name if user.groups.exists() else "No Role Assigned"
+                            
                         except CustomUser.DoesNotExist:
                             store_name = "User Not Found"
                             store_address = "Address Not Found"
                             role = "Role Not Found"
+                            
 
                         signer_info = (
                             f"Name: {signer['name']}\n"
@@ -101,6 +110,7 @@ def check_outstanding_envelopes_task():
                             f"Role: {role}\n"
                             f"Store: {store_name}\n"
                             f"Address: {store_address}\n"
+                            
                         )
                         outstanding_signers_info.append(signer_info)
 
@@ -111,12 +121,14 @@ def check_outstanding_envelopes_task():
                 )
             else:
                 primary_recipient_name = "Unknown Recipient"
+                store_manager = "Manager Not Found"
                 signer_list = "No signers available"
 
             # Add to the list of behind documents with detailed signer information
             behind_docs.append(
                 f"Document: {envelope['template_name']}\n"
                 f"Sent to: {primary_recipient_name}\n"
+                f"Manager: {store_manager}\n"
                 f"Outstanding Signers:\n{signer_list}"
             )
 
