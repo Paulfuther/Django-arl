@@ -285,6 +285,10 @@ class FetchTwilioCallsView(LoginRequiredMixin, UserPassesTestMixin, TemplateView
                 "store_number": (
                     store_number if store_number else "Unknown Store Number"
                 ),
+                "status": (
+                    call.status
+                ),
+                
                 # Add more fields as needed
             }
             truncated_calls.append(call_data)
