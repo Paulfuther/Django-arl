@@ -29,18 +29,20 @@
                 <thead>
                     <tr>
                         <th>Date</th>
-                        <th>Time</th>
                         <th>To</th>
-                        <th>Name</th>
+                        <th>Status</th>
+                        <th>Time</th>
+                        <th>Number</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for sms in call_data %}
                     <tr>
                         <td>{{ sms.date_created|date:"Y-m-d" }}</td>
+                        <td>{{ sms.store_number}}</td>
+                        <td>{{ sms.status }}</td>
                         <td>{{ sms.date_created|date:"H:i" }}</td>
                         <td>{{ sms.to }}</td>
-                        <td>{{ sms.store_number}}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
