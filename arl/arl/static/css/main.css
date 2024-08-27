@@ -109,6 +109,56 @@
 }
 
 
+.quiz-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    background-color: #f9f9f9;
+}
+
+.quiz-container h3 {
+    margin-bottom: 10px;
+    font-size: 1.2em;
+}
+
+.question {
+    margin-bottom: 20px;
+    padding: 10px;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.question label {
+    display: block;
+    padding: 5px 0;
+    cursor: pointer;
+}
+
+.question input[type="radio"] {
+    margin-right: 10px;
+}
+
+.submit-button {
+    text-align: center;
+}
+
+.submit-button button {
+    padding: 10px 20px;
+    font-size: 1em;
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.submit-button button:hover {
+    background-color: #0056b3;
+}
+
 @media only screen and (max-width: 768px) {
 
     .infscroll h1 {

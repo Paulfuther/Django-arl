@@ -19,32 +19,22 @@ from django.utils.text import slugify
 
 from arl.celery import app
 from arl.dbox.helpers import upload_incident_file_to_dropbox
-from arl.dsign.helpers import (
-    create_docusign_envelope,
-    create_docusign_envelope_new_hire_quiz,
-    get_docusign_envelope,
-    get_docusign_envelope_quiz,
-    get_docusign_template_name_from_template,
-    get_template_id,
-)
+from arl.dsign.helpers import (create_docusign_envelope,
+                               create_docusign_envelope_new_hire_quiz,
+                               get_docusign_envelope,
+                               get_docusign_envelope_quiz,
+                               get_docusign_template_name_from_template,
+                               get_template_id)
 from arl.dsign.models import DocuSignTemplate, ProcessedDocsignDocument
-from arl.helpers import (
-    get_s3_images_for_incident,
-    remove_old_backups,
-    upload_to_linode_object_storage,
-)
+from arl.helpers import (get_s3_images_for_incident, remove_old_backups,
+                         upload_to_linode_object_storage)
 from arl.incident.models import Incident
-from arl.msg.helpers import (
-    create_email,
-    create_hr_newhire_email,
-    create_incident_file_email,
-    create_incident_file_email_by_rule,
-    create_single_email,
-    create_tobacco_email,
-    send_bulk_sms,
-    send_monthly_store_phonecall,
-    send_sms_model,
-)
+from arl.msg.helpers import (create_email, create_hr_newhire_email,
+                             create_incident_file_email,
+                             create_incident_file_email_by_rule,
+                             create_single_email, create_tobacco_email,
+                             send_bulk_sms, send_monthly_store_phonecall,
+                             send_sms_model)
 from arl.msg.models import EmailEvent, EmailTemplate, SmsLog
 from arl.user.models import CustomUser, Employer, Store, UserManager
 
@@ -132,7 +122,32 @@ def send_bulk_sms_task():
         active_users = CustomUser.objects.filter(is_active=True)
         gsat = [user.phone_number for user in active_users]
         message = (
-            "Required Action Policy for Tobacco and Vape Products WHAT IS REQUIRED? You must request ID from anyone purchasing tobacco or vape products, who looks to be younger than 40. WHY? It is against the law to sell tobacco or vape products to minors. A person who distributes tobacco or vape products to a minor is guilty of an offence, and could be punished with: Loss of employment. Face personal fines of $4,000 to $100,000. Loss of license to sell tobacco and vape products, as well as face additional fines of $10,000 to $150,000. (for the Associate) WHO? Each and every Guest that wants to buy tobacco products. REQUIRED Guests that look under the age of 40 are asked for (picture) I.D. when purchasing tobacco products. Ask for (picture) I.D. if they look under 40 before quoting the price of tobacco products. Ask for (picture) I.D. if they look under 40 before placing tobacco products on the counter. Dont let an angry Guest stop you from asking for (picture) I.D. ITs THE LAW! I.D. Drivers license Passport Certificate of Canadian Citizenship Canadian permanent resident card Canadian Armed Forces I.D. card Any documents issued by a federal or provincial authority or a foreign government that contain a photo, date of birth and signature are also acceptable. IMPORTANT - School I.D. cannot be accepted as proof of age. EXPECTED RESULTS. No employee is charged with selling tobacco products to a minor. Employees always remember to ask for I.D. No Employee receives a warning letter about selling to a minor.",
+            "Required Action Policy for Tobacco and Vape Products WHAT IS "
+            "REQUIRED? You must request ID from anyone purchasing tobacco "
+            "or vape products, who looks to be younger than 40. WHY? It is "
+            "against the law to sell tobacco or vape products to minors. "
+            "A person who distributes tobacco or vape products to a minor "
+            "is guilty of an offence, and could be punished with: Loss of "
+            "employment. Face personal fines of $4,000 to $100,000. Loss of "
+            "license to sell tobacco and vape products, as well as face "
+            "additional fines of $10,000 to $150,000. (for the Associate) "
+            "WHO? Each and every Guest that wants to buy tobacco products. "
+            "REQUIRED Guests that look under the age of 40 are asked for "
+            "(picture) I.D. when purchasing tobacco products. Ask for "
+            "(picture) I.D. if they look under 40 before quoting the price "
+            "of tobacco products. Ask for (picture) I.D. if they look under "
+            "40 before placing tobacco products on the counter. Dont let an "
+            "angry Guest stop you from asking for (picture) I.D. "
+            "ITs THE LAW! I.D. Drivers license Passport Certificate of "
+            "Canadian Citizenship Canadian permanent resident card "
+            "Canadian Armed Forces I.D. card Any documents issued by a "
+            "federal or provincial authority or a foreign government that"
+            "contain a photo, date of birth and signature are also "
+            "acceptable. IMPORTANT - School I.D. cannot be accepted as "
+            "proof of age. EXPECTED RESULTS. No employee is charged with "
+            "selling tobacco products to a minor. Employees always remember "
+            "to ask for I.D. No Employee receives a warning letter about "
+            "selling to a minor.",
         )
         send_bulk_sms(gsat, message)
         # Log the result
@@ -204,17 +219,23 @@ def generate_pdf_task(incident_id):
         #  Create a BytesIO object to store the PDF content
         pdf_buffer = BytesIO(pdf)
         # Create a unique file name for the PDF
-        store_number = incident.store.number  # Replace with your actual 
+        store_number = incident.store.number  # Replace with your actual
         # attribute name
         brief_description = incident.brief_description
-        # Create a unique file name for the PDF using store number and brief 
-        # # description
-        pdf_filename = f"{store_number}_{slugify(brief_description)}_report.pdf"
+        # Create a unique file name for the PDF using store number and brief
+        # description
+        pdf_filename = (
+            f"{store_number}_{slugify(brief_description)}"
+            f"_report.pdf"
+        )
 
         # Close the BytesIO buffer to free up resources
         # Set the BytesIO buffer's position to the beginning
         # Upload the PDF to Linode Object Storage
-        object_key = f"SITEINCIDENT/{incident.user_employer}/INCIDENTPDF/{pdf_filename}"
+        object_key = (
+            f"SITEINCIDENT/{incident.user_employer}/INCIDENTPDF/"
+            f"{pdf_filename}"
+        )
         upload_to_linode_object_storage(pdf_buffer, object_key)
 
         # Upload the PDF to Dropbox
@@ -227,7 +248,10 @@ def generate_pdf_task(incident_id):
         # the group incident_form_email
 
         subject = "A New Incident Report Has Been Created"
-        body = "Thank you for using our services. Attached is your incident report."
+        body = (
+            "Thank you for using our services. Attached "
+            "is your incident report."
+        )
         # attachment_data = pdf_buffer.getvalue()
 
         # Call the create_incident_file_email_by_rule
@@ -261,14 +285,18 @@ def generate_pdf_email_to_user_task(incident_id, user_email):
         try:
             incident = Incident.objects.get(pk=incident_id)
         except ObjectDoesNotExist:
-            raise ValueError("Incident with ID {} does not exist.".format(incident_id))
+            raise ValueError(
+                "Incident with ID {} does not exist.".format(incident_id)
+            )
 
         # get images, if there are any, from the s3 bucket
         images = get_s3_images_for_incident(
             incident.image_folder, incident.user_employer
         )
         context = {"incident": incident, "images": images}
-        html_content = render_to_string("incident/incident_form_pdf.html", context)
+        html_content = render_to_string(
+            "incident/incident_form_pdf.html", context
+            )
         #  Generate the PDF using pdfkit
         options = {
             "enable-local-file-access": None,
@@ -280,21 +308,28 @@ def generate_pdf_email_to_user_task(incident_id, user_email):
         #  Create a BytesIO object to store the PDF content
         pdf_buffer = BytesIO(pdf)
         # Create a unique file name for the PDF
-        store_number = incident.store.number  # Replace with your actual attribute name
+        store_number = incident.store.number
+        # Replace with your actual attribute name
         brief_description = incident.brief_description
-        # Create a unique file name for the PDF using store number and brief description
-        pdf_filename = f"{store_number}_{slugify(brief_description)}_report.pdf"
+        # Create a unique file name for the PDF
+        # using store number and brief description
+        pdf_filename = (
+            f"{store_number}_{slugify(brief_description)}"
+            f"_report.pdf"
+        )
 
         # Close the BytesIO buffer to free up resources
         # Then email to the current user
 
         subject = f"Your Incident Report {pdf_filename}"
-        body = "Thank you for using our services. Attached is your incident report."
+        body = "Thank you for using our services. "
+        "Attached is your incident report."
         # attachment_data = pdf_buffer.getvalue()
 
         # Call the create_single_email function with
         # user_email and other details
-        create_incident_file_email(user_email, subject, body, pdf_buffer, pdf_filename)
+        create_incident_file_email(user_email, subject, body,
+                                   pdf_buffer, pdf_filename)
         # create_single_email(user_email, subject, body, pdf_buffer)
 
         return {
@@ -314,25 +349,41 @@ def create_docusign_envelope_task(envelope_args):
         create_docusign_envelope(envelope_args)
 
         logger.info(
-            f"Docusign envelope New Hire File for {signer_name} created successfully"
+            f"Docusign envelope New Hire File for {signer_name} "
+            "created successfully"
         )
-        return f"Docusign envelope New Hire File for {signer_name} created successfully"
+        return (
+            f"Docusign envelope New Hire File for {signer_name} "
+            "created successfully"
+        )
+
     except Exception as e:
         logger.error(
-            f"Error creating Docusign envelope New Hire File for {signer_name}: {str(e)}"
+            f"Error creating Docusign envelope New Hire File for "
+            f"{signer_name}: {str(e)}"
         )
-        return f"Error creating Docusign envelope New Hire File for {signer_name}: {str(e)}"
+        return (
+            f"Error creating Docusign envelope New Hire File for "
+            f"{signer_name}: {str(e)}"
+        )
 
 
 @app.task(name="create_hr_newhire_email")
 def create_newhire_data_email(**email_data):
     try:
         create_hr_newhire_email(**email_data)
-        logger.info(f"New hire email created successfully for {email_data['email']}")
-        return f"New hire email for {email_data['firstname']} - {email_data['lastname']} created successfully"
+        logger.info(
+            f"New hire email created successfully for "
+            f"{email_data['email']}"
+        )
+        return (
+            f"New hire email for {email_data['firstname']} - "
+            f"{email_data['lastname']} created successfully"
+        )
     except Exception as e:
         logger.error(
-            f"Error creating new hire email for {email_data['email']}: {str(e)}"
+            f"Error creating new hire email "
+            f"for {email_data['email']}: {str(e)}"
         )
         return f"Error creating new hire email: {str(e)}"
 
@@ -436,22 +487,29 @@ def process_docusign_webhook(payload):
                 full_name = user.get_full_name()
 
                 # print("fullname", full_name)
-                # print(f"{template_name} sent to: {full_name} at {recipient_email}")
+                # print(f"{template_name} sent to:
+                # # {full_name} at {recipient_email}")
                 hr_users = CustomUser.objects.filter(
                     Q(is_active=True) & Q(groups__name="dsign_sms")
                 ).values_list("phone_number", flat=True)
                 message_body = (
-                    f"{template_name} sent to: {full_name} at {recipient_email}"
+                    f"{template_name} sent to: {full_name} at "
+                    f"{recipient_email}"
                 )
                 send_bulk_sms(hr_users, message_body)
                 logger.info(
-                    f"Sent SMS for 'sent' status to HR:{full_name} {message_body}"
+                    f"Sent SMS for 'sent' status to HR:{full_name}"
+                    f" {message_body}"
                 )
-                return f"Sent SMS for 'sent' status to HR: {full_name} {template_name} {message_body}"
+                return (
+                    f"Sent SMS for 'sent' status to HR: {full_name}"
+                    f" {template_name} {message_body}"
+                )
 
             except CustomUser.DoesNotExist:
                 logging.error(
-                    f"User with email {recipient_email} not found in the database."
+                    f"User with email {recipient_email} "
+                    f"not found in the database."
                 )
             except Exception as e:
                 logging.error(f"Error processing recipient data: {e}")
@@ -460,7 +518,8 @@ def process_docusign_webhook(payload):
         # Check if the document is a Standard Release and exit if it is
         if "Standard Release" in template_name:
             print(
-                f"Processed Standard Release for {recipient_email}, no further action."
+                f"Processed Standard Release for {recipient_email}"
+                f", no further action."
             )
             return
 
@@ -487,7 +546,8 @@ def process_docusign_webhook(payload):
             if not already_completed:
                 # Record this file to the db
                 ProcessedDocsignDocument.objects.create(
-                    user=user, envelope_id=template_id, template_name=template_name
+                    user=user, envelope_id=template_id,
+                    template_name=template_name
                 )
                 # Logic to send another file called New Hire Quiz
                 # The quiz is not sent here.
@@ -507,13 +567,18 @@ def process_docusign_webhook(payload):
             ).values_list("phone_number", flat=True)
 
             message_body = (
-                f"{template_name} completed by: {full_name} at {recipient_email}"
+                f"{template_name} completed by: {full_name} "
+                f"at {recipient_email}"
             )
             send_bulk_sms(hr_users, message_body)
             logger.info(
-                f"Sent SMS for 'completed' status to HR: {full_name} {message_body}"
+                f"Sent SMS for 'completed' status to HR: {full_name} "
+                f"{message_body}"
             )
-            return f"Sent SMS for 'completed' status to HR: {full_name} {template_name} {message_body}"
+            return (
+                f"Sent SMS for 'completed' status to HR: "
+                f"{full_name} {template_name} {message_body}"
+            )
         else:
             # Record the completed non-new-hire file in
             # ProcessedDocsignDocument
@@ -528,13 +593,18 @@ def process_docusign_webhook(payload):
                 Q(is_active=True) & Q(groups__name="dsign_sms")
             ).values_list("phone_number", flat=True)
             message_body = (
-                f"{template_name} completed by: {full_name} at {recipient_email}"
+                f"{template_name} completed by: {full_name} "
+                f"at {recipient_email}"
             )
             send_bulk_sms(hr_users, message_body)
             logger.info(
-                f"Sent SMS for 'completed' status to HR:{full_name} {message_body}"
+                f"Sent SMS for 'completed' status to HR:{full_name}"
+                f" {message_body}"
             )
-            return f"Sent SMS for 'completed' status to HR: {full_name} {template_name} {message_body}"
+            return (
+                f"Sent SMS for 'completed' status to HR: {full_name} "
+                f"{template_name} {message_body}"
+            )
 
     print("Done.")
 
@@ -562,7 +632,10 @@ def create_db_backup_and_upload():
         object_key = f"POSTGRES/postgres_{current_date}.sql"
         upload_to_linode_object_storage(in_memory_backup, object_key)
         remove_old_backups()
-        return f"Database backup created and uploaded successfully: {object_key}"
+        return (
+            f"Database backup created and uploaded successfully: "
+            f"{object_key}"
+        )
 
     except subprocess.CalledProcessError as e:
         print(f"An error occurred during backup or upload: {e}")
@@ -638,7 +711,8 @@ def save_user_to_db(**kwargs):
         dob_isoformat = kwargs.get("dob")
         manager_id = kwargs.get("manager_id")
         # Deserialize the data if needed
-        # Convert employer_pk, manager_dropdown_pk, and dob_isoformat back to their original types
+        # Convert employer_pk, manager_dropdown_pk, and dob_isoformat back
+        # to their original types
         # Perform the necessary processing with the data
         # Update UserManager with user and manager, etc.
         # Example:
@@ -647,7 +721,8 @@ def save_user_to_db(**kwargs):
         user.manager = CustomUser.objects.get(pk=manager_dropdown_pk)
         user.dob = datetime.strptime(dob_isoformat, "%Y-%m-%d").date()
         user.save()
-        # Create a new UserManager object to associate the user with the manager
+        # Create a new UserManager object to associate
+        # the user with the manager
         UserManager.objects.create(user=user, manager_id=manager_id)
     except Exception as e:
         # Handle any exceptions that may occur during database save
@@ -660,12 +735,20 @@ def send_new_hire_quiz(envelope_args):
         create_docusign_envelope_new_hire_quiz(envelope_args)
         signer_name = envelope_args.get("signer_name")
         logger.info(
-            f"Docusign envelope New Hire Quiz for {signer_name} created successfully"
+            f"Docusign envelope New Hire Quiz for {signer_name} "
+            f"created successfully"
         )
 
-        return f"Docusign envelope New Hire Quiz for {signer_name} created successfully"
+        return (
+            f"Docusign envelope New Hire Quiz for {signer_name} "
+            f"created successfully"
+        )
     except Exception as e:
         logger.error(
-            f"Error creating Docusign New Hire Quiz for {signer_name} envelope: {str(e)}"
+            f"Error creating Docusign New Hire Quiz for {signer_name} "
+            f"envelope: {str(e)}"
         )
-        return f"Error creating Docusign New Hire Quiz for {signer_name} envelope: {str(e)}"
+        return (
+            f"Error creating Docusign New Hire Quiz for {signer_name}"
+            f"envelope: {str(e)}"
+        )

@@ -1,0 +1,48 @@
+{% extends "../base/base.html" %}
+{% block title %}Index{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Take Quiz</title>
+    <!-- Link to main.css -->
+    <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}">
+</head>
+
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+            <legend>{{ quiz.title }}</legend>
+            <p>{{ quiz.description }}</p>
+
+            <form method="post">
+                {% csrf_token %}
+                {% for question in questions %}
+                    <div class="question">
+                        <legend>{{ question.text }}</legend>
+                        <label>
+                            <input type="radio" name="question_{{ question.id }}" value="yes" required>
+                            Yes
+                        </label>
+                        <label>
+                            <input type="radio" name="question_{{ question.id }}" value="no" required>
+                            No
+                        </label>
+                    </div>
+                {% endfor %}
+                <div class="submit-button">
+                    <button type="submit">Submit Quiz</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+{% endblock %}
