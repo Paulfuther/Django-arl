@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from django.utils.html import format_html
 from import_export import fields
 from import_export import fields as export_fields
 from import_export import resources
@@ -7,17 +8,19 @@ from import_export.admin import ExportActionMixin
 
 from arl.dsign.models import DocuSignTemplate, ProcessedDocsignDocument
 from arl.incident.models import Incident
-from arl.msg.models import (
-    BulkEmailSendgrid,
-    EmailTemplate,
-    Twimlmessages,
-    UserConsent,
-    WhatsAppTemplate,
-)
+from arl.msg.models import (BulkEmailSendgrid, EmailTemplate, Twimlmessages,
+                            UserConsent, WhatsAppTemplate)
+from arl.quiz.models import Answer, Question, Quiz
 
-from .models import CustomUser, Employer, Store, UserManager
+from .models import (CustomUser, Employer, ExternalRecipient, Store,
+                     UserManager)
 
 # fields = list(UserAdmin.fieldsets)
+
+
+class ExternalRecipientAdmin(admin.ModelAdmin):
+    list_display = ('first_name', 'last_name', 'company', 'email', 'group')
+    search_fields = ('first_name', 'last_name', 'company', 'email', 'group__name')
 
 
 class UserResource(resources.ModelResource):
@@ -49,7 +52,8 @@ class UserResource(resources.ModelResource):
         )
 
     def dehydrate_manager(self, custom_user):
-        # Assuming a reverse ForeignKey from UserManager to CustomUser as 'managed_users'
+        # Assuming a reverse ForeignKey from
+        # UserManager to CustomUser as 'managed_users'
         user_manager = UserManager.objects.filter(user=custom_user).first()
         return (
             user_manager.manager.username
@@ -97,7 +101,8 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
     get_groups.short_description = "Groups"
 
     def get_consent(self, obj):
-        consent = UserConsent.objects.filter(user=obj, consent_type="WhatsApp").first()
+        consent = UserConsent.objects.filter(user=obj,
+                                             consent_type="WhatsApp").first()
         return "Granted" if consent and consent.is_granted else "Not Granted"
 
     get_consent.short_description = "WhatsApp Consent"
@@ -185,7 +190,8 @@ class UserManagerAdmin(admin.ModelAdmin):
 
 @admin.register(UserConsent)
 class UserConsentAdmin(admin.ModelAdmin):
-    list_display = ("user", "consent_type", "is_granted", "granted_on", "revoked_on")
+    list_display = ("user", "consent_type", "is_granted", "granted_on",
+                    "revoked_on")
     list_filter = ("consent_type", "is_granted")
     search_fields = ("user__username",)
 
@@ -195,7 +201,59 @@ class StoreAdmin(admin.ModelAdmin):
     search_fields = ("number", "employer__name", "manager__username")
 
 
+class AnswerInline(admin.TabularInline):
+    model = Answer
+    extra = 1  # Allow adding one extra answer by default
+    fields = ['text', 'is_correct']
+
+
+class QuestionInline(admin.StackedInline):
+    model = Question
+    extra = 1  # Allow adding one extra question by default
+    # Do not attempt to nest inlines here; just show questions.
+
+
+class QuizAdmin(admin.ModelAdmin):
+    inlines = [QuestionInline]
+    # Display questions inline within the Quiz admin view
+    list_display = ('title', 'description')
+    # Display quiz title and description in the list view
+
+    def get_queryset(self, request):
+        # Preload related questions and answers to avoid multiple database hits
+        return (super().get_queryset(request).
+                prefetch_related('questions__answers'))
+
+    def view_questions_and_answers(self, obj):
+        # Display questions and their answers as a
+        # read-only field in the list view
+        questions = obj.questions.all()
+        html = ""
+        for question in questions:
+            html += f"<strong>{question.text}</strong><br>"
+            answers = question.answers.all()
+            for answer in answers:
+                html += f"&nbsp;&nbsp;- {answer.text} "
+                f"{'(Correct)' if answer.is_correct else ''}<br>"
+        return format_html(html)
+
+    view_questions_and_answers.short_description = 'Questions and Answers'
+
+
+class QuestionAdmin(admin.ModelAdmin):
+    inlines = [AnswerInline]  # Include AnswerInline in the QuestionAdmin
+    list_display = ('text', 'quiz', 'display_answers')
+    # Display the question text, quiz, and answers
+
+    def display_answers(self, obj):
+        answers = obj.answers.all()
+        return [f"{answer.text} " for answer in answers]
+
+    display_answers.short_description = 'Answers'
+
 # UserAdmin.fieldsets = tuple(fields)
+
+
 admin.site.register(Employer)
 admin.site.register(Twimlmessages)
 admin.site.register(BulkEmailSendgrid)
@@ -207,3 +265,9 @@ admin.site.register(ProcessedDocsignDocument)
 admin.site.register(CustomUser, CustomUserAdmin)
 # admin.site.register(UserManager)
 admin.site.register(WhatsAppTemplate)
+admin.site.register(Quiz, QuizAdmin)
+# admin.site.register(Question)
+admin.site.register(Answer)
+admin.site.register(Question, QuestionAdmin)
+admin.site.register(ExternalRecipient, ExternalRecipientAdmin)
+

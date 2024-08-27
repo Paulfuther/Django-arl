@@ -1,4 +1,4 @@
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, Group
 from django.core.validators import (
     MaxLengthValidator,
     MinLengthValidator,
@@ -101,7 +101,8 @@ class CustomUser(AbstractUser):
 
 
 class UserManager(models.Model):
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='user_manager_profile')
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE,
+                                related_name='user_manager_profile')
     manager = models.ForeignKey(
         CustomUser, on_delete=models.CASCADE, related_name="managed_users"
     )
@@ -116,3 +117,18 @@ class ErrorLog(models.Model):
     method = models.CharField(max_length=10)
     status_code = models.IntegerField()
     error_message = models.TextField()
+
+
+class ExternalRecipient(models.Model):
+    first_name = models.CharField(max_length=50, blank=True, null=True)
+    last_name = models.CharField(max_length=50, blank=True, null=True)
+    company = models.CharField(max_length=100, blank=True, null=True)
+    email = models.EmailField(unique=True)
+    group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name} - {self.email}"
+
+    @property
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}".strip()

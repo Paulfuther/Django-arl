@@ -1,0 +1,24 @@
+{% extends "../base/base.html" %}
+{% block title %}Quiz List{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+
+
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+            <legend>Select a Quiz</legend>
+            <ul class="list-group">
+                {% for quiz in quizzes %}
+                    <li class="list-group-item">
+                        <a href="{% url 'take_quiz' quiz.id %}">{{ quiz.title }}</a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

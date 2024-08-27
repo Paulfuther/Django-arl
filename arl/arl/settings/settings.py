@@ -25,6 +25,24 @@ ADMINS = [
     # Add more admins if needed
 ]
 
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': os.path.join(BASE_DIR, 'django_debug.log'),
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['file'],
+            'level': 'ERROR',
+            'propagate': True,
+        },
+    },
+ }
 
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
@@ -43,6 +61,7 @@ INSTALLED_APPS = [
     "crispy_forms",
     "crispy_bootstrap4",
     "arl.msg",
+    "arl.quiz",
     "django_celery_results",
     "django_countries",
     "import_export",
@@ -52,6 +71,7 @@ INSTALLED_APPS = [
     "arl.dbox",
     "arl.incident",
     "arl.bucket",
+    
 ]
 
 
