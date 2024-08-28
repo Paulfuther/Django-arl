@@ -189,7 +189,7 @@ def generate_major_incident_pdf_from_list_task(incident_id, user_email):
         # Close the BytesIO buffer to free up resources
         # Then email to the current user
 
-        subject = f"Your Incident Report {pdf_filename}"
+        subject = f"Your Major Incident Report {pdf_filename}"
         body = "Thank you for using our services. "
         "Attached is your incident report."
         # attachment_data = pdf_buffer.getvalue()
