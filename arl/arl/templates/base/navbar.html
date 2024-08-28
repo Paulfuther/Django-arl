@@ -33,7 +33,15 @@
         <li class="nav-item">
           <a class="nav-link" href="{% url 'incident_list' %}">View/Edit Incident Form</a>
         </li>
-
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'create_major_incident' %}">Create Major Inc. Form</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'major_incident_list' %}">List Major Inc. Form</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'quiz_list' %}">Quiz</a>
+        </li>
         {% if user.is_comms %}
         <li class="nav-item">
           <a class="nav-link" href="{% url 'comms' %}">Comms</a>
@@ -48,27 +56,19 @@
           <a class="nav-link" href="{% url 'waiting_for_others' %}">Outstanding Docs</a>
         </li>
         {% endif %}
-        
+
         {% if user.is_staff %}
         <li class="nav-item">
           <a class="nav-link" href="{% url 'admin:index' %}">Admin</a>
         </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'quiz_list' %}">Quiz</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'create_major_incident' %}">Create Major Inc.</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'major_incident_list' %}">List Major Inc.</a>
-        </li>
+
         {% endif %}
         {% else %}
         <li class="nav-item">
           <a class="nav-link" href="{% url 'login' %}">Login</a>
         </li>
         {% endif %}
-       
+
       </ul>
     </div>
   </div>

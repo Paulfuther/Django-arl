@@ -162,12 +162,15 @@
 
 .custom-section {
     padding: 20px;
-    margin-bottom: 20px;
-    margin-top: 20px;
+    margin: 20px auto; /* Center the section and adjust margins */
     background-color: #f8f9fa; /* Light gray background */
     border: 1px solid #ddd;
     border-radius: 5px;
+    max-width: 100%; /* Ensure the section doesn’t exceed the screen width */
+    box-sizing: border-box; /* Include padding and border in the element's total width */
 }
+
+/* Existing media query */
 @media only screen and (max-width: 768px) {
 
     .infscroll h1 {
@@ -179,5 +182,12 @@
     .infscroll-date {
         font-size: 0.0123rem;
     }
+}
 
+/* Additional media query for better responsiveness */
+@media only screen and (max-width: 600px) {
+    .custom-section {
+        padding: 10px; /* Reduce padding on smaller screens */
+        margin: 10px;  /* Reduce margins on smaller screens */
+    }
 }
