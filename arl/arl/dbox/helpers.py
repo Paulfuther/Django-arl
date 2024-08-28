@@ -91,6 +91,27 @@ def upload_incident_file_to_dropbox(file_content, file_name):
         return False, f"Error: {str(e)}"
 
 
+def upload_major_incident_file_to_dropbox(file_content, file_name):
+    try:
+        new_access_token = generate_new_access_token()
+        if new_access_token:
+            dbx = dropbox.Dropbox(new_access_token)
+            # Upload the file content to Dropbox
+            dbx.files_upload(
+                file_content, f"/MAJORSITEINCIDENTS/{file_name}",
+                mode=WriteMode("overwrite")
+            )
+            return True, f"Uploaded file: {file_name} to Dropbox."
+        else:
+            return False, "Refresh token not found in .env file."
+    except dropbox.exceptions.ApiError as e:
+        logging.error(f"Dropbox API Error: {str(e)}")
+        return False, f"Dropbox API Error: {str(e)}"
+    except Exception as e:
+        logging.error(f"Error: {str(e)}")
+        return False, f"Error: {str(e)}"
+
+
 def upload_to_dropbox_quiz(uploaded_file):
     # This uploads a completed new hire quiz
     # to dropbox in the folder NEWHIREQUIZ

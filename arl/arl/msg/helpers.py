@@ -347,7 +347,8 @@ def create_incident_file_email_by_rule(
             )
             print(to_email)
             if attachment_buffer and attachment_filename:
-                attachment_buffer.seek(0)  # Ensure the buffer is at the beginning
+                attachment_buffer.seek(0)  
+                # Ensure the buffer is at the beginning
                 attachment_content = base64.b64encode(attachment_buffer.read()).decode()
                 attachment = Attachment()
                 attachment.file_content = FileContent(attachment_content)

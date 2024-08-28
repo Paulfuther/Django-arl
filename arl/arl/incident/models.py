@@ -101,3 +101,78 @@ class Incident(models.Model):
 
     def __str__(self):
         return f"Incident {self.pk}"
+
+
+class MajorIncident(models.Model):
+    brief_description = models.CharField(max_length=60, default='')
+    robbery = models.BooleanField(default=False)
+    breakandenter = models.BooleanField(default=False)
+    assault = models.BooleanField(default=False)
+    bombthreat = models.BooleanField(default=False)
+    majorfireorexplosion = models.BooleanField(default=False)
+    fatality = models.BooleanField(default=False)
+    criticalinjury = models.BooleanField(default=False)
+
+    store = models.ForeignKey(Store, on_delete=models.CASCADE,
+                              related_name='majorincidents')
+    policeagency = models.CharField(max_length=60, default='', blank=True)
+    officerdetails = models.TextField(blank=True)
+    eventdate = models.DateField(null=True)
+    eventtime = models.TimeField(null=True)
+    reportedby = models.CharField(max_length=255, blank=True)
+    policefilenumber = models.CharField(max_length=255, blank=True)
+    policecalledyes = models.BooleanField(default=False)
+    policecalledno = models.BooleanField(default=False)
+    policeattendyes = models.BooleanField(default=False)
+    policeattendno = models.BooleanField(default=False)
+
+    gsoccalledyes = models.BooleanField(default=False)
+    gsoccalledno = models.BooleanField(default=False)
+
+    stolencash = models.BooleanField(default=False)
+    stolcash = models.CharField(blank=True)
+    stolencards = models.BooleanField(default=False)
+    stolcards = models.CharField(blank=True)
+    stolentobacco = models.BooleanField(default=False)
+    stoltobacco = models.CharField(blank=True)
+    stolenlottery = models.BooleanField(default=False)
+    stollottery = models.CharField(blank=True)
+    stolenother = models.BooleanField(default=False)
+    stolother = models.CharField(blank=True)
+    stolenothervalue = models.CharField(blank=True)
+    stolenna = models.BooleanField(default=False)
+
+    damagetoproperty = models.TextField(blank=True)
+
+    gender = models.CharField(max_length=255, blank=True)
+    age = models.CharField(max_length=255, blank=True)
+    height = models.CharField(max_length=255, blank=True)
+    weight = models.CharField(max_length=255, blank=True)
+    haircolor = models.CharField(max_length=255, blank=True)
+    haircut = models.CharField(max_length=255, blank=True)
+    complexion = models.CharField(max_length=255, blank=True)
+    beardmoustache = models.CharField(max_length=255, blank=True)
+    eyeeyeglasses = models.CharField(max_length=255, blank=True)
+    licencenumber = models.CharField(max_length=255, blank=True)
+    makemodel = models.CharField(max_length=255, blank=True)
+    color = models.CharField(max_length=255, blank=True)
+    scars = models.CharField(max_length=255, blank=True)
+    tatoos = models.CharField(max_length=255, blank=True)
+    hat = models.CharField(max_length=255, blank=True)
+    shirt = models.CharField(max_length=255, blank=True)
+    trousers = models.CharField(max_length=255, blank=True)
+    shoes = models.CharField(max_length=255, blank=True)
+    voice = models.CharField(max_length=255, blank=True)
+
+    licenceplatenumber = models.CharField(max_length=255, blank=True)
+    approximateyearmakemodel = models.CharField(max_length=255, blank=True)
+    colour = models.CharField(max_length=255, blank=True)
+    distinguishablefeatures = models.CharField(max_length=255, blank=True)
+    bumpersticker = models.CharField(max_length=255, blank=True)
+    direction = models.CharField(max_length=255, blank=True)
+    damage = models.CharField(max_length=255, blank=True)
+    image_folder = models.CharField(max_length=255, null=True)
+    user_employer = models.ForeignKey(Employer, on_delete=models.SET_NULL, null=True)
+
+    def __str__(self):
+        return f"MajorIncident {self.pk}"

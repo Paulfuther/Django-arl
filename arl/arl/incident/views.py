@@ -1,7 +1,8 @@
 from io import BytesIO
 
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth.mixins import (LoginRequiredMixin,
+                                        PermissionRequiredMixin)
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -13,15 +14,15 @@ from django.views.generic.edit import CreateView, UpdateView
 from django.views.generic.list import ListView
 from PIL import Image
 
-from arl.helpers import get_s3_images_for_incident, upload_to_linode_object_storage
-from arl.tasks import (
-    generate_pdf_email_to_user_task,
-    generate_pdf_task,
-    save_incident_file,
-)
+from arl.helpers import (get_s3_images_for_incident,
+                         upload_to_linode_object_storage)
+from arl.tasks import (generate_pdf_email_to_user_task, generate_pdf_task,
+                       save_incident_file)
 
-from .forms import IncidentForm
-from .models import Incident
+from .forms import IncidentForm, MajorIncidentForm
+from .models import Incident, MajorIncident
+from .tasks import (generate_major_incident_pdf_from_list_task,
+                    generate_major_incident_pdf_task, save_major_incident_file)
 
 
 class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView):
@@ -86,6 +87,77 @@ class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView
         return form_data
 
 
+class MajorIncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView):
+    model = MajorIncident
+    login_url = "/login/"
+    permission_required = "incident.add_major_incident"
+    form_class = MajorIncidentForm
+    template_name = "incident/create_major_incident.html"
+    success_url = reverse_lazy("home")
+    # permission_denied_message = "You are not allowed to add incidents."
+
+    def handle_no_permission(self):
+        # Render the custom 403.html template for permission denial
+        return render(self.request, "incident/403.html", status=403)
+
+    def dispatch(self, request, *args, **kwargs):
+        try:
+            # Your print statement for debugging
+            print("Dispatch method called.")
+            return super().dispatch(request, *args, **kwargs)
+        except Exception as e:
+            print(f"Exception occurred: {e}")
+            raise
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user  # Pass the user to the form
+        return kwargs
+
+    def get(self, request, *args, **kwargs):
+        form = self.form_class(user=self.request.user)
+        return self.render_to_response({"form": form})
+
+    def form_valid(self, form):
+        form.instance.user_employer = self.request.user.employer
+        form_data = self.serialize_form_data(form.cleaned_data)
+
+        # Trigger the Celery task to save form data
+        save_major_incident_file.delay(**form_data)
+
+        messages.success(
+            self.request,
+            "PDF generation started. Check your email. The file is attached.",
+        )
+        return redirect("home")
+
+    def form_invalid(self, form):
+        return self.render_to_response({"form": form})
+
+    def serialize_form_data(self, form_data):
+        # Convert ForeignKey fields to their primary key values
+        form_data["store"] = (
+            form_data["store"].pk
+            if "store" in form_data and form_data["store"] is not None
+            else None
+        )
+        form_data["user_employer"] = (
+            form_data["user_employer"].pk
+            if "user_employer" in form_data and form_data["user_employer"] is not None
+            else None
+        )
+        return form_data
+
+
+@receiver(post_save, sender=MajorIncident)
+def handle_new_major_incident_form_creation(sender, instance, created, **kwargs):
+    if created:
+        try:
+            generate_major_incident_pdf_task.delay(instance.id)
+        except Exception as e:
+            print(f"An error occurred: {e}")
+
+
 @receiver(post_save, sender=Incident)
 def handle_new_incident_form_creation(sender, instance, created, **kwargs):
     if created:
@@ -95,7 +167,8 @@ def handle_new_incident_form_creation(sender, instance, created, **kwargs):
             print(f"An error occurred: {e}")
 
 
-class IncidentUpdateView(PermissionRequiredMixin, LoginRequiredMixin, UpdateView):
+class IncidentUpdateView(PermissionRequiredMixin, LoginRequiredMixin,
+                         UpdateView):
     model = Incident
     login_url = "/login/"
     permission_required = "incident.add_incident"
@@ -135,7 +208,8 @@ class IncidentUpdateView(PermissionRequiredMixin, LoginRequiredMixin, UpdateView
 
         return self.render_to_response(
             self.get_context_data(
-                form=form, existing_images=existing_images, user_employer=employer
+                form=form, existing_images=existing_images,
+                user_employer=employer
             )
         )
 
@@ -152,7 +226,67 @@ class IncidentUpdateView(PermissionRequiredMixin, LoginRequiredMixin, UpdateView
         return context
 
 
-class ProcessIncidentImagesView(PermissionRequiredMixin, LoginRequiredMixin, View):
+class MajorIncidentUpdateView(PermissionRequiredMixin, LoginRequiredMixin,
+                              UpdateView):
+    model = MajorIncident
+    login_url = "/login/"
+    permission_required = "incident.add_incident"
+    form_class = MajorIncidentForm
+    template_name = "incident/create_major_incident.html"
+    success_url = reverse_lazy("major_incident_list")
+
+    def handle_no_permission(self):
+        # Render the custom 403.html template for permission denial
+        return render(self.request, "incident/403.html", status=403)
+
+    def dispatch(self, request, *args, **kwargs):
+        try:
+            # Your print statement for debugging
+            print("Dispatch method called.")
+            return super().dispatch(request, *args, **kwargs)
+        except Exception as e:
+            print(f"Exception occurred: {e}")
+            raise
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        user = self.request.user
+        employer = user.employer
+        existing_images = []
+
+        # Check if image_folder exists and get available images from S3
+        if self.object.image_folder:
+            existing_images = get_s3_images_for_incident(
+                self.object.image_folder, user.employer
+            )
+        # print(existing_images)
+        form = self.form_class(
+            instance=self.object, initial={"existing_images": existing_images}
+        )
+        form.fields["user_employer"].initial = employer
+
+        return self.render_to_response(
+            self.get_context_data(
+                form=form, existing_images=existing_images,
+                user_employer=employer
+            )
+        )
+
+    def form_valid(self, form):
+        form.instance.user_employer = self.request.user.employer
+        return super().form_valid(form)
+
+    def form_invalid(self, form):
+        return self.render_to_response(self.get_context_data(form=form))
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["user"] = self.request.user
+        return context
+
+
+class ProcessIncidentImagesView(PermissionRequiredMixin,
+                                LoginRequiredMixin, View):
     login_url = "/login/"
     permission_required = "incident.add_incident"
     raise_exception = True  # Raise exception when no access
@@ -217,6 +351,13 @@ def generate_pdf(request, incident_id):
     return redirect("home")
 
 
+def generate_major_incident_pdf(request, incident_id):
+    user_email = request.user.email
+    print(user_email, incident_id)
+    generate_major_incident_pdf_from_list_task.delay(incident_id, user_email)
+    messages.success(request, "PDF generation started. HR will receive copy")
+    return redirect("home")
+
 # This route is used to generate a pdf and
 # email it to the user
 
@@ -233,13 +374,15 @@ def generate_incident_pdf_email(request, incident_id):
 def generate_pdf_web(request, incident_id):
     # Fetch incident data based on incident_id
     try:
-        incident = Incident.objects.get(pk=incident_id)
+        incident = MajorIncident.objects.get(pk=incident_id)
     except ObjectDoesNotExist:
-        raise ValueError("Incident with ID {} does not exist.".format(incident_id))
+        raise ValueError("Incident with ID {} does not exist."
+                         .format(incident_id))
 
-    images = get_s3_images_for_incident(incident.image_folder, incident.user_employer)
+    images = get_s3_images_for_incident(incident.image_folder,
+                                        incident.user_employer)
     context = {"incident": incident, "images": images}
-    return render(request, "incident/incident_form_pdf.html", context)
+    return render(request, "incident/major_incident_form_pdf.html", context)
 
 
 class IncidentListView(PermissionRequiredMixin, ListView):
@@ -252,7 +395,23 @@ class IncidentListView(PermissionRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["defer_render"] = True  # Pass defer_render as context to the template
+        context["defer_render"] = True
+        # Pass defer_render as context to the template
+        return context
+
+
+class MajorIncidentListView(PermissionRequiredMixin, ListView):
+    model = MajorIncident
+    template_name = "incident/major_incident_list.html"
+    context_object_name = "incidents"
+    permission_required = "incident.view_incident"
+    raise_exception = True
+    permission_denied_message = "You are not allowed to view incidents."
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["defer_render"] = True
+        # Pass defer_render as context to the template
         return context
 
 
