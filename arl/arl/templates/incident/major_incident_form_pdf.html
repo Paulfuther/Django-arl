@@ -357,7 +357,7 @@
             </tr>
             <tr>
                 <td style="padding-left: 15px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;;">
-                    {% if incident.stolenother %}
+                    {% if incident.stolother %}
                     <i class="far fa-check-square"></i>
                     {% else %}
                     <i class="far fa-square"></i>
@@ -368,7 +368,7 @@
             <tr>
                 <td
                     style="height: 300px; border: 2px; border-style: solid; text-align: left; vertical-align: top; padding-left: 30px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
-                    {{incident.stolenothervalue|default:"NA"}} </td>
+                    {{incident.stolother|default:"NA"}} </td>
             </tr>
         </table>
 
