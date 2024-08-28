@@ -45,7 +45,7 @@ class Store(models.Model):
     def __str__(self):
         if self.employer:
             manager_name = self.manager.first_name if self.manager else "No Manager"
-            return f"Store {self.number} - {self.address} - Manager: {manager_name}"
+            return f"Store {self.number} - {self.address} - {self.city} - {self.province} - Manager: {manager_name}"
         else:
             return f"Store {self.number}"
 

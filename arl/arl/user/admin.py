@@ -7,7 +7,7 @@ from import_export import resources
 from import_export.admin import ExportActionMixin
 
 from arl.dsign.models import DocuSignTemplate, ProcessedDocsignDocument
-from arl.incident.models import Incident
+from arl.incident.models import Incident, MajorIncident
 from arl.msg.models import (BulkEmailSendgrid, EmailTemplate, Twimlmessages,
                             UserConsent, WhatsAppTemplate)
 from arl.quiz.models import Answer, Question, Quiz
@@ -20,7 +20,8 @@ from .models import (CustomUser, Employer, ExternalRecipient, Store,
 
 class ExternalRecipientAdmin(admin.ModelAdmin):
     list_display = ('first_name', 'last_name', 'company', 'email', 'group')
-    search_fields = ('first_name', 'last_name', 'company', 'email', 'group__name')
+    search_fields = ('first_name', 'last_name', 'company', 'email',
+                     'group__name')
 
 
 class UserResource(resources.ModelResource):
@@ -170,6 +171,12 @@ class IncidentAdmin(admin.ModelAdmin):
     list_filter = ("eventdate",)
 
 
+class MajorIncidentAdmin(admin.ModelAdmin):
+    list_display = ("store", "brief_description", "eventdate")
+    search_fields = ("store__number", "brief_description")
+    list_filter = ("eventdate",)
+
+
 @admin.register(UserManager)
 class UserManagerAdmin(admin.ModelAdmin):
     list_display = ("user", "get_manager", "user_creation_date")
@@ -259,6 +266,7 @@ admin.site.register(Twimlmessages)
 admin.site.register(BulkEmailSendgrid)
 admin.site.register(Store, StoreAdmin)
 admin.site.register(Incident, IncidentAdmin)
+admin.site.register(MajorIncident, MajorIncidentAdmin)
 admin.site.register(EmailTemplate)
 admin.site.register(DocuSignTemplate)
 admin.site.register(ProcessedDocsignDocument)
@@ -270,4 +278,3 @@ admin.site.register(Quiz, QuizAdmin)
 admin.site.register(Answer)
 admin.site.register(Question, QuestionAdmin)
 admin.site.register(ExternalRecipient, ExternalRecipientAdmin)
-

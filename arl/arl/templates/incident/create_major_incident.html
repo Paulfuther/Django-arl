@@ -1,0 +1,236 @@
+{% extends "../base/base.html" %}
+{% block title %}Index{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+{{ form.non_field_errors }}
+
+{% load static %}
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Major Incident Form</title>
+    <!-- Link to main.css -->
+    <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}">
+</head>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+            <form method="post" enctype="multipart/form-data" id="form" class="was-validated">
+                {% csrf_token %}
+
+                {% if form.errors %}
+                <div class="alert alert-danger">
+                    <ul>
+                        {% for field_name, error_list in form.errors.items %}
+                        <li>{{ field_name }}: {{ error_list|join:", " }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <h2>SIGNIFICANT SECURITY INCIDENT REPORT</h2>
+                {{ form.user_employer|as_crispy_field }}
+                {{ form.store|as_crispy_field }}
+                {{ form.image_folder }}
+                {{ form.brief_description|as_crispy_field}}
+
+                <div class="section custom-section">
+                    <h4>Signifcant Security Incident Type</h4>
+                    <div class="form-group">
+                        {{ form.robbery|as_crispy_field }}
+                        {{ form.breakandenter|as_crispy_field }}
+                        {{ form.assault|as_crispy_field }}
+                        {{ form.bombthreat|as_crispy_field }}
+                        {{ form.majorfireorexplosion|as_crispy_field }}
+                        {{ form.fatality|as_crispy_field }}
+                        {{ form.criticalinjury|as_crispy_field }}
+                    </div>
+                </div>
+
+                <div class="section custom-section">
+                    <h4>Police Information</h4>
+                    <div class="form-group">
+                        {{ form.policecalledyes|as_crispy_field }}
+                        {{ form.policecalledno|as_crispy_field }}
+                        {{ form.policeattendyes|as_crispy_field }}
+                        {{ form.policeattendno|as_crispy_field }}
+                        {{ form.policeagency|as_crispy_field }}
+                        {{ form.officerdetails|as_crispy_field }}
+                        {{ form.eventdate|as_crispy_field }}
+                        {{ form.eventtime|as_crispy_field }}
+                        {{ form.reportedby|as_crispy_field }}
+                        {{ form.policefilenumber|as_crispy_field }}
+                    </div>
+                </div>
+
+                <div class="section custom-section">
+                    <h4>Was GSOC Notified</h4>
+                    <div class="form-group">
+                        {{ form.gsoccalledyes|as_crispy_field }}
+                        {{ form.gsoccalledno|as_crispy_field }}
+                    </div>
+                </div>
+
+                <div class="section custom-section">
+                    <h4>Section 3: Theft Details</h4>
+                    <div class="form-group">
+                        {{ form.stolencash|as_crispy_field }}
+                        {{ form.stolcash|as_crispy_field }}
+                        {{ form.stolencards|as_crispy_field }}
+                        {{ form.stolcards|as_crispy_field }}
+                        {{ form.stolentobacco|as_crispy_field }}
+                        {{ form.stoltobacco|as_crispy_field }}
+                        {{ form.stolenlottery|as_crispy_field }}
+                        {{ form.stollottery|as_crispy_field }}
+                        {{ form.stolenother|as_crispy_field }}
+                        {{ form.stolother|as_crispy_field }}
+                        {{ form.stolenothervalue|as_crispy_field }}
+                        {{ form.stolenna|as_crispy_field }}
+                    </div>
+                </div>
+
+                <div class="section custom-section">
+                    <h4>Section 3: Damage to Property?</h4>
+                    <div class="form-group">
+                        {{ form.damagetoproperty|as_crispy_field }}
+                    </div>
+                </div>
+
+                <div class="section custom-section">
+                    <h4>Section 4: Suspect Details</h4>
+                    <div class="form-group">
+                        {{ form.gender|as_crispy_field}}
+                        {{ form.height|as_crispy_field }}
+                        {{ form.weight|as_crispy_field }}
+                        {{ form.age|as_crispy_field }}
+                        {{ form.haircolor|as_crispy_field }}
+                        {{ form.haircut|as_crispy_field }}
+                        {{ form.complexion|as_crispy_field }}
+                        {{ form.beardmoustache|as_crispy_field }}
+                        {{ form.eyeeyeglasses|as_crispy_field }}
+                        {{ form.color|as_crispy_field }}
+                        {{ form.scars|as_crispy_field }}
+                        {{ form.tatoos|as_crispy_field }}
+                        {{ form.hat|as_crispy_field }}
+                        {{ form.shirt|as_crispy_field }}
+                        {{ form.trousers|as_crispy_field }}
+                        {{ form.shoes|as_crispy_field }}
+                        {{ form.voice|as_crispy_field }}
+                        </div>
+                        </div>
+
+                        <div class="section custom-section">
+                            <h4 >Section 3: Vehicle Details</h4>
+                            <div class="form-group">
+                        {{ form.licenceplatenumber|as_crispy_field}}
+                        {{ form.approximateyearmakemodel|as_crispy_field}}
+                        {{ form.colour|as_crispy_field}}
+                        {{ form.distinguishablefeatures|as_crispy_field}}
+                        {{ form.bumpersticker|as_crispy_field }}
+                        {{ form.direction|as_crispy_field }}
+                        {{ form.damage|as_crispy_field }}
+                    </div>
+                </div>
+
+                {% if existing_images %}
+                <div class="text-center mt-2 mb-2 border border-dark p-3">
+                    <h2>Existing Images</h2>
+                    <div class="ms-2 mt-2">
+                        {% for image_url in existing_images %}
+                        <img src="{{ image_url }}" alt="Existing Image" width="100" height="100">
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="section text-center">
+                    <h2>Upload Images</h2>
+                    Pictures Only
+                    Maximum 4
+                    No Video
+                    <div class="form-group">
+                        <div class="dropzone" id="my-dropzone" class="mb-3"> </div>
+                    </div>
+                </div>
+
+                <div class="text-center">
+                    <button type="submit" id="submit" class="btn btn-primary ms-2 mt-2" style="margin-bottom: 20px;">Submit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+
+<div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="successModalLabel">Files Uploaded Successfully</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Your files have been uploaded successfully.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Function to retrieve CSRF token from cookies
+    function getCSRFToken() {
+        let csrfToken = null;
+        const cookies = document.cookie.split(';');
+        for (const cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'csrftoken') {
+                csrfToken = decodeURIComponent(value);
+                break;
+            }
+        }
+        return csrfToken;
+    }
+
+    // Initialise Dropzone
+    let randomNumber;
+    let myDropzone = new Dropzone("#my-dropzone", {
+        url: "{% url 'incident_upload' %}",
+        maxFilesize: 5, // MB
+        maxFiles: 4,
+        acceptedFiles: "image/*",
+        headers: {
+            "X-CSRFToken": getCSRFToken(),
+        },
+    });
+
+    // Enable the next button initially
+    const submitButton = document.getElementById("submit");
+    submitButton.disabled = false;
+
+    myDropzone.on("sending", function (file, xhr, formData) {
+        var imageFolderValue = document.getElementById('id_image_folder').value;
+        formData.append("image_folder", imageFolderValue);
+
+        // Deactivate the next button while sending the file
+        submitButton.disabled = true;
+    });
+
+    myDropzone.on("success", function (file, response) {
+        // Enable the next button after files are uploaded successfully
+        document.getElementById("submit").disabled = false;
+
+        // Show a success popup using a Bootstrap modal
+        $("#successModal").modal("show");
+    });
+
+</script>
+
+{% endblock %}
