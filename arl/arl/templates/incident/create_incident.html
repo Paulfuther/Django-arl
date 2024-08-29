@@ -6,11 +6,28 @@
 {% load crispy_forms_tags %}
 {{ form|as_crispy_errors }}
 
+<head>
+    <style>
+        .container {
+            max-width: 100%;
+            overflow-x: hidden;
+            /* Prevent horizontal overflow */
+        }
+
+        select,
+        input,
+        button {
+            max-width: 100%;
+            box-sizing: border-box;
+            /* Include padding and border in the element's width */
+        }
+    </style>
+</head>
 
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
-            <h1>Create Incident</h1>
+            <h2>Create Site Incident Report</h2>
             <form method="post" enctype="multipart/form-data" id="form" class="was-validated">
                 {% csrf_token %}
                 {{ form.user_employer|as_crispy_field }}

@@ -21,12 +21,30 @@
     <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
 
     <style>
+        .container {
+            max-width: 100%;
+            overflow-x: hidden;
+            /* Prevent horizontal overflow */
+        }
+
+        select,
+        input,
+        button {
+            max-width: 100%;
+            box-sizing: border-box;
+            /* Include padding and border in the element's width */
+        }
+
         @media (max-width: 576px) {
+
             /* Apply this style on screens smaller than 576px, e.g., iPhone */
             .container {
-                padding: 20px; /* Add some padding inside the border */
-                border-radius: 5px; /* Optional: rounded corners */
-                background-color: #f8f9fa; /* Optional: light background color */
+                padding: 20px;
+                /* Add some padding inside the border */
+                border-radius: 5px;
+                /* Optional: rounded corners */
+                background-color: #f8f9fa;
+                /* Optional: light background color */
             }
         }
     </style>
@@ -41,12 +59,13 @@
                 <form id="login" method="post" class="was-validated">
                     {% csrf_token %}
                     <legend class="border-bottm mb-4">Join Today</legend>
-                   
+
                     {{ form|crispy }}
-                    
-                    
+
+
                     <fieldset class="form-group mt-3">
-                        <input class="form-control" id="phone" type="tel" name="phone" value="{{ form.phone_number }}" />
+                        <input class="form-control" id="phone" type="tel" name="phone"
+                            value="{{ form.phone_number }}" />
                         <button type="submit" class="btn btn-primary" id="verify-button" value="Verify">Verify</button>
                     </fieldset>
                     <button type="submit" id="register_button" class="btn btn-primary mt-1 mb-1"
@@ -66,16 +85,16 @@
 <script src="{% static '/utils/verification.js' %}"></script>
 
 <script>
-const checkPhoneNumberUniqueURL = "{% url 'check_phone_number_unique' %}";
-const twilioVerificationCheckURL = "/check-verification/"
-const twilioVerificationRequestURL = "/request-verification/"
-    
+    const checkPhoneNumberUniqueURL = "{% url 'check_phone_number_unique' %}";
+    const twilioVerificationCheckURL = "/check-verification/"
+    const twilioVerificationRequestURL = "/request-verification/"
+
 </script>
 
 
 
 <script>
-  // initializeManagerDropdown()
+    // initializeManagerDropdown()
 </script>
 
 <script>

@@ -6,14 +6,22 @@
 {% load crispy_forms_tags %}
 {{ form.non_field_errors }}
 
-{% load static %}
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Major Incident Form</title>
-    <!-- Link to main.css -->
-    <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}">
+    <style>
+        .container {
+            max-width: 100%;
+            overflow-x: hidden;
+            /* Prevent horizontal overflow */
+        }
+
+        select,
+        input,
+        button {
+            max-width: 100%;
+            box-sizing: border-box;
+            /* Include padding and border in the element's width */
+        }
+    </style>
 </head>
 
 <div class="container">
@@ -32,7 +40,7 @@
                 </div>
                 {% endif %}
 
-                <h2>SIGNIFICANT SECURITY INCIDENT REPORT</h2>
+                <h2>Create Significant Security Incident Report</h2>
                 {{ form.user_employer|as_crispy_field }}
                 {{ form.store|as_crispy_field }}
                 {{ form.image_folder }}
