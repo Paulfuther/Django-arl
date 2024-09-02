@@ -71,6 +71,7 @@ INSTALLED_APPS = [
     "arl.dbox",
     "arl.incident",
     "arl.bucket",
+    "explorer",
     
 ]
 
@@ -113,6 +114,7 @@ WSGI_APPLICATION = "arl.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -120,9 +122,15 @@ DATABASES = {
         "USER": "postgres",
         "PASSWORD": "Paulee12!@",
         "HOST": "localhost",
-        'PORT': '5433', 
+        'PORT': '5433',
     }
 }
+
+EXPLORER_CONNECTIONS = {
+    'Default': 'default'
+}
+EXPLORER_DEFAULT_CONNECTION = 'default'
+# This should match one of the keys in EXPLORER_CONNECTIONS
 
 
 # Password validation
