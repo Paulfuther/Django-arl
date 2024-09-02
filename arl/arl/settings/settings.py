@@ -71,8 +71,6 @@ INSTALLED_APPS = [
     "arl.dbox",
     "arl.incident",
     "arl.bucket",
-    "explorer",
-    
 ]
 
 
@@ -126,10 +124,7 @@ DATABASES = {
     }
 }
 
-EXPLORER_CONNECTIONS = {
-    'Default': 'default'
-}
-EXPLORER_DEFAULT_CONNECTION = 'default'
+
 # This should match one of the keys in EXPLORER_CONNECTIONS
 
 

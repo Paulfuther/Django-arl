@@ -42,7 +42,6 @@ django-intl-tel-input==0.3.1
 django-phonenumber-field==7.1.0
 django-ratelimit==4.1.0
 django-sendgrid-v5==1.2.2
-django-sql-explorer==5.2
 django-taggit==4.0.0
 django-timezone-field==5.1
 django-waffle==4.1.0
