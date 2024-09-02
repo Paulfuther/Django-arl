@@ -12,8 +12,7 @@ from arl.msg.models import (BulkEmailSendgrid, EmailTemplate, Twimlmessages,
                             UserConsent, WhatsAppTemplate)
 from arl.quiz.models import Answer, Question, Quiz
 
-from .models import (CustomUser, Employer, ExternalRecipient, Store,
-                     UserManager)
+from .models import CustomUser, Employer, ExternalRecipient, Store, UserManager
 
 # fields = list(UserAdmin.fieldsets)
 
