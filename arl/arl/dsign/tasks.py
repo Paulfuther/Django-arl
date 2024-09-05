@@ -76,6 +76,7 @@ def check_outstanding_envelopes_task():
     outstanding_envelopes = get_waiting_for_others_envelopes()
     now = datetime.utcnow()
     behind_docs = []
+    managers_to_notify = set()
 
     for envelope in outstanding_envelopes:
         sent_date_time = parse_sent_date_time(envelope["sent_date_time"])
@@ -92,10 +93,15 @@ def check_outstanding_envelopes_task():
                         (email=primary_recipient_email)
                     )
                     store_manager = (
-                        user.store.manager if
-                        user.store and user.store.manager
-                        else "No Manager Assigned"
+                        user.store.manager if user.store and
+                        user.store.manager else None
                     )
+                    if store_manager:
+                        # Add the manager's phone number to
+                        # the notification list
+                        managers_to_notify.add(store_manager.phone_number)
+                    else:
+                        store_manager = "No Manager Assigned"
                 except CustomUser.DoesNotExist:
                     store_manager = "Manager Not Found"
 
@@ -170,9 +176,11 @@ def check_outstanding_envelopes_task():
         hr_users = CustomUser.objects.filter(
             Q(is_active=True) & Q(groups__name="dsign_sms")
         ).values_list("phone_number", flat=True)
-
+        # Combine HR users and managers into one recipient list
+        recipients = list(hr_users) + list(managers_to_notify)
         # Send the SMS message to all users in the group
-        send_bulk_sms(hr_users, message)
+        print("recipients:", recipients)
+        # send_bulk_sms(recipients, message)
 
         logger.info(f"Sent SMS for documents 48 hours behind to HR: {message}")
         return f"Sent SMS for documents 48 hours behind to HR: {document_list}"

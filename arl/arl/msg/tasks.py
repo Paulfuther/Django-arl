@@ -139,6 +139,8 @@ def send_template_whatsapp_autoreply_task(whatsapp_id, from_id, receiver):
 @app.task(name="process_whatsapp_webhook")
 def process_whatsapp_webhook(data):
     try:
+        print(data)
+        
         # Determine message type
         message_type = "SMS" if "SmsMessageSid" in data else "WhatsApp"
 
@@ -149,9 +151,8 @@ def process_whatsapp_webhook(data):
         receiver = receiver_raw.split(":")[1] if ":" in receiver_raw else receiver_raw
 
         message_status = data.get("MessageStatus", ["unknown"])[0]
-        template_used = (
-            "TemplateId" in data
-        )  # This assumes it's a boolean flag for WhatsApp
+
+        template_used = "TemplateId" in data
 
         # Fetch user or set to unknown
         username = "Unknown"
@@ -166,6 +167,7 @@ def process_whatsapp_webhook(data):
 
         # Create message record
         Message.objects.create(
+            
             sender=sender,
             receiver=receiver,
             message_status=message_status,
