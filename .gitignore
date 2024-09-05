@@ -13,7 +13,7 @@ private.key
 config.json
 local_settings.py
 db.json
-
+google.json
 # Django #
 *.log
 *.pot
