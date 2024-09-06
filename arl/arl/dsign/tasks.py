@@ -179,8 +179,8 @@ def check_outstanding_envelopes_task():
         # Combine HR users and managers into one recipient list
         recipients = list(hr_users) + list(managers_to_notify)
         # Send the SMS message to all users in the group
-        print("recipients:", recipients)
-        # send_bulk_sms(recipients, message)
+        # print("recipients:", recipients)
+        send_bulk_sms(recipients, message)
 
         logger.info(f"Sent SMS for documents 48 hours behind to HR: {message}")
         return f"Sent SMS for documents 48 hours behind to HR: {document_list}"
