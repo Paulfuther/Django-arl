@@ -198,7 +198,7 @@ def check_outstanding_envelopes_weekly_sms_task():
 
     for envelope in outstanding_envelopes:
         sent_date_time = parse_sent_date_time(envelope["sent_date_time"])
-        if now - sent_date_time >= timedelta(hours=0):
+        if now - sent_date_time >= timedelta(hours=48):
             # Check if there are any signers
             if envelope["signers"]:
                 # Assuming the primary recipient is the first signer
