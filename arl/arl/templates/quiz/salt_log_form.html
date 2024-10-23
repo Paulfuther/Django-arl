@@ -6,6 +6,24 @@
 {% load crispy_forms_tags %}
 {{ form|as_crispy_errors }}
 
+<head>
+    <style>
+        .container {
+            max-width: 100%;
+            overflow-x: hidden;
+            /* Prevent horizontal overflow */
+        }
+
+        select,
+        input,
+        button {
+            max-width: 100%;
+            box-sizing: border-box;
+            /* Include padding and border in the element's width */
+        }
+    </style>
+</head>
+
 <div class="container mt-4">
     <div class="row justify-content-center">
         <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
