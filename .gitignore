@@ -19,6 +19,7 @@ google.json
 *.pot
 *.pyc
 .csv
+.zip
 __pycache__
 db.sqlite3
 media

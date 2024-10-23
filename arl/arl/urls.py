@@ -14,6 +14,7 @@ urlpatterns = [
     path("", include("arl.dsign.urls")),
     path("", include("arl.msg.urls")),
     path("", include("arl.bucket.urls")),
+    path("", include("arl.statscan.urls")),
     path("quiz/", include("arl.quiz.urls")),
 ]
 
