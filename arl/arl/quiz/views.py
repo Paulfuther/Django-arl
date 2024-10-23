@@ -14,6 +14,8 @@ from django.http import JsonResponse
 from PIL import Image
 from io import BytesIO
 from django.views.generic.list import ListView
+from .tasks import save_salt_log
+
 
 @login_required
 def create_quiz(request):
@@ -133,7 +135,11 @@ class SaltLogCreateView(LoginRequiredMixin, CreateView):
     def form_valid(self, form):
         # Calls form.save() which triggers the image 
         # folder creation inside the form's logic
-        self.object = form.save()
+        form.instance.user_employer = self.request.user.employer
+        form_data = self.serialize_form_data(form.cleaned_data)
+
+        # Trigger the Celery task to save form data
+        save_salt_log.delay(**form_data)
         messages.success(
             self.request,
             "Salt Log Added.",
@@ -143,6 +149,20 @@ class SaltLogCreateView(LoginRequiredMixin, CreateView):
     def form_invalid(self, form):
         # Render the form again with validation errors
         return self.render_to_response({"form": form})
+
+    def serialize_form_data(self, form_data):
+        # Convert ForeignKey fields to their primary key values
+        form_data["store"] = (
+            form_data["store"].pk
+            if "store" in form_data and form_data["store"] is not None
+            else None
+        )
+        form_data["user_employer"] = (
+            form_data["user_employer"].pk
+            if "user_employer" in form_data and form_data["user_employer"] is not None
+            else None
+        )
+        return form_data
 
 
 class ProcessSaltLogImagesView(LoginRequiredMixin, View):
@@ -247,7 +267,7 @@ class SaltLogUpdateView(LoginRequiredMixin, UpdateView):
         )
 
     def form_valid(self, form):
-        print(form)
+        # print(form)
         form.instance.user_employer = self.request.user.employer
         return super().form_valid(form)
 
