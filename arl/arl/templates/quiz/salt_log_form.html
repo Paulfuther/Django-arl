@@ -1,0 +1,157 @@
+{% extends "../base/base.html" %}
+{% block title %}Index{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+{{ form|as_crispy_errors }}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Create Salt Log</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Display the user's name at the top -->
+                    <p><strong>User:</strong> {{ user.first_name }}</p>
+                    
+                    <form method="post" enctype="multipart/form-data" id="form" class="was-validated">
+                        {% csrf_token %}
+                        {{ form.user_employer|as_crispy_field }}
+                        {{ form.image_folder }}
+                        <!-- Store Field with Padding -->
+                        <div class="form-group pb-3">
+                            {{ form.store|as_crispy_field }}  <!-- Add padding-bottom -->
+                        </div>
+                        
+                        <!-- Area Salted Field with Padding -->
+                        <div class="form-group pb-3">
+                            {{ form.area_salted|as_crispy_field }}  <!-- Add padding-bottom -->
+                        </div>
+                        
+                        <!-- Date Salted Field with Padding -->
+                        <div class="form-group pb-3">
+                            {{ form.date_salted|as_crispy_field }}  <!-- Add padding-bottom -->
+                        </div>
+                        
+                        <!-- Time Salted Field with Padding -->
+                        <div class="form-group pb-3">
+                            {{ form.time_salted|as_crispy_field }}  <!-- Add padding-bottom -->
+                        </div>
+                        
+                        <!-- Submit Button with Padding -->
+                        <div class="form-group">
+                            <button type="submit" id="submit" class="btn btn-primary mt-3 w-100">Add Log</button>
+                        </div>
+                        {% if existing_images %}
+                <div class= "text-center mt-2 mb-2 border border-dark p-3" >
+                <h2>Existing Images</h2>
+                <div class="ms-2 mt-2">
+
+                    {% for image_url in existing_images %}
+                    <img src="{{ image_url }}" alt="Existing Image" width="100" height="100">
+                    {% endfor %}
+                </div>
+                </div>
+                {% endif %}
+                        <div class="section text-center">
+                            <h2>Upload Images</h2>
+                            Pictures Only
+                            Maximum 4
+                            No Video
+                            <div class="form-group">
+                                <div class="dropzone" id="my-dropzone" class="mb-3"> </div>
+                            </div>
+                        </div>
+
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if form.errors %}
+<div class="alert alert-danger">
+    <ul>
+        {% for field_name, error_list in form.errors.items %}
+        <li>{{ field_name }}: {{ error_list|join:", " }}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+<div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="successModalLabel">Files Uploaded Successfully</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Your files have been uploaded successfully.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<script>
+    // Function to retrieve CSRF token from cookies
+    function getCSRFToken() {
+        let csrfToken = null;
+        const cookies = document.cookie.split(';');
+        for (const cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'csrftoken') {
+                csrfToken = decodeURIComponent(value);
+                break;
+            }
+        }
+        return csrfToken;
+    }
+
+    // Initialise Dropzone
+    let randomNumber;
+    let myDropzone = new Dropzone("#my-dropzone", {
+        url: "{% url 'salt_log_upload' %}",
+        maxFilesize: 5, // MB
+        maxFiles: 4,
+        acceptedFiles: "image/*",
+        headers: {
+            "X-CSRFToken": getCSRFToken(),
+        },
+    });
+
+    // Enable the next button initially
+    const submitButton = document.getElementById("submit");
+    submitButton.disabled = false;
+
+    myDropzone.on("sending", function (file, xhr, formData) {
+        var imageFolderValue = document.getElementById('id_image_folder').value;
+        formData.append("image_folder", imageFolderValue);
+
+        // Deactivate the next button while sending the file
+        submitButton.disabled = true;
+    });
+
+    myDropzone.on("success", function (file, response) {
+        // Enable the next button after files are uploaded successfully
+        document.getElementById("submit").disabled = false;
+
+        // Show a success popup using a Bootstrap modal
+        $("#successModal").modal("show");
+    });
+
+</script>
+
+
+
+
+
+{% endblock %}

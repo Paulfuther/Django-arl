@@ -1,0 +1,37 @@
+{% extends "../base/base.html" %}
+{% block title %}Feature Unavailable{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+
+<head>
+    <!-- Link to main.css -->
+    <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}">
+</head>
+
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card text-center">
+                <div class="card-header">
+                    <legend>Feature Temporarily Unavailable</legend>
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-tools"></i> Maintenance Mode</h5>
+                    <p class="card-text">We're currently improving this feature to serve you better. We appreciate your patience and encourage you to check back later. Thank you for your understanding.</p>
+                    <div class="feature-unavailable-buttons">
+                        <a href="/" class="btn btn-primary">Home Page</a>
+                        <a href="/contact" class="btn btn-secondary">Contact Support</a>
+                    </div>
+                </div>
+                <div class="card-footer text-muted">
+                    If you need immediate assistance, please contact our support team.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,3 +1,5 @@
+{% load waffle_tags %}
+
 <nav class="navbar navbar-expand-lg bg-body-tertiary">
   <div class="container">
     <a class="navbar-brand fs-3" href="#">ARL</a>
@@ -25,7 +27,12 @@
           <a class="nav-link" href="{% url 'list_folders' %}">Dropbox</a>
         </li>
         {% endif %}
-       
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'create_salt_log' %}">Create Salt Log</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'salt_log_list' %}">Update Salt Log</a>
+        </li>
         <li class="nav-item">
           <a class="nav-link" href="{% url 'create_incident' %}">Make Incident Form</a>
         </li>
@@ -39,9 +46,12 @@
         <li class="nav-item">
           <a class="nav-link" href="{% url 'major_incident_list' %}">List Major Inc. Form</a>
         </li>
+        {% flag 'enable_nav_link' %}
         <li class="nav-item">
           <a class="nav-link" href="{% url 'quiz_list' %}">Quiz</a>
         </li>
+        {% endflag %}
+
         {% if user.is_comms %}
         <li class="nav-item">
           <a class="nav-link" href="{% url 'comms' %}">Comms</a>

@@ -10,7 +10,7 @@ from arl.dsign.models import DocuSignTemplate, ProcessedDocsignDocument
 from arl.incident.models import Incident, MajorIncident
 from arl.msg.models import (BulkEmailSendgrid, EmailTemplate, Twimlmessages,
                             UserConsent, WhatsAppTemplate)
-from arl.quiz.models import Answer, Question, Quiz
+from arl.quiz.models import Answer, Question, Quiz, SaltLog
 
 from .models import CustomUser, Employer, ExternalRecipient, Store, UserManager
 
@@ -258,6 +258,11 @@ class QuestionAdmin(admin.ModelAdmin):
     display_answers.short_description = 'Answers'
 
 # UserAdmin.fieldsets = tuple(fields)
+@admin.register(SaltLog)
+class SaltLogAdmin(admin.ModelAdmin):
+    list_display = ('store', 'area_salted', 'date_salted', 'time_salted', 'hidden_timestamp')
+    list_filter = ('store', 'date_salted')
+    search_fields = ('store__name', 'area_salted')
 
 
 admin.site.register(Employer)
@@ -277,3 +282,4 @@ admin.site.register(Quiz, QuizAdmin)
 admin.site.register(Answer)
 admin.site.register(Question, QuestionAdmin)
 admin.site.register(ExternalRecipient, ExternalRecipientAdmin)
+# admin.site.register(SaltLog)
