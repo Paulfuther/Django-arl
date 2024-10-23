@@ -71,7 +71,6 @@ INSTALLED_APPS = [
     "arl.dbox",
     "arl.incident",
     "arl.bucket",
-    "arl.statscan",
 ]
 
 

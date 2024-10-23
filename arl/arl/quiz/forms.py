@@ -3,8 +3,6 @@ import string
 
 from django import forms
 from django.forms import inlineformset_factory
-from django.forms.widgets import SelectDateWidget, TimeInput
-from django.utils import timezone
 from django.utils.text import slugify
 
 from .models import Answer, Question, Quiz, SaltLog
@@ -39,7 +37,8 @@ AnswerFormSet = inlineformset_factory(Question, Answer,
 
 
 class SaltLogForm(forms.ModelForm):
-    image_folder = forms.CharField(widget=forms.TextInput(attrs={'style': 'display:none;'}))
+    image_folder = forms.CharField(widget=forms.TextInput(attrs={'style':
+                                                          'display:none;'}))
 
     class Meta:
         model = SaltLog
