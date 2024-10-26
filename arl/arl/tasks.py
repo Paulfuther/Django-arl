@@ -4,7 +4,7 @@ import imaplib
 import io
 import logging
 import subprocess
-from datetime import datetime, timedelta
+from datetime import datetime
 from io import BytesIO
 
 import pdfkit
@@ -14,7 +14,6 @@ from django.contrib.auth.models import Group
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from django.template.loader import render_to_string
-from django.utils import timezone
 from django.utils.text import slugify
 
 from arl.celery import app
@@ -34,7 +33,7 @@ from arl.msg.helpers import (create_email, create_hr_newhire_email,
                              create_single_email, create_tobacco_email,
                              send_bulk_sms, send_monthly_store_phonecall,
                              send_sms_model)
-from arl.msg.models import EmailEvent, EmailTemplate, SmsLog
+from arl.msg.models import EmailTemplate, SmsLog
 from arl.user.models import CustomUser, Employer, UserManager
 
 logger = get_task_logger(__name__)
