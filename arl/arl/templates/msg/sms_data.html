@@ -18,12 +18,10 @@
 
 </head>
 
-
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-12 col-sm-10 col-md-8 col-lg-10 col-xl-10">
             <legend class="border-bottom mb-4">Text Logs</legend>
-
 
             <table id="table_sms" class="display">
                 <thead>
@@ -33,6 +31,7 @@
                         <th>To</th>
                         <th>Name</th>
                         <th>Body</th>
+                        <th>Price</th> <!-- Added the missing header for price -->
                     </tr>
                 </thead>
                 <tbody>
@@ -41,8 +40,9 @@
                         <td>{{ sms.date_sent|date:"Y-m-d" }}</td>
                         <td>{{ sms.date_sent|date:"H:i" }}</td>
                         <td>{{ sms.to }}</td>
-                        <td>{{ sms.username}}</td>
+                        <td>{{ sms.username }}</td>
                         <td>{{ sms.body }}</td>
+                        <td>{{ sms.price|floatformat:2 }}</td> <!-- Price formatted to 2 decimal places -->
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -52,19 +52,14 @@
 </div>
 
 <script>
-
     $(document).ready(function () {
-        $('#table_sms').DataTable(
-            {
-                dom: 'Bfrtip',
-                responsive: true,
-                buttons: ['copy', 'excel', 'pdf'],
-                order: [[0, 'desc']]
-
-            },
-        );
+        $('#table_sms').DataTable({
+            dom: 'Bfrtip',
+            responsive: true,
+            buttons: ['copy', 'excel', 'pdf'],
+            order: [[0, 'desc']]  // Corrected ordering by date (descending order)
+        });
     });
-
 </script>
 
 {% endblock %}

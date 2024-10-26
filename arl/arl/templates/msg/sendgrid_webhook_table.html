@@ -38,6 +38,14 @@
 
 
 <div class="container">
+    <!-- Loading indicator -->
+    <div id="loading"
+    style="display: none; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+    <p>Loading outstanding documents, please wait...</p>
+    <div class="spinner-border" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    </div>
     <div class="row justify-content-center">
         <div class="col-12 col-sm-10 col-md-8 col-lg-10 col-xl-10">
             <legend class="border-bottom mb-4">Email Logs</legend>
@@ -83,24 +91,39 @@
                             </tr>
                         {% endfor %}
                     </tbody>
+                    
                 </table>
             </div>
          </div>
     </div>
 
    <script>
-    $(document).ready(function () {
+   $(document).ready(function () {
+        // Show the loading indicator when the page loads
+        $('#loading').show();
+        $('#eventsTable').hide();
+
+        // Initialize DataTables and hide the loading indicator once it's ready
         $('#eventsTable').DataTable({
-            dom: 'Bfrtip',  // Add the buttons to the table
+            dom: 'Bfrtip',
             buttons: [
-                    {
-                        extend: 'excelHtml5',
-                        text: 'Export to Excel',
-                        title: 'Email Event Summary'
-                    }
-                ],
-                pageLength: 10,
-                lengthMenu: [10, 25, 50, 100]
+                {
+                    extend: 'excelHtml5',
+                    text: 'Export to Excel',
+                    title: 'Email Event Summary'
+                },
+                {
+                    extend: 'pdfHtml5',
+                    text: 'Export to PDF',
+                    title: 'Email Event Summary'
+                }
+            ],
+            pageLength: 10,
+            lengthMenu: [10, 25, 50, 100],
+            initComplete: function () {
+                $('#loading').hide();
+                $('#eventsTable').show();
+            }
         });
     });
 </script>
