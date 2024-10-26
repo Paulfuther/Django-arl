@@ -256,6 +256,7 @@ def filter_sendgrid_events(date_from=None, date_to=None, template_id=None):
                 'user__username',        # User's username
                 'user__store__number',   # Store identifier
                 'event',                 # Event type
+                'sg_event_id',
                 'sg_template_name',      # Template name
                 'timestamp'              # Timestamp of the event
             ))

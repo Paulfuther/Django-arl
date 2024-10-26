@@ -72,6 +72,7 @@
                             <th>User</th>
                             <th>Store</th>
                             <th>Event</th>
+                            <th>Event ID</th>
                             <th>Template Name</th>
                             <th>Timestamp</th>
                            
@@ -86,6 +87,7 @@
                                 <td>{{ event.user__username }}</td>
                                 <td>{{ event.user__store__number }}</td> <!-- Assuming 'number' as the store identifier -->
                                 <td>{{ event.event }}</td>
+                                <td>{{ event.sg_event_id }}</td>
                                 <td>{{ event.sg_template_name }}</td> <!-- Or update to 'event.sg_template_name' if available -->
                                 <td>{{ event.timestamp|date:"Y-m-d" }}</td>
                             </tr>
