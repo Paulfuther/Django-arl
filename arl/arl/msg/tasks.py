@@ -3,14 +3,16 @@ from __future__ import absolute_import, unicode_literals
 import csv
 import os
 from datetime import datetime, timedelta
-
+from django.contrib.auth import get_user_model
+from .models import EmailEvent
+import pandas as pd
 import pandas as pd
 from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.db import connection
 from django.utils import timezone
-
+from django.db.models import OuterRef, Subquery
 from arl.celery import app
 from arl.msg.helpers import (create_single_csv_email, send_whats_app_template,
                              send_whats_app_template_autoreply)
@@ -18,7 +20,7 @@ from arl.msg.models import EmailEvent
 from arl.user.models import CustomUser
 
 from arl.msg.models import Message
-
+CustomUser = get_user_model()
 logger = get_task_logger(__name__)
 
 
@@ -264,3 +266,56 @@ def filter_sendgrid_events(date_from=None, date_to=None, template_id=None):
         event_data = []
 
     return event_data
+
+
+@app.task(name="email_event_summary")
+def generate_email_event_summary(template_id=None):
+    # Filter events based on template_id if provided
+    events = EmailEvent.objects.all()
+    if template_id:
+        events = events.filter(sg_template_id=template_id)
+
+    # Subquery to retrieve first_name and last_name based on email in CustomUser
+    customuser_subquery = CustomUser.objects.filter(
+        email=OuterRef('email')
+    ).values('first_name', 'last_name')
+
+    # Annotate events with first_name and last_name from CustomUser
+    events = events.annotate(
+        first_name=Subquery(customuser_subquery.values('first_name')[:1]),
+        last_name=Subquery(customuser_subquery.values('last_name')[:1])
+    )
+
+    # Convert events queryset to a DataFrame
+    event_data = list(events.values(
+        'email', 'event', 'sg_template_name', 'first_name', 'last_name'
+    ))
+    df = pd.DataFrame(event_data)
+
+    # Group by template name, email, first_name, and last_name, then pivot on the event type
+    summary_df = df.pivot_table(
+        index=['sg_template_name', 'email', 'first_name', 'last_name'],
+        columns='event',
+        aggfunc='size',
+        fill_value=0
+    ).reset_index()
+
+    # Capitalize column names for display
+    summary_df.columns = [col.capitalize() for col in summary_df.columns]
+
+    # Define the desired column order
+    desired_columns = ["Sg_template_name", "Email", "First_name", "Last_name", "Click", "Open"]
+
+    # Add any missing columns with default value 0
+    for col in desired_columns:
+        if col not in summary_df.columns:
+            summary_df[col] = 0
+
+    # Reorder columns and add any remaining columns
+    remaining_columns = [col for col in summary_df.columns if col not in desired_columns]
+    final_column_order = desired_columns + sorted(remaining_columns)
+
+    summary_df = summary_df[final_column_order]
+
+    # Convert the summary DataFrame to HTML and return
+    return summary_df.to_html(classes="table table-striped", index=False, table_id="table_sms")
