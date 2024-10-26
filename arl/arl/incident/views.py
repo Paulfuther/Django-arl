@@ -16,16 +16,17 @@ from PIL import Image
 
 from arl.helpers import (get_s3_images_for_incident,
                          upload_to_linode_object_storage)
-from arl.tasks import (generate_pdf_email_to_user_task, generate_pdf_task,
-                       save_incident_file)
+from arl.tasks import generate_pdf_email_to_user_task
 
 from .forms import IncidentForm, MajorIncidentForm
 from .models import Incident, MajorIncident
 from .tasks import (generate_major_incident_pdf_from_list_task,
-                    generate_major_incident_pdf_task, save_major_incident_file)
+                    generate_major_incident_pdf_task, generate_pdf_task,
+                    save_incident_file, save_major_incident_file)
 
 
-class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView):
+class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin,
+                         CreateView):
     model = Incident
     login_url = "/login/"
     permission_required = "incident.add_incident"
@@ -87,7 +88,8 @@ class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView
         return form_data
 
 
-class MajorIncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView):
+class MajorIncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin,
+                              CreateView):
     model = MajorIncident
     login_url = "/login/"
     permission_required = "incident.add_major_incident"
@@ -150,7 +152,8 @@ class MajorIncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, Creat
 
 
 @receiver(post_save, sender=MajorIncident)
-def handle_new_major_incident_form_creation(sender, instance, created, **kwargs):
+def handle_new_major_incident_form_creation(sender, instance, created,
+                                            **kwargs):
     if created:
         try:
             generate_major_incident_pdf_task.delay(instance.id)
@@ -159,7 +162,8 @@ def handle_new_major_incident_form_creation(sender, instance, created, **kwargs)
 
 
 @receiver(post_save, sender=Incident)
-def handle_new_incident_form_creation(sender, instance, created, **kwargs):
+def handle_new_incident_form_creation(sender, instance, created,
+                                      **kwargs):
     if created:
         try:
             generate_pdf_task.delay(instance.id)
@@ -418,4 +422,3 @@ class MajorIncidentListView(PermissionRequiredMixin, ListView):
 def Permission_Denied_View(request, exception):
     def get(self, request, exception):
         return render(request, "incident/403.html", status=403)
-

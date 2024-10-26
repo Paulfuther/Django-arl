@@ -1,0 +1,131 @@
+{% extends "../base/base.html" %}
+{% block title %}Index{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+
+<head>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" type="text/css"
+        href="https://cdn.datatables.net/v/dt/jq-3.6.0/jszip-2.5.0/dt-1.12.1/b-2.2.3/b-html5-2.2.3/b-print-2.2.3/r-2.3.0/datatables.min.css" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/pdfmake.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/vfs_fonts.js"></script>
+    <script type="text/javascript"
+        src="https://cdn.datatables.net/v/dt/jq-3.6.0/jszip-2.5.0/dt-1.12.1/b-2.2.3/b-html5-2.2.3/b-print-2.2.3/r-2.3.0/datatables.min.js"></script>
+
+    
+            <style>
+                .container {
+                    max-width: 100%;
+                    overflow-x: hidden;
+                    /* Prevent horizontal overflow */
+                }
+        
+                select,
+                input,
+                button {
+                    max-width: 100%;
+                    box-sizing: border-box;
+                    /* Include padding and border in the element's width */
+                }
+            </style>
+     
+
+</head>
+
+
+<div class="container">
+    <!-- Loading indicator -->
+    <div id="loading"
+    style="display: none; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+    <p>Loading outstanding documents, please wait...</p>
+    <div class="spinner-border" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    </div>
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-10 col-md-8 col-lg-10 col-xl-10">
+            <legend class="border-bottom mb-4">Email Logs</legend>
+            <form method="get" action="{% url 'sendgrid_webhook_view' %}" class="mb-4">
+                {% csrf_token %}
+               
+                <div class="row">
+                    <div class="col-md-4">
+                        {{ form.date_from|as_crispy_field }}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form.date_to|as_crispy_field }}
+                    </div>
+                    <div class="col-md-4">
+                        {{ form.template_id|as_crispy_field }}
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary mt-2">Filter</button>
+            </form>
+                <table id="eventsTable" class="display">
+                    <thead>
+                        <tr>
+                            <th>Email</th>
+                            <th>User</th>
+                            <th>Store</th>
+                            <th>Event</th>
+                            <th>Template Name</th>
+                            <th>Timestamp</th>
+                           
+                          
+                           
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for event in events %}
+                            <tr>
+                                <td>{{ event.email }}</td>
+                                <td>{{ event.user__username }}</td>
+                                <td>{{ event.user__store__number }}</td> <!-- Assuming 'number' as the store identifier -->
+                                <td>{{ event.event }}</td>
+                                <td>{{ event.sg_template_name }}</td> <!-- Or update to 'event.sg_template_name' if available -->
+                                <td>{{ event.timestamp|date:"Y-m-d" }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                    
+                </table>
+            </div>
+         </div>
+    </div>
+
+   <script>
+   $(document).ready(function () {
+        // Show the loading indicator when the page loads
+        $('#loading').show();
+        $('#eventsTable').hide();
+
+        // Initialize DataTables and hide the loading indicator once it's ready
+        $('#eventsTable').DataTable({
+            dom: 'Bfrtip',
+            buttons: [
+                {
+                    extend: 'excelHtml5',
+                    text: 'Export to Excel',
+                    title: 'Email Event Summary'
+                },
+                {
+                    extend: 'pdfHtml5',
+                    text: 'Export to PDF',
+                    title: 'Email Event Summary'
+                }
+            ],
+            pageLength: 10,
+            lengthMenu: [10, 25, 50, 100],
+            initComplete: function () {
+                $('#loading').hide();
+                $('#eventsTable').show();
+            }
+        });
+    });
+</script>
+
+{% endblock %}

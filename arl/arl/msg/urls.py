@@ -5,7 +5,9 @@ from arl.msg.views import (EmailEventList, FetchTwilioCallsView,
                            SendTemplateEmailView, SendTemplateWhatsAppView,
                            click_thank_you, comms, sendgrid_webhook,
                            sms_success_view, template_email_success_view,
-                           template_whats_app_success_view, whatsapp_webhook)
+                           template_whats_app_success_view, whatsapp_webhook,
+                           carwash_targets,message_summary_view, TwilioView,
+                           sendgrid_webhook_view)
 
 urlpatterns = [
     path("send-sms/", SendSMSView.as_view(), name="send_sms_view"),
@@ -41,4 +43,12 @@ urlpatterns = [
     path("thank-you/", click_thank_you, name="thank_you"),
     path("comms/", comms, name="comms"),
     path('webhook/whatsapp/', whatsapp_webhook, name='whatsapp_webhook'),
+    path('carwash/targets/', carwash_targets, name='carwash_targets'),
+    # path('message-summary/', message_summary_view, name='message_summary'),
+    # Route for listing messages
+    path('messages/', TwilioView.as_view(), name='list_messages'),
+
+    # Route for summarizing costs
+    path('message-summary/', TwilioView.as_view(), name='summarize_costs'),
+    path('sendgrid-webhook/', sendgrid_webhook_view, name='sendgrid_webhook_view'),
 ]

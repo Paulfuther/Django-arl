@@ -117,3 +117,22 @@ class TemplateWhatsAppForm(forms.Form):
         for field_name, field in self.fields.items():
             if field_name != 'csrfmiddlewaretoken':  # Skip CSRF token field
                 field.widget.attrs.update({'class': 'custom-input'})
+
+
+class SendGridFilterForm(forms.Form):
+    date_from = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        label="From"
+    )
+    date_to = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        label="To"
+    )
+    template_id = forms.ModelChoiceField(
+        queryset=EmailTemplate.objects.all(),
+        required=True,
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        label="Template Name"
+    )
