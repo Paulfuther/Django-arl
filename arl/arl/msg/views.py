@@ -6,9 +6,10 @@ import pandas as pd
 from django import forms
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import Group
+from django.db.models import OuterRef, Subquery
 from django.forms import modelformset_factory
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import HttpResponse, get_object_or_404, render
 from django.urls import reverse_lazy
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
@@ -23,8 +24,10 @@ from arl.tasks import (send_email_task, send_one_off_bulk_sms_task,
 from arl.user.models import CustomUser, Store
 
 from .forms import (EmailForm, SendGridFilterForm, SMSForm, TemplateEmailForm,
-                    TemplateWhatsAppForm)
-from .tasks import filter_sendgrid_events, process_sendgrid_webhook
+                    TemplateFilterForm, TemplateWhatsAppForm)
+from .models import EmailEvent, EmailTemplate
+from .tasks import (filter_sendgrid_events, generate_email_event_summary,
+                    process_sendgrid_webhook)
 
 logger = logging.getLogger(__name__)
 
@@ -537,5 +540,23 @@ def sendgrid_webhook_view(request):
 
     return render(request, "msg/sendgrid_webhook_table.html", {
         "events": events,
+        "form": form,
+    })
+
+
+def email_event_summary_view(request):
+    form = TemplateFilterForm(request.GET or None)
+    summary_table = ""
+
+    # Only proceed with task if form is valid and template_id is provided
+    if form.is_valid() and form.cleaned_data.get('template_id'):
+        template_id = form.cleaned_data['template_id'].sendgrid_id
+
+        # Call the Celery task
+        result = generate_email_event_summary.delay(template_id)
+        summary_table = result.get(timeout=10)  # Wait for task completion
+
+    return render(request, "msg/email_event_summary_table.html", {
+        "summary_table": summary_table,
         "form": form,
     })

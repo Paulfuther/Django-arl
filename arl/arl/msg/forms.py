@@ -136,3 +136,11 @@ class SendGridFilterForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-control'}),
         label="Template Name"
     )
+
+class TemplateFilterForm(forms.Form):
+    template_id = forms.ModelChoiceField(
+        queryset=EmailTemplate.objects.all(),
+        required=True,
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        label="Template Name"
+    )
