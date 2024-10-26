@@ -2,36 +2,29 @@ import json
 import logging
 import urllib.parse
 
-from django.conf import settings
+import pandas as pd
+from django import forms
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import Group
+from django.forms import modelformset_factory
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse_lazy
+from django.views import View
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormView
 from waffle.decorators import waffle_flag
-from waffle.mixins import WaffleFlagMixin
 
-from arl.msg.helpers import client
-from arl.msg.tasks import (
-    send_template_whatsapp_task, 
-    process_whatsapp_webhook,
-)
-from arl.tasks import (
-    process_sendgrid_webhook,
-    send_email_task,
-    send_one_off_bulk_sms_task,
-    send_template_email_task,
-    
-)
+from arl.msg.helpers import client, send_whats_app_carwash_sites_template
+from arl.msg.tasks import process_whatsapp_webhook, send_template_whatsapp_task
+from arl.tasks import (send_email_task, send_one_off_bulk_sms_task,
+                       send_template_email_task)
 from arl.user.models import CustomUser, Store
 
-from .forms import EmailForm, SMSForm, TemplateEmailForm, TemplateWhatsAppForm
-from .models import Message
-
+from .forms import (EmailForm, SendGridFilterForm, SMSForm, TemplateEmailForm,
+                    TemplateWhatsAppForm)
+from .tasks import filter_sendgrid_events, process_sendgrid_webhook
 
 logger = logging.getLogger(__name__)
 
@@ -203,7 +196,7 @@ def template_whats_app_success_view(request):
 
 
 def fetch_sms():
-    return client.messages.list(limit=200)
+    return client.messages.list(limit=1000)
 
 
 def fetch_whatsapp_messages(account_sid, auth_token):
@@ -241,6 +234,8 @@ class FetchTwilioView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
                 "body": truncated_body,
                 "username": username,  # Add the username to the SMS data
                 # Add more fields as needed
+                "price": msg.price,
+                "price unit": msg.price_unit
             }
             truncated_sms.append(msg_data)
         context["sms_data"] = truncated_sms
@@ -250,6 +245,83 @@ class FetchTwilioView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
 def fetch_calls():
     return client.calls.list(limit=20)
 
+
+class TwilioMessageSummary:
+    def __init__(self, client):
+        # Use the existing Twilio client
+        self.client = client
+
+    def fetch_messages(self, limit=1000):
+        # Fetch the messages from Twilio
+        messages = self.client.messages.list(limit=limit)
+        return messages
+
+    def separate_messages(self, messages):
+        # Separate SMS and WhatsApp messages
+        sms_data = []
+        whatsapp_data = []
+
+        for message in messages:
+            if message.price:  # Ensure the message has pricing data
+                data = {
+                    'date_sent': message.date_sent,
+                    'price': float(message.price),
+                    'price_unit': message.price_unit,
+                    'sid': message.sid
+                }
+
+                # Separate based on the 'from_' or 'to' fields containing 'whatsapp:'
+                if 'whatsapp:' in message.from_ or 'whatsapp:' in message.to:
+                    whatsapp_data.append(data)
+                else:
+                    sms_data.append(data)
+
+        return sms_data, whatsapp_data
+
+    def summarize_by_month(self, data):
+        # Create a DataFrame from the data
+        df = pd.DataFrame(data)
+
+        if df.empty:
+            return pd.DataFrame(columns=['date_sent', 'price'])  # Return empty DataFrame if no data
+
+        # Convert 'date_sent' to a datetime type and remove timezone information
+        df['date_sent'] = pd.to_datetime(df['date_sent']).dt.tz_localize(None)
+
+        # Group by year and month, then sum the 'price' column
+        summary = df.groupby(df['date_sent'].dt.to_period('M')).agg({
+            'price': 'sum'
+        }).reset_index()
+
+        # Format the date as year-month
+        summary['date_sent'] = summary['date_sent'].dt.strftime('%Y-%m')
+
+        return summary.to_dict('records')  # Return as a list of dictionaries
+
+    def get_sms_and_whatsapp_summary(self, limit=1000):
+        # Fetch, separate, and summarize messages
+        messages = self.fetch_messages(limit=limit)
+        sms_data, whatsapp_data = self.separate_messages(messages)
+
+        sms_summary = self.summarize_by_month(sms_data)
+        whatsapp_summary = self.summarize_by_month(whatsapp_data)
+
+        return sms_summary, whatsapp_summary
+
+
+def message_summary_view(request):
+    twilio_summary = TwilioMessageSummary(client)
+
+    # Get the SMS and WhatsApp message summaries as lists of dictionaries
+    sms_summary, whatsapp_summary = twilio_summary.get_sms_and_whatsapp_summary()
+
+    # Pass the lists directly to the template
+    context = {
+        'sms_summary': sms_summary,
+        'whatsapp_summary': whatsapp_summary,
+    }
+
+    return render(request, 'msg/message_summary.html', context)
 
 class FetchTwilioCallsView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
     template_name = "msg/call_data.html"
@@ -328,3 +400,142 @@ def whatsapp_webhook(request):
         )
 
     return JsonResponse({"status": "success"}, status=200)
+
+
+class StoreTargetForm(forms.ModelForm):
+    sales_target = forms.IntegerField(required=True, label='Sales Target')
+
+    class Meta:
+        model = Store
+        fields = ['number', 'sales_target']
+
+    def __init__(self, *args, **kwargs):
+        super(StoreTargetForm, self).__init__(*args, **kwargs)
+        self.fields['number'].disabled = True
+        self.fields['number'].label = "Store Number"
+
+
+StoreFormSet = modelformset_factory(Store, form=StoreTargetForm, extra=0, 
+                                    fields=('number', 'sales_target'))
+
+# Form for selecting a group
+class GroupSelectForm(forms.Form):
+    group = forms.ModelChoiceField(queryset=Group.objects.all(), required=True, label="Select Group")
+
+
+def carwash_targets(request):
+    if request.method == 'POST':
+        print(request.POST)
+        formset = StoreFormSet(request.POST)
+        group_form = GroupSelectForm(request.POST)
+        if formset.is_valid() and group_form.is_valid():
+            formset.save()
+            # Get the user name (assuming it's from request.user or another source)
+            user_name = request.user.first_name  # Or however you get the user's name
+
+            # Build content variables for the WhatsApp message
+            content_vars = {"1": user_name}  # First placeholder is the user's name
+            row_number = 2  # Start after 1 since 1 is used for the username
+            # Extract store number and sales target from the cleaned data
+            
+            for form in formset:
+                store_number = form.cleaned_data['number']
+                target = form.cleaned_data['sales_target']
+                content_vars[f"{row_number}"] = f"Store {store_number}"
+                content_vars[f"{row_number+1}"] = f"Target {target}"
+                row_number += 2
+            print("contentvars", content_vars)
+            content_vars_json = json.dumps(content_vars)
+            # Get the selected group
+            selected_group = group_form.cleaned_data['group']
+            print("selected group", selected_group)
+            group_id = selected_group.id
+            print("group id", group_id)
+            whatsapp_template = "HX1a363c5a2312c9baeb34daed5d422f9d"
+            from_sid = "MGb005e5fe6d147e13d0b2d1322e00b1cb"
+            whatsapp_id = (whatsapp_template)
+            # Assuming sendgrid_id is a field in the EmailTemplate model
+            group = Group.objects.get(pk=group_id)
+            users_in_group = group.user_set.filter(is_active=True)
+            for user in users_in_group:
+                print(user.first_name, user.phone_number, content_vars)
+                send_whats_app_carwash_sites_template(whatsapp_id, from_sid,
+                                                      user.first_name,
+                                                      user.phone_number,
+                                                      content_vars_json
+                                                    )
+    else:
+        # Filter the queryset to include only carwash stores
+        queryset = Store.objects.filter(carwash=True)
+        formset = StoreFormSet(queryset=queryset)
+        group_form = GroupSelectForm()
+
+    return render(request, 'msg/carwash_targets.html', {'formset': formset, 'group_form': group_form})
+   
+
+
+class TwilioView(LoginRequiredMixin, UserPassesTestMixin, View):
+
+    def test_func(self):
+        return is_member_of_msg_group(self.request.user)
+
+    def get(self, request, *args, **kwargs):
+        # Check the requested URL path to determine the function to execute
+        if request.path == '/messages/':
+            return self.list_messages(request)
+        elif request.path == '/message-summary/':
+            return self.summarize_costs(request)
+
+    def list_messages(self, request):
+        sms = fetch_sms()
+        truncated_sms = []
+        for msg in sms:
+            truncated_body = msg.body[:1000]
+            user = CustomUser.objects.filter(phone_number=msg.to).first()
+            username = f"{user.first_name} {user.last_name}" if user else None
+            msg_data = {
+                "sid": msg.sid,
+                "date_sent": msg.date_sent,
+                "from": msg.from_,
+                "to": msg.to,
+                "body": truncated_body,
+                "username": username,
+                "price": msg.price,
+                "price_unit": msg.price_unit
+            }
+            truncated_sms.append(msg_data)
+        context = {
+            "sms_data": truncated_sms
+        }
+        return render(request, "msg/sms_data.html", context)
+
+    def summarize_costs(self, request):
+        twilio_summary = TwilioMessageSummary(client)
+        sms_summary, whatsapp_summary = twilio_summary.get_sms_and_whatsapp_summary()
+        context = {
+            'sms_summary': sms_summary,
+            'whatsapp_summary': whatsapp_summary,
+        }
+        return render(request, 'msg/message_summary.html', context)
+
+
+def sendgrid_webhook_view(request):
+    # Initialize form with GET data
+    form = SendGridFilterForm(request.GET or None)
+
+    # Initialize an empty list for event data
+    events = []
+
+    if form.is_valid() and form.cleaned_data.get('template_id'):
+        date_from = form.cleaned_data['date_from']
+        date_to = form.cleaned_data['date_to']
+        template_id = form.cleaned_data['template_id'].sendgrid_id
+
+        # Trigger the Celery task and get the result
+        task = filter_sendgrid_events.delay(date_from, date_to, template_id)
+        events = task.get()  # Wait for the task to complete and get the result
+
+    return render(request, "msg/sendgrid_webhook_table.html", {
+        "events": events,
+        "form": form,
+    })

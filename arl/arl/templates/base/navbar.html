@@ -63,6 +63,9 @@
           <a class="nav-link" href="{% url 'fetch_twilio_calls' %}">Call Logs</a>
         </li>
         <li class="nav-item">
+          <a class="nav-link" href="{% url 'sendgrid_webhook_view' %}">Email Logs</a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link" href="{% url 'waiting_for_others' %}">Outstanding Docs</a>
         </li>
         {% endif %}

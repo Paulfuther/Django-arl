@@ -9,16 +9,15 @@ from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.contrib.auth.models import Group
 from django.db import connection
+from django.utils import timezone
 
 from arl.celery import app
-from arl.msg.helpers import (
-    create_single_csv_email,
-    send_whats_app_template,
-    send_whats_app_template_autoreply,
-)
+from arl.msg.helpers import (create_single_csv_email, send_whats_app_template,
+                             send_whats_app_template_autoreply)
+from arl.msg.models import EmailEvent
 from arl.user.models import CustomUser
 
-from .models import Message
+from arl.msg.models import Message
 
 logger = get_task_logger(__name__)
 
@@ -180,3 +179,87 @@ def process_whatsapp_webhook(data):
         logger.error(f"Error processing webhook data: {e}")
         return {"status": "error", "message": "Internal Server Error"}
     return {"status": "success"}
+
+
+@app.task(name="sendgrid_webhook")
+def process_sendgrid_webhook(payload):
+    try:
+        if isinstance(payload, list) and len(payload) > 0:
+            event_data = payload[0]
+            # print(event_data)
+            email = event_data.get("email", "")
+            event = event_data.get("event", "")
+            ip = event_data.get("ip", "")
+            # Handle missing 'ip' value with a placeholder or default value
+            if not ip:
+                ip = "192.0.2.0"
+            sg_event_id = event_data.get("sg_event_id", "")
+            sg_message_id = event_data.get("sg_message_id", "")
+            sg_template_id = event_data.get("sg_template_id", "")
+            sg_template_name = event_data.get("sg_template_name", "")
+            timestamp = timezone.datetime.fromtimestamp(
+                event_data.get("timestamp", 0), tz=timezone.utc
+            ) - timedelta(hours=5)
+            url = event_data.get("url", "")
+            useragent = event_data.get("useragent", "")
+            # Find the user by email address in your custom user model
+            try:
+                user = CustomUser.objects.get(email=email)
+            except CustomUser.DoesNotExist:
+                user = None
+            username = user.username if user else None
+            # Create and save the EmailEvent instance
+            event = EmailEvent(
+                email=email,
+                event=event,
+                ip=ip,
+                sg_event_id=sg_event_id,
+                sg_message_id=sg_message_id,
+                sg_template_id=sg_template_id,
+                sg_template_name=sg_template_name,
+                timestamp=timestamp,
+                url=url,
+                user=user,  # Set the user associated with this email event
+                username=username,
+                useragent=useragent,
+            )
+            event.save()
+        return "Sendgrid Webhook Entry Made"
+    except Exception as e:
+        return str(e)
+
+
+@app.task(name="filter_sendgrid_events")
+def filter_sendgrid_events(date_from=None, date_to=None, template_id=None):
+    # Initialize the queryset
+    events = EmailEvent.objects.none()
+
+    # Ensure template_id is provided
+    if template_id:
+        # Filter events based on template_id
+        events = EmailEvent.objects.filter(sg_template_id=template_id)
+
+        # Apply date filters if provided
+        if date_from:
+            events = events.filter(timestamp__gte=timezone.datetime.combine(
+                date_from, timezone.datetime.min.time()))
+        if date_to:
+            events = events.filter(timestamp__lte=timezone.datetime.combine(
+                date_to, timezone.datetime.max.time()))
+
+        # Prefetch related store data for each user in the event
+        events = events.select_related('user__store')
+
+    # Convert events to a list of dictionaries for easier rendering
+        event_data = list(events.values(
+                'email',                 # User's email
+                'user__username',        # User's username
+                'user__store__number',   # Store identifier
+                'event',                 # Event type
+                'sg_template_name',      # Template name
+                'timestamp'              # Timestamp of the event
+            ))
+    else:
+        event_data = []
+
+    return event_data
