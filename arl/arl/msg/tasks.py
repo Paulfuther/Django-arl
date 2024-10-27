@@ -18,7 +18,7 @@ from arl.msg.helpers import (create_single_csv_email, send_whats_app_template,
                              send_whats_app_template_autoreply)
 from arl.msg.models import EmailEvent
 from arl.user.models import CustomUser
-
+from django.db.models import OuterRef, Subquery, F, IntegerField, Func
 from arl.msg.models import Message
 CustomUser = get_user_model()
 logger = get_task_logger(__name__)
@@ -275,26 +275,29 @@ def generate_email_event_summary(template_id=None):
     if template_id:
         events = events.filter(sg_template_id=template_id)
 
-    # Subquery to retrieve first_name and last_name based on email in CustomUser
+    # Subquery to retrieve first_name, last_name from CustomUser and store number from Store
     customuser_subquery = CustomUser.objects.filter(
         email=OuterRef('email')
-    ).values('first_name', 'last_name')
+    ).annotate(
+        store_number_int=Func(F('store__number'), function='FLOOR', output_field=IntegerField())
+    ).values('first_name', 'last_name', 'store_number_int')
 
-    # Annotate events with first_name and last_name from CustomUser
+    # Annotate events with first_name, last_name, and integer store number
     events = events.annotate(
         first_name=Subquery(customuser_subquery.values('first_name')[:1]),
-        last_name=Subquery(customuser_subquery.values('last_name')[:1])
+        last_name=Subquery(customuser_subquery.values('last_name')[:1]),
+        store_number=Subquery(customuser_subquery.values('store_number_int')[:1])
     )
 
     # Convert events queryset to a DataFrame
     event_data = list(events.values(
-        'email', 'event', 'sg_template_name', 'first_name', 'last_name'
+        'email', 'event', 'sg_template_name', 'first_name', 'last_name', 'store_number'
     ))
     df = pd.DataFrame(event_data)
 
-    # Group by template name, email, first_name, and last_name, then pivot on the event type
+    # Group by template name, email, first_name, last_name, and store number, then pivot on the event type
     summary_df = df.pivot_table(
-        index=['sg_template_name', 'email', 'first_name', 'last_name'],
+        index=['sg_template_name', 'email', 'first_name', 'last_name', 'store_number'],
         columns='event',
         aggfunc='size',
         fill_value=0
@@ -304,7 +307,7 @@ def generate_email_event_summary(template_id=None):
     summary_df.columns = [col.capitalize() for col in summary_df.columns]
 
     # Define the desired column order
-    desired_columns = ["Sg_template_name", "Email", "First_name", "Last_name", "Click", "Open"]
+    desired_columns = ["Sg_template_name", "Email", "First_name", "Last_name", "Store_number", "Click", "Open"]
 
     # Add any missing columns with default value 0
     for col in desired_columns:
