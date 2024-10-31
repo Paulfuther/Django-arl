@@ -113,13 +113,8 @@ class SaltLogCreateView(LoginRequiredMixin, CreateView):
     success_url = reverse_lazy('home')
 
     def dispatch(self, request, *args, **kwargs):
-        try:
-            # Your print statement for debugging
-            print("Dispatch method called.")
-            return super().dispatch(request, *args, **kwargs)
-        except Exception as e:
-            print(f"Exception occurred: {e}")
-            raise
+        print("Dispatch method called.")
+        return super().dispatch(request, *args, **kwargs)
 
     def get_form_kwargs(self):
         # Pass the user to the form to initialize certain fields
@@ -133,37 +128,36 @@ class SaltLogCreateView(LoginRequiredMixin, CreateView):
         return self.render_to_response({"form": form})
 
     def form_valid(self, form):
-        # Calls form.save() which triggers the image 
-        # folder creation inside the form's logic
+        # Set the user and user_employer fields for the form instance
+        form.instance.user = self.request.user
         form.instance.user_employer = self.request.user.employer
+        print(form.instance.user, form.instance.user_employer)
+        # Serialize form data to pass to the Celery task
         form_data = self.serialize_form_data(form.cleaned_data)
 
         # Trigger the Celery task to save form data
         save_salt_log.delay(**form_data)
-        messages.success(
-            self.request,
-            "Salt Log Added.",
-        )
+        
+        # Show a success message
+        messages.success(self.request, "Salt Log Added.")
+
         return redirect("home")
 
     def form_invalid(self, form):
         # Render the form again with validation errors
+        print(form.errors)
         return self.render_to_response({"form": form})
 
     def serialize_form_data(self, form_data):
         # Convert ForeignKey fields to their primary key values
         form_data["store"] = (
-            form_data["store"].pk
-            if "store" in form_data and form_data["store"] is not None
-            else None
+            form_data["store"].pk if "store" in form_data and form_data["store"] is not None else None
         )
         form_data["user_employer"] = (
-            form_data["user_employer"].pk
-            if "user_employer" in form_data and form_data["user_employer"] is not None
-            else None
+            form_data["user_employer"].pk if "user_employer" in form_data and form_data["user_employer"] is not None else None
         )
+        form_data["user"] = self.request.user.pk  # Add the user's ID for task
         return form_data
-
 
 class ProcessSaltLogImagesView(LoginRequiredMixin, View):
     login_url = "/login/"
@@ -230,7 +224,7 @@ class SaltLogUpdateView(LoginRequiredMixin, UpdateView):
     model = SaltLog
     login_url = "/login/"
     form_class = SaltLogForm
-    template_name = "quiz/salt_log_form.html"
+    template_name = "quiz/salt_log_form_update.html"
     success_url = reverse_lazy("salt_log_list")
 
     def dispatch(self, request, *args, **kwargs):

@@ -1,6 +1,7 @@
+from django.conf import settings
 from django.db import models
 
-from arl.user.models import Employer
+from arl.user.models import CustomUser, Employer
 
 
 class Quiz(models.Model):
@@ -33,6 +34,7 @@ class Answer(models.Model):
 
 
 class SaltLog(models.Model):
+    user = models.ForeignKey(CustomUser, null=True, on_delete=models.CASCADE, related_name='salt_log')
     store = models.ForeignKey('user.Store', on_delete=models.CASCADE)
     area_salted = models.CharField(max_length=255)
     date_salted = models.DateField(null=True)
@@ -43,4 +45,4 @@ class SaltLog(models.Model):
                                       null=True)
 
     def __str__(self):
-        return f"Salt Log {self.pk}"
+        return f"Salt Log {self.pk} for {self.user.first_name} {self.user.last_name}"

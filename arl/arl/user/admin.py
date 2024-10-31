@@ -260,7 +260,7 @@ class QuestionAdmin(admin.ModelAdmin):
 # UserAdmin.fieldsets = tuple(fields)
 @admin.register(SaltLog)
 class SaltLogAdmin(admin.ModelAdmin):
-    list_display = ('store', 'area_salted', 'date_salted', 'time_salted', 'hidden_timestamp')
+    list_display = ('store', 'user', 'area_salted', 'date_salted', 'time_salted', 'hidden_timestamp')
     list_filter = ('store', 'date_salted')
     search_fields = ('store__name', 'area_salted')
 
