@@ -90,37 +90,29 @@ def generate_salt_log_pdf_task(incident_id):
         pdf = pdfkit.from_string(html_content, False, options)
         #  Create a BytesIO object to store the PDF content
         pdf_buffer = BytesIO(pdf)
-        # Create a unique file name for the PDF
-        store_number = incident.store.number  # Replace with your actual
-        # attribute name
+        # Generate a unique filename with date and store number
+        store_number = incident.store.number
         date_salted_str = incident.date_salted.strftime("%Y-%m-%d") if incident.date_salted else "no-date"
-        # Create a unique file name for the PDF using store number and brief
-        # description
-        pdf_filename = (
-            f"{store_number}_{slugify(date_salted_str)}"
-            f"_salte_log_report.pdf"
-        )
+        pdf_filename = f"{store_number}_{slugify(date_salted_str)}_salt_log_report.pdf"
 
-        # Close the BytesIO buffer to free up resources
-        # Set the BytesIO buffer's position to the beginning
-        # Upload the PDF to Linode Object Storage
-        object_key = (
-            f"SALTLOGS/{incident.user_employer}/{incident.store}/"
-            f"{pdf_filename}"
-        )
-        
+        # Define folder structure parameters for Dropbox
+        company_name = slugify(incident.user_employer.name)
+        store_name = slugify(incident.store.number)
+
         # Upload the PDF to Dropbox
-        upload_any_file_to_dropbox(pdf, pdf_filename, object_key=object_key)
-        # Set the BytesIO buffer's position to the beginning
-        pdf_buffer.seek(0)
+        upload_result = upload_any_file_to_dropbox(pdf_buffer.getvalue(), pdf_filename, company_name, store_name)
+        
+        pdf_buffer.seek(0)  # Reset buffer position
 
-        # Close the BytesIO buffer to free up resources
-        # Then email to the current user and all users in
-        # the group incident_form_email
-        return {
-            "status": "success",
-            "message": "PDF generated and uploaded successfully",
-        }
+        # Log or return the upload result
+        if upload_result[0]:
+            return {
+                "status": "success",
+                "message": "PDF generated and uploaded successfully",
+            }
+        else:
+            raise Exception(upload_result[1])
+
     except Exception as e:
-        logger.error("Error in generate_pdf_task: {}".format(e))
+        logger.error(f"Error in generate_pdf_task: {e}")
         return {"status": "error", "message": str(e)}
