@@ -1,6 +1,7 @@
 from django.urls import path
+
 from . import views
-from .views import (SaltLogCreateView, ProcessSaltLogImagesView,
+from .views import (ProcessSaltLogImagesView, SaltLogCreateView,
                     SaltLogListView, SaltLogUpdateView)
 
 urlpatterns = [
@@ -14,4 +15,6 @@ urlpatterns = [
     path("salt-log-list/", SaltLogListView.as_view(), name="salt_log_list"),
     path("log-process-images/", ProcessSaltLogImagesView.as_view(),
          name="salt_log_upload"),
+    #path('saltlog-pdf/', views.generate_salt_log_pdf,
+    #     name='generate_saltlog_pdf'),
 ]

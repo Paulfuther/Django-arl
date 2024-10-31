@@ -1,20 +1,25 @@
+from io import BytesIO
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import (LoginRequiredMixin,
                                         PermissionRequiredMixin)
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
+from django.views.generic import CreateView, UpdateView, View
+from django.views.generic.list import ListView
+from PIL import Image
 from waffle import flag_is_active
-from django.views.generic import CreateView, View, UpdateView
-from .forms import AnswerFormSet, QuestionFormSet, QuizForm, SaltLogForm
-from .models import Quiz, SaltLog
+
 from arl.helpers import (get_s3_images_for_salt_log,
                          upload_to_linode_object_storage)
-from django.http import JsonResponse
-from PIL import Image
-from io import BytesIO
-from django.views.generic.list import ListView
-from .tasks import save_salt_log
+
+from .forms import AnswerFormSet, QuestionFormSet, QuizForm, SaltLogForm
+from .models import Quiz, SaltLog
+from .tasks import generate_salt_log_pdf_task, save_salt_log
 
 
 @login_required
@@ -159,6 +164,7 @@ class SaltLogCreateView(LoginRequiredMixin, CreateView):
         form_data["user"] = self.request.user.pk  # Add the user's ID for task
         return form_data
 
+
 class ProcessSaltLogImagesView(LoginRequiredMixin, View):
     login_url = "/login/"
 
@@ -273,3 +279,33 @@ class SaltLogUpdateView(LoginRequiredMixin, UpdateView):
         context["user"] = self.request.user
         return context
 
+# this route is turned off in the urls.
+
+
+def generate_salt_log_pdf(request):
+    # Fetch the SaltLog with incident_id = 1
+    incident = get_object_or_404(SaltLog, pk=23)
+    images = get_s3_images_for_salt_log(incident.image_folder, incident.user_employer)
+
+    # Attempt to trigger the PDF generation task
+    try:
+        generate_salt_log_pdf_task.delay(incident.id)
+        messages.success(request, "PDF generation task initiated successfully.")
+    except Exception as e:
+        messages.error(request, f"An error occurred while generating the PDF: {e}")
+
+    context = {
+        "incident": incident,
+        "images": images,
+    }
+    return render(request, "quiz/salt_log_form_pdf.html", context)
+
+
+@receiver(post_save, sender=SaltLog)
+def handle_new_incident_form_creation(sender, instance, created,
+                                      **kwargs):
+    if created:
+        try:
+            generate_salt_log_pdf_task.delay(instance.id)
+        except Exception as e:
+            print(f"An error occurred: {e}")
