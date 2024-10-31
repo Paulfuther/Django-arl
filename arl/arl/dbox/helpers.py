@@ -142,3 +142,26 @@ def upload_to_dropbox_quiz(uploaded_file):
         return False, f"Dropbox API Error: {str(e)}"
     except Exception as e:
         return False, f"Error: {str(e)}"
+    
+
+
+def upload_any_file_to_dropbox(file_content, file_name, object_key=None):
+    try:
+        new_access_token = generate_new_access_token()
+        if new_access_token:
+            dbx = dropbox.Dropbox(new_access_token)
+            # Use object_key for path if provided, otherwise default to /UPLOADERRORS
+            dropbox_path = f"/{object_key}" if object_key else f"/UPLOADERRORS/{file_name}"
+            # Upload the file content to Dropbox
+            dbx.files_upload(
+                file_content, dropbox_path, mode=dropbox.files.WriteMode("overwrite")
+            )
+            return True, f"Uploaded file: {file_name} to Dropbox at {dropbox_path}."
+        else:
+            return False, "Refresh token not found in .env file."
+    except dropbox.exceptions.ApiError as e:
+        logging.error(f"Dropbox API Error: {str(e)}")
+        return False, f"Dropbox API Error: {str(e)}"
+    except Exception as e:
+        logging.error(f"Error: {str(e)}")
+        return False, f"Error: {str(e)}"

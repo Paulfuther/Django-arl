@@ -1,0 +1,76 @@
+<head>
+
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta2/css/all.min.css"
+        integrity="sha512-YWzhKL2whUzgiheMoBFwW8CKV4qpHQAEuvilg9FAn5VJUDwKZZxkJNuGM4XkWuk94WCrrwslk8yWNGmY1EduTA=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.min.js"></script>
+
+    <title>Salt Log Report</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+        .container {
+            width: 90%;
+            margin: 20px auto;
+        }
+        h2, h4 {
+            color: #2c3e50;
+        }
+        .details, .images-section {
+            margin-bottom: 20px;
+        }
+        .details p, .images-section img {
+            margin: 5px 0;
+        }
+        .images-section img {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            margin: 5px;
+        }
+        .bordered {
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+
+{% block content%}
+<body>
+    <div class="container">
+        <h2>Salt Log Report</h2>
+
+        <!-- Display Salt Log details -->
+        <div class="details bordered">
+            <h4>Salt Log Details</h4>
+            <p><strong>GSA:</strong> {{ incident.user.first_name }} {{ incident.user.last_name }}</p>
+            <p><strong>User Employer:</strong> {{ incident.user_employer }}</p>
+            <p><strong>Image Folder:</strong> {{ incident.image_folder }}</p>
+            <p><strong>Date Salted:</strong> {{ incident.date_salted }}</p>
+            <p><strong>Time Salted:</strong> {{ incident.time_salted }}</p>
+            <p><strong>Store:</strong> {{ incident.store }}</p>
+            <p><strong>Area Salted:</strong> {{ incident.area_salted }}</p>
+        </div>
+
+        <!-- Display associated images -->
+        {% if images %}
+            <div class="images-section bordered">
+                <h4>Uploaded Images</h4>
+                <div>
+                    {% for image_url in images %}
+                        <img src="{{ image_url }}" alt="Salt Log Image">
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</body>
+</html>
+
+{% endblock %}
