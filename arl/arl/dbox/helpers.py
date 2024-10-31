@@ -1,6 +1,6 @@
 import logging
 import os
-
+from datetime import datetime
 import dropbox
 import requests
 from celery.utils.log import get_task_logger
@@ -145,20 +145,39 @@ def upload_to_dropbox_quiz(uploaded_file):
     
 
 
-def upload_any_file_to_dropbox(file_content, file_name, object_key=None):
+
+
+def upload_any_file_to_dropbox(file_content, file_name, company_name, store_name):
     try:
         new_access_token = generate_new_access_token()
-        if new_access_token:
-            dbx = dropbox.Dropbox(new_access_token)
-            # Use object_key for path if provided, otherwise default to /UPLOADERRORS
-            dropbox_path = f"/{object_key}" if object_key else f"/UPLOADERRORS/{file_name}"
-            # Upload the file content to Dropbox
-            dbx.files_upload(
-                file_content, dropbox_path, mode=dropbox.files.WriteMode("overwrite")
-            )
-            return True, f"Uploaded file: {file_name} to Dropbox at {dropbox_path}."
-        else:
+        if not new_access_token:
             return False, "Refresh token not found in .env file."
+
+        dbx = dropbox.Dropbox(new_access_token)
+
+        # Define base folder path structure
+        base_folder_path = f"/SALTLOGS/{company_name}/{store_name}"
+        
+        # Check and create nested folder structure if it doesn't exist
+        try:
+            dbx.files_get_metadata(base_folder_path)
+        except dropbox.exceptions.ApiError as e:
+            # If folder not found, create it
+            if isinstance(e.error, dropbox.files.GetMetadataError) and e.error.get_path().is_not_found():
+                dbx.files_create_folder_v2(base_folder_path)
+            else:
+                raise
+
+        # Generate a unique file name with timestamp
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        unique_file_name = f"{timestamp}_{file_name}"
+        file_path = f"{base_folder_path}/{unique_file_name}"
+
+        # Upload the file with WriteMode("add") to avoid overwriting
+        dbx.files_upload(file_content, file_path, mode=dropbox.files.WriteMode("add"))
+
+        return True, f"Uploaded file: {unique_file_name} to Dropbox at {file_path}."
+
     except dropbox.exceptions.ApiError as e:
         logging.error(f"Dropbox API Error: {str(e)}")
         return False, f"Dropbox API Error: {str(e)}"
