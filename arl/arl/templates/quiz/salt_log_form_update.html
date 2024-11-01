@@ -85,10 +85,7 @@
                         {{ form.store|as_crispy_field }}
                         {{ form.area_salted|as_crispy_field }}
                         
-                        <!-- Submit Button positioned above Dropzones -->
-                        <div class="form-group">
-                            <button type="submit" id="submit" class="btn btn-primary mt-3 w-100" disabled>Add Log</button>
-                        </div>
+                        
                         {% if existing_images %}
                         <div class= "text-center mt-2 mb-2 border border-dark p-3" >
                         <h2>Existing Images</h2>
@@ -110,6 +107,10 @@
                                 No Video
                             </p>
                             <div class="dropzone" id="optional-dropzone"></div>
+                        </div>
+                        <!-- Submit Button positioned above Dropzones -->
+                        <div class="form-group">
+                            <button type="submit" id="submit" class="btn btn-primary mt-3 w-100" disabled>Add Log</button>
                         </div>
                     </form>
                 </div>
