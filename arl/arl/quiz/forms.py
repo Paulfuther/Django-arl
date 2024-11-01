@@ -4,6 +4,7 @@ from django.utils import timezone
 from django import forms
 from django.forms import inlineformset_factory
 from django.utils.text import slugify
+import pytz
 
 from .models import Answer, Question, Quiz, SaltLog
 
@@ -62,7 +63,7 @@ class SaltLogForm(forms.ModelForm):
 
         # Set date_salted and time_salted to the current date and time, and disable them
         if self.instance.pk is None:  # Only set these for new entries
-            current_datetime = timezone.now()
+            current_datetime = timezone.now().astimezone(pytz.timezone("America/New_York"))
             self.fields["date_salted"].initial = current_datetime.date()
             self.fields["time_salted"].initial = current_datetime.time()
 
