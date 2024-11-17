@@ -8,19 +8,12 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.http import HttpResponse
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import (
-    Attachment,
-    ContentId,
-    Disposition,
-    FileContent,
-    FileName,
-    FileType,
-    Mail,
-)
+from sendgrid.helpers.mail import (Attachment, ContentId, Disposition,
+                                   FileContent, FileName, FileType, Mail)
 from twilio.base.exceptions import TwilioException
 from twilio.rest import Client
 
-from arl.user.models import Store
+from arl.user.models import CustomUser, Store
 
 logger = get_task_logger(__name__)
 
@@ -403,6 +396,7 @@ def send_whats_app_template(content_sid, from_sid, user_name, to_number):
         print(f"Failed to send message: {str(e)}")
         return None
 
+
 def send_whats_app_carwash_sites_template(content_sid, from_sid, user_name, 
                                           to_number, content_vars):
     # Ensure phone number is in the correct format
@@ -475,3 +469,80 @@ def send_whats_app_template_autoreply(content_sid, from_sid, to_number):
         # Handle errors in message sending
         print(f"Failed to send message: {str(e)}")
         return None
+
+
+def get_inactive_contact_ids():
+    """Retrieve contact IDs of inactive users from SendGrid based on email."""
+    inactive_emails = CustomUser.objects.filter(is_active=False).values_list('email', flat=True)
+    inactive_emails = [email for email in inactive_emails if email]  # Filter out empty emails
+    contact_ids = []
+
+    for email in inactive_emails:
+        response = sg.client.marketing.contacts.search.post(
+            request_body={"query": f"email LIKE '{email}'"}
+        )
+        data = json.loads(response.body)  # Convert the response to JSON (dictionary)
+        if 'result' in data and len(data['result']) > 0:
+            contact_ids.append(data['result'][0]['id'])
+
+    print("Contact IDs for deletion:", contact_ids)  # Debugging print
+    return contact_ids
+
+
+def delete_contacts_by_ids(contact_ids):
+    """Delete contacts from SendGrid using their contact IDs."""
+    if contact_ids:
+        ids_string = ','.join(contact_ids)
+        try:
+            delete_response = sg.client.marketing.contacts.delete(
+                query_params={"ids": ids_string}
+            )
+            print("Deletion response:", delete_response.status_code, delete_response.body)
+        except Exception as e:
+            print("Deletion error:", e)
+    else:
+        print("No inactive contact IDs to delete.")
+
+
+def add_active_contacts(selected_list_id):
+    """Add active users to SendGrid with first name, last name, and email."""
+    # Retrieve active users with first name, last name, and email
+    active_users = CustomUser.objects.filter(is_active=True).values('email', 'first_name', 'last_name')
+    contacts = [
+        {
+            "email": user['email'],
+            "first_name": user['first_name'],
+            "last_name": user['last_name']
+        }
+        for user in active_users if user['email']  # Ensure no empty emails
+    ]
+    print(contacts)
+    if contacts:
+        data = {
+            "list_ids": [selected_list_id],  # Specify the target list ID
+            "contacts": contacts
+        }
+        try:
+            add_response = sg.client.marketing.contacts.put(request_body=data)
+            print("Addition response:", add_response.status_code, add_response.body)
+        except Exception as e:
+            print("Addition error:", e)
+
+
+def sync_contacts_with_sendgrid(selected_list_id):
+    """Main function to sync contacts with SendGrid: remove inactive contacts, add active ones."""
+    contact_ids = get_inactive_contact_ids()
+    delete_contacts_by_ids(contact_ids)
+    add_active_contacts(selected_list_id)
+
+
+def get_all_contact_lists():
+    """Retrieve all contact lists and their IDs from SendGrid."""
+    try:
+        response = sg.client.marketing.lists.get()
+        lists = response.to_dict.get('result', [])
+        for contact_list in lists:
+            print(f"List Name: {contact_list['name']}, List ID: {contact_list['id']}")
+        return lists
+    except Exception as e:
+        print("Error retrieving contact lists:", e)

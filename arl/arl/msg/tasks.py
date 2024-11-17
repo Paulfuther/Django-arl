@@ -3,24 +3,26 @@ from __future__ import absolute_import, unicode_literals
 import csv
 import os
 from datetime import datetime, timedelta
-from django.contrib.auth import get_user_model
-from .models import EmailEvent
-import pandas as pd
+
 import pandas as pd
 from celery.utils.log import get_task_logger
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.db import connection
+from django.db.models import F, Func, IntegerField, OuterRef, Subquery
 from django.utils import timezone
-from django.db.models import OuterRef, Subquery
+
 from arl.celery import app
 from arl.msg.helpers import (create_single_csv_email, send_whats_app_template,
-                             send_whats_app_template_autoreply)
-from arl.msg.models import EmailEvent
+                             send_whats_app_template_autoreply,
+                             sync_contacts_with_sendgrid)
+from arl.msg.models import EmailEvent, Message
 from arl.user.models import CustomUser
-from django.db.models import OuterRef, Subquery, F, IntegerField, Func
-from arl.msg.models import Message
+
 CustomUser = get_user_model()
+
+
 logger = get_task_logger(__name__)
 
 
@@ -322,3 +324,13 @@ def generate_email_event_summary(template_id=None):
 
     # Convert the summary DataFrame to HTML and return
     return summary_df.to_html(classes="table table-striped", index=False, table_id="table_sms")
+
+
+@app.task(name="email_campaign_automation")
+def start_campaign_task(selected_list_id):
+    """Sync contacts and schedule the campaign."""
+    # Sync contacts to the selected list in SendGrid
+    sync_contacts_with_sendgrid(selected_list_id)
+
+    # Log or manage start/end dates for your campaign as needed
+    print(f"Campaign scheduled for list {selected_list_id}.")

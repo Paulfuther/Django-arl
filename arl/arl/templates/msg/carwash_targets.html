@@ -1,0 +1,47 @@
+{% extends "../base/base.html" %}
+{% block template %}
+{% include "../base/navbar.html" %}
+
+
+<form method="post" class="form">
+  {% csrf_token %}
+  {{ formset.management_form }}
+
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+        <legend class="border-bottom mb-4">Store Targets</legend>
+
+        <table class="table table-bordered">
+          <thead>
+            <tr>
+              <th>Store Number</th>
+              <th>Sales Target</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for form in formset %}
+
+            <tr>
+             
+              <td>
+                {{ form.id }}
+                {{ form.number }}
+              </td>
+              
+              <td>{{ form.sales_target}}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <legend class="border-bottom mb-4">Select Group to Send To</legend>
+        <div class="form-group">
+          {{ group_form.group.label_tag }} {{ group_form.group }}
+        </div>
+        <button type="submit" class="btn btn-primary">Submit</button>
+      </div>
+    </div>
+  </div>
+</form>
+
+{% endblock %}
