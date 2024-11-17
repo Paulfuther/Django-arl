@@ -137,6 +137,7 @@ class SendGridFilterForm(forms.Form):
         label="Template Name"
     )
 
+
 class TemplateFilterForm(forms.Form):
     template_id = forms.ModelChoiceField(
         queryset=EmailTemplate.objects.all(),
@@ -144,3 +145,15 @@ class TemplateFilterForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-control'}),
         label="Template Name"
     )
+
+
+class CampaignSetupForm(forms.Form):
+    contact_list = forms.ChoiceField(
+        label="Select Contact List",
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        contact_list_choices = kwargs.pop("contact_list_choices", [])
+        super().__init__(*args, **kwargs)
+        self.fields["contact_list"].choices = contact_list_choices

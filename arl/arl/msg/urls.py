@@ -6,8 +6,9 @@ from arl.msg.views import (EmailEventList, FetchTwilioCallsView,
                            click_thank_you, comms, sendgrid_webhook,
                            sms_success_view, template_email_success_view,
                            template_whats_app_success_view, whatsapp_webhook,
-                           carwash_targets,message_summary_view, TwilioView,
-                           sendgrid_webhook_view, email_event_summary_view)
+                           carwash_targets, message_summary_view, TwilioView,
+                           sendgrid_webhook_view, email_event_summary_view,
+                           campaign_setup_view)
 
 urlpatterns = [
     path("send-sms/", SendSMSView.as_view(), name="send_sms_view"),
@@ -52,4 +53,5 @@ urlpatterns = [
     path('message-summary/', TwilioView.as_view(), name='summarize_costs'),
     path('sendgrid-webhook/', sendgrid_webhook_view, name='sendgrid_webhook_view'),
     path('email-event-summary/', email_event_summary_view, name='email_event_summary'),
+    path("campaign/setup/", campaign_setup_view, name="campaign_setup"),
 ]

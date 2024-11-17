@@ -121,3 +121,8 @@ class Message(models.Model):
 
     def __str__(self):
         return f"{self.message_type} message from {self.sender} to {self.receiver}, status {self.message_status}, at {self.action_time}"
+
+
+class EmailList(models.Model):
+    email = models.EmailField(unique=True)
+    is_active = models.BooleanField(default=True)

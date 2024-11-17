@@ -4,12 +4,12 @@ import urllib.parse
 
 import pandas as pd
 from django import forms
+from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import Group
-from django.db.models import OuterRef, Subquery
 from django.forms import modelformset_factory
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import HttpResponse, get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
@@ -17,15 +17,17 @@ from django.views.generic import TemplateView
 from django.views.generic.edit import FormView
 from waffle.decorators import waffle_flag
 
-from arl.msg.helpers import client, send_whats_app_carwash_sites_template
-from arl.msg.tasks import process_whatsapp_webhook, send_template_whatsapp_task
+from arl.msg.helpers import (client, send_whats_app_carwash_sites_template,
+                             get_all_contact_lists)
+from arl.msg.tasks import (process_whatsapp_webhook,
+                           send_template_whatsapp_task, start_campaign_task)
 from arl.tasks import (send_email_task, send_one_off_bulk_sms_task,
                        send_template_email_task)
 from arl.user.models import CustomUser, Store
 
-from .forms import (EmailForm, SendGridFilterForm, SMSForm, TemplateEmailForm,
-                    TemplateFilterForm, TemplateWhatsAppForm)
-from .models import EmailEvent, EmailTemplate
+from .forms import (CampaignSetupForm, EmailForm, SendGridFilterForm, SMSForm,
+                    TemplateEmailForm, TemplateFilterForm,
+                    TemplateWhatsAppForm)
 from .tasks import (filter_sendgrid_events, generate_email_event_summary,
                     process_sendgrid_webhook)
 
@@ -326,6 +328,7 @@ def message_summary_view(request):
 
     return render(request, 'msg/message_summary.html', context)
 
+
 class FetchTwilioCallsView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
     template_name = "msg/call_data.html"
 
@@ -421,6 +424,7 @@ class StoreTargetForm(forms.ModelForm):
 StoreFormSet = modelformset_factory(Store, form=StoreTargetForm, extra=0, 
                                     fields=('number', 'sales_target'))
 
+
 # Form for selecting a group
 class GroupSelectForm(forms.Form):
     group = forms.ModelChoiceField(queryset=Group.objects.all(), required=True, label="Select Group")
@@ -475,7 +479,6 @@ def carwash_targets(request):
 
     return render(request, 'msg/carwash_targets.html', {'formset': formset, 'group_form': group_form})
    
-
 
 class TwilioView(LoginRequiredMixin, UserPassesTestMixin, View):
 
@@ -560,3 +563,30 @@ def email_event_summary_view(request):
         "summary_table": summary_table,
         "form": form,
     })
+
+
+def campaign_setup_view(request):
+    contact_lists = get_all_contact_lists()
+    contact_list_choices = [(cl["id"], cl["name"]) for cl in contact_lists]
+
+    if request.method == "POST":
+        # Pass the dynamic choices to the form during POST
+        form = CampaignSetupForm(request.POST)
+        form.fields["contact_list"].choices = contact_list_choices
+
+        if form.is_valid():
+            selected_list_id = form.cleaned_data["contact_list"]
+            try:
+                # Sync contacts with the selected list and start the campaign
+                start_campaign_task.delay(selected_list_id)
+
+                messages.success(request, "Campaign started successfully!")
+                return redirect("home")  # Redirect to a success page
+            except Exception as e:
+                messages.error(request, f"Error starting campaign: {e}")
+    else:
+        # Pass the choices to the form during GET
+        form = CampaignSetupForm()
+        form.fields["contact_list"].choices = contact_list_choices
+
+    return render(request, "msg/campaign_setup.html", {"form": form})
