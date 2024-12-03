@@ -170,8 +170,8 @@
     // Required Dropzone
     const requiredDropzone = new Dropzone("#required-dropzone", {
         url: "{% url 'salt_log_upload' %}",
-        maxFilesize: 5, // MB
-        maxFiles: 1,
+        maxFilesize: 8, // MB
+        maxFiles: 4,
         acceptedFiles: "image/*",
         headers: { "X-CSRFToken": getCSRFToken() },
         init: function () {
@@ -201,7 +201,7 @@
     // Optional Dropzone
     const optionalDropzone = new Dropzone("#optional-dropzone", {
         url: "{% url 'salt_log_upload' %}",
-        maxFilesize: 5, // MB
+        maxFilesize: 8, // MB
         maxFiles: 4,
         acceptedFiles: "image/*",
         headers: { "X-CSRFToken": getCSRFToken() },
