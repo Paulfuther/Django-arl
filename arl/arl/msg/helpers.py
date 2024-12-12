@@ -12,7 +12,7 @@ from sendgrid.helpers.mail import (Attachment, ContentId, Disposition,
                                    FileContent, FileName, FileType, Mail)
 from twilio.base.exceptions import TwilioException
 from twilio.rest import Client
-
+from sendgrid.helpers.mail import Asm, GroupId, GroupsToDisplay
 from arl.user.models import CustomUser, Store
 
 logger = get_task_logger(__name__)
@@ -62,6 +62,7 @@ def create_tobacco_email(to_email, name):
 
 
 def create_email(to_email, subject, name, template_id):
+    unsubscribe_group_id = 24753
     subject = subject
     message = Mail(from_email=settings.MAIL_DEFAULT_SENDER, to_emails=to_email)
     message.dynamic_template_data = {
@@ -69,6 +70,12 @@ def create_email(to_email, subject, name, template_id):
         "name": name,
     }
     message.template_id = template_id
+    # Add ASM (Advanced Suppression Manager) for unsubscribe
+    asm = Asm(
+        group_id=unsubscribe_group_id,
+        )
+    message.asm = asm
+    print(message)
     response = sg.send(message)
 
     # Handle the response and return an appropriate value based on your requirements
@@ -128,7 +135,23 @@ def create_hr_newhire_email(**kwargs):
         return False
 
 
-def create_single_email(to_email, name, template_id=None, attachment=None):
+def create_single_email(to_email, name, template_id=None, attachments=None):
+    """
+    Create and send a single email using the SendGrid API.
+
+    Args:
+        to_email: The recipient's email address.
+        name: The recipient's name for personalization.
+        template_id: The SendGrid template ID (optional).
+        attachments: List of attachments (optional).
+            Each attachment is a dictionary with:
+            {
+                "file_content": file bytes content,
+                "file_name": "example.pdf",
+                "file_type": "application/pdf"
+            }
+    """
+    unsubscribe_group_id = 24753
     message = Mail(
         from_email=settings.MAIL_DEFAULT_SENDER,
         to_emails=to_email,
@@ -137,17 +160,25 @@ def create_single_email(to_email, name, template_id=None, attachment=None):
         "name": name,
     }
     message.template_id = template_id
-    # Add attachments if any
-    if attachment:
-        encoded_file = base64.b64encode(attachment['file_content']).decode()
 
-        attached_file = Attachment(
-            FileContent(encoded_file),
-            FileName(attachment['file_name']),
-            FileType(attachment['file_type']),
-            Disposition('attachment')
+    # Add ASM (Advanced Suppression Manager) for unsubscribe
+    asm = Asm(
+        group_id=unsubscribe_group_id,
         )
-        message.add_attachment(attached_file)
+    message.asm = asm
+    print(message)
+    # Add attachments if provided
+    if attachments:
+        for attachment in attachments:
+            encoded_file = base64.b64encode(attachment['file_content']).decode()
+
+            attached_file = Attachment(
+                FileContent(encoded_file),
+                FileName(attachment['file_name']),
+                FileType(attachment['file_type']),
+                Disposition('attachment')
+            )
+            message.add_attachment(attached_file)
 
     try:
         response = sg.send(message)
