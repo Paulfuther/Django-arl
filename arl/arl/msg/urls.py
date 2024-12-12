@@ -3,12 +3,13 @@ from django.urls import path
 from arl.msg.views import (EmailEventList, FetchTwilioCallsView,
                            FetchTwilioView, SendEmailView, SendSMSView,
                            SendTemplateEmailView, SendTemplateWhatsAppView,
-                           click_thank_you, comms, sendgrid_webhook,
-                           sms_success_view, template_email_success_view,
+                           TwilioView, campaign_setup_view, carwash_targets,
+                           click_thank_you, comms, email_event_summary_view,
+                           message_summary_view, sendgrid_webhook,
+                           sendgrid_webhook_view, sms_success_view,
+                           template_email_success_view,
                            template_whats_app_success_view, whatsapp_webhook,
-                           carwash_targets, message_summary_view, TwilioView,
-                           sendgrid_webhook_view, email_event_summary_view,
-                           campaign_setup_view)
+                           )
 
 urlpatterns = [
     path("send-sms/", SendSMSView.as_view(), name="send_sms_view"),

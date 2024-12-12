@@ -7,6 +7,7 @@ from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import Group
+from django.contrib.messages.views import SuccessMessageMixin
 from django.forms import modelformset_factory
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -14,19 +15,20 @@ from django.urls import reverse_lazy
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
-from django.views.generic.edit import FormView
+from django.views.generic.edit import CreateView, FormView
 from waffle.decorators import waffle_flag
 
-from arl.msg.helpers import (client, send_whats_app_carwash_sites_template,
-                             get_all_contact_lists)
+from arl.msg.helpers import (client, get_all_contact_lists,
+                             send_whats_app_carwash_sites_template)
+from arl.msg.models import EmailTemplate
 from arl.msg.tasks import (process_whatsapp_webhook,
                            send_template_whatsapp_task, start_campaign_task)
 from arl.tasks import (send_email_task, send_one_off_bulk_sms_task,
                        send_template_email_task)
 from arl.user.models import CustomUser, Store
 
-from .forms import (CampaignSetupForm, EmailForm, SendGridFilterForm, SMSForm,
-                    TemplateEmailForm, TemplateFilterForm,
+from .forms import (CampaignSetupForm, SendGridFilterForm,
+                    SMSForm, TemplateEmailForm, TemplateFilterForm,
                     TemplateWhatsAppForm)
 from .tasks import (filter_sendgrid_events, generate_email_event_summary,
                     process_sendgrid_webhook)
@@ -100,49 +102,78 @@ class SendTemplateEmailView(LoginRequiredMixin, UserPassesTestMixin, FormView):
         return super().form_valid(form)
 
 
-class SendEmailView(LoginRequiredMixin, UserPassesTestMixin, FormView):
-    form_class = EmailForm
-    template_name = "msg/email_form.html"
-    success_url = reverse_lazy("sms_success")  # URL name for success page
-
+class SendEmailView(LoginRequiredMixin, UserPassesTestMixin, View):
     def test_func(self):
         return is_member_of_msg_group(self.request.user)
 
-    def form_valid(self, form):
+    def get(self, request, *args, **kwargs):
+        # Fetch available groups and email templates
+        groups = Group.objects.all()
+        templates = EmailTemplate.objects.all()
+
+        # Render the form with context
+        return render(request, "msg/email_form.html", {"groups": groups, "templates": templates})
+
+    def post(self, request, *args, **kwargs):
         try:
-            selected_group_id = form.cleaned_data["selected_group"].id
-            template_id = form.cleaned_data["template_id"].sendgrid_id
+            # Retrieve form data
+            selected_group_id = request.POST.get('selected_group')
+            template_id = request.POST.get('template_id')
 
-            # Debugging: Check if any file is received
-            print("Files received:", self.request.FILES)
+            # Validate required fields
+            if not selected_group_id or not template_id:
+                messages.error(request, "Group and Template are required.")
+                return self.get(request)
 
-            attachment = self.request.FILES.get('attachment')
+            # Retrieve selected group and template
+            selected_group = Group.objects.get(id=selected_group_id)
+            email_template = EmailTemplate.objects.get(id=template_id)
 
-            # Debugging: Print the name of the attachment
-            if attachment:
-                print("Attachment:", attachment.name)
-                attachment_data = {
-                    'file_name': attachment.name,
-                    'file_type': attachment.content_type,
-                    'file_content': attachment.read()  # Read the file content
-                }
-            else:
-                print("No attachment found")
-                attachment_data = None
+            # Retrieve uploaded files
+            uploaded_files = request.FILES.getlist('attachments')
 
-            # Use these to send emails to the entire group with the attachment
-            send_email_task.delay(selected_group_id, template_id, attachment_data)
-            return super().form_valid(form)
+            # Debugging: Log uploaded files
+            print("Uploaded files:", uploaded_files)
 
+            if not uploaded_files:
+                messages.error(request, "No files were submitted. Please upload at least one file.")
+                return self.get(request)
+
+            # Validate file size
+            for file in uploaded_files:
+                if file.size > 10 * 1024 * 1024:  # 10 MB limit
+                    messages.error(request, f"{file.name} exceeds the 10MB size limit.")
+                    return self.get(request)
+
+            # Prepare attachments
+            attachments = []
+            for file in uploaded_files:
+                attachments.append({
+                    'file_name': file.name,
+                    'file_type': file.content_type,
+                    'file_content': file.read()
+                })
+
+            # Debugging: Log attachments
+            print("Attachments prepared:", attachments)
+
+            # Call task to send emails
+            send_email_task.delay(selected_group.id,
+                                  email_template.sendgrid_id, attachments)
+
+            messages.success(request, "Emails with attachments are being sent!")
+            return redirect(reverse_lazy("template_email_success"))
+        except Group.DoesNotExist:
+            messages.error(request, "Selected group does not exist.")
+        except EmailTemplate.DoesNotExist:
+            messages.error(request, "Selected email template does not exist.")
         except Exception as e:
-            form.add_error(None, f"An error occurred: {str(e)}")
-            return self.form_invalid(form)
+            # Handle other exceptions
+            print("Error in SendEmailView:", str(e))
+            messages.error(request, f"An error occurred: {str(e)}")
 
-    def form_invalid(self, form):
-        # Handle invalid form submission
-        response = super().form_invalid(form)
-        # You can add more custom error handling here if needed
-        return response
+        # Render the form with errors
+        return self.get(request)
 
 
 class SendTemplateWhatsAppView(LoginRequiredMixin, UserPassesTestMixin, FormView):
@@ -590,3 +621,4 @@ def campaign_setup_view(request):
         form.fields["contact_list"].choices = contact_list_choices
 
     return render(request, "msg/campaign_setup.html", {"form": form})
+

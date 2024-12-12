@@ -5,23 +5,49 @@
 {% load crispy_forms_tags %}
 
 
-
-
-
 <form method="post" action="{% url 'send_email_view' %}" enctype="multipart/form-data">
+  {% csrf_token %}
   <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
-        <legend class="border-bottom mb-4">Send SMS By Group</legend>
-        {% csrf_token %}
-        {{ form|crispy }}
-        <button type="submit" class="btn btn-primary mt-2 mb-1">Send</button>
+      <div class="row justify-content-center">
+          <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+              <legend class="border-bottom mb-4">Send Email Template With Attachments</legend>
+
+              <!-- Group Selection -->
+              <div class="form-group">
+                  <label for="selected_group">Select Group</label>
+                  <select id="selected_group" name="selected_group" class="form-control">
+                      <option value="">-- Select a Group --</option>
+                      {% for group in groups %}
+                          <option value="{{ group.id }}">{{ group.name }}</option>
+                      {% endfor %}
+                  </select>
+              </div>
+
+              <!-- Template Selection -->
+              <div class="form-group">
+                  <label for="template_id">Select Email Template</label>
+                  <select id="template_id" name="template_id" class="form-control">
+                      <option value="">-- Select a Template --</option>
+                      {% for template in templates %}
+                          <option value="{{ template.id }}">{{ template.name }}</option>
+                      {% endfor %}
+                  </select>
+              </div>
+
+              <!-- File Upload -->
+              <div class="form-group">
+                  <label for="attachments">Attach Files</label>
+                  <input type="file" id="attachments" name="attachments" multiple class="form-control">
+                  <small class="form-text text-muted">
+                      You can upload multiple files. Each file should be less than 10MB.
+                  </small>
+              </div>
+
+              <!-- Submit Button -->
+              <button type="submit" class="btn btn-primary mt-2 mb-1">Send</button>
+          </div>
       </div>
-    </div>
   </div>
 </form>
-
-
-
 
 {% endblock %}

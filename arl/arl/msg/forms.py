@@ -2,8 +2,9 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
 from django import forms
 from django.contrib.auth.models import Group
-from django.forms.widgets import ClearableFileInput
+
 from arl.msg.models import EmailTemplate, WhatsAppTemplate
+
 
 
 class SMSForm(forms.Form):
@@ -57,47 +58,6 @@ class TemplateEmailForm(forms.Form):
         for field_name, field in self.fields.items():
             if field_name != 'csrfmiddlewaretoken':  # Skip CSRF token field
                 field.widget.attrs.update({'class': 'custom-input'})
-
-
-class MultipleFileInput(forms.ClearableFileInput):
-    allow_multiple_selected = True
-
-    def __init__(self, attrs=None):
-        super().__init__(attrs)
-        if attrs is None:
-            attrs = {}
-        attrs.update({'multiple': 'multiple'})
-        self.attrs = attrs
-
-    def value_from_datadict(self, data, files, name):
-        return files.getlist(name)
-    
-
-class EmailForm(forms.Form):
-    selected_group = forms.ModelChoiceField(
-        queryset=Group.objects.all(),
-        required=True,
-        label="Select Group to Send Email",
-        widget=forms.Select(attrs={"class": "form-control"}),
-    )
-    
-    template_id = forms.ModelChoiceField(
-        queryset=EmailTemplate.objects.all(),
-        required=True,
-        label="Select Email Template",
-        widget=forms.Select(attrs={"class": "form-control"}),
-    )
-    attachment = forms.FileField(
-        label="Attach File",
-        widget=forms.ClearableFileInput(attrs={'class': 'form-control'}),
-        required=False
-    )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for field_name, field in self.fields.items():
-            if field_name != 'csrfmiddlewaretoken':  # Skip CSRF token field
-                field.widget.attrs.update({'class': 'form-control'})
 
 
 class TemplateWhatsAppForm(forms.Form):
@@ -157,3 +117,5 @@ class CampaignSetupForm(forms.Form):
         contact_list_choices = kwargs.pop("contact_list_choices", [])
         super().__init__(*args, **kwargs)
         self.fields["contact_list"].choices = contact_list_choices
+
+
