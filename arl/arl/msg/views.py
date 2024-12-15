@@ -235,6 +235,7 @@ def fetch_sms():
     return client.messages.list(limit=1000)
 
 
+# this is for whatas app.
 def fetch_whatsapp_messages(account_sid, auth_token):
     # Fetch messages sent via WhatsApp
     messages = client.messages.list(limit=20)  # Adjust 'limit' as needed
