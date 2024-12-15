@@ -12,10 +12,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    env: # Define environment variables for Twilio credentials
-      TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
-      TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v2
@@ -25,10 +21,37 @@ jobs:
       with:
         python-version: 3.9
 
-    - name: Install dependencies
+    - name: Install system dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        sudo apt update
+        sudo apt install -y \
+          libcairo2-dev \
+          pkg-config \
+          python3-dev \
+          libjpeg-dev \
+          libz-dev \
+          libfreetype6-dev
+
+    - name: Debug Cairo Installation
+      run: |
+        echo "Checking cairo installation..."
+        pkg-config --modversion cairo || echo "Cairo not found by pkg-config"
+        dpkg -l | grep cairo
+
+    - name: Locate Cairo.pc
+      run: |
+        find /usr -name cairo.pc || echo "cairo.pc not found"
+
+    - name: Set PKG_CONFIG_PATH
+      run: |
+        export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH
+        echo $PKG_CONFIG_PATH
+
+    - name: Upgrade pip
+      run: python -m pip install --upgrade pip
+
+    - name: Install Python dependencies
+      run: pip install -r requirements.txt
 
     - name: Coverage report
       run: |
