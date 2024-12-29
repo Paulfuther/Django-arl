@@ -15,7 +15,7 @@ jobs:
     env: # Define environment variables for Twilio credentials
       TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
       TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
-      
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v2
@@ -66,8 +66,5 @@ jobs:
     - name: Django Testing
       run: |
         python arl/manage.py test
-
-
-
 
 
