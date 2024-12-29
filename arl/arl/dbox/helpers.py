@@ -144,8 +144,6 @@ def upload_to_dropbox_quiz(uploaded_file):
         return False, f"Error: {str(e)}"
 
 
-
-
 def upload_any_file_to_dropbox(file_content, file_name, company_name, store_name):
     try:
         new_access_token = generate_new_access_token()
@@ -154,8 +152,12 @@ def upload_any_file_to_dropbox(file_content, file_name, company_name, store_name
 
         dbx = dropbox.Dropbox(new_access_token)
 
-        # Define base folder path structure
-        base_folder_path = f"/SALTLOGS/{company_name}/{store_name}"
+        # Get current year and month
+        current_year = datetime.now().strftime("%Y")
+        current_month = datetime.now().strftime("%B")  # Full month name (e.g., "January")
+
+        # Define base folder path structure with year and month
+        base_folder_path = f"/SALTLOGS/{company_name}/{current_year}/{current_month}/{store_name}"
         
         # Check and create nested folder structure if it doesn't exist
         try:
