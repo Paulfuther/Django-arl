@@ -275,7 +275,7 @@ def generate_pdf_task(incident_id):
 
         # Upload the PDF to Dropbox
         pdf_buffer.seek(0)  # Reset buffer position before reusing
-        # upload_incident_file_to_dropbox(pdf_buffer.getvalue(), pdf_filename)
+        upload_incident_file_to_dropbox(pdf_buffer.getvalue(), pdf_filename)
         # Set the BytesIO buffer's position to the beginning
         pdf_buffer.seek(0)
 
