@@ -142,7 +142,6 @@ def upload_to_dropbox_quiz(uploaded_file):
         return False, f"Dropbox API Error: {str(e)}"
     except Exception as e:
         return False, f"Error: {str(e)}"
-    
 
 
 

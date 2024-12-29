@@ -1,0 +1,64 @@
+{% extends "../base/base.html" %}
+{% block title %}Queued Incident Forms{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+<div class="container mb-2 mb-2" style="height: 95vh;">
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-10 col-md-8 col-lg-8 col-xl-8 mt-2">
+            <legend class="border-bottom mb-4">Queued Incident Forms</legend>
+
+            {% if queued_incidents %}
+            <table id="table_docs" class="table table-bordered" style="width:100%">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Store</th>
+                        <th>Description</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for incident in queued_incidents %}
+                    <tr id="incident-{{ incident.id }}">
+                        <td>{{ incident.id }}</td>
+                        <td>{{ incident.store }}</td>
+                        <td>{{ incident.brief_description }}</td>
+                        <td>{{ incident.eventdate }}</td>
+                        <td>
+                            <!-- Action Buttons -->
+                            <div class="d-flex">
+                                <!-- Send Now Button -->
+                                <button 
+                                    class="btn btn-primary btn-sm py-1 px-2 me-2" 
+                                    style="font-size: 0.875rem;"
+                                    hx-get="{% url 'send_incident_now' pk=incident.id %}" 
+                                    hx-target="#incident-{{ incident.id }}" 
+                                    hx-swap="outerHTML:remove">
+                                    Send Now
+                                </button>
+        
+                                <!-- Do Not Send Button -->
+                                <button 
+                                    class="btn btn-danger btn-sm py-1 px-2" 
+                                    style="font-size: 0.875rem;" 
+                                    hx-get="{% url 'mark_do_not_send' pk=incident.id %}" 
+                                    hx-target="#incident-{{ incident.id }}" 
+                                    hx-swap="outerHTML:remove">
+                                    Do Not Send
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="text-muted">No queued incidents available.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% endblock %}

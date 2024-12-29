@@ -14,6 +14,7 @@ class IncidentForm(forms.ModelForm):
     class Meta:
         model = Incident
         fields = "__all__"
+        exclude = ['queued_for_sending', 'sent', 'sent_at']
         labels = {
             "syes": "Off Property Impact: Yes",
             "sno": "Off Property Impact: No",

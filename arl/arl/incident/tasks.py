@@ -7,6 +7,7 @@ import pdfkit
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from django.template.loader import render_to_string
+from django.utils import timezone
 from django.utils.text import slugify
 
 from arl.celery import app
@@ -14,12 +15,13 @@ from arl.dbox.helpers import (upload_incident_file_to_dropbox,
                               upload_major_incident_file_to_dropbox)
 from arl.helpers import (get_s3_images_for_incident,
                          upload_to_linode_object_storage)
-from arl.incident.models import Incident
 from arl.msg.helpers import (create_incident_file_email,
-                             create_incident_file_email_by_rule)
-from arl.user.models import CustomUser, Employer, Store
+                             create_incident_file_email_by_rule,
+                             send_incident_email)
+from arl.user.models import CustomUser, Employer, Store, ExternalRecipient
 
-from .models import MajorIncident
+from .helpers import create_pdf
+from .models import Incident, MajorIncident
 
 logger = logging.getLogger(__name__)
 
@@ -254,50 +256,26 @@ def save_incident_file(**kwargs):
 @app.task(name="create_incident_pdf")
 def generate_pdf_task(incident_id):
     try:
-        # Fetch incident data based on incident_id
-        try:
-            incident = Incident.objects.get(pk=incident_id)
-        except ObjectDoesNotExist:
-            raise ValueError("Incident with ID {} does not exist.".
-                             format(incident_id))
+        # Generate the PDF using the helper function
+        pdf_result = create_pdf(incident_id)
 
-        images = get_s3_images_for_incident(
-            incident.image_folder, incident.user_employer
-        )
-        context = {"incident": incident, "images": images}
-        html_content = render_to_string("incident/incident_form_pdf.html",
-                                        context)
-        #  Generate the PDF using pdfkit
-        options = {
-            "enable-local-file-access": None,
-            "--keep-relative-links": "",
-            "encoding": "UTF-8",
-        }
-        pdf = pdfkit.from_string(html_content, False, options)
-        #  Create a BytesIO object to store the PDF content
-        pdf_buffer = BytesIO(pdf)
-        # Create a unique file name for the PDF
-        store_number = incident.store.number  # Replace with your actual
-        # attribute name
-        brief_description = incident.brief_description
-        # Create a unique file name for the PDF using store number and brief
-        # description
-        pdf_filename = (
-            f"{store_number}_{slugify(brief_description)}"
-            f"_report.pdf"
-        )
+        if pdf_result["status"] != "success":
+            # If PDF generation fails, log the error and return
+            logger.error(f"Failed to generate PDF for incident {incident_id}:{pdf_result['message']}")
+            return {"status": "error", "message": pdf_result["message"]}
 
-        # Close the BytesIO buffer to free up resources
-        # Set the BytesIO buffer's position to the beginning
+        # Extract the PDF filename and buffer from the result
+        pdf_filename = pdf_result["pdf_filename"]
+        pdf_buffer = pdf_result["pdf_buffer"]
         # Upload the PDF to Linode Object Storage
         object_key = (
-            f"SITEINCIDENT/{incident.user_employer}/INCIDENTPDF/"
-            f"{pdf_filename}"
+            f"SITEINCIDENT/{Incident.objects.get(pk=incident_id).user_employer}/INCIDENTPDF/{pdf_filename}"
         )
         upload_to_linode_object_storage(pdf_buffer, object_key)
 
         # Upload the PDF to Dropbox
-        upload_incident_file_to_dropbox(pdf, pdf_filename)
+        pdf_buffer.seek(0)  # Reset buffer position before reusing
+        # upload_incident_file_to_dropbox(pdf_buffer.getvalue(), pdf_filename)
         # Set the BytesIO buffer's position to the beginning
         pdf_buffer.seek(0)
 
@@ -330,3 +308,122 @@ def generate_pdf_task(incident_id):
     except Exception as e:
         logger.error("Error in generate_pdf_task: {}".format(e))
         return {"status": "error", "message": str(e)}
+
+
+# This task creates a pdf of the select Incident Form
+# Then emails the form to the user.
+# This is called from the list of incidents
+# when you click the pdf button
+
+
+@app.task(name="email_updated_incident_pdf")
+def generate_pdf_email_to_user_task(incident_id, user_email):
+    try:
+        # Fetch incident data based on incident_id
+        try:
+            incident = Incident.objects.get(pk=incident_id)
+        except ObjectDoesNotExist:
+            raise ValueError(
+                "Incident with ID {} does not exist.".format(incident_id)
+            )
+
+        # get images, if there are any, from the s3 bucket
+        images = get_s3_images_for_incident(
+            incident.image_folder, incident.user_employer
+        )
+        context = {"incident": incident, "images": images}
+        html_content = render_to_string(
+            "incident/incident_form_pdf.html", context
+            )
+        #  Generate the PDF using pdfkit
+        options = {
+            "enable-local-file-access": None,
+            "--keep-relative-links": "",
+            "encoding": "UTF-8",
+        }
+        # create the pdf
+        pdf = pdfkit.from_string(html_content, False, options)
+        #  Create a BytesIO object to store the PDF content
+        pdf_buffer = BytesIO(pdf)
+        # Create a unique file name for the PDF
+        store_number = incident.store.number
+        # Replace with your actual attribute name
+        brief_description = incident.brief_description
+        # Create a unique file name for the PDF
+        # using store number and brief description
+        pdf_filename = (
+            f"{store_number}_{slugify(brief_description)}"
+            f"_report.pdf"
+        )
+
+        # Close the BytesIO buffer to free up resources
+        # Then email to the current user
+
+        subject = f"Your Incident Report {pdf_filename}"
+        body = "Thank you for using our services. "
+        "Attached is your incident report."
+        # attachment_data = pdf_buffer.getvalue()
+
+        # Call the create_single_email function with
+        # user_email and other details
+        create_incident_file_email(user_email, subject, body,
+                                   pdf_buffer, pdf_filename)
+        # create_single_email(user_email, subject, body, pdf_buffer)
+
+        return {
+            "status": "success",
+            "message": f"Incident {pdf_filename} emailed to {user_email}",
+        }
+    except Exception as e:
+        logger.error("Error in generate_pdf_task: {}".format(e))
+        return {"status": "error", "message": str(e)}
+
+
+@app.task(name='generate_and_send_pdf_task')
+def generate_and_send_pdf_task(incident_id):
+    try:
+        # Fetch the incident
+        incident = Incident.objects.get(pk=incident_id)
+
+        # Generate the PDF
+        pdf_data = create_pdf(incident_id)  # Updated helper function returns a dictionary
+
+        if pdf_data.get("status") == "error":
+            raise ValueError(pdf_data.get("message"))
+
+        pdf_buffer = pdf_data.get("pdf_buffer")
+        pdf_filename = pdf_data.get("pdf_filename")
+
+        # Define email details
+        # Fetch active external recipients
+        to_emails = ExternalRecipient.objects.filter(is_active=True).values_list("email", flat=True)
+        subject = f"Incident Report: {incident.brief_description}"
+        body = (
+            f"<p>An incident occurred on {incident.eventdate} at {incident.store}.</p>"
+            f"<p>Details: {incident.brief_description}</p>"
+            f"<p>Please find the incident report attached.</p>"
+        )
+
+        # Send the email
+        send_incident_email(
+            to_emails=to_emails,
+            subject=subject,
+            body=body,
+            attachment_buffer=pdf_buffer,
+            attachment_filename=pdf_filename,
+        )
+
+        # Mark the incident as sent
+        incident.sent = True
+        incident.sent_at = timezone.now()
+        incident.save(update_fields=["sent", "sent_at"])
+
+        return f"Incident {incident_id} processed and sent successfully."
+
+    except Incident.DoesNotExist:
+        logger.error(f"Incident with ID {incident_id} does not exist.")
+        return f"Incident {incident_id} does not exist."
+
+    except Exception as e:
+        logger.error(f"Error processing incident {incident_id}: {str(e)}")
+        return f"Error processing incident {incident_id}: {str(e)}"

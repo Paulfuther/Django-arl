@@ -53,20 +53,19 @@
         {% endflag %}
 
         {% if user.is_comms %}
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'comms' %}">Comms</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'fetch_twilio' %}">SMS Logs</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'fetch_twilio_calls' %}">Call Logs</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'email_event_summary' %}">Email Logs</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'waiting_for_others' %}">Outstanding Docs</a>
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            Comms 
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+            <li><a class="dropdown-item" href="{% url 'comms' %}">Comms Overview</a></li>
+            <li><a class="dropdown-item" href="{% url 'fetch_twilio' %}">SMS Logs</a></li>
+            <li><a class="dropdown-item" href="{% url 'fetch_twilio_calls' %}">Call Logs</a></li>
+            <li><a class="dropdown-item" href="{% url 'email_event_summary' %}">Email Logs</a></li>
+            <li><a class="dropdown-item" href="{% url 'waiting_for_others' %}">Outstanding Docs</a></li>
+            <li><a class="dropdown-item" href="{% url 'queued_incidents_list' %}">Queued Incidents</a></li>
+            <li><a class="dropdown-item" href="{% url 'summarize_costs' %}">Message Summary</a></li>
+          </ul>
         </li>
         {% endif %}
 

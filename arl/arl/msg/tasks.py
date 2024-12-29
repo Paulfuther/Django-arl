@@ -7,23 +7,154 @@ from datetime import datetime, timedelta
 import pandas as pd
 from celery.utils.log import get_task_logger
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.cache import cache
 from django.db import connection
 from django.db.models import F, Func, IntegerField, OuterRef, Subquery
 from django.utils import timezone
+from .helpers import client
 
 from arl.celery import app
-from arl.msg.helpers import (create_single_csv_email, send_whats_app_template,
-                             send_whats_app_template_autoreply,
-                             sync_contacts_with_sendgrid)
-from arl.msg.models import EmailEvent, Message
+from arl.msg.models import EmailEvent, Message, SmsLog
 from arl.user.models import CustomUser
 
-CustomUser = get_user_model()
-
+from .helpers import (create_master_email, create_single_csv_email,
+                      create_single_email, create_tobacco_email, send_bulk_sms,
+                      send_monthly_store_phonecall, send_sms_model,
+                      send_whats_app_template,
+                      send_whats_app_template_autoreply,
+                      sync_contacts_with_sendgrid)
 
 logger = get_task_logger(__name__)
+
+
+# this is the master email task.
+@app.task(name="master_email_send")
+def master_email_send_task(recipients, sendgrid_id, attachments=None):
+    """
+    Master task to send emails using the provided template and recipient data.
+
+    Args:
+        recipients (list): List of dictionaries containing recipient data (name, email).
+        sendgrid_id (str): SendGrid template ID to use for the email.
+        attachments (list, optional): List of attachments (each as a dictionary with file details).
+
+    Returns:
+        str: Success or error message.
+    """
+    try:
+        # Track errors and successes
+        failed_emails = []
+        for recipient in recipients:
+            try:
+                email = recipient.get("email")
+                name = recipient.get("name")
+
+                if not email:
+                    print(f"Skipping recipient with no email: {recipient}")
+                    continue  # Skip if no email is provided
+
+                # Call the helper function to send the email
+                success = create_master_email(
+                    to_email=email,
+                    name=name,
+                    sendgrid_id=sendgrid_id,
+                    attachments=attachments,
+                )
+                if not success:
+                    failed_emails.append(email)
+                    print(f"Failed to send email to {email}.")
+            except Exception as e:
+                # Handle individual recipient errors without stopping the loop
+                failed_emails.append(email if email else "Unknown")
+                print(f"Error sending email to {email if email else 'Unknown'}: {str(e)}")
+
+        # Final status message
+        if failed_emails:
+            print(f"Emails sent with some failures. Failed emails: {failed_emails}")
+            return f"Emails sent with some failures. Failed emails: {', '.join(failed_emails)}"
+        else:
+            print(f"All emails sent successfully using template '{sendgrid_id}'.")
+            return f"All emails sent successfully using template '{sendgrid_id}'."
+
+    except Exception as e:
+        # Handle task-wide errors
+        error_message = f"Critical error in master_email_send_task: {str(e)}"
+        print(error_message)
+    return error_message
+
+# SMS tasks
+
+
+@app.task(name="sms")
+def send_sms_task(phone_number, message):
+    try:
+        send_sms_model(phone_number, message)
+        return "Text message sent successfully"
+    except Exception as e:
+        return str(e)
+
+
+@app.task(name="bulk_sms")
+def send_bulk_sms_task():
+    try:
+        active_users = CustomUser.objects.filter(is_active=True)
+        gsat = [user.phone_number for user in active_users]
+        message = (
+            "Required Action Policy for Tobacco and Vape Products WHAT IS "
+            "REQUIRED? You must request ID from anyone purchasing tobacco "
+            "or vape products, who looks to be younger than 40. WHY? It is "
+            "against the law to sell tobacco or vape products to minors. "
+            "A person who distributes tobacco or vape products to a minor "
+            "is guilty of an offence, and could be punished with: Loss of "
+            "employment. Face personal fines of $4,000 to $100,000. Loss of "
+            "license to sell tobacco and vape products, as well as face "
+            "additional fines of $10,000 to $150,000. (for the Associate) "
+            "WHO? Each and every Guest that wants to buy tobacco products. "
+            "REQUIRED Guests that look under the age of 40 are asked for "
+            "(picture) I.D. when purchasing tobacco products. Ask for "
+            "(picture) I.D. if they look under 40 before quoting the price "
+            "of tobacco products. Ask for (picture) I.D. if they look under "
+            "40 before placing tobacco products on the counter. Dont let an "
+            "angry Guest stop you from asking for (picture) I.D. "
+            "ITs THE LAW! I.D. Drivers license Passport Certificate of "
+            "Canadian Citizenship Canadian permanent resident card "
+            "Canadian Armed Forces I.D. card Any documents issued by a "
+            "federal or provincial authority or a foreign government that"
+            "contain a photo, date of birth and signature are also "
+            "acceptable. IMPORTANT - School I.D. cannot be accepted as "
+            "proof of age. EXPECTED RESULTS. No employee is charged with "
+            "selling tobacco products to a minor. Employees always remember "
+            "to ask for I.D. No Employee receives a warning letter about "
+            "selling to a minor.",
+        )
+        send_bulk_sms(gsat, message)
+        # Log the result
+        logger.info("Bulk SMS task completed successfully")
+        log_message = f"Bulk SMS sent successfully to {', '.join(gsat)}"
+        log_entry = SmsLog(level="INFO", message=log_message)
+        log_entry.save()
+    except Exception as e:
+        # Log or handle other exceptions
+        logger.error(f"An error occurred: {str(e)}")
+
+
+@app.task(name="one_off_bulk_sms")
+def send_one_off_bulk_sms_task(group_id, message):
+    try:
+        group = Group.objects.get(pk=group_id)
+        users_in_group = group.user_set.filter(is_active=True)
+        gsat = [user.phone_number for user in users_in_group]
+        message = message
+        send_bulk_sms(gsat, message)
+        # Log the result
+        logger.info("Bulk SMS task completed successfully")
+        log_message = f"Bulk SMS sent successfully to {', '.join(gsat)}"
+        log_entry = SmsLog(level="INFO", message=log_message)
+        log_entry.save()
+    except Exception as e:
+        # Log or handle other exceptions
+        logger.error(f"An error occurred: {str(e)}")
 
 
 @app.task(name="send whatsapp")
@@ -334,3 +465,88 @@ def start_campaign_task(selected_list_id):
 
     # Log or manage start/end dates for your campaign as needed
     print(f"Campaign scheduled for list {selected_list_id}.")
+
+
+@app.task(name="send_weekly_tobacco_email")
+def send_weekly_tobacco_email():
+    success_message = "Weekly Tobacco Emails Sent Successfully"
+    template_id = "d-488749fd81d4414ca7bbb2eea2b830db"
+    attachments = None
+    try:
+        active_users = CustomUser.objects.filter(is_active=True)
+        for user in active_users:
+            create_master_email(user.email, user.username, template_id, attachments)
+        return success_message
+    except CustomUser.DoesNotExist:
+        logger.warning("No active users found to send tobacco emails.")
+        return success_message
+
+    except Exception as e:
+        error_message = f"Failed to send tobacco emails. Error: {str(e)}"
+        logger.error(error_message)
+        return error_message
+
+
+@app.task(name="monthly_store_calls")
+def monthly_store_calls_task():
+    try:
+        send_monthly_store_phonecall()
+        return "Monthly Phone Calls sent successfully"
+    except Exception as e:
+        return str(e)
+
+
+@app.task(naem="get_twilio_messsage_summary")
+def fetch_twilio_summary():
+    # Initialize the Twilio client
+    try:
+        # Fetch messages
+        messages = client.messages.list(limit=1000)
+
+        # Separate messages into SMS and WhatsApp
+        sms_data = []
+        whatsapp_data = []
+
+        for message in messages:
+            if message.price:  # Ensure the message has pricing data
+                data = {
+                    'date_sent': message.date_sent,
+                    'price': float(message.price),
+                    'price_unit': message.price_unit,
+                    'sid': message.sid,
+                }
+                if 'whatsapp:' in message.from_ or 'whatsapp:' in message.to:
+                    whatsapp_data.append(data)
+                else:
+                    sms_data.append(data)
+
+        # Summarize messages by month
+        def summarize_by_month(data):
+            df = pd.DataFrame(data)
+            if df.empty:
+                return []
+
+            # Convert 'date_sent' to datetime and remove timezone
+            df['date_sent'] = pd.to_datetime(df['date_sent']).dt.tz_localize(None)
+            summary = (
+                df.groupby(df['date_sent'].dt.to_period('M'))
+                .agg({'price': 'sum'})
+                .reset_index()
+            )
+            summary['date_sent'] = summary['date_sent'].dt.strftime('%Y-%m')
+            return summary.to_dict('records')
+
+        # Summarize SMS and WhatsApp data
+        sms_summary = summarize_by_month(sms_data)
+        whatsapp_summary = summarize_by_month(whatsapp_data)
+
+        # Return the summaries
+        return {
+            "sms_summary": sms_summary,
+            "whatsapp_summary": whatsapp_summary,
+        }
+
+    except Exception as e:
+        # Log any errors for debugging
+        print(f"Error fetching or processing Twilio messages: {e}")
+        raise e

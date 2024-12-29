@@ -1,37 +1,36 @@
+import base64
 import json
 import logging
 import urllib.parse
 
-import pandas as pd
+from celery.result import AsyncResult
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import Group
-from django.contrib.messages.views import SuccessMessageMixin
 from django.forms import modelformset_factory
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse_lazy
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
-from django.views.generic.edit import CreateView, FormView
+from django.views.generic.edit import FormView
 from waffle.decorators import waffle_flag
 
 from arl.msg.helpers import (client, get_all_contact_lists,
                              send_whats_app_carwash_sites_template)
-from arl.msg.models import EmailTemplate
 from arl.msg.tasks import (process_whatsapp_webhook,
                            send_template_whatsapp_task, start_campaign_task)
-from arl.tasks import (send_email_task, send_one_off_bulk_sms_task,
-                       send_template_email_task)
 from arl.user.models import CustomUser, Store
 
-from .forms import (CampaignSetupForm, SendGridFilterForm,
-                    SMSForm, TemplateEmailForm, TemplateFilterForm,
+from .forms import (CampaignSetupForm, SendGridFilterForm, SMSForm,
+                    TemplateEmailForm, TemplateFilterForm,
                     TemplateWhatsAppForm)
-from .tasks import (filter_sendgrid_events, generate_email_event_summary,
-                    process_sendgrid_webhook)
+from .tasks import (fetch_twilio_summary, filter_sendgrid_events,
+                    generate_email_event_summary, master_email_send_task,
+                    process_sendgrid_webhook, send_one_off_bulk_sms_task)
 
 logger = logging.getLogger(__name__)
 
@@ -77,103 +76,105 @@ class SendSMSView(LoginRequiredMixin, UserPassesTestMixin, FormView):
 class SendTemplateEmailView(LoginRequiredMixin, UserPassesTestMixin, FormView):
     form_class = TemplateEmailForm
     template_name = "msg/template_email_form.html"
-    # URL name for success page
     success_url = reverse_lazy("template_email_success")
 
     def test_func(self):
         return is_member_of_msg_group(self.request.user)
 
     def form_valid(self, form):
-        subject = form.cleaned_data["subject"]
-        selected_group_id = form.cleaned_data["selected_group"].id
-        sendgrid_template = form.cleaned_data["sendgrid_id"]
+        # Retrieve the template ID and fetch the corresponding instance
+        sendgrid_template = form.cleaned_data.get("sendgrid_id").first()
+        print(sendgrid_template.id)
+        if not sendgrid_template:
+            return JsonResponse({"success": False, "error": "No email template selected."}, status=400)
+        # Use the SendGrid ID directly
+        sendgrid_id = sendgrid_template.sendgrid_id
+        selected_groups = form.cleaned_data.get("selected_group")
+        selected_users = form.cleaned_data.get("selected_users")
 
-        # Fetch the group and sendgrid_id
-        group = get_object_or_404(Group, pk=selected_group_id)
-        group_id = group.id
-        sendgrid_id = (
-            sendgrid_template.sendgrid_id
-        )  # Assuming sendgrid_id is a field in the EmailTemplate model
+        if not selected_groups and not selected_users:
+            return JsonResponse({"success": False, "error": "No recipients selected."}, status=400)
 
-        # Now you have both the group_id and the corresponding sendgrid_id
-        # Use these to send emails to the entire group
-        send_template_email_task.delay(group_id, subject, sendgrid_id)
+        # Collect attachments
+        attachments = self.collect_attachments()
+        if attachments is None:
+            return JsonResponse({"success": False, "error": "One or more attachments exceed the 10MB size limit."}, status=400)
+
+        # Gather recipient data
+        recipients = self.prepare_recipient_data(selected_groups, selected_users)
+
+        # Debugging: Log recipient data
+        print("Prepared recipient data:", recipients, sendgrid_id)
+
+        # Pass data to the task
+        master_email_send_task.delay(
+            recipients=recipients,
+            sendgrid_id=sendgrid_id,
+            attachments=attachments
+        )
+
+        print("sent")
+        if self.request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({
+                "success": True,
+                "message": "Emails processed successfully! The page will refresh after you close this message.",
+            })
 
         return super().form_valid(form)
 
+    def form_invalid(self, form):
+        print("Form validation failed. Errors:", form.errors)
 
-class SendEmailView(LoginRequiredMixin, UserPassesTestMixin, View):
-    def test_func(self):
-        return is_member_of_msg_group(self.request.user)
+        if self.request.headers.get("x-requested-with") == "XMLHttpRequest":
+            # Render the form with errors as HTML
+            html = render_to_string(self.template_name, {"form": form}, self.request)
+            return JsonResponse({"success": False, "html": html})
 
-    def get(self, request, *args, **kwargs):
-        # Fetch available groups and email templates
-        groups = Group.objects.all()
-        templates = EmailTemplate.objects.all()
+        return self.render_to_response(self.get_context_data(form=form))
 
-        # Render the form with context
-        return render(request, "msg/email_form.html", {"groups": groups, "templates": templates})
+    def collect_attachments(self):
+        attachments = []
+        for field_name in ["attachment_1", "attachment_2", "attachment_3"]:
+            file = self.request.FILES.get(field_name)
+            if file:
+                # Validate file size (10 MB limit)
+                if file.size > 10 * 1024 * 1024:
+                    messages.error(self.request, f"{file.name} exceeds the 10MB size limit.")
+                    return None
 
-    def post(self, request, *args, **kwargs):
-        try:
-            # Retrieve form data
-            selected_group_id = request.POST.get('selected_group')
-            template_id = request.POST.get('template_id')
-
-            # Validate required fields
-            if not selected_group_id or not template_id:
-                messages.error(request, "Group and Template are required.")
-                return self.get(request)
-
-            # Retrieve selected group and template
-            selected_group = Group.objects.get(id=selected_group_id)
-            email_template = EmailTemplate.objects.get(id=template_id)
-
-            # Retrieve uploaded files
-            uploaded_files = request.FILES.getlist('attachments')
-
-            # Debugging: Log uploaded files
-            print("Uploaded files:", uploaded_files)
-
-            if not uploaded_files:
-                messages.error(request, "No files were submitted. Please upload at least one file.")
-                return self.get(request)
-
-            # Validate file size
-            for file in uploaded_files:
-                if file.size > 10 * 1024 * 1024:  # 10 MB limit
-                    messages.error(request, f"{file.name} exceeds the 10MB size limit.")
-                    return self.get(request)
-
-            # Prepare attachments
-            attachments = []
-            for file in uploaded_files:
+                # Serialize the attachment
                 attachments.append({
-                    'file_name': file.name,
-                    'file_type': file.content_type,
-                    'file_content': file.read()
+                    "file_name": file.name,
+                    "file_type": file.content_type,
+                    "file_content": base64.b64encode(file.read()).decode("utf-8"),
+                })
+                print(file.name)
+        return attachments
+
+    def prepare_recipient_data(self, selected_groups, selected_users):
+        """
+        Gather user names and email addresses from selected groups and users.
+        """
+        recipients = []  # Use a list to store dictionaries with name and email
+
+        if selected_groups:
+            for group in selected_groups:
+                for user in group.user_set.all():
+                    recipients.append({
+                        "name": user.get_full_name(),
+                        "email": user.email
+                    })
+
+        if selected_users:
+            for user in selected_users:
+                recipients.append({
+                    "name": user.get_full_name(),
+                    "email": user.email
                 })
 
-            # Debugging: Log attachments
-            print("Attachments prepared:", attachments)
-
-            # Call task to send emails
-            send_email_task.delay(selected_group.id,
-                                  email_template.sendgrid_id, attachments)
-
-            messages.success(request, "Emails with attachments are being sent!")
-            return redirect(reverse_lazy("template_email_success"))
-        except Group.DoesNotExist:
-            messages.error(request, "Selected group does not exist.")
-        except EmailTemplate.DoesNotExist:
-            messages.error(request, "Selected email template does not exist.")
-        except Exception as e:
-            # Handle other exceptions
-            print("Error in SendEmailView:", str(e))
-            messages.error(request, f"An error occurred: {str(e)}")
-
-        # Render the form with errors
-        return self.get(request)
+        # Remove duplicates based on email
+        unique_recipients = {recipient["email"]: recipient for recipient in recipients}.values()
+        return list(unique_recipients)
 
 
 class SendTemplateWhatsAppView(LoginRequiredMixin, UserPassesTestMixin, FormView):
@@ -283,82 +284,24 @@ def fetch_calls():
     return client.calls.list(limit=20)
 
 
-class TwilioMessageSummary:
-    def __init__(self, client):
-        # Use the existing Twilio client
-        self.client = client
+def fetch_twilio_data(request):
+    # Run the synchronous task
+    task = fetch_twilio_summary.delay()
+    return JsonResponse({"task_id": task.id})
 
-    def fetch_messages(self, limit=1000):
-        # Fetch the messages from Twilio
-        messages = self.client.messages.list(limit=limit)
-        return messages
 
-    def separate_messages(self, messages):
-        # Separate SMS and WhatsApp messages
-        sms_data = []
-        whatsapp_data = []
-
-        for message in messages:
-            if message.price:  # Ensure the message has pricing data
-                data = {
-                    'date_sent': message.date_sent,
-                    'price': float(message.price),
-                    'price_unit': message.price_unit,
-                    'sid': message.sid
-                }
-
-                # Separate based on the 'from_' or 'to' fields containing 'whatsapp:'
-                if 'whatsapp:' in message.from_ or 'whatsapp:' in message.to:
-                    whatsapp_data.append(data)
-                else:
-                    sms_data.append(data)
-
-        return sms_data, whatsapp_data
-
-    def summarize_by_month(self, data):
-        # Create a DataFrame from the data
-        df = pd.DataFrame(data)
-
-        if df.empty:
-            return pd.DataFrame(columns=['date_sent', 'price'])  # Return empty DataFrame if no data
-
-        # Convert 'date_sent' to a datetime type and remove timezone information
-        df['date_sent'] = pd.to_datetime(df['date_sent']).dt.tz_localize(None)
-
-        # Group by year and month, then sum the 'price' column
-        summary = df.groupby(df['date_sent'].dt.to_period('M')).agg({
-            'price': 'sum'
-        }).reset_index()
-
-        # Format the date as year-month
-        summary['date_sent'] = summary['date_sent'].dt.strftime('%Y-%m')
-
-        return summary.to_dict('records')  # Return as a list of dictionaries
-
-    def get_sms_and_whatsapp_summary(self, limit=1000):
-        # Fetch, separate, and summarize messages
-        messages = self.fetch_messages(limit=limit)
-        sms_data, whatsapp_data = self.separate_messages(messages)
-
-        sms_summary = self.summarize_by_month(sms_data)
-        whatsapp_summary = self.summarize_by_month(whatsapp_data)
-
-        return sms_summary, whatsapp_summary
+def get_task_status(request, task_id):
+    task = AsyncResult(task_id)
+    if task.state == "SUCCESS":
+        return JsonResponse({"status": "success", "result": task.result})
+    elif task.state == "FAILURE":
+        return JsonResponse({"status": "failure", "error": str(task.result)})
+    else:
+        return JsonResponse({"status": "pending"})
 
 
 def message_summary_view(request):
-    twilio_summary = TwilioMessageSummary(client)
-
-    # Get the SMS and WhatsApp message summaries as lists of dictionaries
-    sms_summary, whatsapp_summary = twilio_summary.get_sms_and_whatsapp_summary()
-
-    # Pass the lists directly to the template
-    context = {
-        'sms_summary': sms_summary,
-        'whatsapp_summary': whatsapp_summary,
-    }
-
-    return render(request, 'msg/message_summary.html', context)
+    return render(request, "msg/message_summary.html")
 
 
 class FetchTwilioCallsView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):

@@ -1,6 +1,7 @@
 import base64
 import json
 import os
+import traceback  # For detailed error reporting
 
 from celery.utils.log import get_task_logger
 from django.conf import settings
@@ -8,12 +9,15 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.http import HttpResponse
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import (Attachment, ContentId, Disposition,
+from sendgrid.helpers.mail import (Asm, Attachment, ContentId, Disposition,
                                    FileContent, FileName, FileType, Mail)
 from twilio.base.exceptions import TwilioException
 from twilio.rest import Client
-from sendgrid.helpers.mail import Asm, GroupId, GroupsToDisplay
+
+from arl.msg.models import EmailTemplate
 from arl.user.models import CustomUser, Store
+
+from .models import EmailEvent  # Import your EmailEvent model
 
 logger = get_task_logger(__name__)
 
@@ -60,32 +64,70 @@ def create_tobacco_email(to_email, name):
             logger.error(f"SendGrid response status code: {response_status}")
             logger.error(f"SendGrid response body: {response_body}")
 
+# this is the master email function
 
-def create_email(to_email, subject, name, template_id):
-    unsubscribe_group_id = 24753
-    subject = subject
-    message = Mail(from_email=settings.MAIL_DEFAULT_SENDER, to_emails=to_email)
-    message.dynamic_template_data = {
-        "subject": subject,
-        "name": name,
-    }
-    message.template_id = template_id
-    # Add ASM (Advanced Suppression Manager) for unsubscribe
-    asm = Asm(
-        group_id=unsubscribe_group_id,
+
+def create_master_email(to_email, name, sendgrid_id, attachments=None):
+    try:
+        unsubscribe_group_id = 24753
+        # template = EmailTemplate.objects.get(id=template_id)
+
+        # Initialize the email message
+        message = Mail(
+            from_email=settings.MAIL_DEFAULT_SENDER,
+            to_emails=to_email,
         )
-    message.asm = asm
-    print(message)
-    response = sg.send(message)
 
-    # Handle the response and return an appropriate value based on your requirements
-    if response.status_code == 202:
-        return True
-    else:
-        print("Failed to send email. Error code:", response.status_code)
+        # Add dynamic template data
+        message.dynamic_template_data = {
+            "name": name,
+            "subject": "NONE",
+        }
+        message.template_id = sendgrid_id
+        asm = Asm(
+            group_id=unsubscribe_group_id,
+        )
+        message.asm = asm
+        # Handle attachments if provided
+        if attachments:
+            for attachment in attachments:
+                encoded_content = attachment.get("file_content")
+                if encoded_content:
+                    attachment_instance = Attachment(
+                        FileContent(encoded_content),
+                        FileName(attachment.get("file_name", "file")),
+                        FileType(attachment.get("file_type", "application/octet-stream")),
+                        Disposition("attachment")
+                    )
+                    message.attachment = attachment_instance
+
+        # Send the email via SendGrid
+        sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
+        response = sg.send(message)
+
+        # Check response status
+        if response.status_code == 202:
+            print(f"Email sent successfully to {to_email}.")
+            return True
+        else:
+            print(f"Failed to send email to {to_email}. Status code: {response.status_code}")
+            return False
+
+    except Exception as e:
+        # Extract detailed error information if available
+        error_details = str(e)
+        if hasattr(e, 'body'):
+            error_details += f" Response body: {e.body}"
+
+        # Log error details for debugging
+        print(f"Error in create_master_email: {error_details}")
+        traceback.print_exc()  # For detailed error trace
         return False
 
 
+# for now we are going to keep this helper file
+# it has data in the dynamic_template_date that is needed
+# Eventually, we will merge this with master email.
 def create_hr_newhire_email(**kwargs):
     CustomUser = get_user_model()
 
@@ -402,6 +444,53 @@ def create_incident_file_email_by_rule(
             response_status = e.response.status_code
             logger.error(f"SendGrid response status code: {response_status}")
             logger.error(f"SendGrid response body: {response_body}")
+
+
+def send_incident_email(
+    to_emails, subject, body, attachment_buffer=None, attachment_filename=None
+):
+    try:
+        for to_email in to_emails:
+            message = Mail(
+                from_email=settings.MAIL_DEFAULT_SENDER,
+                to_emails=to_email,
+                subject=subject,
+                html_content=body,
+            )
+            print(to_email)
+            if attachment_buffer and attachment_filename:
+                attachment_buffer.seek(0)  
+                # Ensure the buffer is at the beginning
+                attachment_content = base64.b64encode(attachment_buffer.read()).decode()
+                attachment = Attachment()
+                attachment.file_content = FileContent(attachment_content)
+                attachment.file_name = FileName(attachment_filename)
+                attachment.file_type = FileType("application/pdf")
+                attachment.disposition = Disposition("attachment")
+                attachment.content_id = ContentId("Attachment")
+
+                message.attachment = attachment
+
+            response = sg.send(message)
+
+            if response.status_code != 202:
+                print(
+                    "Failed to send email to",
+                    to_email,
+                    "Error code:",
+                    response.status_code,
+                )
+
+    except Exception as e:
+        error_message = f"An error occurred while sending email to {to_email}: {str(e)}"
+        logger.error(error_message)
+
+        if hasattr(e, "response") and e.response is not None:
+            response_body = e.response.body
+            response_status = e.response.status_code
+            logger.error(f"SendGrid response status code: {response_status}")
+            logger.error(f"SendGrid response body: {response_body}")
+
 
 
 def send_whats_app_template(content_sid, from_sid, user_name, to_number):

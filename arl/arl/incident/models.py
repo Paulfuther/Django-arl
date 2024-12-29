@@ -99,8 +99,21 @@ class Incident(models.Model):
     image_folder = models.CharField(max_length=255, null=True)
     user_employer = models.ForeignKey(Employer, on_delete=models.SET_NULL, null=True)
 
+    # New fields for email tracking
+    queued_for_sending = models.BooleanField(default=False, help_text="Indicates if this file is queued for sending.")
+    sent = models.BooleanField(default=False)
+    sent_at = models.DateTimeField(null=True, blank=True, help_text="The timestamp when the file was sent.")
+    do_not_send = models.BooleanField(default=False)
+
+    
     def __str__(self):
         return f"Incident {self.pk}"
+
+    def is_ready_to_send(self):
+        """
+        Determine if the incident is ready to be sent.
+        """
+        return self.queued_for_sending and self.sent_at is None
 
 
 class MajorIncident(models.Model):

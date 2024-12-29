@@ -6,23 +6,27 @@ from django.contrib.auth.mixins import (LoginRequiredMixin,
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.http import JsonResponse
-from django.shortcuts import redirect, render
-from django.urls import reverse_lazy
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse, reverse_lazy
 from django.views import View
+from django.views.generic import ListView
 from django.views.generic.edit import CreateView, UpdateView
-from django.views.generic.list import ListView
 from PIL import Image
-
+from django.template.loader import render_to_string
 from arl.helpers import (get_s3_images_for_incident,
                          upload_to_linode_object_storage)
-from arl.tasks import generate_pdf_email_to_user_task
 
 from .forms import IncidentForm, MajorIncidentForm
 from .models import Incident, MajorIncident
-from .tasks import (generate_major_incident_pdf_from_list_task,
-                    generate_major_incident_pdf_task, generate_pdf_task,
+from .tasks import (generate_and_send_pdf_task,
+                    generate_major_incident_pdf_from_list_task,
+                    generate_major_incident_pdf_task,
+                    generate_pdf_email_to_user_task, generate_pdf_task,
                     save_incident_file, save_major_incident_file)
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin,
@@ -166,10 +170,77 @@ def handle_new_incident_form_creation(sender, instance, created,
                                       **kwargs):
     if created:
         try:
+            # Set the queued_for_sending field to True
+            instance.queued_for_sending = True
+            instance.save(update_fields=["queued_for_sending"])
             generate_pdf_task.delay(instance.id)
         except Exception as e:
             print(f"An error occurred: {e}")
 
+
+class QueuedIncidentsListView(ListView):
+    model = Incident
+    template_name = 'incident/queued_incidents_list.html'
+    context_object_name = 'queued_incidents'
+
+    def get_queryset(self):
+        queryset = Incident.objects.filter(queued_for_sending=True, sent=False, do_not_send=False)
+        print(queryset)
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        logger.debug(f"Context Data: {context}")
+        print("Context Data:", context) 
+        return context
+
+
+def send_incident_now(request, pk):
+    """
+    Process the "Send Now" action for an incident and update its status.
+    """
+    # Fetch the incident object
+    incident = get_object_or_404(Incident, pk=pk)
+
+    try:
+        # Mark the incident as processed
+        incident.queued_for_sending = False
+        incident.save(update_fields=["queued_for_sending"])
+
+        # Trigger the task to generate and send the PDF
+        generate_and_send_pdf_task.delay(incident.id)
+
+        # Return an empty response to indicate the row should be removed
+        return HttpResponse(status=200)  # HTMX will remove the row with "outerHTML:remove"
+    
+    except Exception as e:
+        # Return an error response as an HTML row for display
+        error_html = f"""
+        <tr id="incident-{incident.id}">
+            <td colspan="5" class="text-danger">Error: {str(e)}</td>
+        </tr>
+        """
+        return HttpResponse(error_html, status=500, content_type="text/html")
+
+
+def mark_do_not_send(request, pk):
+    """
+    Marks the incident as "Do Not Send" and removes it from the queue.
+    """
+    incident = get_object_or_404(Incident, pk=pk)
+
+    try:
+        # Mark the incident as "Do Not Send"
+        incident.queued_for_sending = False
+        incident.sent = False  # Ensure it's not marked as sent
+        incident.do_not_send = True  # Add this field in your model if not present
+        incident.save(update_fields=["queued_for_sending", "sent", "do_not_send"])
+        print(f"Incident {pk} marked as 'Do Not Send'.")
+        return HttpResponse(status=200)  # HTMX will remove the row
+    except Exception as e:
+        print(f"Error processing 'Do Not Send' for incident {pk}: {e}")
+        return HttpResponse(status=500)  # Generic error response
+    
 
 class IncidentUpdateView(PermissionRequiredMixin, LoginRequiredMixin,
                          UpdateView):

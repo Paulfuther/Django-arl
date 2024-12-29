@@ -2,24 +2,216 @@
 {% block title %}Index{% endblock %}
 
 {% block template %}
-
+{% load static %}
 {% load crispy_forms_tags %}
 
+<head>
+  <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}">
+</head>
 
-<form method="post" action="{% url 'send_template_email_view' %}">
-  <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
-        <legend class="border-bottm mb-4">Send Email Template by Group</legend>
-        {% csrf_token %}
-        {{ form|crispy }}
-        <button type="submit" class="btn btn-primary mt-2 mb-1">Send</button>
+<!-- Main Form Container -->
+<div id="email-form-container">
+  <form id="email-form" method="post" action="{% url 'send_template_email_view' %}">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+          {% csrf_token %}
+          <legend class="border-bottom mb-4">Send Email Template</legend>
+          
+          <!-- Display Form Errors -->
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger" role="alert">
+              {% for error in form.non_field_errors %}
+                <p>{{ error }}</p>
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          {% for field in form.visible_fields %}
+            {% if field.errors %}
+              <div class="alert alert-danger" role="alert">
+                {% for error in field.errors %}
+                  <p>{{ field.label }}: {{ error }}</p>
+                {% endfor %}
+              </div>
+            {% endif %}
+          {% endfor %}
+
+          <!-- Collapsible Template Selection -->
+          <div style="border: 1px solid #ddd; padding: 10px; border-radius: 5px;" class="mb-4">
+            <div class="d-flex align-items-center">
+              <button type="button" id="template-arrow-toggle" class="btn btn-link p-0"
+                      style="text-decoration: none; font-size: 1.2em; margin-right: 8px;">
+                <span id="template-arrow-icon">►</span>
+              </button>
+              <label for="template-list" style="font-weight: bold; margin: 0;">Select Templates:</label>
+            </div>
+            <div id="template-list" style="display: none; max-height: 150px; overflow-y: auto; margin-top: 10px;">
+              {% for template in form.fields.sendgrid_id.queryset %}
+                <div>
+                  <input type="checkbox" class="template-checkbox" name="sendgrid_id" value="{{ template.id }}" id="template-{{ template.id }}" />
+                  <label for="template-{{ template.id }}">{{ template.name }}</label>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Collapsible Groups Section -->
+          <div style="border: 1px solid #ddd; padding: 10px; border-radius: 5px;" class="mb-4">
+            <div class="d-flex align-items-center">
+              <button type="button" id="group-arrow-toggle" class="btn btn-link p-0"
+                      style="text-decoration: none; font-size: 1.2em; margin-right: 8px;">
+                <span id="group-arrow-icon">►</span>
+              </button>
+              <label style="font-weight: bold; margin: 0;">Select Groups:</label>
+            </div>
+            <div id="group-list" style="display: none; max-height: 150px; overflow-y: auto; margin-top: 10px;">
+              {% for group in form.fields.selected_group.queryset %}
+                <div>
+                  <input type="checkbox" class="group-checkbox" name="selected_group" value="{{ group.id }}" id="group-{{ group.id }}" />
+                  <label for="group-{{ group.id }}">{{ group.name }}</label>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Collapsible Individual Users Section -->
+          <div style="border: 1px solid #ddd; padding: 10px; border-radius: 5px;" class="mb-4">
+            <div class="d-flex align-items-center">
+              <button type="button" id="user-arrow-toggle" class="btn btn-link p-0"
+                      style="text-decoration: none; font-size: 1.2em; margin-right: 8px;">
+                <span id="user-arrow-icon">►</span>
+              </button>
+              <label style="font-weight: bold; margin: 0;">Select Individual Users:</label>
+            </div>
+            <div id="user-list" style="display: none; max-height: 150px; overflow-y: auto; margin-top: 10px;">
+              <div class="d-flex align-items-center mt-2">
+                <input type="checkbox" id="select-all-users" />
+                <label for="select-all-users" class="ml-2 mb-0" style="font-weight: bold;">Select All Users</label>
+              </div>
+              {% for user in form.fields.selected_users.queryset %}
+                <div>
+                  <input type="checkbox" class="user-checkbox" name="selected_users" value="{{ user.id }}" id="user-{{ user.id }}" />
+                  <label for="user-{{ user.id }}">{{ user.get_full_name }} ({{ user.email }})</label>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+
+              <!-- Collapsible Attachments Section -->
+        <div style="border: 1px solid #ddd; padding: 10px; border-radius: 5px;" class="mb-4">
+          <div class="d-flex align-items-center">
+            <button type="button" id="attachments-arrow-toggle" class="btn btn-link p-0"
+                    style="text-decoration: none; font-size: 1.2em; margin-right: 8px;"
+                    aria-expanded="false" aria-controls="attachments-list">
+              <span id="attachments-arrow-icon">►</span>
+            </button>
+            <label style="font-weight: bold; margin: 0;">Upload Attachments:</label>
+          </div>
+
+          <!-- Collapsible Attachments List with Fixed Height -->
+          <div id="attachments-list" style="display: none; max-height: 150px; overflow-y: auto; margin-top: 10px;">
+            <div class="mb-3">
+              <label for="attachment_1" class="form-label">Attachment 1</label>
+              <input type="file" name="attachment_1" id="attachment_1" class="form-control">
+            </div>
+            <div class="mb-3">
+              <label for="attachment_2" class="form-label">Attachment 2</label>
+              <input type="file" name="attachment_2" id="attachment_2" class="form-control">
+            </div>
+            <div class="mb-3">
+              <label for="attachment_3" class="form-label">Attachment 3</label>
+              <input type="file" name="attachment_3" id="attachment_3" class="form-control">
+            </div>
+          </div>
+        </div>
+          <!-- Submit Button -->
+          <button type="submit" class="btn btn-primary mt-3">Send</button>
+        </div>
       </div>
     </div>
-  </div>
-
-</form>
-
+  </form>
+</div>
 
 
+<script>
+// Get CSRF token from the form
+function getCSRFToken() {
+  const csrfInput = document.querySelector("input[name='csrfmiddlewaretoken']");
+  return csrfInput ? csrfInput.value : null;
+}
+
+// Setup collapsible toggles
+function setupToggle(buttonId, listId, arrowId) {
+  const button = document.getElementById(buttonId);
+  const list = document.getElementById(listId);
+  const arrow = document.getElementById(arrowId);
+
+  if (button) {
+    button.addEventListener("click", function () {
+      if (list.style.display === "none") {
+        list.style.display = "block";
+        arrow.textContent = "▼";
+      } else {
+        list.style.display = "none";
+        arrow.textContent = "►";
+      }
+    });
+  }
+}
+
+// Initialize collapsible sections and other functionality
+function initializeCollapsibleSections() {
+  setupToggle("template-arrow-toggle", "template-list", "template-arrow-icon");
+  setupToggle("group-arrow-toggle", "group-list", "group-arrow-icon");
+  setupToggle("user-arrow-toggle", "user-list", "user-arrow-icon");
+  setupToggle("attachments-arrow-toggle", "attachments-list", "attachments-arrow-icon");
+
+  const selectAll = document.getElementById("select-all-users");
+  if (selectAll) {
+    selectAll.addEventListener("change", function () {
+      const checkboxes = document.querySelectorAll(".user-checkbox");
+      checkboxes.forEach(checkbox => (checkbox.checked = this.checked));
+    });
+  }
+}
+
+// AJAX form submission
+document.getElementById("email-form").addEventListener("submit", function (event) {
+  event.preventDefault(); // Prevent default form submission
+  const form = this;
+
+  fetch(form.action, {
+    method: "POST",
+    body: new FormData(form),
+    headers: {
+      "X-Requested-With": "XMLHttpRequest",
+      "X-CSRFToken": getCSRFToken(), // Include the CSRF token in headers
+    },
+  })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then((data) => {
+      if (data.success) {
+        alert("Email sent successfully!");
+        // Reload the page to reset the form
+        window.location.reload();
+      } else {
+        // Replace form content with updated form containing errors
+        document.getElementById("email-form-container").innerHTML = data.html;
+
+        // Reinitialize collapsible toggles for dynamically loaded content
+        initializeCollapsibleSections();
+      }
+    })
+    .catch((error) => console.error("Error:", error));
+});
+
+// Initialize toggles on page load
+initializeCollapsibleSections();
+</script>
 {% endblock %}

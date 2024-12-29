@@ -35,6 +35,20 @@
     white-space: nowrap;
 }
 
+
+button span {
+    cursor: pointer;
+    transition: transform 0.2s ease;
+  }
+button:hover span {
+    transform: scale(1.2);
+  }
+input[type="checkbox"]:checked + label {
+    background-color: #f0f8ff;
+    border-radius: 4px;
+    padding: 2px 4px;
+  }
+
 /* Adjust button widths to be the same */
 .btn-primary,
 .btn-success {
