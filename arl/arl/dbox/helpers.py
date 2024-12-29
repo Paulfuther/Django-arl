@@ -154,7 +154,7 @@ def upload_any_file_to_dropbox(file_content, file_name, company_name, store_name
 
         # Get current year and month
         current_year = datetime.now().strftime("%Y")
-        current_month = datetime.now().strftime("%B")  # Full month name (e.g., "January")
+        current_month = datetime.now().strftime("%m-%B") # e.g., "12-December"
 
         # Define base folder path structure with year and month
         base_folder_path = f"/SALTLOGS/{company_name}/{current_year}/{current_month}/{store_name}"
