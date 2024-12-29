@@ -212,7 +212,6 @@ def send_incident_now(request, pk):
 
         # Return an empty response to indicate the row should be removed
         return HttpResponse(status=200)  # HTMX will remove the row with "outerHTML:remove"
-    
     except Exception as e:
         # Return an error response as an HTML row for display
         error_html = f"""

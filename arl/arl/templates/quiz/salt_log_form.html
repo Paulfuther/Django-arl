@@ -7,6 +7,10 @@
 {{ form|as_crispy_errors }}
 
 <head>
+   
+        <!-- Dropzone JS -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/min/dropzone.min.js"></script>
+  
     <style>
         .container {
             max-width: 100%;
@@ -147,52 +151,43 @@
 </div>
 
 <script>
+   
+
+    // CSRF Token
     function getCSRFToken() {
         let csrfToken = null;
-        const cookies = document.cookie.split(';');
-        for (const cookie of cookies) {
+        document.cookie.split(';').forEach(cookie => {
             const [name, value] = cookie.trim().split('=');
-            if (name === 'csrftoken') {
-                csrfToken = decodeURIComponent(value);
-                break;
-            }
-        }
+            if (name === 'csrftoken') csrfToken = decodeURIComponent(value);
+        });
         return csrfToken;
     }
 
-    // Initialize Dropzones
-    Dropzone.autoDiscover = false;
-
-    const submitButton = document.getElementById("submit");
-    let requiredDropzoneComplete = false;
-    let optionalDropzoneComplete = true; // Optional starts as complete if no files are added
+    // Submit button
+    const submitButton = document.getElementById('submit');
+    let requiredUploaded = false;
 
     // Required Dropzone
     const requiredDropzone = new Dropzone("#required-dropzone", {
         url: "{% url 'salt_log_upload' %}",
-        maxFilesize: 8, // MB
-        maxFiles: 4,
+        maxFilesize: 5, // 5MB
+        maxFiles: 1,
         acceptedFiles: "image/*",
         headers: { "X-CSRFToken": getCSRFToken() },
         init: function () {
-            this.on("sending", function (file, xhr, formData) {
-                const imageFolderValue = document.getElementById('id_image_folder').value;
-                formData.append("image_folder", imageFolderValue);
-                submitButton.disabled = true; // Disable submit during upload
+            this.on("addedfile", () => {
+                submitButton.disabled = true; // Disable until upload completes
             });
-
-            this.on("success", function () {
-                requiredDropzoneComplete = true; // Mark as complete only if successfully uploaded
-                checkAllUploadsComplete();
+            this.on("success", () => {
+                requiredUploaded = true; // Mark required upload as successful
+                enableSubmitButton();
             });
-
-            this.on("error", function () {
-                requiredDropzoneComplete = false; // Ensure incomplete if there's an error
+            this.on("removedfile", () => {
+                requiredUploaded = false; // Reset if file is removed
                 submitButton.disabled = true;
             });
-
-            this.on("removedfile", function () {
-                requiredDropzoneComplete = false;
+            this.on("error", () => {
+                requiredUploaded = false;
                 submitButton.disabled = true;
             });
         }
@@ -201,41 +196,15 @@
     // Optional Dropzone
     const optionalDropzone = new Dropzone("#optional-dropzone", {
         url: "{% url 'salt_log_upload' %}",
-        maxFilesize: 8, // MB
+        maxFilesize: 5, // 5MB
         maxFiles: 4,
         acceptedFiles: "image/*",
-        headers: { "X-CSRFToken": getCSRFToken() },
-        init: function () {
-            this.on("sending", function (file, xhr, formData) {
-                const imageFolderValue = document.getElementById('id_image_folder').value;
-                formData.append("image_folder", imageFolderValue);
-                submitButton.disabled = true;
-                optionalDropzoneComplete = false;
-            });
-
-            this.on("success", function () {
-                optionalDropzoneComplete = true; // Mark as complete only if successfully uploaded
-                checkAllUploadsComplete();
-            });
-
-            this.on("error", function () {
-                optionalDropzoneComplete = false;
-                submitButton.disabled = true;
-            });
-        }
+        headers: { "X-CSRFToken": getCSRFToken() }
     });
 
-    // Function to enable submit button when all uploads are complete
-    function checkAllUploadsComplete() {
-        if (requiredDropzoneComplete && optionalDropzoneComplete) {
-            submitButton.disabled = false;
-            $("#successModal").modal("show");
-        }
+    // Enable submit button when all validations pass
+    function enableSubmitButton() {
+        if (requiredUploaded) submitButton.disabled = false;
     }
-
-    // Event to re-enable submit button when the modal is closed
-    $('#successModal').on('hidden.bs.modal', function () {
-        submitButton.disabled = false;
-    });
 </script>
 {% endblock %}
