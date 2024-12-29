@@ -15,15 +15,13 @@ from django.urls import reverse
 from django.views import View
 from twilio.base.exceptions import TwilioException
 
-from arl.msg.helpers import check_verification_token, request_verification_token
-from arl.tasks import (
-    create_docusign_envelope_task,
-    create_newhire_data_email,
-    save_user_to_db,
-    send_newhire_template_email_task,
-    send_sms_task,
-)
-
+from arl.msg.helpers import (check_verification_token,
+                             request_verification_token)
+from arl.msg.tasks import send_sms_task
+from arl.dsign.tasks import create_docusign_envelope_task
+from .tasks import (send_newhire_template_email_task,
+                    create_newhire_data_email,
+                    save_user_to_db)
 from .forms import CustomUserCreationForm, TwoFactorAuthenticationForm
 from .models import CustomUser, Employer, Store
 

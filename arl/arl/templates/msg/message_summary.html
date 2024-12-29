@@ -6,78 +6,115 @@
 {% load crispy_forms_tags %}
 
 <head>
+    <!-- jQuery (required for DataTables) -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-    <link rel="stylesheet" type="text/css"
-        href="https://cdn.datatables.net/v/dt/jq-3.6.0/jszip-2.5.0/dt-1.12.1/b-2.2.3/b-html5-2.2.3/b-print-2.2.3/r-2.3.0/datatables.min.css" />
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/pdfmake.min.js"></script>
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/vfs_fonts.js"></script>
-    <script type="text/javascript"
-        src="https://cdn.datatables.net/v/dt/jq-3.6.0/jszip-2.5.0/dt-1.12.1/b-2.2.3/b-html5-2.2.3/b-print-2.2.3/r-2.3.0/datatables.min.js"></script>
 
-    <script>
-        $(document).ready(function () {
-            $('#table_sms').DataTable({
-                dom: 'Bfrtip',
-                responsive: true,
-                buttons: ['copy', 'excel', 'pdf'],
-                order: [[0, 'desc']]
-            });
-            $('#table_whatsapp').DataTable({
-                dom: 'Bfrtip',
-                responsive: true,
-                buttons: ['copy', 'excel', 'pdf'],
-                order: [[0, 'desc']]
-            });
-        });
-    </script>
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" type="text/css"
+          href="https://cdn.datatables.net/1.13.1/css/jquery.dataTables.min.css"/>
+
+    <!-- DataTables JS -->
+    <script type="text/javascript"
+            src="https://cdn.datatables.net/1.13.1/js/jquery.dataTables.min.js"></script>
 </head>
 
-<div class="container">
+<div class="container mb-2" style="height: 95vh;">
     <div class="row justify-content-center">
-        <div class="col-12 col-sm-10 col-md-8 col-lg-10 col-xl-10">
-            <legend class="border-bottom mb-4">Text Logs</legend>
-
-            <h1>Twilio Message Summary</h1>
-
-            <h2>SMS Summary by Month</h2>
-            <table id="table_sms" class="display responsive nowrap" style="width:100%">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Price</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in sms_summary %}
-                    <tr>
-                        <td>{{ row.date_sent }}</td>
-                        <td>{{ row.price|floatformat:2 }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-
-            <h2>WhatsApp Summary by Month</h2>
-            <table id="table_whatsapp" class="display responsive nowrap" style="width:100%">
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Price</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in whatsapp_summary %}
-                    <tr>
-                        <td>{{ row.date_sent }}</td>
-                        <td>{{ row.price|floatformat:2 }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-
-        </div>
+        <div class="col-12 col-sm-10 col-md-8 col-lg-8 col-xl-8 mt-2">
+            <legend class="border-bottom mb-4">Message Cost Summary</legend>
+<div id="loading-spinner"
+     style="display: flex; justify-content: center; align-items: center; height: 100vh; background: rgba(255, 255, 255, 0.8); z-index: 9999;">
+    <p>Loading message summary, please wait...</p>
+    <div class="spinner-border" role="status">
+        <span class="visually-hidden">Loading...</span>
     </div>
 </div>
 
+<div id="content" style="display: none;">
+    <h2>SMS Summary by Month</h2>
+    <table id="table_sms" class="display responsive nowrap" style="width:100%">
+        <thead>
+            <tr>
+                <th>Date Sent</th>
+                <th>Total Price</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <h2>WhatsApp Summary by Month</h2>
+    <table id="table_whatsapp" class="display responsive nowrap" style="width:100%">
+        <thead>
+            <tr>
+                <th>Date Sent</th>
+                <th>Total Price</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+</div></div></div>
+<script>
+    $(document).ready(function () {
+        // Show the spinner
+        $('#loading-spinner').show();
+        $('#content').hide();
+
+        // Step 1: Trigger the task
+        $.ajax({
+            url: "{% url 'fetch_twilio_data' %}",
+            method: "GET",
+            success: function (data) {
+                console.log("Task started with ID:", data.task_id);
+                pollTaskStatus(data.task_id);
+            },
+            error: function () {
+                $('#loading-spinner').hide();
+                alert("Failed to start the task. Please try again.");
+            }
+        });
+
+        // Step 2: Poll for task status
+        function pollTaskStatus(taskId) {
+            $.ajax({
+                url: `/get-task-status/${taskId}/`,
+                method: "GET",
+                success: function (data) {
+                    if (data.status === "success") {
+                        console.log("Task completed:", data.result);
+
+                        // Populate SMS table
+                        var smsTable = $('#table_sms').DataTable();
+                        data.result.sms_summary.forEach(function (row) {
+                            smsTable.row.add([row.date_sent, row.price.toFixed(2)]).draw(false);
+                        });
+
+                        // Populate WhatsApp table
+                        var whatsappTable = $('#table_whatsapp').DataTable();
+                        data.result.whatsapp_summary.forEach(function (row) {
+                            whatsappTable.row.add([row.date_sent, row.price.toFixed(2)]).draw(false);
+                        });
+
+                        // Hide spinner and show content
+                        $('#loading-spinner').hide();
+                        $('#content').fadeIn();
+                    } else if (data.status === "pending") {
+                        // Task still in progress, keep polling
+                        setTimeout(function () {
+                            pollTaskStatus(taskId);
+                        }, 1000); // Poll every 1 second
+                    } else if (data.status === "failure") {
+                        $('#loading-spinner').hide();
+                        alert("Task failed: " + data.error);
+                    }
+                },
+                error: function () {
+                    $('#loading-spinner').hide();
+                    alert("Failed to fetch task status. Please try again.");
+                }
+            });
+        }
+    });
+</script>
 {% endblock %}
+

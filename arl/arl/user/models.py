@@ -125,6 +125,7 @@ class ExternalRecipient(models.Model):
     company = models.CharField(max_length=100, blank=True, null=True)
     email = models.EmailField(unique=True)
     group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True, blank=True)
+    is_active = models.BooleanField(default=True)  # New field
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} - {self.email}"

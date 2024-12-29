@@ -7,26 +7,21 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.http import HttpResponse, JsonResponse
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
-from arl.dbox.helpers import upload_to_dropbox
-from arl.dsign.helpers import (
-    get_docusign_envelope,
-    get_docusign_template_name_from_template,
-)
+from arl.dsign.helpers import (get_docusign_envelope,
+                               get_docusign_template_name_from_template)
 from arl.dsign.models import DocuSignTemplate
-from arl.dsign.tasks import get_outstanding_docs, list_all_docusign_envelopes_task
-from arl.tasks import (
-    create_docusign_envelope_task,
-    process_docusign_webhook,
-    send_new_hire_quiz,
-)
+from arl.dsign.tasks import (get_outstanding_docs,
+                             list_all_docusign_envelopes_task)
 
 from .forms import NameEmailForm
 from .models import ProcessedDocsignDocument
+from .tasks import (create_docusign_envelope_task, process_docusign_webhook,
+                    send_new_hire_quiz)
 
 logger = logging.getLogger(__name__)
 

@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
+
 from arl.user.models import CustomUser
 
 
@@ -126,3 +127,4 @@ class Message(models.Model):
 class EmailList(models.Model):
     email = models.EmailField(unique=True)
     is_active = models.BooleanField(default=True)
+

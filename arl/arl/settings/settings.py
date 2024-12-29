@@ -30,7 +30,7 @@ LOGGING = {
     'disable_existing_loggers': False,
     'handlers': {
         'file': {
-            'level': 'ERROR',
+            'level': 'INFO',
             'class': 'logging.FileHandler',
             'filename': os.path.join(BASE_DIR, 'django_debug.log'),
         },
@@ -38,7 +38,7 @@ LOGGING = {
     'loggers': {
         'django': {
             'handlers': ['file'],
-            'level': 'ERROR',
+            'level': 'INFO',
             'propagate': True,
         },
     },
@@ -252,6 +252,8 @@ EMAIL_USE_TLS = True
 
 BACKUP_FILE_PATH = os.environ.get("BACKUP_FILE_PATH_DEV")
 BACKUP_DUMP_PATH = os.environ.get("BACKUP_DUMP_PATH_DEV")
+
+
 
 
 try:

@@ -2,13 +2,14 @@ from django.urls import path
 
 from arl.incident.views import (IncidentCreateView, IncidentListView,
                                 IncidentUpdateView, MajorIncidentCreateView,
-                                MajorIncidentListView,
-                                MajorIncidentUpdateView,
+                                MajorIncidentListView, MajorIncidentUpdateView,
                                 Permission_Denied_View,
                                 ProcessIncidentImagesView,
-                                generate_incident_pdf_email, generate_pdf,
-                                generate_pdf_web,
-                                generate_major_incident_pdf)
+                                QueuedIncidentsListView,
+                                generate_incident_pdf_email,
+                                generate_major_incident_pdf, generate_pdf,
+                                generate_pdf_web, send_incident_now
+                                ,mark_do_not_send)
 
 urlpatterns = [
     path("incident/", IncidentCreateView.as_view(), name="create_incident"),
@@ -30,6 +31,9 @@ urlpatterns = [
     path("major_incident_list/", MajorIncidentListView.as_view(),
          name="major_incident_list"),
     path("403/", Permission_Denied_View, name="permission_denied"),
+    path('queued-incidents/', QueuedIncidentsListView.as_view(), name='queued_incidents_list'),
+    path('send-now/<int:pk>/', send_incident_now, name='send_incident_now'),
+    path('do-not-send/<int:pk>/', mark_do_not_send, name='mark_do_not_send'),
    
 ]
 
