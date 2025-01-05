@@ -233,7 +233,8 @@ def send_incident_now(request, pk):
         generate_and_send_pdf_task.delay(incident.id)
 
         # Return an empty response to indicate the row should be removed
-        return HttpResponse(status=200)  # HTMX will remove the row with "outerHTML:remove"
+        return HttpResponse(status=200)  # HTMX will remove the row with
+        # "outerHTML:remove"
     except Exception as e:
         # Return an error response as an HTML row for display
         error_html = f"""
@@ -262,7 +263,7 @@ def mark_do_not_send(request, pk):
     except Exception as e:
         print(f"Error processing 'Do Not Send' for incident {pk}: {e}")
         return HttpResponse(status=500)  # Generic error response
-    
+
 
 class IncidentUpdateView(PermissionRequiredMixin, LoginRequiredMixin,
                          UpdateView):

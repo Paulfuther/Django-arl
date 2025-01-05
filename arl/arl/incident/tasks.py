@@ -11,8 +11,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from arl.celery import app
-from arl.dbox.helpers import (upload_incident_file_to_dropbox,
-                              master_upload_file_to_dropbox,
+from arl.dbox.helpers import (master_upload_file_to_dropbox,
                               upload_major_incident_file_to_dropbox)
 from arl.helpers import (get_s3_images_for_incident,
                          upload_to_linode_object_storage)
@@ -286,8 +285,9 @@ def upload_to_linode_task(data):
         # Convert bytes back to a BytesIO object
         pdf_buffer = BytesIO(pdf_data)
         # Upload to Linode Object Storage
+        user_employer = Incident.objects.get(pk=incident_id).user_employer
         object_key = (
-            f"SITEINCIDENT/{Incident.objects.get(pk=incident_id).user_employer}/INCIDENTPDF/{pdf_filename}"
+            f"SITEINCIDENT/{user_employer}/INCIDENTPDF/{pdf_filename}"
         )
         upload_to_linode_object_storage(pdf_buffer, object_key)
         # Update and return the data dictionary
@@ -313,7 +313,8 @@ def upload_file_to_dropbox_task(data):
         dropbox_file_path = f"/SITEINCIDENT/{pdf_filename}"
 
         # Call the helper function to upload the file
-        success, message = master_upload_file_to_dropbox(pdf_data, dropbox_file_path)
+        success, message = master_upload_file_to_dropbox(pdf_data,
+                                                         dropbox_file_path)
 
         if not success:
             raise Exception(f"Dropbox upload failed: {message}")
@@ -345,7 +346,10 @@ def send_email_to_group_task(data, group_name, subject):
         create_incident_file_email_by_rule(
             to_emails=to_emails,
             subject=subject,
-            body="Thank you for using our services. Attached is your incident report.",
+            body=(
+                "Thank you for using our services. "
+                "Attached is your incident report."
+            ),
             attachment_buffer=pdf_buffer,
             attachment_filename=pdf_filename,
         )
@@ -427,6 +431,8 @@ def generate_pdf_email_to_user_task(incident_id, user_email):
         logger.error("Error in generate_pdf_task: {}".format(e))
         return {"status": "error", "message": str(e)}
 
+# this task sends incident forms to those on the external sedners list
+
 
 @app.task(name='generate_and_send_pdf_task')
 def generate_and_send_pdf_task(incident_id):
@@ -435,7 +441,7 @@ def generate_and_send_pdf_task(incident_id):
         incident = Incident.objects.get(pk=incident_id)
 
         # Generate the PDF
-        pdf_data = create_pdf(incident_id)  # Updated helper function returns a dictionary
+        pdf_data = create_pdf(incident_id)  # helper returns "data"
 
         if pdf_data.get("status") == "error":
             raise ValueError(pdf_data.get("message"))
@@ -445,13 +451,16 @@ def generate_and_send_pdf_task(incident_id):
 
         # Define email details
         # Fetch active external recipients
-        to_emails = ExternalRecipient.objects.filter(is_active=True).values_list("email", flat=True)
+        to_emails = ExternalRecipient.objects.filter(
+            is_active=True
+            ).values_list("email", flat=True)
         subject = f"Incident Report: {incident.brief_description}"
         body = (
-            f"<p>An incident occurred on {incident.eventdate} at {incident.store}.</p>"
-            f"<p>Details: {incident.brief_description}</p>"
-            f"<p>Please find the incident report attached.</p>"
-        )
+                f"<p>An incident occurred on {incident.eventdate} "
+                f"at {incident.store}.</p>"
+                f"<p>Details: {incident.brief_description}</p>"
+                f"<p>Please find the incident report attached.</p>"
+            )
 
         # Send the email
         send_incident_email(
