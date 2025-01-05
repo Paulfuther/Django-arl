@@ -1,19 +1,21 @@
+import logging
 from io import BytesIO
 
+from celery import chain
 from django.contrib import messages
 from django.contrib.auth.mixins import (LoginRequiredMixin,
                                         PermissionRequiredMixin)
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse, reverse_lazy
+from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import ListView
 from django.views.generic.edit import CreateView, UpdateView
 from PIL import Image
-from django.template.loader import render_to_string
+
 from arl.helpers import (get_s3_images_for_incident,
                          upload_to_linode_object_storage)
 
@@ -23,8 +25,9 @@ from .tasks import (generate_and_send_pdf_task,
                     generate_major_incident_pdf_from_list_task,
                     generate_major_incident_pdf_task,
                     generate_pdf_email_to_user_task, generate_pdf_task,
-                    save_incident_file, save_major_incident_file)
-import logging
+                    save_incident_file, save_major_incident_file,
+                    send_email_to_group_task, upload_file_to_dropbox_task,
+                    upload_to_linode_task)
 
 logger = logging.getLogger(__name__)
 
@@ -166,16 +169,34 @@ def handle_new_major_incident_form_creation(sender, instance, created,
 
 
 @receiver(post_save, sender=Incident)
-def handle_new_incident_form_creation(sender, instance, created,
-                                      **kwargs):
-    if created:
-        try:
-            # Set the queued_for_sending field to True
+def handle_new_incident_form_creation(sender, instance, created, **kwargs):
+    """
+    Signal to handle actions on Incident form creation and update.
+    """
+    try:
+        if created:
+            # When a new Incident is created
             instance.queued_for_sending = True
             instance.save(update_fields=["queued_for_sending"])
-            generate_pdf_task.delay(instance.id)
-        except Exception as e:
-            print(f"An error occurred: {e}")
+
+            # Trigger the chain of tasks for a new incident
+            chain(
+                generate_pdf_task.s(instance.id),  # Generate PDF
+                upload_to_linode_task.s(),        # Upload to Linode storage
+                upload_file_to_dropbox_task.s(),  # Upload to Dropbox
+                send_email_to_group_task.s(group_name="incident_form_email",
+                                           subject="A New Incident Report Has Been Created")  # Email the PDF to a group
+            ).apply_async()
+        else:
+            # When an existing Incident is updated
+            # Directly generate the PDF and email to the group
+            chain(
+                generate_pdf_task.s(instance.id),  # Generate PDF
+                send_email_to_group_task.s(group_name="incident_update_email",
+                                           subject="An Incident Report Has Been Updated")  # Email the PDF to the update group
+            ).apply_async()
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 
 class QueuedIncidentsListView(ListView):
@@ -197,6 +218,7 @@ class QueuedIncidentsListView(ListView):
 
 def send_incident_now(request, pk):
     """
+    This is part of the queued incidents to external sendrs.
     Process the "Send Now" action for an incident and update its status.
     """
     # Fetch the incident object
@@ -224,6 +246,7 @@ def send_incident_now(request, pk):
 
 def mark_do_not_send(request, pk):
     """
+    Marking do not send for queued incidents.
     Marks the incident as "Do Not Send" and removes it from the queue.
     """
     incident = get_object_or_404(Incident, pk=pk)

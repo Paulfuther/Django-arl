@@ -12,6 +12,7 @@ from django.utils.text import slugify
 
 from arl.celery import app
 from arl.dbox.helpers import (upload_incident_file_to_dropbox,
+                              master_upload_file_to_dropbox,
                               upload_major_incident_file_to_dropbox)
 from arl.helpers import (get_s3_images_for_incident,
                          upload_to_linode_object_storage)
@@ -248,65 +249,113 @@ def save_incident_file(**kwargs):
 
 
 # This task is used when a site incident form is first created.
-# It takes the form, creates a pdf, then the following:
-# Email are sent to incident_form_email group as well as
-# Being uploaded to S3 and Dropbox
-
+# There are four tasks to be called.
+# generate_pdf_task_upload_to_linode_task, upload_to_dropbox_task
+# and send_email_to_group_task
 
 @app.task(name="create_incident_pdf")
 def generate_pdf_task(incident_id):
+    '''
+    This task is used to create a pdf of a site incident form.
+    '''
     try:
-        # Generate the PDF using the helper function
         pdf_result = create_pdf(incident_id)
 
         if pdf_result["status"] != "success":
-            # If PDF generation fails, log the error and return
-            logger.error(f"Failed to generate PDF for incident {incident_id}:{pdf_result['message']}")
-            return {"status": "error", "message": pdf_result["message"]}
+            raise Exception(f"Failed to generate PDF: {pdf_result['message']}")
 
-        # Extract the PDF filename and buffer from the result
-        pdf_filename = pdf_result["pdf_filename"]
-        pdf_buffer = pdf_result["pdf_buffer"]
-        # Upload the PDF to Linode Object Storage
+        # Return the PDF details for further tasks
+        return {
+            "pdf_filename": pdf_result["pdf_filename"],
+            "pdf_buffer": pdf_result["pdf_buffer"].getvalue(),
+            "incident_id": incident_id,
+        }
+    except Exception as e:
+        raise Exception(f"Error in generate_pdf_task: {e}")
+
+
+@app.task(name="upload_incident_pdf_to_linode")
+def upload_to_linode_task(data):
+    """
+    Task to upload the generated PDF to Linode Object Storage.
+    """
+    try:
+        pdf_data = data["pdf_buffer"]
+        pdf_filename = data["pdf_filename"]
+        incident_id = data["incident_id"]
+        # Convert bytes back to a BytesIO object
+        pdf_buffer = BytesIO(pdf_data)
+        # Upload to Linode Object Storage
         object_key = (
             f"SITEINCIDENT/{Incident.objects.get(pk=incident_id).user_employer}/INCIDENTPDF/{pdf_filename}"
         )
         upload_to_linode_object_storage(pdf_buffer, object_key)
+        # Update and return the data dictionary
+        data["object_key"] = object_key
+        return data
+    except Exception as e:
+        raise Exception(f"Error in upload_to_storage_task: {e}")
 
-        # Upload the PDF to Dropbox
-        pdf_buffer.seek(0)  # Reset buffer position before reusing
-        upload_incident_file_to_dropbox(pdf_buffer.getvalue(), pdf_filename)
-        # Set the BytesIO buffer's position to the beginning
-        pdf_buffer.seek(0)
 
-        # Close the BytesIO buffer to free up resources
-        # Then email to the current user and all users in
-        # the group incident_form_email
+@app.task(name="upload_incident_pdf_to_dropbox")
+def upload_file_to_dropbox_task(data):
+    """
+    Task to upload a file to Dropbox using the provided file content and path.
+    """
+    try:
+        # Extract data
+        pdf_data = data["pdf_buffer"]
+        pdf_filename = data["pdf_filename"]
+        # incident_id = data["incident_id"]
 
-        subject = "A New Incident Report Has Been Created"
-        body = (
-            "Thank you for using our services. Attached "
-            "is your incident report."
-        )
-        # attachment_data = pdf_buffer.getvalue()
+        # Construct the Dropbox file path
+        # user_employer = Incident.objects.get(pk=incident_id).user_employer
+        dropbox_file_path = f"/SITEINCIDENT/{pdf_filename}"
 
-        # Call the create_incident_file_email_by_rule
-        # user_email and other details
+        # Call the helper function to upload the file
+        success, message = master_upload_file_to_dropbox(pdf_data, dropbox_file_path)
 
+        if not success:
+            raise Exception(f"Dropbox upload failed: {message}")
+
+        # Return updated data for the next task
+        data["dropbox_path"] = dropbox_file_path
+        return data
+
+    except Exception as e:
+        raise Exception(f"Error in upload_file_to_dropbox_task: {e}")
+
+
+@app.task(name="email_incident_pdf_to_group")
+def send_email_to_group_task(data, group_name, subject):
+    try:
+        # Fetch the emails of active users in the specified group
         to_emails = CustomUser.objects.filter(
-            Q(is_active=True) & Q(groups__name="incident_form_email")
+            Q(is_active=True) & Q(groups__name=group_name)
         ).values_list("email", flat=True)
 
+        if not to_emails:
+            raise ValueError(f"No active users found in group: {group_name}")
+
+        # Convert the PDF bytes back to BytesIO for attachment
+        pdf_buffer = BytesIO(data["pdf_buffer"])
+        pdf_filename = data["pdf_filename"]
+
+        # Send the email with the PDF attachment
         create_incident_file_email_by_rule(
-            to_emails, subject, body, pdf_buffer, pdf_filename
+            to_emails=to_emails,
+            subject=subject,
+            body="Thank you for using our services. Attached is your incident report.",
+            attachment_buffer=pdf_buffer,
+            attachment_filename=pdf_filename,
         )
 
         return {
             "status": "success",
-            "message": "PDF generated and uploaded successfully",
+            "message": f"Emails sent to group '{group_name}' successfully.",
         }
     except Exception as e:
-        logger.error("Error in generate_pdf_task: {}".format(e))
+        logger.error(f"Error sending email to group '{group_name}': {e}")
         return {"status": "error", "message": str(e)}
 
 

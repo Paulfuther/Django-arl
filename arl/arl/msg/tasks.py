@@ -319,32 +319,31 @@ def process_whatsapp_webhook(data):
 @app.task(name="sendgrid_webhook")
 def process_sendgrid_webhook(payload):
     try:
-        if isinstance(payload, list) and len(payload) > 0:
-            event_data = payload[0]
-            # print(event_data)
+        if not isinstance(payload, list) or len(payload) == 0:
+            logger.warning("Invalid or empty payload received.")
+            return "No events to process."
+
+        for event_data in payload:
             email = event_data.get("email", "")
-            event = event_data.get("event", "")
-            ip = event_data.get("ip", "")
-            # Handle missing 'ip' value with a placeholder or default value
-            if not ip:
-                ip = "192.0.2.0"
             sg_event_id = event_data.get("sg_event_id", "")
             sg_message_id = event_data.get("sg_message_id", "")
             sg_template_id = event_data.get("sg_template_id", "")
             sg_template_name = event_data.get("sg_template_name", "")
-            timestamp = timezone.datetime.fromtimestamp(
-                event_data.get("timestamp", 0), tz=timezone.utc
-            ) - timedelta(hours=5)
+            event = event_data.get("event", "")
+            timestamp = timezone.datetime.fromtimestamp(event_data.get("timestamp", 0), tz=timezone.utc)
+            ip = event_data.get("ip", "192.0.2.0")  # Default IP
             url = event_data.get("url", "")
             useragent = event_data.get("useragent", "")
-            # Find the user by email address in your custom user model
+
+            # Find the associated user
             try:
                 user = CustomUser.objects.get(email=email)
             except CustomUser.DoesNotExist:
                 user = None
-            username = user.username if user else None
-            # Create and save the EmailEvent instance
-            event = EmailEvent(
+                logger.warning(f"User with email {email} not found.")
+
+            # Save the email event
+            EmailEvent.objects.create(
                 email=email,
                 event=event,
                 ip=ip,
@@ -354,16 +353,18 @@ def process_sendgrid_webhook(payload):
                 sg_template_name=sg_template_name,
                 timestamp=timestamp,
                 url=url,
-                user=user,  # Set the user associated with this email event
-                username=username,
+                user=user,
+                username=user.username if user else None,
                 useragent=useragent,
             )
-            event.save()
-        return "Sendgrid Webhook Entry Made"
+            logger.info(f"Processed SendGrid event: {event} for {email}")
+
+        return "SendGrid Webhook Events Processed Successfully."
     except Exception as e:
-        return str(e)
-
-
+        logger.error(f"Error processing SendGrid webhook: {str(e)}", exc_info=True)
+        return f"Error: {str(e)}"
+    
+    
 @app.task(name="filter_sendgrid_events")
 def filter_sendgrid_events(date_from=None, date_to=None, template_id=None):
     # Initialize the queryset

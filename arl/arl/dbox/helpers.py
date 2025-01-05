@@ -38,6 +38,7 @@ def generate_new_access_token():
         return None
 
 
+# may not need
 def upload_to_dropbox(uploaded_file):
     # Note. This helper file uploads a New Hire File
     # to a folder called NEWHIREFILES
@@ -71,6 +72,7 @@ def upload_to_dropbox(uploaded_file):
         return False, f"Error: {str(e)}"
 
 
+# may not need
 def upload_incident_file_to_dropbox(file_content, file_name):
     try:
         new_access_token = generate_new_access_token()
@@ -91,6 +93,7 @@ def upload_incident_file_to_dropbox(file_content, file_name):
         return False, f"Error: {str(e)}"
 
 
+# may not need
 def upload_major_incident_file_to_dropbox(file_content, file_name):
     try:
         new_access_token = generate_new_access_token()
@@ -144,6 +147,7 @@ def upload_to_dropbox_quiz(uploaded_file):
         return False, f"Error: {str(e)}"
 
 
+"""
 def upload_any_file_to_dropbox(file_content, file_name, company_name, store_name):
     try:
         new_access_token = generate_new_access_token()
@@ -154,11 +158,14 @@ def upload_any_file_to_dropbox(file_content, file_name, company_name, store_name
 
         # Get current year and month
         current_year = datetime.now().strftime("%Y")
-        current_month = datetime.now().strftime("%m-%B") # e.g., "12-December"
+        current_month = datetime.now().strftime("%m-%B")  # e.g., "12-December"
 
         # Define base folder path structure with year and month
-        base_folder_path = f"/SALTLOGS/{company_name}/{current_year}/{current_month}/{store_name}"
-        
+        base_folder_path = (
+            f"/SALTLOGS/{company_name}/{current_year}/"
+            f"{current_month}/{store_name}"
+        )
+
         # Check and create nested folder structure if it doesn't exist
         try:
             dbx.files_get_metadata(base_folder_path)
@@ -178,6 +185,36 @@ def upload_any_file_to_dropbox(file_content, file_name, company_name, store_name
         dbx.files_upload(file_content, file_path, mode=dropbox.files.WriteMode("add"))
 
         return True, f"Uploaded file: {unique_file_name} to Dropbox at {file_path}."
+
+    except dropbox.exceptions.ApiError as e:
+        logging.error(f"Dropbox API Error: {str(e)}")
+        return False, f"Dropbox API Error: {str(e)}"
+    except Exception as e:
+        logging.error(f"Error: {str(e)}")
+        return False, f"Error: {str(e)}"
+
+"""
+
+
+def master_upload_file_to_dropbox(file_content, file_path):
+    """
+    Upload a file to Dropbox at the specified file path.
+    :param file_content: The content of the file to upload (bytes-like object).
+    :param file_path: Full file path in Dropbox, including folders and file name.
+    :return: Tuple (success: bool, message: str).
+    """
+    try:
+        # Generate a new access token
+        new_access_token = generate_new_access_token()
+        if not new_access_token:
+            return False, "Refresh token not found in .env file."
+
+        dbx = dropbox.Dropbox(new_access_token)
+
+        # Upload the file with WriteMode("add") to avoid overwriting
+        dbx.files_upload(file_content, file_path, mode=dropbox.files.WriteMode("add"))
+
+        return True, f"Uploaded file to Dropbox at {file_path}."
 
     except dropbox.exceptions.ApiError as e:
         logging.error(f"Dropbox API Error: {str(e)}")
