@@ -1,15 +1,15 @@
 from __future__ import absolute_import, unicode_literals
 
 import logging
+from datetime import datetime
 from io import BytesIO
 
 import pdfkit
-from django.core.exceptions import ObjectDoesNotExist
 from django.template.loader import render_to_string
 from django.utils.text import slugify
 
 from arl.celery import app
-from arl.dbox.helpers import upload_any_file_to_dropbox
+from arl.dbox.helpers import master_upload_file_to_dropbox
 from arl.helpers import get_s3_images_for_salt_log
 from arl.quiz.models import SaltLog
 from arl.user.models import CustomUser, Employer, Store
@@ -68,51 +68,59 @@ def save_salt_log(**kwargs):
 @app.task(name="create_salt_log_pdf")
 def generate_salt_log_pdf_task(incident_id):
     try:
-        # Fetch incident data based on incident_id
-        try:
-            incident = SaltLog.objects.get(pk=incident_id)
-        except ObjectDoesNotExist:
-            raise ValueError("Incident with ID {} does not exist.".
-                             format(incident_id))
+        # Fetch the salt log data
+        incident = SaltLog.objects.get(pk=incident_id)
 
+        # Get associated images
         images = get_s3_images_for_salt_log(
             incident.image_folder, incident.user_employer
         )
+
+        # Prepare the context for rendering the PDF
         context = {"incident": incident, "images": images}
-        html_content = render_to_string("quiz/salt_log_form_pdf.html",
-                                        context)
-        #  Generate the PDF using pdfkit
-        options = {
+        html_content = render_to_string("quiz/salt_log_form_pdf.html", context)
+
+        # Generate the PDF using pdfkit
+        pdf_options = {
             "enable-local-file-access": None,
             "--keep-relative-links": "",
             "encoding": "UTF-8",
         }
-        pdf = pdfkit.from_string(html_content, False, options)
-        #  Create a BytesIO object to store the PDF content
-        pdf_buffer = BytesIO(pdf)
-        # Generate a unique filename with date and store number
+        pdf = pdfkit.from_string(html_content, False, pdf_options)
+        pdf_buffer = BytesIO(pdf)  # Create a BytesIO object to store the PDF content
+
+        # Generate a unique filename
         store_number = incident.store.number
         date_salted_str = incident.date_salted.strftime("%Y-%m-%d") if incident.date_salted else "no-date"
         pdf_filename = f"{store_number}_{slugify(date_salted_str)}_salt_log_report.pdf"
 
-        # Define folder structure parameters for Dropbox
+        # Define folder structure parameters
         company_name = slugify(incident.user_employer.name)
         store_name = slugify(incident.store.number)
+        current_year = datetime.now().strftime("%Y")
+        current_month = datetime.now().strftime("%m-%B")
+        folder_path = f"/SALTLOGS/{company_name}/{current_year}/{current_month}/{store_name}"
 
-        # Upload the PDF to Dropbox
-        upload_result = upload_any_file_to_dropbox(pdf_buffer.getvalue(), pdf_filename, company_name, store_name)
+        # Define the full file path
+        full_file_path = f"{folder_path}/{pdf_filename}"
+
+        # Upload the file using the helper function
+        upload_result = master_upload_file_to_dropbox(
+            pdf_buffer.getvalue(), full_file_path
+        )
         
         pdf_buffer.seek(0)  # Reset buffer position
 
         # Log or return the upload result
         if upload_result[0]:
-            return {
-                "status": "success",
-                "message": "PDF generated and uploaded successfully",
-            }
+            return {"status": "success", "message": "PDF generated and uploaded successfully"}
         else:
             raise Exception(upload_result[1])
 
+    except SaltLog.DoesNotExist:
+        error_msg = f"SaltLog with ID {incident_id} does not exist."
+        logger.error(error_msg)
+        return {"status": "error", "message": error_msg}
     except Exception as e:
-        logger.error(f"Error in generate_pdf_task: {e}")
+        logger.error(f"Error in generate_salt_log_pdf_task: {e}")
         return {"status": "error", "message": str(e)}

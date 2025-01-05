@@ -257,10 +257,18 @@ class QuestionAdmin(admin.ModelAdmin):
 
     display_answers.short_description = 'Answers'
 
+
 # UserAdmin.fieldsets = tuple(fields)
 @admin.register(SaltLog)
 class SaltLogAdmin(admin.ModelAdmin):
-    list_display = ('store', 'user', 'area_salted', 'date_salted', 'time_salted', 'hidden_timestamp')
+    list_display = (
+        'store',
+        'user',
+        'area_salted',
+        'date_salted',
+        'time_salted',
+        'hidden_timestamp',
+    )
     list_filter = ('store', 'date_salted')
     search_fields = ('store__name', 'area_salted')
 
@@ -275,11 +283,8 @@ admin.site.register(EmailTemplate)
 admin.site.register(DocuSignTemplate)
 admin.site.register(ProcessedDocsignDocument)
 admin.site.register(CustomUser, CustomUserAdmin)
-# admin.site.register(UserManager)
 admin.site.register(WhatsAppTemplate)
 admin.site.register(Quiz, QuizAdmin)
-# admin.site.register(Question)
 admin.site.register(Answer)
 admin.site.register(Question, QuestionAdmin)
 admin.site.register(ExternalRecipient, ExternalRecipientAdmin)
-# admin.site.register(SaltLog)

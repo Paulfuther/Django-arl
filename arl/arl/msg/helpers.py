@@ -14,10 +14,9 @@ from sendgrid.helpers.mail import (Asm, Attachment, ContentId, Disposition,
 from twilio.base.exceptions import TwilioException
 from twilio.rest import Client
 
-from arl.msg.models import EmailTemplate
+
 from arl.user.models import CustomUser, Store
 
-from .models import EmailEvent  # Import your EmailEvent model
 
 logger = get_task_logger(__name__)
 
@@ -28,6 +27,7 @@ twilio_verify_sid = settings.TWILIO_VERIFY_SID
 notify_service_sid = settings.TWILIO_NOTIFY_SERVICE_SID
 
 client = Client(account_sid, auth_token)
+
 
 sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
 
@@ -397,53 +397,62 @@ def create_incident_file_email(
 
 
 # sends new icident pdf to users with the rule
-# incident_email
+# incident_form_email
 
 
-def create_incident_file_email_by_rule(
-    to_emails, subject, body, attachment_buffer=None, attachment_filename=None
-):
+def create_incident_file_email_by_rule(to_emails, subject, body,
+                                       attachment_buffer=None,
+                                       attachment_filename=None):
+    results = {"success": [], "failed": []}
     try:
+        print(to_emails)
         for to_email in to_emails:
-            message = Mail(
-                from_email=settings.MAIL_DEFAULT_SENDER,
-                to_emails=to_email,
-                subject=subject,
-                html_content=body,
-            )
-            print(to_email)
-            if attachment_buffer and attachment_filename:
-                attachment_buffer.seek(0)  
-                # Ensure the buffer is at the beginning
-                attachment_content = base64.b64encode(attachment_buffer.read()).decode()
-                attachment = Attachment()
-                attachment.file_content = FileContent(attachment_content)
-                attachment.file_name = FileName(attachment_filename)
-                attachment.file_type = FileType("application/pdf")
-                attachment.disposition = Disposition("attachment")
-                attachment.content_id = ContentId("Attachment")
-
-                message.attachment = attachment
-
-            response = sg.send(message)
-
-            if response.status_code != 202:
-                print(
-                    "Failed to send email to",
-                    to_email,
-                    "Error code:",
-                    response.status_code,
+            try:
+                # Prepare the email message
+                message = Mail(
+                    from_email=settings.MAIL_DEFAULT_SENDER,
+                    to_emails=to_email,
+                    subject=subject,
+                    html_content=body,
                 )
 
-    except Exception as e:
-        error_message = f"An error occurred while sending email to {to_email}: {str(e)}"
-        logger.error(error_message)
+                # Attach the file if provided
+                if attachment_buffer and attachment_filename:
+                    attachment_buffer.seek(0)  # Ensure the buffer is at the start
+                    attachment_content = base64.b64encode(
+                        attachment_buffer.read()
+                    ).decode()
+                    attachment = Attachment(
+                        file_content=FileContent(attachment_content),
+                        file_name=FileName(attachment_filename),
+                        file_type=FileType("application/pdf"),
+                        disposition=Disposition("attachment"),
+                    )
+                    message.attachment = attachment
+                # Send the email
+                response = sg.send(message)
 
-        if hasattr(e, "response") and e.response is not None:
-            response_body = e.response.body
-            response_status = e.response.status_code
-            logger.error(f"SendGrid response status code: {response_status}")
-            logger.error(f"SendGrid response body: {response_body}")
+                # Log the result
+                if response.status_code == 202:
+                    results["success"].append(to_email)
+                    logger.info(f"Email successfully sent to {to_email}")
+                else:
+                    results["failed"].append(to_email)
+                    logger.error(
+                        f"Failed to send email to {to_email}. Status code: {response.status_code}"
+                    )
+
+            except Exception as e:
+                # Handle errors for a specific recipient
+                results["failed"].append(to_email)
+                logger.error(f"An error occurred while sending email to {to_email}: {str(e)}")
+
+    except Exception as e:
+        # Handle general errors in the function
+        logger.error(f"An error occurred while processing emails: {str(e)}")
+
+    # Return a summary of the operation
+    return results
 
 
 def send_incident_email(
@@ -490,7 +499,6 @@ def send_incident_email(
             response_status = e.response.status_code
             logger.error(f"SendGrid response status code: {response_status}")
             logger.error(f"SendGrid response body: {response_body}")
-
 
 
 def send_whats_app_template(content_sid, from_sid, user_name, to_number):
