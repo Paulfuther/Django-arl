@@ -89,7 +89,8 @@ class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin,
         )
         form_data["user_employer"] = (
             form_data["user_employer"].pk
-            if "user_employer" in form_data and form_data["user_employer"] is not None
+            if "user_employer" in form_data and
+            form_data["user_employer"] is not None
             else None
         )
         return form_data
@@ -152,7 +153,8 @@ class MajorIncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin,
         )
         form_data["user_employer"] = (
             form_data["user_employer"].pk
-            if "user_employer" in form_data and form_data["user_employer"] is not None
+            if "user_employer" in form_data and
+            form_data["user_employer"] is not None
             else None
         )
         return form_data
@@ -184,16 +186,21 @@ def handle_new_incident_form_creation(sender, instance, created, **kwargs):
                 generate_pdf_task.s(instance.id),  # Generate PDF
                 upload_to_linode_task.s(),        # Upload to Linode storage
                 upload_file_to_dropbox_task.s(),  # Upload to Dropbox
-                send_email_to_group_task.s(group_name="incident_form_email",
-                                           subject="A New Incident Report Has Been Created")  # Email the PDF to a group
+                send_email_to_group_task.s(
+                    group_name="incident_form_email",
+                    subject="A New Incident Report Has Been Created"
+                )  # Email the PDF to a group
             ).apply_async()
         else:
             # When an existing Incident is updated
             # Directly generate the PDF and email to the group
             chain(
                 generate_pdf_task.s(instance.id),  # Generate PDF
-                send_email_to_group_task.s(group_name="incident_update_email",
-                                           subject="An Incident Report Has Been Updated")  # Email the PDF to the update group
+                send_email_to_group_task.s(
+                    group_name="incident_update_email",
+                    subject="An Incident Report Has Been Updated"
+                )
+                # Email the PDF to the update group
             ).apply_async()
     except Exception as e:
         print(f"An error occurred: {e}")
@@ -205,14 +212,15 @@ class QueuedIncidentsListView(ListView):
     context_object_name = 'queued_incidents'
 
     def get_queryset(self):
-        queryset = Incident.objects.filter(queued_for_sending=True, sent=False, do_not_send=False)
+        queryset = Incident.objects.filter(queued_for_sending=True, sent=False,
+                                           do_not_send=False)
         print(queryset)
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         logger.debug(f"Context Data: {context}")
-        print("Context Data:", context) 
+        print("Context Data:", context)
         return context
 
 
@@ -256,8 +264,9 @@ def mark_do_not_send(request, pk):
         # Mark the incident as "Do Not Send"
         incident.queued_for_sending = False
         incident.sent = False  # Ensure it's not marked as sent
-        incident.do_not_send = True  # Add this field in your model if not present
-        incident.save(update_fields=["queued_for_sending", "sent", "do_not_send"])
+        incident.do_not_send = True
+        incident.save(update_fields=["queued_for_sending",
+                                     "sent", "do_not_send"])
         print(f"Incident {pk} marked as 'Do Not Send'.")
         return HttpResponse(status=200)  # HTMX will remove the row
     except Exception as e:
@@ -464,7 +473,8 @@ def generate_incident_pdf_email(request, incident_id):
     user_email = request.user.email
     generate_pdf_email_to_user_task.delay(incident_id, user_email)
     messages.success(
-        request, "PDF generation started. Check your email. The file is attached."
+        request,
+        "PDF generation started. Check your email for the attached file."
     )
     return redirect("home")
 
