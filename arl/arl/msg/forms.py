@@ -2,6 +2,7 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
 from django import forms
 from django.contrib.auth.models import Group
+from arl.user.models import CustomUser
 
 from arl.msg.models import EmailTemplate, WhatsAppTemplate
 from django.contrib.auth import get_user_model
@@ -120,16 +121,6 @@ class TemplateFilterForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-control'}),
         label="Template Name"
     )
-    start_date = forms.DateField(
-        required=False,
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-        label="Start Date"
-    )
-    end_date = forms.DateField(
-        required=False,
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-        label="End Date"
-    )
 
 
 class CampaignSetupForm(forms.Form):
@@ -143,3 +134,11 @@ class CampaignSetupForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.fields["contact_list"].choices = contact_list_choices
 
+
+class EmployeeSearchForm(forms.Form):
+    employee = forms.ModelChoiceField(
+        queryset=CustomUser.objects.filter(is_active=True),
+        required=False,
+        widget=forms.Select(attrs={"class": "form-control"}),
+        label="Select Employee"
+    )

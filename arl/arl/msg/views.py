@@ -13,6 +13,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse_lazy
+from django.utils.timezone import now
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
@@ -25,12 +26,14 @@ from arl.msg.tasks import (process_whatsapp_webhook,
                            send_template_whatsapp_task, start_campaign_task)
 from arl.user.models import CustomUser, Store
 
-from .forms import (CampaignSetupForm, SendGridFilterForm, SMSForm,
-                    TemplateEmailForm, TemplateFilterForm,
+from .forms import (CampaignSetupForm, EmployeeSearchForm, SendGridFilterForm,
+                    SMSForm, TemplateEmailForm, TemplateFilterForm,
                     TemplateWhatsAppForm)
 from .tasks import (fetch_twilio_summary, filter_sendgrid_events,
-                    generate_email_event_summary, master_email_send_task,
-                    process_sendgrid_webhook, send_one_off_bulk_sms_task)
+                    generate_email_event_summary,
+                    generate_employee_email_report_task,
+                    master_email_send_task, process_sendgrid_webhook,
+                    send_one_off_bulk_sms_task)
 
 logger = logging.getLogger(__name__)
 
@@ -542,6 +545,26 @@ def email_event_summary_view(request):
     })
 
 
+def employee_email_report_view(request):
+    form = EmployeeSearchForm(request.GET or None)
+    report_table = None
+
+    if form.is_valid():
+        # Fetch the selected employee
+        employee = form.cleaned_data.get("employee")
+        if employee:
+            # Trigger the Celery task with the employee ID
+            result = generate_employee_email_report_task.delay(employee_id=employee.id)
+
+            # Wait for the result (blocking, for demonstration purposes)
+            report_table = result.get(timeout=10)
+    # print(report_table)
+    return render(request, "msg/employee_email_report.html", {
+        "form": form,
+        "report_table": report_table,
+    })
+
+
 def campaign_setup_view(request):
     contact_lists = get_all_contact_lists()
     contact_list_choices = [(cl["id"], cl["name"]) for cl in contact_lists]
@@ -567,4 +590,3 @@ def campaign_setup_view(request):
         form.fields["contact_list"].choices = contact_list_choices
 
     return render(request, "msg/campaign_setup.html", {"form": form})
-

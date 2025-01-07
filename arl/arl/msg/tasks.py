@@ -10,15 +10,15 @@ from django.conf import settings
 from django.contrib.auth.models import Group
 from django.core.cache import cache
 from django.db import connection
-from django.db.models import F, Func, IntegerField, OuterRef, Subquery
+from django.db.models import (Count, F, Func, IntegerField, OuterRef, Q,
+                              Subquery)
 from django.utils import timezone
-from .helpers import client
 
 from arl.celery import app
 from arl.msg.models import EmailEvent, Message, SmsLog
 from arl.user.models import CustomUser
 
-from .helpers import (create_master_email, create_single_csv_email,
+from .helpers import (client, create_master_email, create_single_csv_email,
                       create_single_email, create_tobacco_email, send_bulk_sms,
                       send_monthly_store_phonecall, send_sms_model,
                       send_whats_app_template,
@@ -567,3 +567,43 @@ def fetch_twilio_summary():
         # Log any errors for debugging
         print(f"Error fetching or processing Twilio messages: {e}")
         raise e
+
+
+@app.task(name="generate_employee_email_report")
+def generate_employee_email_report_task(employee_id):
+    # Fetch the employee's email using the ID
+    employee = CustomUser.objects.get(pk=employee_id)
+    email = employee.email
+
+    # Search for all email events related to this email address
+    email_events = EmailEvent.objects.filter(email=email)
+
+    # Summarize the events into a DataFrame
+    event_data = list(email_events.values('event', 'sg_template_name'))
+    if not event_data:
+        return "<p>No data found for this employee.</p>"
+
+    # Create DataFrame
+    df = pd.DataFrame(event_data)
+
+    # Check if the DataFrame is empty
+    if df.empty:
+        return "<p>No data found for this employee.</p>"
+
+    # Pivot table to summarize events
+    summary_df = df.pivot_table(
+        index='sg_template_name',
+        columns='event',
+        aggfunc='size',
+        fill_value=0
+    ).reset_index()
+
+    # Capitalize column names
+    summary_df.columns = [str(col).capitalize() for col in summary_df.columns]
+
+    # Convert DataFrame to HTML
+    return summary_df.to_html(
+        classes="table table-striped",
+        index=False,
+        table_id="table_email_report"
+    )
