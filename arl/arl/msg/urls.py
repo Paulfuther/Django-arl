@@ -1,15 +1,15 @@
 from django.urls import path
 
 from arl.msg.views import (EmailEventList, FetchTwilioCallsView,
-                           FetchTwilioView, SendSMSView,
-                           SendTemplateEmailView, SendTemplateWhatsAppView,
-                           TwilioView, campaign_setup_view, carwash_targets,
+                           FetchTwilioView, SendSMSView, SendTemplateEmailView,
+                           SendTemplateWhatsAppView, TwilioView,
+                           campaign_setup_view, carwash_targets,
                            click_thank_you, comms, email_event_summary_view,
-                           message_summary_view, sendgrid_webhook,
-                           sendgrid_webhook_view, sms_success_view,
-                           template_email_success_view,
-                           template_whats_app_success_view, whatsapp_webhook,
-                           fetch_twilio_data, get_task_status)
+                           employee_email_report_view, fetch_twilio_data,
+                           get_task_status, message_summary_view,
+                           sendgrid_webhook, sendgrid_webhook_view,
+                           sms_success_view, template_email_success_view,
+                           template_whats_app_success_view, whatsapp_webhook)
 
 urlpatterns = [
     path("send-sms/", SendSMSView.as_view(), name="send_sms_view"),
@@ -56,4 +56,5 @@ urlpatterns = [
     path('sendgrid-webhook/', sendgrid_webhook_view, name='sendgrid_webhook_view'),
     path('email-event-summary/', email_event_summary_view, name='email_event_summary'),
     path("campaign/setup/", campaign_setup_view, name="campaign_setup"),
+    path('employee-email-report/', employee_email_report_view, name='employee_email_report'),
 ]
