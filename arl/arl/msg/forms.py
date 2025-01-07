@@ -120,6 +120,16 @@ class TemplateFilterForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-control'}),
         label="Template Name"
     )
+    start_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        label="Start Date"
+    )
+    end_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        label="End Date"
+    )
 
 
 class CampaignSetupForm(forms.Form):
@@ -132,5 +142,4 @@ class CampaignSetupForm(forms.Form):
         contact_list_choices = kwargs.pop("contact_list_choices", [])
         super().__init__(*args, **kwargs)
         self.fields["contact_list"].choices = contact_list_choices
-
 

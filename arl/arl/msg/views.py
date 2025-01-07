@@ -529,9 +529,11 @@ def email_event_summary_view(request):
     # Only proceed with task if form is valid and template_id is provided
     if form.is_valid() and form.cleaned_data.get('template_id'):
         template_id = form.cleaned_data['template_id'].sendgrid_id
-
+        start_date = form.cleaned_data.get('start_date')
+        end_date = form.cleaned_data.get('end_date')
         # Call the Celery task
-        result = generate_email_event_summary.delay(template_id)
+        result = generate_email_event_summary.delay(template_id,
+                                                    start_date, end_date)
         summary_table = result.get(timeout=10)  # Wait for task completion
 
     return render(request, "msg/email_event_summary_table.html", {
