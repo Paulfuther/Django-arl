@@ -363,8 +363,8 @@ def process_sendgrid_webhook(payload):
     except Exception as e:
         logger.error(f"Error processing SendGrid webhook: {str(e)}", exc_info=True)
         return f"Error: {str(e)}"
-    
-    
+
+
 @app.task(name="filter_sendgrid_events")
 def filter_sendgrid_events(date_from=None, date_to=None, template_id=None):
     # Initialize the queryset
@@ -403,17 +403,28 @@ def filter_sendgrid_events(date_from=None, date_to=None, template_id=None):
 
 
 @app.task(name="email_event_summary")
-def generate_email_event_summary(template_id=None):
+def generate_email_event_summary(template_id=None, start_date=None,
+                                 end_date=None):
     # Filter events based on template_id if provided
     events = EmailEvent.objects.all()
     if template_id:
         events = events.filter(sg_template_id=template_id)
 
-    # Subquery to retrieve first_name, last_name from CustomUser and store number from Store
+    # Apply date range filtering if provided
+    if start_date:
+        events = events.filter(timestamp__gte=start_date)
+    if end_date:
+        events = events.filter(timestamp__lte=end_date)
+    # Check if there are no events after filtering
+    if not events.exists():
+        return "<p>No email events found for the given filters.</p>"
+    # Subquery to retrieve first_name, last_name from CustomUser
+    # and store number from Store
     customuser_subquery = CustomUser.objects.filter(
         email=OuterRef('email')
     ).annotate(
-        store_number_int=Func(F('store__number'), function='FLOOR', output_field=IntegerField())
+        store_number_int=Func(F('store__number'), function='FLOOR',
+                              output_field=IntegerField())
     ).values('first_name', 'last_name', 'store_number_int')
 
     # Annotate events with first_name, last_name, and integer store number
@@ -427,6 +438,9 @@ def generate_email_event_summary(template_id=None):
     event_data = list(events.values(
         'email', 'event', 'sg_template_name', 'first_name', 'last_name', 'store_number'
     ))
+    # If no data is available in the queryset
+    if not event_data:
+        return "<p>No email events found for the given filters.</p>"
     df = pd.DataFrame(event_data)
 
     # Group by template name, email, first_name, last_name, and store number, then pivot on the event type
@@ -449,13 +463,15 @@ def generate_email_event_summary(template_id=None):
             summary_df[col] = 0
 
     # Reorder columns and add any remaining columns
-    remaining_columns = [col for col in summary_df.columns if col not in desired_columns]
+    remaining_columns = [col for col in summary_df.columns if
+                         col not in desired_columns]
     final_column_order = desired_columns + sorted(remaining_columns)
 
     summary_df = summary_df[final_column_order]
 
     # Convert the summary DataFrame to HTML and return
-    return summary_df.to_html(classes="table table-striped", index=False, table_id="table_sms")
+    return summary_df.to_html(classes="table table-striped",
+                              index=False, table_id="table_sms")
 
 
 @app.task(name="email_campaign_automation")
