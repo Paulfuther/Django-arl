@@ -121,6 +121,16 @@ class TemplateFilterForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-control'}),
         label="Template Name"
     )
+    start_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+        label="Start Date"
+    )
+    end_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+        label="End Date"
+    )
 
 
 class CampaignSetupForm(forms.Form):
