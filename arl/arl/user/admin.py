@@ -17,6 +17,12 @@ from .models import CustomUser, Employer, ExternalRecipient, Store, UserManager
 # fields = list(UserAdmin.fieldsets)
 
 
+class EmailTemplateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'sendgrid_id', 'include_in_report')  # Display the checkbox
+    list_editable = ('include_in_report',)  # Allow inline editing of the checkbox
+    search_fields = ('name',)
+
+
 class ExternalRecipientAdmin(admin.ModelAdmin):
     list_display = ('first_name', 'last_name', 'company', 'email', 'group')
     search_fields = ('first_name', 'last_name', 'company', 'email',

@@ -8,14 +8,12 @@ import pandas as pd
 from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.contrib.auth.models import Group
-from django.core.cache import cache
 from django.db import connection
-from django.db.models import (Count, F, Func, IntegerField, OuterRef, Q,
-                              Subquery)
+from django.db.models import F, Func, IntegerField, OuterRef, Subquery
 from django.utils import timezone
 
 from arl.celery import app
-from arl.msg.models import EmailEvent, Message, SmsLog
+from arl.msg.models import EmailEvent, EmailTemplate, Message, SmsLog
 from arl.user.models import CustomUser
 
 from .helpers import (client, create_master_email, create_single_csv_email,
@@ -575,8 +573,13 @@ def generate_employee_email_report_task(employee_id):
     employee = CustomUser.objects.get(pk=employee_id)
     email = employee.email
 
+    # Fetch template IDs for templates marked as "include_in_report"
+    template_ids = EmailTemplate.objects.filter(
+        include_in_report=True).values_list('sendgrid_id', flat=True)
+    # print(template_ids)
     # Search for all email events related to this email address
-    email_events = EmailEvent.objects.filter(email=email)
+    email_events = EmailEvent.objects.filter(email=email,
+                                             sg_template_id__in=template_ids)
 
     # Summarize the events into a DataFrame
     event_data = list(email_events.values('event', 'sg_template_name'))

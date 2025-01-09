@@ -57,6 +57,7 @@ class SmsLog(models.Model):
 class EmailTemplate(models.Model):
     name = models.CharField(max_length=100, null=True)
     sendgrid_id = models.TextField()
+    include_in_report = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
