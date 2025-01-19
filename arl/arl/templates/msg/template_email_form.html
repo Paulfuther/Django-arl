@@ -125,6 +125,16 @@
             </div>
           </div>
         </div>
+
+        <!-- Section to Display Emails in the Group -->
+        <div style="border: 1px solid #ddd; padding: 10px; border-radius: 5px; margin-top: 20px;">
+          <h5 style="font-weight: bold; margin-bottom: 10px;">
+            Emails in Selected Group (<span id="email-count">0</span>)
+          </h5>
+          <div id="email-list" style="max-height: 200px; overflow-y: auto; padding: 10px; background-color: #f9f9f9;">
+            <p class="text-muted">Select a group to view emails.</p>
+          </div>
+        </div>
           <!-- Submit Button -->
           <button type="submit" class="btn btn-primary mt-3">Send</button>
         </div>
@@ -210,6 +220,67 @@ document.getElementById("email-form").addEventListener("submit", function (event
     })
     .catch((error) => console.error("Error:", error));
 });
+
+// Fetch and display emails for selected groups
+function setupGroupEmailFetcher() {
+  const groupCheckboxes = document.querySelectorAll(".group-checkbox");
+  const emailListDiv = document.getElementById("email-list");
+  const emailCountSpan = document.getElementById("email-count");
+
+  if (!groupCheckboxes || !emailListDiv || !emailCountSpan) return;
+
+  groupCheckboxes.forEach(checkbox => {
+    checkbox.addEventListener("change", function () {
+      const selectedGroupIds = Array.from(groupCheckboxes)
+        .filter(cb => cb.checked)
+        .map(cb => cb.value);
+
+      if (selectedGroupIds.length > 0) {
+        emailListDiv.innerHTML = '<p class="text-muted">Loading emails...</p>'; // Show loading message
+
+        fetch(`/get-group-emails/?group_ids=${selectedGroupIds.join(",")}`)
+          .then((response) => response.json())
+          .then((data) => {
+            emailListDiv.innerHTML = ""; // Clear the list
+            const totalEmails = data.emails.length;
+
+            // Update the email count
+            emailCountSpan.textContent = totalEmails;
+
+            if (totalEmails > 0) {
+              const list = document.createElement("ul");
+              list.style.listStyleType = "none";
+              list.style.padding = "0";
+
+              data.emails.forEach(email => {
+                const listItem = document.createElement("li");
+                listItem.style.marginBottom = "5px";
+                listItem.innerHTML = `
+                  <strong>${email.email}</strong> 
+                  <span style="color: ${email.status === "Active" ? "green" : "red"};">(${email.status})</span>
+                `;
+                list.appendChild(listItem);
+              });
+
+              emailListDiv.appendChild(list);
+            } else {
+              emailListDiv.innerHTML = '<p class="text-muted">No emails found in the selected groups.</p>';
+            }
+          })
+          .catch((error) => {
+            emailListDiv.innerHTML = '<p class="text-danger">Error loading emails.</p>';
+            console.error("Error:", error);
+          });
+      } else {
+        emailListDiv.innerHTML = '<p class="text-muted">Select a group to view emails.</p>';
+        emailCountSpan.textContent = "0";
+      }
+    });
+  });
+}
+
+// Initialize the email fetcher when the page loads
+setupGroupEmailFetcher();
 
 // Initialize toggles on page load
 initializeCollapsibleSections();

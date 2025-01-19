@@ -2,7 +2,7 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Submit
 from django import forms
 from django.contrib.auth.models import Group
-from arl.user.models import CustomUser
+from arl.user.models import CustomUser, Store
 
 from arl.msg.models import EmailTemplate, WhatsAppTemplate
 from django.contrib.auth import get_user_model
@@ -152,3 +152,21 @@ class EmployeeSearchForm(forms.Form):
         widget=forms.Select(attrs={"class": "form-control"}),
         label="Select Employee"
     )
+
+
+# Form for selecting a group
+class GroupSelectForm(forms.Form):
+    group = forms.ModelChoiceField(queryset=Group.objects.all(), required=True, label="Select Group")
+
+
+class StoreTargetForm(forms.ModelForm):
+    sales_target = forms.IntegerField(required=True, label='Sales Target')
+
+    class Meta:
+        model = Store
+        fields = ['number', 'sales_target']
+
+    def __init__(self, *args, **kwargs):
+        super(StoreTargetForm, self).__init__(*args, **kwargs)
+        self.fields['number'].disabled = True
+        self.fields['number'].label = "Store Number"

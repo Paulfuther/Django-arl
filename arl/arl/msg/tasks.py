@@ -17,9 +17,8 @@ from arl.msg.models import EmailEvent, EmailTemplate, Message, SmsLog
 from arl.user.models import CustomUser
 
 from .helpers import (client, create_master_email, create_single_csv_email,
-                      create_single_email, create_tobacco_email, send_bulk_sms,
-                      send_monthly_store_phonecall, send_sms_model,
-                      send_whats_app_template,
+                      send_bulk_sms, send_monthly_store_phonecall,
+                      send_sms_model, send_whats_app_template,
                       send_whats_app_template_autoreply,
                       sync_contacts_with_sendgrid)
 
