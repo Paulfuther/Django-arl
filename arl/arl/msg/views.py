@@ -4,7 +4,6 @@ import logging
 import urllib.parse
 
 from celery.result import AsyncResult
-from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import Group
@@ -13,7 +12,6 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse_lazy
-from django.utils.timezone import now
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
@@ -28,7 +26,8 @@ from arl.user.models import CustomUser, Store
 
 from .forms import (CampaignSetupForm, EmployeeSearchForm, SendGridFilterForm,
                     SMSForm, TemplateEmailForm, TemplateFilterForm,
-                    TemplateWhatsAppForm)
+                    TemplateWhatsAppForm, GroupSelectForm,
+                    StoreTargetForm)
 from .tasks import (fetch_twilio_summary, filter_sendgrid_events,
                     generate_email_event_summary,
                     generate_employee_email_report_task,
@@ -162,21 +161,26 @@ class SendTemplateEmailView(LoginRequiredMixin, UserPassesTestMixin, FormView):
 
         if selected_groups:
             for group in selected_groups:
-                for user in group.user_set.all():
+                for user in group.user_set.filter(is_active=True):  # Filter active
                     recipients.append({
                         "name": user.get_full_name(),
-                        "email": user.email
+                        "email": user.email,
+                        "status": "Active"
                     })
 
         if selected_users:
             for user in selected_users:
                 recipients.append({
                     "name": user.get_full_name(),
-                    "email": user.email
+                    "email": user.email,
+                    "status": "Active"
                 })
 
         # Remove duplicates based on email
         unique_recipients = {recipient["email"]: recipient for recipient in recipients}.values()
+        # Debugging: Print recipient data
+        for recipient in unique_recipients:
+            print(recipient["email"], recipient["status"])
         return list(unique_recipients)
 
 
@@ -208,50 +212,8 @@ class SendTemplateWhatsAppView(LoginRequiredMixin, UserPassesTestMixin, FormView
         return super().form_valid(form)
 
 
-@csrf_exempt  # In production, use proper CSRF protection.
-def sendgrid_webhook(request):
-    if request.method == "POST":
-        try:
-            payload = json.loads(request.body.decode("utf-8"))
-            process_sendgrid_webhook.delay(payload)
-            return JsonResponse(
-                {"message": "Webhook received successfully"}, status=200
-            )
-        except json.JSONDecodeError:
-            return JsonResponse({"error": "Invalid JSON payload"}, status=400)
-    else:
-        return JsonResponse({"error": "Only POST requests are allowed"}, status=405)
-
-
-def sms_success_view(request):
-    return render(request, "msg/sms_success.html")
-
-
-def template_email_success_view(request):
-    return render(request, "msg/template_email_success.html")
-
-
-def template_whats_app_success_view(request):
-    return render(request, "msg/template_whats_app_success.html")
-
-
-def fetch_sms():
-    return client.messages.list(limit=1000)
-
-
-# this is for whatas app.
-def fetch_whatsapp_messages(account_sid, auth_token):
-    # Fetch messages sent via WhatsApp
-    messages = client.messages.list(limit=20)  # Adjust 'limit' as needed
-
-    for message in messages:
-        if "whatsapp:" in message.from_:  # Filter messages sent from a WhatsApp number
-            print(
-                f"From: {message.from_}, To: {message.to}, Body: {message.body}, Status: {message.status}, Date Sent: {message.date_sent}"
-            )
-
-
 class FetchTwilioView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
+    # This class is for a summary of SMS messages
     template_name = "msg/sms_data.html"
 
     def test_func(self):
@@ -281,30 +243,6 @@ class FetchTwilioView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
             truncated_sms.append(msg_data)
         context["sms_data"] = truncated_sms
         return context
-
-
-def fetch_calls():
-    return client.calls.list(limit=20)
-
-
-def fetch_twilio_data(request):
-    # Run the synchronous task
-    task = fetch_twilio_summary.delay()
-    return JsonResponse({"task_id": task.id})
-
-
-def get_task_status(request, task_id):
-    task = AsyncResult(task_id)
-    if task.state == "SUCCESS":
-        return JsonResponse({"status": "success", "result": task.result})
-    elif task.state == "FAILURE":
-        return JsonResponse({"status": "failure", "error": str(task.result)})
-    else:
-        return JsonResponse({"status": "pending"})
-
-
-def message_summary_view(request):
-    return render(request, "msg/message_summary.html")
 
 
 class FetchTwilioCallsView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
@@ -353,6 +291,73 @@ class FetchTwilioCallsView(LoginRequiredMixin, UserPassesTestMixin, TemplateView
         return context
 
 
+@csrf_exempt  # In production, use proper CSRF protection.
+def sendgrid_webhook(request):
+    if request.method == "POST":
+        try:
+            payload = json.loads(request.body.decode("utf-8"))
+            process_sendgrid_webhook.delay(payload)
+            return JsonResponse(
+                {"message": "Webhook received successfully"}, status=200
+            )
+        except json.JSONDecodeError:
+            return JsonResponse({"error": "Invalid JSON payload"}, status=400)
+    else:
+        return JsonResponse({"error": "Only POST requests are allowed"}, status=405)
+
+
+def sms_success_view(request):
+    return render(request, "msg/sms_success.html")
+
+
+def template_email_success_view(request):
+    return render(request, "msg/template_email_success.html")
+
+
+def template_whats_app_success_view(request):
+    return render(request, "msg/template_whats_app_success.html")
+
+
+def fetch_sms():
+    return client.messages.list(limit=1000)
+
+
+# this is for whatas app.
+def fetch_whatsapp_messages(account_sid, auth_token):
+    # Fetch messages sent via WhatsApp
+    messages = client.messages.list(limit=20)  # Adjust 'limit' as needed
+
+    for message in messages:
+        if "whatsapp:" in message.from_:  # Filter messages sent from a WhatsApp number
+            print(
+                f"From: {message.from_}, To: {message.to}, Body: {message.body}, Status: {message.status}, Date Sent: {message.date_sent}"
+            )
+
+
+def fetch_calls():
+    return client.calls.list(limit=20)
+
+
+def fetch_twilio_data(request):
+    # Run the synchronous task
+    task = fetch_twilio_summary.delay()
+    return JsonResponse({"task_id": task.id})
+
+
+def get_task_status(request, task_id):
+    task = AsyncResult(task_id)
+    if task.state == "SUCCESS":
+        return JsonResponse({"status": "success", "result": task.result})
+    elif task.state == "FAILURE":
+        return JsonResponse({"status": "failure", "error": str(task.result)})
+    else:
+        return JsonResponse({"status": "pending"})
+
+
+def message_summary_view(request):
+    return render(request, "msg/message_summary.html")
+
+
 def comms(request):
     return render(request, "msg/master_comms.html")
 
@@ -386,26 +391,8 @@ def whatsapp_webhook(request):
     return JsonResponse({"status": "success"}, status=200)
 
 
-class StoreTargetForm(forms.ModelForm):
-    sales_target = forms.IntegerField(required=True, label='Sales Target')
-
-    class Meta:
-        model = Store
-        fields = ['number', 'sales_target']
-
-    def __init__(self, *args, **kwargs):
-        super(StoreTargetForm, self).__init__(*args, **kwargs)
-        self.fields['number'].disabled = True
-        self.fields['number'].label = "Store Number"
-
-
 StoreFormSet = modelformset_factory(Store, form=StoreTargetForm, extra=0, 
                                     fields=('number', 'sales_target'))
-
-
-# Form for selecting a group
-class GroupSelectForm(forms.Form):
-    group = forms.ModelChoiceField(queryset=Group.objects.all(), required=True, label="Select Group")
 
 
 def carwash_targets(request):
@@ -456,51 +443,6 @@ def carwash_targets(request):
         group_form = GroupSelectForm()
 
     return render(request, 'msg/carwash_targets.html', {'formset': formset, 'group_form': group_form})
-   
-
-class TwilioView(LoginRequiredMixin, UserPassesTestMixin, View):
-
-    def test_func(self):
-        return is_member_of_msg_group(self.request.user)
-
-    def get(self, request, *args, **kwargs):
-        # Check the requested URL path to determine the function to execute
-        if request.path == '/messages/':
-            return self.list_messages(request)
-        elif request.path == '/message-summary/':
-            return self.summarize_costs(request)
-
-    def list_messages(self, request):
-        sms = fetch_sms()
-        truncated_sms = []
-        for msg in sms:
-            truncated_body = msg.body[:1000]
-            user = CustomUser.objects.filter(phone_number=msg.to).first()
-            username = f"{user.first_name} {user.last_name}" if user else None
-            msg_data = {
-                "sid": msg.sid,
-                "date_sent": msg.date_sent,
-                "from": msg.from_,
-                "to": msg.to,
-                "body": truncated_body,
-                "username": username,
-                "price": msg.price,
-                "price_unit": msg.price_unit
-            }
-            truncated_sms.append(msg_data)
-        context = {
-            "sms_data": truncated_sms
-        }
-        return render(request, "msg/sms_data.html", context)
-
-    def summarize_costs(self, request):
-        twilio_summary = TwilioMessageSummary(client)
-        sms_summary, whatsapp_summary = twilio_summary.get_sms_and_whatsapp_summary()
-        context = {
-            'sms_summary': sms_summary,
-            'whatsapp_summary': whatsapp_summary,
-        }
-        return render(request, 'msg/message_summary.html', context)
 
 
 def sendgrid_webhook_view(request):
@@ -590,3 +532,24 @@ def campaign_setup_view(request):
         form.fields["contact_list"].choices = contact_list_choices
 
     return render(request, "msg/campaign_setup.html", {"form": form})
+
+
+def get_group_emails(request):
+    if request.method == 'GET':
+        # Retrieve group IDs from the query parameters
+        group_ids = request.GET.get('group_ids', '')  # Returns a string like "1,2,3"
+        if not group_ids:
+            return JsonResponse({"emails": [], "error": "No group IDs provided."}, status=400)
+
+        # Convert the string of IDs into a list of integers
+        group_id_list = [int(group_id) for group_id in group_ids.split(",") if group_id.isdigit()]
+
+        # Query active users in the specified groups
+        users = CustomUser.objects.filter(groups__id__in=group_id_list, is_active=True).distinct()
+        email_list = [
+            {"email": user.email, "status": "Active"}
+            for user in users
+        ]
+
+        return JsonResponse({"emails": email_list}, status=200)
+    return JsonResponse({"error": "Invalid request method."}, status=400)
