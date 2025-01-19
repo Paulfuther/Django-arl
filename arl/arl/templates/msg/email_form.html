@@ -43,14 +43,6 @@
                   </small>
               </div>
 
-              <!-- Dynamic Email List -->
-              <div class="form-group mt-4">
-                <label for="email_list">Emails in Selected Group:</label>
-                <div id="email_list" class="border p-3">
-                    <p class="text-muted">Select a group to view emails.</p>
-                </div>
-              </div>
-
               <!-- Submit Button -->
               <button type="submit" class="btn btn-primary mt-2 mb-1">Send</button>
           </div>
@@ -58,35 +50,4 @@
   </div>
 </form>
 
-<script>
-    document.getElementById('selected_group').addEventListener('change', function () {
-        const groupId = this.value;
-        const emailListDiv = document.getElementById('email_list');
-
-        if (groupId) {
-            fetch(`/get-group-emails/${groupId}/`)
-                .then(response => response.json())
-                .then(data => {
-                    emailListDiv.innerHTML = '';
-                    if (data.emails.length > 0) {
-                        const list = document.createElement('ul');
-                        data.emails.forEach(email => {
-                            const listItem = document.createElement('li');
-                            listItem.textContent = `${email.email} (${email.status})`;
-                            list.appendChild(listItem);
-                        });
-                        emailListDiv.appendChild(list);
-                    } else {
-                        emailListDiv.innerHTML = '<p class="text-muted">No emails found in this group.</p>';
-                    }
-                })
-                .catch(error => {
-                    emailListDiv.innerHTML = '<p class="text-danger">Error loading emails.</p>';
-                    console.error('Error:', error);
-                });
-        } else {
-            emailListDiv.innerHTML = '<p class="text-muted">Select a group to view emails.</p>';
-        }
-    });
-</script>
 {% endblock %}

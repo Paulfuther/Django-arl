@@ -5,7 +5,7 @@ from import_export import fields
 from import_export import fields as export_fields
 from import_export import resources
 from import_export.admin import ExportActionMixin
-from arl.payroll.models import PayPeriod, StatutoryHoliday, CalendarEvent
+
 from arl.dsign.models import DocuSignTemplate, ProcessedDocsignDocument
 from arl.incident.models import Incident, MajorIncident
 from arl.msg.models import (BulkEmailSendgrid, EmailTemplate, Twimlmessages,
@@ -264,25 +264,8 @@ class QuestionAdmin(admin.ModelAdmin):
     display_answers.short_description = 'Answers'
 
 
-@admin.register(PayPeriod)
-class PayPeriodAdmin(admin.ModelAdmin):
-    list_display = ['start_date', 'end_date', 'gross_pay', 'net_pay', 'deductions']
-
-
-@admin.register(StatutoryHoliday)
-class StatutoryHolidayAdmin(admin.ModelAdmin):
-    list_display = ['date', 'name', 'pay_period']
-
-
-@admin.register(CalendarEvent)
-class CalendarEventAdmin(admin.ModelAdmin):
-    list_display = ['date', 'event_type', 'description']
-
-
 # UserAdmin.fieldsets = tuple(fields)
 @admin.register(SaltLog)
-
-
 class SaltLogAdmin(admin.ModelAdmin):
     list_display = (
         'store',
