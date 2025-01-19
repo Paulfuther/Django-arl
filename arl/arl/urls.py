@@ -15,6 +15,7 @@ urlpatterns = [
     path("", include("arl.msg.urls")),
     path("", include("arl.bucket.urls")),
     path("quiz/", include("arl.quiz.urls")),
+    path("", include("arl.payroll.urls")),
 ]
 
 handler403 = "arl.views.error_403"
