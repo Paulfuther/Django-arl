@@ -12,7 +12,6 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse_lazy
-from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormView
@@ -32,7 +31,7 @@ from .tasks import (fetch_twilio_summary, filter_sendgrid_events,
                     generate_email_event_summary,
                     generate_employee_email_report_task,
                     master_email_send_task, process_sendgrid_webhook,
-                    send_one_off_bulk_sms_task)
+                    send_one_off_bulk_sms_task, fetch_twilio_sms_task)
 
 logger = logging.getLogger(__name__)
 
@@ -88,22 +87,27 @@ class SendTemplateEmailView(LoginRequiredMixin, UserPassesTestMixin, FormView):
         sendgrid_template = form.cleaned_data.get("sendgrid_id").first()
         print(sendgrid_template.id)
         if not sendgrid_template:
-            return JsonResponse({"success": False, "error": "No email template selected."}, status=400)
+            return JsonResponse({"success": False, "error":
+                                 "No email template selected."}, status=400)
         # Use the SendGrid ID directly
         sendgrid_id = sendgrid_template.sendgrid_id
         selected_groups = form.cleaned_data.get("selected_group")
         selected_users = form.cleaned_data.get("selected_users")
 
         if not selected_groups and not selected_users:
-            return JsonResponse({"success": False, "error": "No recipients selected."}, status=400)
+            return JsonResponse({"success": False, "error":
+                                "No recipients selected."}, status=400)
 
         # Collect attachments
         attachments = self.collect_attachments()
         if attachments is None:
-            return JsonResponse({"success": False, "error": "One or more attachments exceed the 10MB size limit."}, status=400)
+            return JsonResponse({"success": False, "error":
+                                "One or more attachments exceed "
+                                 "the 10MB size limit."}, status=400)
 
         # Gather recipient data
-        recipients = self.prepare_recipient_data(selected_groups, selected_users)
+        recipients = self.prepare_recipient_data(selected_groups,
+                                                 selected_users)
 
         # Debugging: Log recipient data
         print("Prepared recipient data:", recipients, sendgrid_id)
@@ -117,10 +121,9 @@ class SendTemplateEmailView(LoginRequiredMixin, UserPassesTestMixin, FormView):
 
         print("sent")
         if self.request.headers.get("x-requested-with") == "XMLHttpRequest":
-            return JsonResponse({
-                "success": True,
-                "message": "Emails processed successfully! The page will refresh after you close this message.",
-            })
+            return JsonResponse({"success": True, "message":
+                                 "Emails processed! "
+                                 "Refresh after closing this message."})
 
         return super().form_valid(form)
 
@@ -129,7 +132,8 @@ class SendTemplateEmailView(LoginRequiredMixin, UserPassesTestMixin, FormView):
 
         if self.request.headers.get("x-requested-with") == "XMLHttpRequest":
             # Render the form with errors as HTML
-            html = render_to_string(self.template_name, {"form": form}, self.request)
+            html = render_to_string(self.template_name, {"form": form},
+                                    self.request)
             return JsonResponse({"success": False, "html": html})
 
         return self.render_to_response(self.get_context_data(form=form))
@@ -141,14 +145,16 @@ class SendTemplateEmailView(LoginRequiredMixin, UserPassesTestMixin, FormView):
             if file:
                 # Validate file size (10 MB limit)
                 if file.size > 10 * 1024 * 1024:
-                    messages.error(self.request, f"{file.name} exceeds the 10MB size limit.")
+                    messages.error(self.request,
+                                   f"{file.name} exceeds the 10MB size limit.")
                     return None
 
                 # Serialize the attachment
                 attachments.append({
                     "file_name": file.name,
                     "file_type": file.content_type,
-                    "file_content": base64.b64encode(file.read()).decode("utf-8"),
+                    "file_content":
+                    base64.b64encode(file.read()).decode("utf-8"),
                 })
                 print(file.name)
         return attachments
@@ -161,7 +167,7 @@ class SendTemplateEmailView(LoginRequiredMixin, UserPassesTestMixin, FormView):
 
         if selected_groups:
             for group in selected_groups:
-                for user in group.user_set.filter(is_active=True):  # Filter active
+                for user in group.user_set.filter(is_active=True):
                     recipients.append({
                         "name": user.get_full_name(),
                         "email": user.email,
@@ -177,14 +183,16 @@ class SendTemplateEmailView(LoginRequiredMixin, UserPassesTestMixin, FormView):
                 })
 
         # Remove duplicates based on email
-        unique_recipients = {recipient["email"]: recipient for recipient in recipients}.values()
+        unique_recipients = {recipient["email"]:
+                             recipient for recipient in recipients}.values()
         # Debugging: Print recipient data
         for recipient in unique_recipients:
             print(recipient["email"], recipient["status"])
         return list(unique_recipients)
 
 
-class SendTemplateWhatsAppView(LoginRequiredMixin, UserPassesTestMixin, FormView):
+class SendTemplateWhatsAppView(LoginRequiredMixin, UserPassesTestMixin,
+                               FormView):
     form_class = TemplateWhatsAppForm
     template_name = "msg/whatsapp_form.html"
     # URL name for success page
@@ -213,7 +221,6 @@ class SendTemplateWhatsAppView(LoginRequiredMixin, UserPassesTestMixin, FormView
 
 
 class FetchTwilioView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
-    # This class is for a summary of SMS messages
     template_name = "msg/sms_data.html"
 
     def test_func(self):
@@ -221,31 +228,40 @@ class FetchTwilioView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        sms = fetch_sms()
-        truncated_sms = []
-        for msg in sms:
-            truncated_body = msg.body[:250]
-            # Fetch user data based on the phone number
-            user = CustomUser.objects.filter(phone_number=msg.to).first()
-            username = f"{user.first_name} {user.last_name}" if user else None
-            # if user exists
-            msg_data = {
-                "sid": msg.sid,
-                "date_sent": msg.date_sent,
-                "from": msg.from_,
-                "to": msg.to,
-                "body": truncated_body,
-                "username": username,  # Add the username to the SMS data
-                # Add more fields as needed
-                "price": msg.price,
-                "price unit": msg.price_unit
-            }
-            truncated_sms.append(msg_data)
-        context["sms_data"] = truncated_sms
+
+        # Trigger the Celery task to fetch SMS messages
+        task_id = fetch_twilio_sms_task.apply_async().id
+        context["task_id"] = task_id  # Pass the task ID to the template
+        context["sms_data"] = []  # Empty until the task completes
         return context
 
+    def post(self, request, *args, **kwargs):
+        try:
+            # Parse JSON body
+            body = json.loads(request.body)
+            task_id = body.get("task_id")
 
-class FetchTwilioCallsView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
+            # Handle missing task ID
+            if not task_id:
+                return JsonResponse({"status": "error", "error": "Task ID is missing from the request."})
+
+            # Retrieve the Celery task result
+            task_result = AsyncResult(task_id)
+            if task_result.ready():
+                if task_result.successful():
+                    return JsonResponse({"status": "success", "data": task_result.result})
+                else:
+                    return JsonResponse({"status": "error", "error": str(task_result.result)})
+            return JsonResponse({"status": "pending"})
+        except json.JSONDecodeError:
+            return JsonResponse({"status": "error", "error": "Invalid JSON payload."})
+        except Exception as e:
+            logger.error(f"Error retrieving task result: {e}", exc_info=True)
+            return JsonResponse({"status": "error", "error": "An error occurred while retrieving the task result."})
+
+
+class FetchTwilioCallsView(LoginRequiredMixin, UserPassesTestMixin,
+                           TemplateView):
     template_name = "msg/call_data.html"
 
     def test_func(self):
