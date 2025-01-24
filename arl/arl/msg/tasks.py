@@ -32,9 +32,11 @@ def master_email_send_task(recipients, sendgrid_id, attachments=None):
     Master task to send emails using the provided template and recipient data.
 
     Args:
-        recipients (list): List of dictionaries containing recipient data (name, email).
+        recipients (list): List of dictionaries containing recipient
+        data (name, email).
         sendgrid_id (str): SendGrid template ID to use for the email.
-        attachments (list, optional): List of attachments (each as a dictionary with file details).
+        attachments (list, optional): List of attachments 
+        (each as a dictionary with file details).
 
     Returns:
         str: Success or error message.
@@ -62,10 +64,9 @@ def master_email_send_task(recipients, sendgrid_id, attachments=None):
                     failed_emails.append(email)
                     print(f"Failed to send email to {email}.")
             except Exception as e:
-                # Handle individual recipient errors without stopping the loop
-                failed_emails.append(email if email else "Unknown")
-                print(f"Error sending email to {email if email else 'Unknown'}: {str(e)}")
-
+                email_address = email or "Unknown"
+                failed_emails.append(email_address)
+                print(f"Error sending email to {email_address}: {e}")
         # Final status message
         if failed_emails:
             print(f"Emails sent with some failures. Failed emails: {failed_emails}")
@@ -609,3 +610,33 @@ def generate_employee_email_report_task(employee_id):
         index=False,
         table_id="table_email_report"
     )
+
+
+@app.task(name="fetch_twilio_sms_task")
+def fetch_twilio_sms_task():
+    """
+    Fetch SMS messages from Twilio and process them.
+    Returns a list of processed message data.
+    """
+    messages = client.messages.list(limit=1000)
+
+    sms_data = []
+    for msg in messages:
+        truncated_body = msg.body[:250]
+        user = CustomUser.objects.filter(phone_number=msg.to).first()
+        username = f"{user.first_name} {user.last_name}" if user else None
+        sms_data.append({
+            "direction": msg.direction,
+            "date_created": msg.date_created,
+            "date_sent": msg.date_sent,
+            "error_code": msg.error_code,
+            "error_message": msg.error_message,
+            "from": msg.from_,
+            "to": msg.to,
+            "status": msg.status,
+            "price": msg.price,
+            "price_unit": msg.price_unit,
+            "body": truncated_body,
+            "username": username,
+        })
+    return sms_data

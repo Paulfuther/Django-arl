@@ -1,21 +1,86 @@
 {% extends "../base/base.html" %}
-{% block title %}Index{% endblock %}
+{% block title %}SMS Dashboard{% endblock %}
 
 {% block template %}
 {% include "../base/navbar.html" %}
 {% load crispy_forms_tags %}
 
 <head>
+    <!-- External Libraries -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <link rel="stylesheet" type="text/css"
         href="https://cdn.datatables.net/v/dt/jq-3.6.0/jszip-2.5.0/dt-1.12.1/b-2.2.3/b-html5-2.2.3/b-print-2.2.3/r-2.3.0/datatables.min.css" />
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/pdfmake.min.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/vfs_fonts.js"></script>
     <script type="text/javascript"
         src="https://cdn.datatables.net/v/dt/jq-3.6.0/jszip-2.5.0/dt-1.12.1/b-2.2.3/b-html5-2.2.3/b-print-2.2.3/r-2.3.0/datatables.min.js"></script>
 
+    <style>
+        .table-container {
+        width: 100%;
+        border: 1px solid #ddd; /* Optional border for the table container */
+        margin-bottom: 1rem; /* Add some spacing below the table */
+        }
+
+        table {
+            width: 100%; /* Ensure the table spans the full container width */
+            border-collapse: collapse;
+            table-layout: auto; /* Adjust column widths dynamically */
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border: 1px solid #ccc;
+            word-wrap: break-word; /* Allow text to break within cells */
+            white-space: nowrap; /* Prevent wrapping for long text */
+        }
+
+        th {
+            background-color: #f2f2f2;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        tr:hover {
+            background-color: #e9f5ff;
+        }
+
+        .spinner {
+            display: inline-block;
+            position: relative;
+            width: 40px;
+            height: 40px;
+        }
+
+        .double-bounce1, .double-bounce2 {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background-color: #3498db;
+            opacity: 0.6;
+            position: absolute;
+            top: 0;
+            left: 0;
+            animation: bounce 2s infinite ease-in-out;
+        }
+
+        .double-bounce2 {
+            animation-delay: -1s;
+        }
+
+        @keyframes bounce {
+            0%, 100% {
+                transform: scale(0);
+            }
+            50% {
+                transform: scale(1);
+            }
+        }
+    </style>
 </head>
 
 <div class="container">
@@ -23,43 +88,111 @@
         <div class="col-12 col-sm-10 col-md-8 col-lg-10 col-xl-10">
             <legend class="border-bottom mb-4">Text Logs</legend>
 
+            <!-- CSRF Token Form -->
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="task_id" value="{{ task_id }}">
+            </form>
+
+            <!-- Table -->
+           
             <table id="table_sms" class="display">
                 <thead>
                     <tr>
-                        <th>Date</th>
-                        <th>Time</th>
+                        <th>#</th>
+                        <!--<th>Direction</th>-->
+                        <!-- <th>Date Created</th> -->
+                        <th>Date Sent</th>
+                        <th>Status</th>
+                        <th>Error Code</th>
+                        <th>Error Message</th>
+                        <th>From</th>
                         <th>To</th>
                         <th>Name</th>
+                        <!--<th>Cost</th>-->
                         <th>Body</th>
-                        <th>Price</th> <!-- Added the missing header for price -->
                     </tr>
                 </thead>
-                <tbody>
-                    {% for sms in sms_data %}
+                <tbody id="smsTableBody">
                     <tr>
-                        <td>{{ sms.date_sent|date:"Y-m-d" }}</td>
-                        <td>{{ sms.date_sent|date:"H:i" }}</td>
-                        <td>{{ sms.to }}</td>
-                        <td>{{ sms.username }}</td>
-                        <td>{{ sms.body }}</td>
-                        <td>{{ sms.price|floatformat:2 }}</td> <!-- Price formatted to 2 decimal places -->
+                        <td colspan="9" style="text-align: center;">
+                            <div class="spinner">
+                                <div class="double-bounce1"></div>
+                                <div class="double-bounce2"></div>
+                            </div>
+                        </td>
                     </tr>
-                    {% endfor %}
                 </tbody>
             </table>
+            
         </div>
     </div>
 </div>
 
 <script>
-    $(document).ready(function () {
+    async function fetchSmsData(taskId) {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const response = await fetch("", {
+            method: "POST",
+            headers: { 
+                "Content-Type": "application/json", 
+                "X-CSRFToken": csrfToken 
+            },
+            body: JSON.stringify({ task_id: taskId })
+        });
+        const data = await response.json();
+
+        if (data.status === "success") {
+            populateTable(data.data);
+            initializeDataTable();
+        } else if (data.status === "pending") {
+            setTimeout(() => fetchSmsData(taskId), 2000); // Retry after 2 seconds
+        } else {
+            alert("Error fetching SMS data: " + data.error);
+        }
+    }
+
+    function populateTable(smsData) {
+        const tableBody = document.getElementById("smsTableBody");
+        tableBody.innerHTML = ""; // Clear existing rows
+
+        smsData.forEach((sms, index) => {
+            const row = `
+                <tr>
+                    <td>${index + 1}</td>
+                    <!-- <td>${sms.direction}</td> -->
+                    <!-- <td>${ sms.date_created }</td> -->
+                    <td>${sms.date_sent || "N/A"}</td>
+                     <td>${sms.status}</td>
+                    <td>${sms.error_code || "-"}</td>
+                    <td>${sms.error_message || "No error"}</td>
+                    <td>${sms.from}</td>
+                    <td>${sms.to}</td>
+                    <td>${sms.username}</td>
+                   
+                    <td>${sms.body}</td>
+                </tr>
+            `;
+            tableBody.innerHTML += row;
+        });
+    }
+
+    function initializeDataTable() {
         $('#table_sms').DataTable({
             dom: 'Bfrtip',
             responsive: true,
             buttons: ['copy', 'excel', 'pdf'],
-            order: [[0, 'desc']]  // Corrected ordering by date (descending order)
+            order: [[2, 'desc']]  // Order by "Date Created" descending
         });
-    });
+    }
+
+    // Start fetching SMS data
+    window.onload = function () {
+        const taskId = "{{ task_id }}";
+        if (taskId) {
+            fetchSmsData(taskId);
+        }
+    };
 </script>
 
 {% endblock %}
