@@ -569,3 +569,10 @@ def get_group_emails(request):
 
         return JsonResponse({"emails": email_list}, status=200)
     return JsonResponse({"error": "Invalid request method."}, status=400)
+
+
+def tobacco_vape_policy_view(request):
+    """
+    Render the Tobacco and Vape Products Required Action Policy.
+    """
+    return render(request, 'msg/tobacco_vape_policy.html')

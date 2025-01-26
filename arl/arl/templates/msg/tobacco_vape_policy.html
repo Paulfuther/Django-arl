@@ -1,0 +1,106 @@
+{% extends "../base/base.html" %}
+{% block title %}Index{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Required Action Policy for Tobacco and Vape Products</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            padding: 0;
+            color: #333;
+            background-color: #f9f9f9;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 20px;
+        }
+        ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        ul li {
+            margin-bottom: 5px;
+        }
+        p {
+            margin: 10px 0;
+        }
+        .signature {
+            margin-top: 30px;
+        }
+        .signature label {
+            font-weight: bold;
+        }
+        .signature input {
+            margin-top: 5px;
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Required Action Policy for Tobacco and Vape Products</h1>
+
+    <h2>1. WHAT IS REQUIRED?</h2>
+    <p>To comply with federal and provincial tobacco regulations, you must request ID from anyone purchasing tobacco or vape products who looks to be younger than 40.</p>
+
+    <h2>2. WHY?</h2>
+    <p>To ensure we are not selling tobacco or vape products to minors. It is against the law to sell tobacco or vape products to minors. A person who distributes tobacco or vape products to a minor is guilty of an offence and could be punished with:</p>
+    <ul>
+        <li>Loss of employment</li>
+        <li>Personal fines ranging from $4,000 to $100,000</li>
+        <li>Loss of license to sell tobacco and vape products</li>
+        <li>Additional fines ranging from $10,000 to $150,000 (for the Associate)</li>
+    </ul>
+
+    <h2>3. WHO?</h2>
+    <p>Each and every Guest that wants to buy tobacco products.</p>
+
+    <h2>4. REQUIRED ACTION</h2>
+    <p>Guests that look under the age of 40 are asked for (picture) I.D. when purchasing tobacco products:</p>
+    <ul>
+        <li>Ask for (picture) I.D. if they look under 40 before quoting the price of tobacco products.</li>
+        <li>Ask for (picture) I.D. if they look under 40 before placing tobacco products on the counter.</li>
+        <li>Don't let an angry Guest stop you from asking for (picture) I.D. IT'S THE LAW!</li>
+    </ul>
+
+    <h2>5. I.D. THAT MAKES THE GRADE</h2>
+    <ul>
+        <li>Driver's license</li>
+        <li>Certificate of Canadian Citizenship</li>
+        <li>Canadian permanent resident card</li>
+        <li>Canadian Armed Forces I.D. card</li>
+        <li>Any document issued by a federal or provincial authority or a foreign government that contains a photo, date of birth, and signature</li>
+    </ul>
+    <p><strong>IMPORTANT:</strong> School I.D. cannot be accepted as proof of age.</p>
+
+    <h2>6. EXPECTED RESULTS</h2>
+    <ul>
+        <li>No Employee is charged with selling tobacco products to a minor.</li>
+        <li>Employees always remember to ask for I.D.</li>
+        <li>No Employee receives a warning letter about selling to a minor.</li>
+        <li>Employees are supported by the manager for asking ALL Guests for I.D. who want to buy tobacco products.</li>
+    </ul>
+
+   
+</body>
+</html>
+
+
+{% endblock %}
