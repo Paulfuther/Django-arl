@@ -10,7 +10,8 @@ from arl.msg.views import (EmailEventList, FetchTwilioCallsView,
                            message_summary_view, sendgrid_webhook,
                            sendgrid_webhook_view, sms_success_view,
                            template_email_success_view,
-                           template_whats_app_success_view, whatsapp_webhook)
+                           template_whats_app_success_view, whatsapp_webhook,
+                           tobacco_vape_policy_view)
 
 urlpatterns = [
     path("send-sms/", SendSMSView.as_view(), name="send_sms_view"),
@@ -55,4 +56,5 @@ urlpatterns = [
     path("campaign/setup/", campaign_setup_view, name="campaign_setup"),
     path('employee-email-report/', employee_email_report_view, name='employee_email_report'),
     path('get-group-emails/', get_group_emails, name='get_group_emails'),
+    path('tobacco-vape-policy/', tobacco_vape_policy_view, name='tobacco_vape_policy'),
 ]

@@ -93,6 +93,30 @@ def send_sms_task(phone_number, message):
         return str(e)
 
 
+@app.task(name="tobacco_compliance_sms_with_download_link")
+def send_bulk_tobacco_sms_link():
+    try:
+        active_users = CustomUser.objects.filter(is_active=True)
+        gsat = [user.phone_number for user in active_users]
+        pdf_url = "https://boysenberry-poodle-7727.twil.io/assets/Required%20Action%20Policy%20for%20Tobacco%20and%20Vape%20single%20page-1.jpg"
+        message = (
+            "Attached is a link to our REQUIRED policy on Tobacco and "
+            "Vape. "
+            "Please review: "
+            f"{pdf_url}. "
+        )
+
+        send_bulk_sms(gsat, message)
+        # Log the result
+        logger.info("Bulk SMS task completed successfully")
+        log_message = f"Bulk SMS sent successfully to {', '.join(gsat)}"
+        log_entry = SmsLog(level="INFO", message=log_message)
+        log_entry.save()
+    except Exception as e:
+        # Log or handle other exceptions
+        logger.error(f"An error occurred: {str(e)}")
+
+
 @app.task(name="bulk_sms")
 def send_bulk_sms_task():
     try:
