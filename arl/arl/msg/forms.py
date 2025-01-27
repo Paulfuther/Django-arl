@@ -69,9 +69,11 @@ class TemplateEmailForm(forms.Form):
 
         # Ensure at least one is selected, but not both
         if not selected_group and not selected_users:
-            raise forms.ValidationError("You must select either a group or at least one user.")
+            raise forms.ValidationError("You must select "
+                                        "either a group or at least one user.")
         if selected_group and selected_users:
-            raise forms.ValidationError("You cannot select both a group and individual users.")
+            raise forms.ValidationError("You cannot select "
+                                        "both a group and individual users.")
 
         return cleaned_data
 
@@ -98,12 +100,14 @@ class TemplateWhatsAppForm(forms.Form):
 class SendGridFilterForm(forms.Form):
     date_from = forms.DateField(
         required=False,
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        widget=forms.DateInput(attrs={'type':
+                                      'date', 'class': 'form-control'}),
         label="From"
     )
     date_to = forms.DateField(
         required=False,
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        widget=forms.DateInput(attrs={'type':
+                                      'date', 'class': 'form-control'}),
         label="To"
     )
     template_id = forms.ModelChoiceField(
@@ -123,12 +127,14 @@ class TemplateFilterForm(forms.Form):
     )
     start_date = forms.DateField(
         required=False,
-        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+        widget=forms.DateInput(attrs={"type":
+                                      "date", "class": "form-control"}),
         label="Start Date"
     )
     end_date = forms.DateField(
         required=False,
-        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+        widget=forms.DateInput(attrs={"type":
+                                      "date", "class": "form-control"}),
         label="End Date"
     )
 
@@ -156,7 +162,8 @@ class EmployeeSearchForm(forms.Form):
 
 # Form for selecting a group
 class GroupSelectForm(forms.Form):
-    group = forms.ModelChoiceField(queryset=Group.objects.all(), required=True, label="Select Group")
+    group = forms.ModelChoiceField(queryset=Group.objects.all(),
+                                   required=True, label="Select Group")
 
 
 class StoreTargetForm(forms.ModelForm):
