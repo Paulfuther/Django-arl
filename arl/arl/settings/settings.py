@@ -71,6 +71,8 @@ INSTALLED_APPS = [
     "arl.dbox",
     "arl.incident",
     "arl.bucket",
+    "arl.payroll",
+    "arl.carwash"
 ]
 
 
