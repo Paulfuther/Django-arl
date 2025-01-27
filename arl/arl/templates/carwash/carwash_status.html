@@ -1,0 +1,37 @@
+{% extends "../base/base.html" %}
+{% block title %}Carwash Status{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+
+<style>
+    .container {
+        max-width: 80%;
+        overflow-x: hidden;
+        /* Prevent horizontal overflow */
+    }
+
+    select,
+    input,
+    button {
+        max-width: 100%;
+        box-sizing: border-box;
+        /* Include padding and border in the element's width */
+    }
+</style>
+
+
+<div class="container mb-2" style="height: 95vh;">
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-10 col-md-8 col-lg-8 col-xl-8 mt-2">
+            <legend class="border-bottom mb-4">Message Cost Summary</legend>
+<form method="post">
+    {% csrf_token %}
+    {{ form|crispy }}
+    <button type="submit" class="btn btn-primary">Submit</button>
+</form>
+</div>
+</div>
+</div>
+{% endblock %}
