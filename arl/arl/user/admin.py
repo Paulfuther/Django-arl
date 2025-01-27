@@ -5,7 +5,7 @@ from import_export import fields
 from import_export import fields as export_fields
 from import_export import resources
 from import_export.admin import ExportActionMixin
-
+from arl.payroll.models import PayPeriod, StatutoryHoliday, CalendarEvent
 from arl.dsign.models import DocuSignTemplate, ProcessedDocsignDocument
 from arl.incident.models import Incident, MajorIncident
 from arl.msg.models import (BulkEmailSendgrid, EmailTemplate, Twimlmessages,
@@ -266,6 +266,8 @@ class QuestionAdmin(admin.ModelAdmin):
 
 # UserAdmin.fieldsets = tuple(fields)
 @admin.register(SaltLog)
+
+
 class SaltLogAdmin(admin.ModelAdmin):
     list_display = (
         'store',

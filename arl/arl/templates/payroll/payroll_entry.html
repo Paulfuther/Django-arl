@@ -1,0 +1,28 @@
+<h1>Payroll Entry for {{ pay_period.name }}</h1>
+<form method="post">
+    {% csrf_token %}
+    <table>
+        <thead>
+            <tr>
+                <th>Employee</th>
+                {% for date in dates %}
+                    <th>{{ date }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for employee, entries in payroll_data.items %}
+                <tr>
+                    <td>{{ employee }}</td>
+                    {% for entry in entries %}
+                        <td>
+                            <input type="number" name="hours-{{ employee.id }}-{{ forloop.counter0|add:start_date }}" 
+                                   value="{{ entry|default:'' }}" step="0.01">
+                        </td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <button type="submit">Save</button>
+</form>
