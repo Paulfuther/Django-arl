@@ -11,7 +11,7 @@ from arl.incident.models import Incident, MajorIncident
 from arl.msg.models import (BulkEmailSendgrid, EmailTemplate, Twimlmessages,
                             UserConsent, WhatsAppTemplate)
 from arl.quiz.models import Answer, Question, Quiz, SaltLog
-
+from django.contrib.admin import SimpleListFilter
 from .models import CustomUser, Employer, ExternalRecipient, Store, UserManager
 
 # fields = list(UserAdmin.fieldsets)
@@ -83,6 +83,27 @@ class UserResource(resources.ModelResource):
             raise e
 
 
+class SINFirstDigitFilter(SimpleListFilter):
+    title = "SIN First Digit"  # Display title for the filter
+    parameter_name = "sin_first_digit"  # Query parameter name in the URL
+
+    def lookups(self, request, model_admin):
+        # Define filter options
+        return [
+            ("9", "Starts with 9"),
+            ("other", "Other"),
+        ]
+
+    def queryset(self, request, queryset):
+        # Apply filtering logic
+        value = self.value()
+        if value == "9":
+            return queryset.filter(sin__startswith="9")
+        elif value == "other":
+            return queryset.exclude(sin__startswith="9")
+        return queryset
+
+
 class CustomUserAdmin(ExportActionMixin, UserAdmin):
     resource_class = UserResource
     # Customize the fields you want to display
@@ -91,13 +112,14 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         "email",
         "store",
         "phone_number",
+        "sin",
         "last_login",
         "is_active",
         "get_groups",
         "get_consent",
     )
-    list_filter = ("is_active", "groups")  # Add any filters you need
-
+    list_filter = ("is_active", "groups", SINFirstDigitFilter)  # Add any filters you need
+    search_fields = ("username", "email", "phone_number", "sin")
     # def has_delete_permission(self, request, obj=None):
     #    return False  # Disables the ability to delete users
 
