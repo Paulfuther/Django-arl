@@ -16,7 +16,7 @@ def carwash_status_view(request):
             status.save()  # Save the instance to the database
             return redirect('carwash_status')  # Redirect to the same page after submission
     else:
-        form = CarwashStatusForm(user=request.user)  # Pass the user to filter stores
+        form = CarwashStatusForm(user=request.user) # Pass the user to filter stores
 
     return render(request, 'carwash/carwash_status.html', {'form': form})
 
@@ -24,5 +24,5 @@ def carwash_status_view(request):
 @login_required
 def carwash_status_list_view(request):
     # Query all entries for the logged-in user's managed stores
-    entries = CarwashStatus.objects.filter(store__manager=request.user)
+    entries = CarwashStatus.objects.filter(store__carwash=True)
     return render(request, 'carwash/carwash_status_list.html', {'entries': entries})

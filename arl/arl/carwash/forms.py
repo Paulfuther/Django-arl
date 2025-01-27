@@ -9,12 +9,12 @@ class CarwashStatusForm(forms.ModelForm):
         fields = ['store', 'status', 'reason', 'date_time']
 
     def __init__(self, *args, **kwargs):
-        # Pass the logged-in user to the form
+        # Extract the user from kwargs
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         
-        # Filter stores to only those managed by the user
+        # Filter stores to only those with carwash=True
         if user and user.is_authenticated:
-            self.fields['store'].queryset = Store.objects.filter(manager=user, carwash=True)
+            self.fields['store'].queryset = Store.objects.filter(carwash=True)
         else:
             self.fields['store'].queryset = Store.objects.none()
