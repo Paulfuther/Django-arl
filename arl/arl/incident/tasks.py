@@ -317,14 +317,27 @@ def upload_file_to_dropbox_task(data):
                                                          dropbox_file_path)
 
         if not success:
-            raise Exception(f"Dropbox upload failed: {message}")
+            # Check for specific error cases
+            if "insufficient_space" in message:
+                logger.error("Dropbox upload failed: Dropbox is full.")
+                return {"status": "failure", "message": "Dropbox is full. Please free up some space."}
+            else:
+                raise Exception(f"Dropbox upload failed: {message}")
 
         # Return updated data for the next task
         data["dropbox_path"] = dropbox_file_path
         return data
 
+    except KeyError as e:
+        error_message = f"Missing key in data passed to upload_file_to_dropbox_task: {e}"
+        logger.error(error_message)
+        raise Exception(error_message)
+
     except Exception as e:
-        raise Exception(f"Error in upload_file_to_dropbox_task: {e}")
+        # Log and raise other unexpected errors
+        error_message = f"Error in upload_file_to_dropbox_task: {e}"
+        logger.error(error_message)
+        raise Exception(error_message)
 
 
 @app.task(name="email_incident_pdf_to_group")
@@ -485,3 +498,5 @@ def generate_and_send_pdf_task(incident_id):
     except Exception as e:
         logger.error(f"Error processing incident {incident_id}: {str(e)}")
         return f"Error processing incident {incident_id}: {str(e)}"
+
+
