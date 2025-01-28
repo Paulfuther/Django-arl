@@ -1,13 +1,15 @@
 import logging
 from io import BytesIO
 
-from celery import chain
+from celery import chain, group
+from celery.exceptions import Ignore
 from django.contrib import messages
 from django.contrib.auth.mixins import (LoginRequiredMixin,
                                         PermissionRequiredMixin)
 from django.core.exceptions import ObjectDoesNotExist
+from django.db import transaction
 from django.db.models.signals import post_save
-from django.dispatch import receiver
+from django.dispatch import Signal, receiver
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
@@ -29,6 +31,7 @@ from .tasks import (generate_and_send_pdf_task,
                     send_email_to_group_task, upload_file_to_dropbox_task,
                     upload_to_linode_task)
 
+incident_updated = Signal()
 logger = logging.getLogger(__name__)
 
 
@@ -173,37 +176,33 @@ def handle_new_major_incident_form_creation(sender, instance, created,
 @receiver(post_save, sender=Incident)
 def handle_new_incident_form_creation(sender, instance, created, **kwargs):
     """
-    Signal to handle actions on Incident form creation and update.
+    Signal to handle actions on Incident form creation.
     """
     try:
         if created:
-            # When a new Incident is created
+            # Mark the instance as queued for sending
             instance.queued_for_sending = True
             instance.save(update_fields=["queued_for_sending"])
 
-            # Trigger the chain of tasks for a new incident
+            # Step 1: Generate PDF and email the group
             chain(
-                generate_pdf_task.s(instance.id),  # Generate PDF
-                upload_to_linode_task.s(),        # Upload to Linode storage
-                upload_file_to_dropbox_task.s(),  # Upload to Dropbox
+                generate_pdf_task.s(instance.id),
                 send_email_to_group_task.s(
                     group_name="incident_form_email",
                     subject="A New Incident Report Has Been Created"
-                )  # Email the PDF to a group
-            ).apply_async()
-        else:
-            # When an existing Incident is updated
-            # Directly generate the PDF and email to the group
-            chain(
-                generate_pdf_task.s(instance.id),  # Generate PDF
-                send_email_to_group_task.s(
-                    group_name="incident_update_email",
-                    subject="An Incident Report Has Been Updated"
                 )
-                # Email the PDF to the update group
             ).apply_async()
+
+            # Step 2: Independent Dropbox upload (optional)
+            generate_pdf_task.s(instance.id).apply_async(
+                link=upload_file_to_dropbox_task.s()
+            )
+
     except Exception as e:
-        print(f"An error occurred: {e}")
+        logger.error(
+            f"Error processing post_save signal for Incident ID {instance.id}: {e}",
+            exc_info=True
+        )
 
 
 class QueuedIncidentsListView(ListView):
@@ -321,8 +320,35 @@ class IncidentUpdateView(PermissionRequiredMixin, LoginRequiredMixin,
         )
 
     def form_valid(self, form):
-        form.instance.user_employer = self.request.user.employer
-        return super().form_valid(form)
+        try:
+            # Save the updated instance
+            response = super().form_valid(form)
+
+            # Trigger the tasks for PDF generation and email
+            chain(
+                generate_pdf_task.s(self.object.id),  # Generate PDF
+                send_email_to_group_task.s(           # Email the PDF
+                    group_name="incident_update_email",
+                    subject="An Incident Report Has Been Updated"
+                )
+            ).apply_async()
+
+            # Add a success message
+            messages.success(
+                self.request,
+                "The incident was updated successfully. A notification has been sent to the relevant group."
+            )
+
+            logger.info(f"Tasks triggered for Incident ID {self.object.id} after update.")
+            return response
+
+        except Exception as e:
+            logger.error(f"Error triggering tasks for Incident ID {self.object.id}: {e}")
+            messages.error(
+                self.request,
+                "An error occurred while processing the update tasks. Please try again."
+            )
+            return super().form_invalid(form)
 
     def form_invalid(self, form):
         return self.render_to_response(self.get_context_data(form=form))
