@@ -14,3 +14,5 @@ def error_500(request, exception=None):
 def custom_405(request, exception):
     """Return a custom response for 405 Method Not Allowed errors."""
     return render(request, 'incident/405.html', status=405)
+
+

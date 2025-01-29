@@ -3,6 +3,7 @@ from django.urls import include, path
 
 from arl.user.views import CustomAdminLoginView
 
+
 admin.site.login = CustomAdminLoginView.as_view()
 
 urlpatterns = [
@@ -17,7 +18,9 @@ urlpatterns = [
     path("quiz/", include("arl.quiz.urls")),
     path("", include("arl.payroll.urls")),
     path("", include("arl.carwash.urls")),
+    
 ]
+
 
 handler403 = "arl.views.error_403"
 handler500 = "arl.views.error_500"

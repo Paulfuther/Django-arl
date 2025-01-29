@@ -72,6 +72,7 @@
             <li><a class="dropdown-item" href="{% url 'waiting_for_others' %}">Outstanding Docs</a></li>
             <li><a class="dropdown-item" href="{% url 'queued_incidents_list' %}">Queued Incidents</a></li>
             <li><a class="dropdown-item" href="{% url 'summarize_costs' %}">Message Summary</a></li>
+            <li><a class="dropdown-item" href="{% url 'task_results' %}">Task Results</a></li>
           </ul>
         </li>
         {% endif %}
@@ -80,6 +81,7 @@
         <li class="nav-item">
           <a class="nav-link" href="{% url 'admin:index' %}">Admin</a>
         </li>
+        
 
         {% endif %}
         {% else %}
