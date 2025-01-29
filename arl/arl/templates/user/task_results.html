@@ -1,0 +1,76 @@
+{% extends "../base/base.html" %}
+{% block title %}Task Results{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+
+<div class="container d-flex flex-column" style="min-height: 100vh;">
+    <div class="row justify-content-center flex-grow-1">
+        <div class="col-12 col-sm-10 col-md-8 col-lg-10 col-xl-10 d-flex flex-column">
+            <legend class="border-bottom mb-4">Task Results</legend>
+
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Task ID</th>
+                            <th>Task Name</th>
+                            <th>Status</th>
+                            <th>Date Done</th>
+                            <th>Worker</th>
+                            <th style="width: 280px;">Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in task_results %}
+                            <tr>
+                                <td>{{ task.task_id }}</td>
+                                <td>{{ task.task_name }}</td>
+                                <td>{{ task.status }}</td>
+                                <td>{{ task.date_done }}</td>
+                                <td>{{ task.worker }}</td>
+                                <td>
+                                    <div style="max-height: 75px; max-width: 280px; overflow-y: auto; overflow-x: hidden; white-space: pre-wrap; border: 1px solid #ddd; padding: 10px; background-color: #f9f9f9;">
+                                        {{ task.result|default:"No result available"|striptags|slice:":500" }}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="d-flex justify-content-between mt-3">
+                {% if is_paginated %}
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination">
+                            {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page=1">&laquo; First</a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a>
+                                </li>
+                            {% endif %}
+
+                            <li class="page-item disabled">
+                                <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                            </li>
+
+                            {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a>
+                                </li>
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Last &raquo;</a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

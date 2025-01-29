@@ -13,17 +13,19 @@ from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
+from django.views.generic import ListView
+from django_celery_results.models import TaskResult
 from twilio.base.exceptions import TwilioException
 
+from arl.dsign.tasks import create_docusign_envelope_task
 from arl.msg.helpers import (check_verification_token,
                              request_verification_token)
 from arl.msg.tasks import send_sms_task
-from arl.dsign.tasks import create_docusign_envelope_task
-from .tasks import (send_newhire_template_email_task,
-                    create_newhire_data_email,
-                    save_user_to_db)
+
 from .forms import CustomUserCreationForm, TwoFactorAuthenticationForm
 from .models import CustomUser, Employer, Store
+from .tasks import (create_newhire_data_email, save_user_to_db,
+                    send_newhire_template_email_task)
 
 
 class RegisterView(FormView):
@@ -406,3 +408,10 @@ def fetch_managers(request):
             return JsonResponse({"error": str(e)}, status=500)
     else:
         return JsonResponse({"error": "No employer ID provided"}, status=400)
+
+
+class TaskResultListView(ListView):
+    model = TaskResult
+    template_name = 'user/task_results.html'
+    context_object_name = 'task_results'
+    paginate_by = 10  # Optional: Paginate results if there are many

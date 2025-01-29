@@ -1,18 +1,10 @@
 from django.contrib.auth import views as auth_views
 from django.urls import path
 
-from .views import (
-    CheckPhoneNumberUniqueView,
-    RegisterView,
-    admin_verification_page,
-    check_verification,
-    fetch_managers,
-    home_view,
-    login_view,
-    logout_view,
-    request_verification,
-    verification_page,
-)
+from .views import (CheckPhoneNumberUniqueView, RegisterView,
+                    TaskResultListView, admin_verification_page,
+                    check_verification, fetch_managers, home_view, login_view,
+                    logout_view, request_verification, verification_page)
 
 urlpatterns = [
     path("", login_view, name="home"),
@@ -58,4 +50,5 @@ urlpatterns = [
     ),
     path("home/", home_view, name="home"),
     path("fetch_managers/", fetch_managers, name="fetch_managers"),
+    path('task-results/', TaskResultListView.as_view(), name='task_results'),
 ]
