@@ -101,6 +101,15 @@ class CustomUser(AbstractUser):
         return self.groups.filter(name="storage").exists()
 
 
+class SMSOptOut(models.Model):
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name="sms_opt_out")
+    reason = models.TextField(blank=True, null=True)  # Optional reason why they're opted out
+    date_added = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username} opted out of SMS"
+
+
 class UserManager(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE,
                                 related_name='user_manager_profile')

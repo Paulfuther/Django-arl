@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from django import forms
 from django.contrib import admin
 from django.contrib.admin import SimpleListFilter
 from django.contrib.auth.admin import UserAdmin
@@ -18,7 +19,7 @@ from arl.msg.models import (BulkEmailSendgrid, EmailTemplate, Twimlmessages,
 from arl.quiz.models import Answer, Question, Quiz, SaltLog
 
 from .models import (CustomUser, DocumentType, EmployeeDocument, Employer,
-                     ExternalRecipient, Store, UserManager)
+                     ExternalRecipient, SMSOptOut, Store, UserManager)
 
 
 class EmailTemplateAdmin(admin.ModelAdmin):
@@ -384,6 +385,44 @@ class CarwashStatusAdmin(admin.ModelAdmin):
         return True
 
 
+class SMSOptOutForm(forms.ModelForm):
+    class Meta:
+        model = SMSOptOut
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Sort users by phone number (or change to 'first_name'/'last_name')
+        self.fields["user"].queryset = CustomUser.objects.filter(is_active=True).order_by("phone_number")
+        self.fields["user"].label_from_instance = self.format_user_label
+
+    def format_user_label(self, user):
+        """Format how users appear in the dropdown."""
+        return f"{user.first_name} {user.last_name} ({user.phone_number})"
+
+
+class SMSOptOutAdmin(admin.ModelAdmin):
+    form = SMSOptOutForm
+    list_display = ("get_first_name", "get_last_name", "get_phone", "user", "reason", "date_added")
+    search_fields = ("user__first_name", "user__last_name", "user__username", "user__phone_number")
+    ordering = ("user__phone_number",)  # Sorts list by phone number
+
+    # Enable autocomplete search for the user field
+    autocomplete_fields = ["user"]
+
+    def get_first_name(self, obj):
+        return obj.user.first_name if obj.user else "N/A"
+    get_first_name.short_description = "First Name"
+
+    def get_last_name(self, obj):
+        return obj.user.last_name if obj.user else "N/A"
+    get_last_name.short_description = "Last Name"
+
+    def get_phone(self, obj):
+        return obj.user.phone_number if obj.user else "N/A"
+    get_phone.short_description = "Phone Number"
+
+
 admin.site.register(Employer)
 admin.site.register(Twimlmessages)
 admin.site.register(BulkEmailSendgrid)
@@ -399,3 +438,4 @@ admin.site.register(Quiz, QuizAdmin)
 admin.site.register(Answer)
 admin.site.register(Question, QuestionAdmin)
 admin.site.register(ExternalRecipient, ExternalRecipientAdmin)
+admin.site.register(SMSOptOut, SMSOptOutAdmin)

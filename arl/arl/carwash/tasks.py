@@ -3,6 +3,11 @@ from collections import defaultdict
 from arl.celery import app
 from arl.carwash.models import Store
 from arl.carwash.helpers import calculate_durations  
+from django.utils.timezone import localtime
+import pytz
+
+
+eastern = pytz.timezone("America/New_York")
 
 
 def format_duration(seconds):
@@ -28,16 +33,20 @@ def generate_carwash_status_report():
         for duration in durations:
             closed_seconds = duration["duration_closed"].total_seconds() if duration.get("duration_closed") else 0
 
+            # Convert UTC timestamps to Eastern Time
+            closed_at = duration["closed_at"].astimezone(eastern) if duration.get("closed_at") else None
+            opened_at = duration["opened_at"].astimezone(eastern) if duration.get("opened_at") else None
+
             # Format individual durations
             formatted_durations.append({
-                "closed_at": duration["closed_at"].isoformat() if duration.get("closed_at") else None,
-                "opened_at": duration["opened_at"].isoformat() if duration.get("opened_at") else None,
+                "closed_at": closed_at.strftime("%Y-%m-%d %I:%M %p") if closed_at else None,
+                "opened_at": opened_at.strftime("%Y-%m-%d %I:%M %p") if opened_at else None,
                 "duration_closed": format_duration(closed_seconds),
             })
 
             # Group by month and sum total closed time
-            if duration.get("closed_at"):
-                month_key = duration["closed_at"].strftime("%Y-%m")  # Format: YYYY-MM
+            if closed_at:
+                month_key = closed_at.strftime("%Y-%m")  # Format: YYYY-MM
                 monthly_summary[month_key] += closed_seconds
 
         # Convert monthly summary to formatted strings
