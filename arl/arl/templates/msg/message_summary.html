@@ -18,103 +18,181 @@
             src="https://cdn.datatables.net/1.13.1/js/jquery.dataTables.min.js"></script>
 </head>
 
+<style>
+                    /* Centering the loader */
+                .loading-container {
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    height: 100px;
+                }
+
+                /* The bouncing dots */
+                .loading-bounce {
+                    display: flex;
+                    justify-content: space-between;
+                    width: 50px;
+                }
+
+                .loading-bounce div {
+                    width: 12px;
+                    height: 12px;
+                    background-color: #007bff; /* Bootstrap primary blue */
+                    border-radius: 50%;
+                    animation: loadingBounce 1.5s infinite ease-in-out;
+                }
+
+                .loading-bounce div:nth-child(1) {
+                    animation-delay: 0s;
+                }
+
+                .loading-bounce div:nth-child(2) {
+                    animation-delay: 0.2s;
+                }
+
+                .loading-bounce div:nth-child(3) {
+                    animation-delay: 0.4s;
+                }
+
+                /* Animation */
+                @keyframes loadingBounce {
+                    0%, 80%, 100% {
+                        transform: scale(0);
+                    }
+                    40% {
+                        transform: scale(1);
+                    }
+                }
+</style>
+
+
+
 <div class="container mb-2" style="height: 95vh;">
     <div class="row justify-content-center">
-        <div class="col-12 col-sm-10 col-md-8 col-lg-8 col-xl-8 mt-2">
+        <div class="col-12 col-sm-10 col-md-8 col-lg-10 col-xl-10">
             <legend class="border-bottom mb-4">Message Cost Summary</legend>
-<div id="loading-spinner"
-     style="display: flex; justify-content: center; align-items: center; height: 100vh; background: rgba(255, 255, 255, 0.8); z-index: 9999;">
-    <p>Loading message summary, please wait...</p>
-    <div class="spinner-border" role="status">
-        <span class="visually-hidden">Loading...</span>
-    </div>
-</div>
+            <div id="loading-spinner" class="loading-container">
+                <div class="loading-bounce">
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                </div>
+            </div>
 
 <div id="content" style="display: none;">
-    <h2>SMS Summary by Month</h2>
-    <table id="table_sms" class="display responsive nowrap" style="width:100%">
-        <thead>
-            <tr>
-                <th>Date Sent</th>
-                <th>Total Price</th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-    </table>
+   
+<table id="table_summary" class="display responsive nowrap" style="width:100%">
+    <thead>
+        <tr>
+            <th>Month</th>
+            <th>SMS Cost</th>
+            <th>WhatsApp Cost</th>
+            <th>Call Cost</th>
+            <th>Total Cost</th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+</table>
 
-    <h2>WhatsApp Summary by Month</h2>
-    <table id="table_whatsapp" class="display responsive nowrap" style="width:100%">
-        <thead>
-            <tr>
-                <th>Date Sent</th>
-                <th>Total Price</th>
-            </tr>
-        </thead>
-        <tbody></tbody>
-    </table>
 </div>
+
 </div></div></div>
 <script>
-    $(document).ready(function () {
-        // Show the spinner
-        $('#loading-spinner').show();
-        $('#content').hide();
+   $(document).ready(function () {
+    $('#loading-spinner').show();
+    $('#content').hide();
 
-        // Step 1: Trigger the task
-        $.ajax({
-            url: "{% url 'fetch_twilio_data' %}",
-            method: "GET",
-            success: function (data) {
-                console.log("Task started with ID:", data.task_id);
-                pollTaskStatus(data.task_id);
-            },
-            error: function () {
-                $('#loading-spinner').hide();
-                alert("Failed to start the task. Please try again.");
-            }
-        });
-
-        // Step 2: Poll for task status
-        function pollTaskStatus(taskId) {
-            $.ajax({
-                url: `/get-task-status/${taskId}/`,
-                method: "GET",
-                success: function (data) {
-                    if (data.status === "success") {
-                        console.log("Task completed:", data.result);
-
-                        // Populate SMS table
-                        var smsTable = $('#table_sms').DataTable();
-                        data.result.sms_summary.forEach(function (row) {
-                            smsTable.row.add([row.date_sent, row.price.toFixed(2)]).draw(false);
-                        });
-
-                        // Populate WhatsApp table
-                        var whatsappTable = $('#table_whatsapp').DataTable();
-                        data.result.whatsapp_summary.forEach(function (row) {
-                            whatsappTable.row.add([row.date_sent, row.price.toFixed(2)]).draw(false);
-                        });
-
-                        // Hide spinner and show content
-                        $('#loading-spinner').hide();
-                        $('#content').fadeIn();
-                    } else if (data.status === "pending") {
-                        // Task still in progress, keep polling
-                        setTimeout(function () {
-                            pollTaskStatus(taskId);
-                        }, 1000); // Poll every 1 second
-                    } else if (data.status === "failure") {
-                        $('#loading-spinner').hide();
-                        alert("Task failed: " + data.error);
-                    }
-                },
-                error: function () {
-                    $('#loading-spinner').hide();
-                    alert("Failed to fetch task status. Please try again.");
-                }
-            });
+    $.ajax({
+        url: "{% url 'fetch_twilio_data' %}",
+        method: "GET",
+        success: function (data) {
+            console.log("Task started with ID:", data.task_id);
+            pollTaskStatus(data.task_id);
+        },
+        error: function () {
+            $('#loading-spinner').hide();
+            alert("Failed to start the task. Please try again.");
         }
     });
+
+    function pollTaskStatus(taskId) {
+    $.ajax({
+        url: `/get-task-status/${taskId}/`,
+        method: "GET",
+        success: function (data) {
+            console.log("Task Status Response:", data);
+
+            if (data.status === "success" && data.result) {
+                console.log("Task completed. Processing data:", data.result);
+
+                let summary = data.result.summary || [];  
+
+                if (summary.length > 0) {
+                    let table = $('#table_summary').DataTable();
+                    summary.forEach(row => {
+                        console.log("Adding row to #table_summary:", row);
+                        table.row.add([
+                            row.date_sent,  
+                            row.sms_price.toFixed(2),  
+                            row.whatsapp_price.toFixed(2),  
+                            row.call_price.toFixed(2),  
+                            row.total_price.toFixed(2)  
+                        ]).draw(false);
+                    });
+                } else {
+                    console.warn("⚠️ No Summary data available. Showing empty table.");
+                    $("#table_summary tbody").html("<tr><td colspan='5'>No summary data available</td></tr>");
+                }
+
+                $('#loading-spinner').hide();
+                $('#content').fadeIn();
+            } else if (data.status === "pending") {
+                setTimeout(() => pollTaskStatus(taskId), 1000);
+            } else if (data.status === "failure") {
+                $('#loading-spinner').hide();
+                alert("Task failed: " + data.error);
+            }
+        },
+        error: function () {
+            $('#loading-spinner').hide();
+            alert("Failed to fetch task status. Please try again.");
+        }
+    });
+}
+
+
+    function populateTable(tableId, data) {
+    var table = $(tableId).DataTable();
+    table.clear();  // Clear old data
+
+    if (!Array.isArray(data)) {
+        console.warn(`Expected an array but got:`, typeof data, "for table:", tableId);
+        data = []; // Set to empty array to prevent errors
+    }
+
+    data.forEach(function (row, index) {
+        console.log(`Adding row to ${tableId}:`, row);
+        let rowData = [];
+
+        if (tableId === "#table_summary") {
+            rowData = [
+                row.date_sent || "N/A",
+                row.sms_cost !== undefined ? row.sms_cost.toFixed(2) : "0.00",
+                row.whatsapp_cost !== undefined ? row.whatsapp_cost.toFixed(2) : "0.00",
+                row.call_cost !== undefined ? row.call_cost.toFixed(2) : "0.00",
+                row.total_cost !== undefined ? row.total_cost.toFixed(2) : "0.00",
+            ];
+        } else {
+            rowData = [
+                row.date_sent || "N/A",
+                row.price !== undefined ? row.price.toFixed(2) : "0.00",
+            ];
+        }
+
+        table.row.add(rowData).draw(false);
+    });
+}
+});
 </script>
 {% endblock %}
 

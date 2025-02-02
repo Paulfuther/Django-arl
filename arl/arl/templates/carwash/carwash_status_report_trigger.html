@@ -1,0 +1,6 @@
+<div hx-get="{% url 'check_report_status' task_id=task_id %}"
+     hx-trigger="every 3s"
+     hx-target="#reportContainer"
+     hx-swap="innerHTML">
+    <p>Report is being generated... Please wait.</p>
+</div>

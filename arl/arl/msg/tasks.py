@@ -537,60 +537,87 @@ def monthly_store_calls_task():
 
 @app.task(naem="get_twilio_messsage_summary")
 def fetch_twilio_summary():
-    # Initialize the Twilio client
     try:
-        # Fetch messages
+        # Fetch messages and calls
         messages = client.messages.list(limit=1000)
+        calls = client.calls.list(limit=1000)
 
         # Separate messages into SMS and WhatsApp
         sms_data = []
         whatsapp_data = []
+        call_data = []
 
         for message in messages:
-            if message.price:  # Ensure the message has pricing data
+            if message.price:
                 data = {
-                    'date_sent': message.date_sent,
+                    'date_sent': message.date_sent.strftime('%Y-%m'),
                     'price': float(message.price),
-                    'price_unit': message.price_unit,
-                    'sid': message.sid,
                 }
                 if 'whatsapp:' in message.from_ or 'whatsapp:' in message.to:
                     whatsapp_data.append(data)
                 else:
                     sms_data.append(data)
 
-        # Summarize messages by month
+        for call in calls:
+            if call.price:
+                call_data.append({
+                    'date_sent': call.start_time.strftime('%Y-%m'),
+                    'price': float(call.price),
+                })
+
+        # Function to summarize by month
         def summarize_by_month(data):
             df = pd.DataFrame(data)
             if df.empty:
-                return []
+                return pd.DataFrame(columns=['date_sent', 'price'])
 
-            # Convert 'date_sent' to datetime and remove timezone
-            df['date_sent'] = pd.to_datetime(df['date_sent']).dt.tz_localize(None)
-            summary = (
-                df.groupby(df['date_sent'].dt.to_period('M'))
-                .agg({'price': 'sum'})
-                .reset_index()
-            )
-            summary['date_sent'] = summary['date_sent'].dt.strftime('%Y-%m')
-            return summary.to_dict('records')
+            df['date_sent'] = pd.to_datetime(df['date_sent']).dt.to_period('M')
+            summary = df.groupby('date_sent')['price'].sum().reset_index()
+            summary['date_sent'] = summary['date_sent'].astype(str)  # Convert period to string
+            return summary
 
-        # Summarize SMS and WhatsApp data
-        sms_summary = summarize_by_month(sms_data)
-        whatsapp_summary = summarize_by_month(whatsapp_data)
+        # Summarize each category
+        sms_df = summarize_by_month(sms_data).rename(columns={'price': 'sms_price'})
+        whatsapp_df = summarize_by_month(whatsapp_data).rename(columns={'price': 'whatsapp_price'})
+        call_df = summarize_by_month(call_data).rename(columns={'price': 'call_price'})
 
-        # Return the summaries
+        # ✅ Merge all categories
+        all_months = pd.concat([sms_df, whatsapp_df, call_df], axis=0)['date_sent'].unique()
+        all_months_df = pd.DataFrame({'date_sent': all_months})
+
+        final_df = (
+            all_months_df
+            .merge(sms_df, on='date_sent', how='left')
+            .merge(whatsapp_df, on='date_sent', how='left')
+            .merge(call_df, on='date_sent', how='left')
+        )
+
+        # ✅ Fill NaN values with 0
+        final_df.fillna(0, inplace=True)
+
+        # ✅ Compute total price
+        final_df['total_price'] = final_df['sms_price'] + final_df['whatsapp_price'] + final_df['call_price']
+
+        # ✅ Sort by month
+        final_df = final_df.sort_values(by='date_sent', ascending=False)
+
+        final_summary = final_df.to_dict('records')
+
+        # ✅ Debugging Output
+        print("🔍 Final Summary Data:", final_summary)
+
         return {
-            "sms_summary": sms_summary,
-            "whatsapp_summary": whatsapp_summary,
+            "sms_summary": sms_df.to_dict('records'),
+            "whatsapp_summary": whatsapp_df.to_dict('records'),
+            "call_summary": call_df.to_dict('records'),
+            "summary": final_summary,  # ✅ Ensuring this is populated
         }
 
     except Exception as e:
-        # Log any errors for debugging
         print(f"Error fetching or processing Twilio messages: {e}")
         raise e
-
-
+    
+    
 @app.task(name="generate_employee_email_report")
 def generate_employee_email_report_task(employee_id):
     # Fetch the employee's email using the ID

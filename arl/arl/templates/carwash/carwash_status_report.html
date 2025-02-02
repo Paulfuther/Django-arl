@@ -1,0 +1,63 @@
+{% extends "../base/base.html" %}
+{% block title %}Carwash Status Report{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+
+
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-10 col-md-8 col-lg-10 col-xl-10">
+            <legend class="border-bottom mb-4">Carwash Status List</legend>
+
+    {% for entry in data %}
+    <h3>Store {{ entry.store_number }}</h3>
+    <table table border="1" class="table table-striped">
+        <thead>
+            <tr>
+                <th>Closed At</th>
+                <th>Opened At</th>
+                <th>Duration Closed</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for duration in entry.durations %}
+                <tr>
+                    <td>{{ duration.closed_at }}</td>
+                    <td>{{ duration.opened_at }}</td>
+                    <td>{{ duration.duration_closed }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h4>Monthly Summary</h4>
+                {% if entry.monthly_summary %}
+                    <table border="1" class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th>Total Time Closed</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for month, total_time in entry.monthly_summary.items %}
+                                <tr>
+                                    <td>{{ month }}</td>
+                                    <td>{{ total_time }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p>No summary data available.</p>
+                {% endif %}
+            {% endfor %}
+</div>
+</div>
+</div>
+
+
+
+{% endblock %}
