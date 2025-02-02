@@ -14,7 +14,7 @@ from django.utils import timezone
 
 from arl.celery import app
 from arl.msg.models import EmailEvent, EmailTemplate, Message, SmsLog
-from arl.user.models import CustomUser
+from arl.user.models import CustomUser, SMSOptOut
 
 from .helpers import (client, create_master_email, create_single_csv_email,
                       send_bulk_sms, send_monthly_store_phonecall,
@@ -96,8 +96,16 @@ def send_sms_task(phone_number, message):
 @app.task(name="tobacco_compliance_sms_with_download_link")
 def send_bulk_tobacco_sms_link():
     try:
-        active_users = CustomUser.objects.filter(is_active=True)
+        # Get active users who have NOT opted out of SMS
+        opted_out_users = SMSOptOut.objects.values_list("user_id", flat=True)
+        active_users = CustomUser.objects.filter(is_active=True).exclude(id__in=opted_out_users)
+        # active_users = CustomUser.objects.filter(is_active=True)
         gsat = [user.phone_number for user in active_users]
+        if not gsat:
+            logger.warning("No valid phone numbers found to send SMS.")
+            print("no valid phone numbers")
+            return
+        
         pdf_url = "https://boysenberry-poodle-7727.twil.io/assets/Required%20Action%20Policy%20for%20Tobacco%20and%20Vape%20single%20page-1.jpg"
         message = (
             "Attached is a link to our REQUIRED policy on Tobacco and "
@@ -115,6 +123,7 @@ def send_bulk_tobacco_sms_link():
     except Exception as e:
         # Log or handle other exceptions
         logger.error(f"An error occurred: {str(e)}")
+        SmsLog.objects.create(level="ERROR", message=f"SMS Task Failed: {str(e)}")
 
 
 @app.task(name="bulk_sms")
