@@ -7,6 +7,7 @@ from django.core.validators import (
 from django.db import models
 from django_countries.fields import CountryField
 from phonenumber_field.modelfields import PhoneNumberField
+from django.utils.timezone import now
 
 
 class Employer(models.Model):
@@ -133,3 +134,27 @@ class ExternalRecipient(models.Model):
     @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}".strip()
+
+
+class DocumentType(models.Model):
+    name = models.CharField(max_length=100, unique=True, help_text="Name of the document type (e.g., Work Permit, Visa).")
+    description = models.TextField(blank=True, help_text="Optional description of the document type.")
+
+    def __str__(self):
+        return self.name
+
+
+class EmployeeDocument(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="documents")
+    document_type = models.ForeignKey(DocumentType, on_delete=models.CASCADE, related_name="documents")
+    document_number = models.CharField(max_length=100, blank=True, null=True, help_text="Unique identifier, if applicable.")
+    issue_date = models.DateField(blank=True, null=True, help_text="The date the document was issued.")
+    expiration_date = models.DateField(blank=True, null=True, help_text="The date the document expires, if applicable.")
+    notes = models.TextField(blank=True, help_text="Additional notes about the document.")
+    # file = models.FileField(upload_to="employee_documents/", blank=True, null=True, help_text="Upload a copy of the document.")
+
+    def is_expired(self):
+        return self.expiration_date and self.expiration_date < now().date()
+
+    def __str__(self):
+        return f"{self.document_type.name} for {self.user.username}"
