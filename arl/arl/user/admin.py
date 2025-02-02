@@ -1,20 +1,24 @@
+from datetime import datetime
+
 from django.contrib import admin
+from django.contrib.admin import SimpleListFilter
 from django.contrib.auth.admin import UserAdmin
 from django.utils.html import format_html
 from import_export import fields
 from import_export import fields as export_fields
 from import_export import resources
 from import_export.admin import ExportActionMixin
-from arl.payroll.models import PayPeriod, StatutoryHoliday, CalendarEvent
+
+from arl.carwash.models import CarwashStatus
 from arl.dsign.models import DocuSignTemplate, ProcessedDocsignDocument
 from arl.incident.models import Incident, MajorIncident
 from arl.msg.models import (BulkEmailSendgrid, EmailTemplate, Twimlmessages,
                             UserConsent, WhatsAppTemplate)
+# from arl.payroll.models import CalendarEvent, PayPeriod, StatutoryHoliday
 from arl.quiz.models import Answer, Question, Quiz, SaltLog
-from django.contrib.admin import SimpleListFilter
-from .models import CustomUser, Employer, ExternalRecipient, Store, UserManager
 
-# fields = list(UserAdmin.fieldsets)
+from .models import (CustomUser, DocumentType, EmployeeDocument, Employer,
+                     ExternalRecipient, Store, UserManager)
 
 
 class EmailTemplateAdmin(admin.ModelAdmin):
@@ -286,10 +290,67 @@ class QuestionAdmin(admin.ModelAdmin):
     display_answers.short_description = 'Answers'
 
 
-# UserAdmin.fieldsets = tuple(fields)
+class TaskResultAdmin(admin.ModelAdmin):
+    list_display = ('task_id', 'task_name', 'status', 'date_done', 'worker', 'short_result', 'created_datetime', 'completed_datetime')
+    readonly_fields = (
+        'task_id', 'task_name', 'status', 'worker', 
+        'result_content_type', 'result_encoding', 'result', 
+        'parameters', 'traceback', 'meta', 
+        'created_datetime', 'completed_datetime'
+    )
+    list_filter = ('status', 'date_done')
+    search_fields = ('task_id', 'task_name')
+
+    def short_result(self, obj):
+        """Shorten the result for list view."""
+        if obj.result:
+            return str(obj.result)[:75] + "..." if len(str(obj.result)) > 75 else obj.result
+        return "No result"
+    short_result.short_description = 'Result (short)'
+
+    def created_datetime(self, obj):
+        """Convert created datetime to local timezone for better readability."""
+        return self._format_datetime(obj.date_created)
+    created_datetime.short_description = "Created DateTime"
+
+    def completed_datetime(self, obj):
+        """Convert completed datetime to local timezone for better readability."""
+        return self._format_datetime(obj.date_done)
+    completed_datetime.short_description = "Completed DateTime"
+
+    def _format_datetime(self, value):
+        if value:
+            # Customize this to match your timezone setup
+            return datetime.strftime(value, "%b. %d, %Y, %I:%M %p")
+        return "N/A"
+
+    def parameters(self, obj):
+        """Display formatted parameters for better readability."""
+        args = obj.task_args or "-"
+        kwargs = obj.task_kwargs or "-"
+        return format_html(
+            "<strong>Positional Arguments:</strong> {}<br><strong>Named Arguments:</strong> {}",
+            args,
+            kwargs,
+        )
+    parameters.short_description = 'Task Parameters'
+
+
+@admin.register(DocumentType)
+class DocumentTypeAdmin(admin.ModelAdmin):
+    list_display = ("name", "description")
+    search_fields = ("name",)
+
+
+@admin.register(EmployeeDocument)
+class EmployeeDocumentAdmin(admin.ModelAdmin):
+    list_display = ("user", "document_type", "issue_date", "expiration_date", "is_expired")
+    list_filter = ("document_type", "expiration_date")
+    search_fields = ("user__username", "user__email", "document_type__name", "document_number")
+    date_hierarchy = "expiration_date"
+
+
 @admin.register(SaltLog)
-
-
 class SaltLogAdmin(admin.ModelAdmin):
     list_display = (
         'store',
@@ -301,6 +362,26 @@ class SaltLogAdmin(admin.ModelAdmin):
     )
     list_filter = ('store', 'date_salted')
     search_fields = ('store__name', 'area_salted')
+
+
+@admin.register(CarwashStatus)
+class CarwashStatusAdmin(admin.ModelAdmin):
+    list_display = ("store", "status", "reason", "date_time", "updated_by")
+    list_filter = ("status", "date_time", "store")
+    search_fields = ("store__number", "status", "reason")
+    ordering = ("-date_time",)
+
+    def has_delete_permission(self, request, obj=None):
+        """Allow deletion of records."""
+        return True  # Ensure deletion is allowed
+
+    def has_change_permission(self, request, obj=None):
+        """Ensure records can be modified."""
+        return True  # Modify this if you need restrictions
+
+    def has_add_permission(self, request):
+        """Allow adding new records."""
+        return True
 
 
 admin.site.register(Employer)

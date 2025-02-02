@@ -1,0 +1,41 @@
+<div>
+    {% for entry in data %}
+    <h3>Store {{ entry.store_number }}</h3>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Closed At</th>
+                <th>Opened At</th>
+                <th>Duration Closed</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for duration in entry.durations %}
+                <tr>
+                    <td>{{ duration.closed_at }}</td>
+                    <td>{{ duration.opened_at }}</td>
+                    <td>{{ duration.duration_closed }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h4>Monthly Summary</h4>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Month</th>
+                <th>Total Time Closed</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for month, total_time in entry.monthly_summary.items %}
+                <tr>
+                    <td>{{ month }}</td>
+                    <td>{{ total_time }}</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endfor %}
+</div>
