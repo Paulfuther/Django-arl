@@ -385,6 +385,27 @@ class CarwashStatusAdmin(admin.ModelAdmin):
         return True
 
 
+class SMSOptOutResource(resources.ModelResource):
+    """Defines the data to export"""
+    first_name = resources.Field()
+    last_name = resources.Field()
+    phone_number = resources.Field()
+
+    class Meta:
+        model = SMSOptOut
+        fields = ("user__first_name", "user__last_name", "user__phone_number", "date_added")
+        export_order = ("user__first_name", "user__last_name", "user__phone_number", "date_added")
+
+    def dehydrate_first_name(self, obj):
+        return obj.user.first_name if obj.user else ""
+
+    def dehydrate_last_name(self, obj):
+        return obj.user.last_name if obj.user else ""
+
+    def dehydrate_phone_number(self, obj):
+        return obj.user.phone_number if obj.user else ""
+
+
 class SMSOptOutForm(forms.ModelForm):
     class Meta:
         model = SMSOptOut
@@ -401,25 +422,29 @@ class SMSOptOutForm(forms.ModelForm):
         return f"{user.first_name} {user.last_name} ({user.phone_number})"
 
 
-class SMSOptOutAdmin(admin.ModelAdmin):
+class SMSOptOutAdmin(ExportActionMixin, admin.ModelAdmin):
     form = SMSOptOutForm
+    resource_class = SMSOptOutResource
     list_display = ("get_first_name", "get_last_name", "get_phone", "user", "reason", "date_added")
     search_fields = ("user__first_name", "user__last_name", "user__username", "user__phone_number")
-    ordering = ("user__phone_number",)  # Sorts list by phone number
+    ordering = ("user__first_name", "user__last_name", "user__phone_number",)  # Sorts list by phone number
 
     # Enable autocomplete search for the user field
     autocomplete_fields = ["user"]
 
     def get_first_name(self, obj):
         return obj.user.first_name if obj.user else "N/A"
+    get_first_name.admin_order_field = "user__first_name"
     get_first_name.short_description = "First Name"
 
     def get_last_name(self, obj):
         return obj.user.last_name if obj.user else "N/A"
+    get_last_name.admin_order_field = "user__last_name"
     get_last_name.short_description = "Last Name"
 
     def get_phone(self, obj):
         return obj.user.phone_number if obj.user else "N/A"
+    get_phone.admin_order_field = "user__phone_number"
     get_phone.short_description = "Phone Number"
 
 
