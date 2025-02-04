@@ -50,6 +50,7 @@ class UserResource(resources.ModelResource):
             "phone_number",
             "manager",
             "whatsapp_consent",
+            "sin",
         )
         export_order = (
             "store",
@@ -60,6 +61,7 @@ class UserResource(resources.ModelResource):
             "phone_number",
             "manager",
             "whatsapp_consent",
+            "sin",
         )
 
     def dehydrate_manager(self, custom_user):
