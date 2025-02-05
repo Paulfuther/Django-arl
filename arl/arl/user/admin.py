@@ -124,6 +124,7 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         "is_active",
         "get_groups",
         "get_consent",
+        "latest_docusign_template",
     )
     list_filter = ("is_active", "groups", SINFirstDigitFilter)  # Add any filters you need
     search_fields = ("username", "email", "phone_number", "sin")
@@ -134,6 +135,13 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         return ", ".join([group.name for group in obj.groups.all()])
 
     get_groups.short_description = "Groups"
+
+    def latest_docusign_template(self, obj):
+        """Fetches the latest template name for the user from ProcessedDocusignDocument."""
+        latest_doc = ProcessedDocsignDocument.objects.filter(user=obj).order_by('-processed_at').first()
+        return latest_doc.template_name if latest_doc else "No Documents"
+
+    latest_docusign_template.short_description = "Docusign Documents"
 
     def get_consent(self, obj):
         consent = UserConsent.objects.filter(user=obj,
