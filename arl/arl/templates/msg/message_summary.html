@@ -79,34 +79,66 @@
                 </div>
             </div>
 
-<div id="content" style="display: none;">
+        <div id="content" style="display: none;">
    
-<table id="table_summary" class="display responsive nowrap" style="width:100%">
-    <thead>
-        <tr>
-            <th>Month</th>
-            <th>SMS Cost</th>
-            <th>WhatsApp Cost</th>
-            <th>Call Cost</th>
-            <th>Total Cost</th>
-        </tr>
-    </thead>
-    <tbody></tbody>
-</table>
+            <table id="sms-summary-table" class="display responsive " style="width:100%">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>SMS Cost</th>
+                        <th>Calls Cost</th>
+                        <th>Authy SMS</th>
+                        <th>Authy Calls</th>
+                        <th>Verify SMS</th>
+                        <th>Verify WhatsApp</th>
+                        <th>Carrier Fees</th>
+                        <th>Total Cost</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
 
-</div>
+        </div>
 
-</div></div></div>
+        </div>
+        </div>
+        </div>
+
+
 <script>
-   $(document).ready(function () {
+    $(document).ready(function () {
     $('#loading-spinner').show();
     $('#content').hide();
 
+    // Initialize DataTable
+    let dataTable = $("#sms-summary-table").DataTable({
+        paging: true,
+        searching: true,
+        ordering: true,
+        responsive: true,
+        scrollX: true,
+        info: true,
+        lengthMenu: [5, 10, 25, 50, 100],
+        order: [[0, "desc"]],
+        columns: [
+                { title: "Month" },
+                { title: "SMS Cost", className: "text-end" },
+                { title: "Calls Cost", className: "text-end" },
+                { title: "Authy SMS", className: "text-end" },
+                { title: "Authy Calls", className: "text-end" },
+                { title: "Verify SMS", className: "text-end" },
+                { title: "Verify WhatsApp", className: "text-end" },
+                { title: "Carrier Fees", className: "text-end" },
+                { title: "Total Cost", className: "text-end fw-bold" },
+            ]
+    });
+
+    // Start the task and fetch the task ID
     $.ajax({
         url: "{% url 'fetch_twilio_data' %}",
         method: "GET",
         success: function (data) {
-            console.log("Task started with ID:", data.task_id);
+            console.log("🚀 Task started with ID:", data.task_id);
             pollTaskStatus(data.task_id);
         },
         error: function () {
@@ -116,83 +148,63 @@
     });
 
     function pollTaskStatus(taskId) {
-    $.ajax({
-        url: `/get-task-status/${taskId}/`,
-        method: "GET",
-        success: function (data) {
-            console.log("Task Status Response:", data);
+        $.ajax({
+            url: `/get-task-status/${taskId}/`,
+            type: "GET",
+            success: function (response) {
+                console.log("📡 Task Status Response:", response);
 
-            if (data.status === "success" && data.result) {
-                console.log("Task completed. Processing data:", data.result);
-
-                let summary = data.result.summary || [];  
-
-                if (summary.length > 0) {
-                    let table = $('#table_summary').DataTable();
-                    summary.forEach(row => {
-                        console.log("Adding row to #table_summary:", row);
-                        table.row.add([
-                            row.date_sent,  
-                            row.sms_price.toFixed(2),  
-                            row.whatsapp_price.toFixed(2),  
-                            row.call_price.toFixed(2),  
-                            row.total_price.toFixed(2)  
-                        ]).draw(false);
-                    });
-                } else {
-                    console.warn("⚠️ No Summary data available. Showing empty table.");
-                    $("#table_summary tbody").html("<tr><td colspan='5'>No summary data available</td></tr>");
+                if (!response || !response.result) {
+                    console.warn("⚠️ No data received. Retrying...");
+                    setTimeout(() => pollTaskStatus(taskId), 2000);
+                    return;
                 }
 
-                $('#loading-spinner').hide();
-                $('#content').fadeIn();
-            } else if (data.status === "pending") {
-                setTimeout(() => pollTaskStatus(taskId), 1000);
-            } else if (data.status === "failure") {
-                $('#loading-spinner').hide();
-                alert("Task failed: " + data.error);
+                let result = response.result;
+
+                if (!result.sms_summary || !Array.isArray(result.sms_summary)) {
+                    console.warn("⚠️ No SMS Summary Data. Setting default empty list.");
+                    result.sms_summary = [];
+                }
+
+                console.log("✅ Processing SMS Summary:", result.sms_summary);
+                processSmsSummary(result.sms_summary);
+            },
+            error: function (xhr, status, error) {
+                console.error("❌ Error fetching task status:", error);
+                setTimeout(() => pollTaskStatus(taskId), 2000);
             }
-        },
-        error: function () {
-            $('#loading-spinner').hide();
-            alert("Failed to fetch task status. Please try again.");
-        }
-    });
-}
-
-
-    function populateTable(tableId, data) {
-    var table = $(tableId).DataTable();
-    table.clear();  // Clear old data
-
-    if (!Array.isArray(data)) {
-        console.warn(`Expected an array but got:`, typeof data, "for table:", tableId);
-        data = []; // Set to empty array to prevent errors
+        });
     }
 
-    data.forEach(function (row, index) {
-        console.log(`Adding row to ${tableId}:`, row);
-        let rowData = [];
+    function processSmsSummary(smsSummary) {
+        dataTable.clear(); // Clear existing data
 
-        if (tableId === "#table_summary") {
-            rowData = [
-                row.date_sent || "N/A",
-                row.sms_cost !== undefined ? row.sms_cost.toFixed(2) : "0.00",
-                row.whatsapp_cost !== undefined ? row.whatsapp_cost.toFixed(2) : "0.00",
-                row.call_cost !== undefined ? row.call_cost.toFixed(2) : "0.00",
-                row.total_cost !== undefined ? row.total_cost.toFixed(2) : "0.00",
-            ];
-        } else {
-            rowData = [
-                row.date_sent || "N/A",
-                row.price !== undefined ? row.price.toFixed(2) : "0.00",
-            ];
+        if (smsSummary.length === 0) {
+            console.warn("⚠️ No SMS summary data to display.");
+            $('#sms-summary-message').html("<div class='alert alert-warning'>No data available</div>");
+            return;
         }
 
-        table.row.add(rowData).draw(false);
-    });
-}
+        smsSummary.forEach(entry => {
+                dataTable.row.add([
+                    entry.date_sent,
+                    `$${parseFloat(entry.sms_price || 0).toFixed(2)}`,
+                    `$${parseFloat(entry.calls_price || 0).toFixed(2)}`,
+                    `$${parseFloat(entry.authy_sms_price || 0).toFixed(2)}`,
+                    `$${parseFloat(entry.authy_calls_price || 0).toFixed(2)}`,
+                    `$${parseFloat(entry.verify_sms_price || 0).toFixed(2)}`,
+                    `$${parseFloat(entry.verify_whatsapp_price || 0).toFixed(2)}`,
+                    `$${parseFloat(entry.carrier_fees || 0).toFixed(2)}`,
+                    `<strong>$${parseFloat(entry.total_price || 0).toFixed(2)}</strong>`
+                ]);
+            });
+        dataTable.draw();
+        console.log("📊 Table updated successfully.");
+        $('#loading-spinner').hide();
+        $('#content').show();
+    }
 });
-</script>
+    </script>
 {% endblock %}
 
