@@ -11,7 +11,7 @@ from django.contrib.auth.models import Group
 from django.db import connection
 from django.db.models import F, Func, IntegerField, OuterRef, Subquery
 from django.utils import timezone
-
+from collections import defaultdict
 from arl.celery import app
 from arl.msg.models import EmailEvent, EmailTemplate, Message, SmsLog
 from arl.user.models import CustomUser, SMSOptOut
@@ -546,87 +546,55 @@ def monthly_store_calls_task():
 
 @app.task(naem="get_twilio_messsage_summary")
 def fetch_twilio_summary():
+    """ Fetch Twilio SMS costs (including carrier fees) for the past 12 months. """
     try:
-        # Fetch messages and calls
-        messages = client.messages.list(limit=1000)
-        calls = client.calls.list(limit=1000)
+        def get_costs(start_date, end_date, category):
+            """ Fetch costs for a specific category within a date range. """
+            records = client.usage.records.list(category=category,
+                                                start_date=start_date,
+                                                end_date=end_date)
+            return sum(float(record.price) for record in records if record.price)
 
-        # Separate messages into SMS and WhatsApp
-        sms_data = []
-        whatsapp_data = []
-        call_data = []
+        # ✅ Define date ranges for past 12 months
+        today = datetime.utcnow()
+        months = [(today.replace(day=1) - timedelta(days=30 * i)).replace(day=1) for i in range(12)]
+        sms_summary = []
 
-        for message in messages:
-            if message.price:
-                data = {
-                    'date_sent': message.date_sent.strftime('%Y-%m'),
-                    'price': float(message.price),
-                }
-                if 'whatsapp:' in message.from_ or 'whatsapp:' in message.to:
-                    whatsapp_data.append(data)
-                else:
-                    sms_data.append(data)
+        for month in months:
+            start_date = month.strftime("%Y-%m-%d")
+            end_date = (month.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+            end_date = end_date.strftime("%Y-%m-%d")
 
-        for call in calls:
-            if call.price:
-                call_data.append({
-                    'date_sent': call.start_time.strftime('%Y-%m'),
-                    'price': float(call.price),
-                })
+            sms_cost = get_costs(start_date, end_date, "sms")
+            calls_cost = get_costs(start_date, end_date, "calls")
+            authy_sms_cost = get_costs(start_date, end_date, "authy-sms-outbound")
+            authy_calls_cost = get_costs(start_date, end_date, "authy-calls-outbound")
+            verify_sms_cost = get_costs(start_date, end_date, "verify-push")  # Might not be exactly SMS
+            verify_whatsapp_cost = get_costs(start_date, end_date, "verify-whatsapp-conversations-business-initiated")
+            carrier_fees = get_costs(start_date, end_date, "sms-messages-carrierfees")
+            total_cost = get_costs(start_date, end_date, "totalprice")  # Includes all fees
 
-        # Function to summarize by month
-        def summarize_by_month(data):
-            df = pd.DataFrame(data)
-            if df.empty:
-                return pd.DataFrame(columns=['date_sent', 'price'])
-
-            df['date_sent'] = pd.to_datetime(df['date_sent']).dt.to_period('M')
-            summary = df.groupby('date_sent')['price'].sum().reset_index()
-            summary['date_sent'] = summary['date_sent'].astype(str)  # Convert period to string
-            return summary
-
-        # Summarize each category
-        sms_df = summarize_by_month(sms_data).rename(columns={'price': 'sms_price'})
-        whatsapp_df = summarize_by_month(whatsapp_data).rename(columns={'price': 'whatsapp_price'})
-        call_df = summarize_by_month(call_data).rename(columns={'price': 'call_price'})
-
-        # ✅ Merge all categories
-        all_months = pd.concat([sms_df, whatsapp_df, call_df], axis=0)['date_sent'].unique()
-        all_months_df = pd.DataFrame({'date_sent': all_months})
-
-        final_df = (
-            all_months_df
-            .merge(sms_df, on='date_sent', how='left')
-            .merge(whatsapp_df, on='date_sent', how='left')
-            .merge(call_df, on='date_sent', how='left')
-        )
-
-        # ✅ Fill NaN values with 0
-        final_df.fillna(0, inplace=True)
-
-        # ✅ Compute total price
-        final_df['total_price'] = final_df['sms_price'] + final_df['whatsapp_price'] + final_df['call_price']
-
-        # ✅ Sort by month
-        final_df = final_df.sort_values(by='date_sent', ascending=False)
-
-        final_summary = final_df.to_dict('records')
-
-        # ✅ Debugging Output
-        print("🔍 Final Summary Data:", final_summary)
-
+            sms_summary.append({
+                "date_sent": month.strftime("%Y-%m"),
+                "sms_price": round(sms_cost, 2),
+                "calls_price": round(calls_cost, 2),
+                "authy_sms_price": round(authy_sms_cost, 2),
+                "authy_calls_price": round(authy_calls_cost, 2),
+                "verify_sms_price": round(verify_sms_cost, 2),
+                "verify_whatsapp_price": round(verify_whatsapp_cost, 2),
+                "carrier_fees": round(carrier_fees, 2),
+                "total_price": round(total_cost, 2),
+            })
         return {
-            "sms_summary": sms_df.to_dict('records'),
-            "whatsapp_summary": whatsapp_df.to_dict('records'),
-            "call_summary": call_df.to_dict('records'),
-            "summary": final_summary,  # ✅ Ensuring this is populated
+            "sms_summary": sms_summary
+        }
+    except Exception as e:
+        return {
+            "sms_summary": [],
+            "error": str(e),
         }
 
-    except Exception as e:
-        print(f"Error fetching or processing Twilio messages: {e}")
-        raise e
-    
-    
+
 @app.task(name="generate_employee_email_report")
 def generate_employee_email_report_task(employee_id):
     # Fetch the employee's email using the ID
