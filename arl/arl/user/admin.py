@@ -111,6 +111,13 @@ class SINFirstDigitFilter(SimpleListFilter):
         return queryset
 
 
+class ProcessedDocusignDocumentInline(admin.TabularInline):
+    model = ProcessedDocsignDocument
+    extra = 0  # Don't show empty extra forms
+    fields = ("template_name", "processed_at")
+    readonly_fields = ("template_name", "processed_at")  # Make these fields non-editable
+
+
 class CustomUserAdmin(ExportActionMixin, UserAdmin):
     resource_class = UserResource
     # Customize the fields you want to display
@@ -126,6 +133,7 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         "get_consent",
         "latest_docusign_template",
     )
+    inlines = [ProcessedDocusignDocumentInline]
     list_filter = ("is_active", "groups", SINFirstDigitFilter)  # Add any filters you need
     search_fields = ("username", "email", "phone_number", "sin")
     # def has_delete_permission(self, request, obj=None):
@@ -137,9 +145,9 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
     get_groups.short_description = "Groups"
 
     def latest_docusign_template(self, obj):
-        """Fetches the latest template name for the user from ProcessedDocusignDocument."""
-        latest_doc = ProcessedDocsignDocument.objects.filter(user=obj).order_by('-processed_at').first()
-        return latest_doc.template_name if latest_doc else "No Documents"
+        """Fetch all template names a user has signed."""
+        templates = ProcessedDocsignDocument.objects.filter(user=obj).values_list("template_name", flat=True)
+        return ", ".join(templates) if templates else "No Documents"
 
     latest_docusign_template.short_description = "Docusign Documents"
 
