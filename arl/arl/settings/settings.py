@@ -1,12 +1,14 @@
 import os
 from pathlib import Path
-
+import logging
 from dotenv import load_dotenv
 
 load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+print("BASE_DIR:", BASE_DIR)
+logger = logging.getLogger('django')
+logger.error("TEST LOGGING: This is a test error log.")
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
@@ -25,25 +27,51 @@ ADMINS = [
     # Add more admins if needed
 ]
 
+import os
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
     'handlers': {
         'file': {
-            'level': 'DEBUG',
+            'level': 'INFO',  # Change to INFO or higher (WARNING, ERROR, CRITICAL)
             'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'django_debug.log'),
+            'filename': os.path.join(BASE_DIR, 'django.log'), # Rename for clarity
+            'formatter': 'verbose',
+        },
+        'console': {  # Add a console handler for immediate feedback during development
+            'level': 'DEBUG', # Keep console at debug for development
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
         },
     },
     'loggers': {
         'django': {
-            'handlers': ['file'],
-            'level': 'DEBUG',
+            'handlers': ['file', 'console'], # Use both file and console
+            'level': 'INFO', # Change to INFO or higher
+            'propagate': True,
+        },
+        '': { # Catch-all logger for other applications
+            'handlers': ['file', 'console'],
+            'level': 'INFO', # Change to INFO or higher
+        },
+        'my_app_name': {  # Example for a specific app
+            'handlers': ['file', 'console'],
+            'level': 'DEBUG', # Or a more specific level for your app
             'propagate': True,
         },
     },
- }
-
+}
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.admin",
@@ -72,7 +100,8 @@ INSTALLED_APPS = [
     "arl.incident",
     "arl.bucket",
     "arl.payroll",
-    "arl.carwash"
+    "arl.carwash",
+    "arl.setup"
 ]
 
 
