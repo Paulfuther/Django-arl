@@ -9,7 +9,7 @@ from import_export import fields
 from import_export import fields as export_fields
 from import_export import resources
 from import_export.admin import ExportActionMixin
-
+from django.utils.html import strip_tags
 from arl.carwash.models import CarwashStatus
 from arl.dsign.models import DocuSignTemplate, ProcessedDocsignDocument
 from arl.incident.models import Incident, MajorIncident
@@ -34,10 +34,12 @@ class ExternalRecipientAdmin(admin.ModelAdmin):
                      'group__name')
 
 
+# This calss is used for exporting
 class UserResource(resources.ModelResource):
     manager = export_fields.Field()
     whatsapp_consent = export_fields.Field()
     store = fields.Field(column_name="store", readonly=True)
+    all_docusign_templates = fields.Field(column_name="Docusign Documents", attribute="all_docusign_templates")
 
     class Meta:
         model = CustomUser
@@ -51,6 +53,7 @@ class UserResource(resources.ModelResource):
             "manager",
             "whatsapp_consent",
             "sin",
+            "all_docusign_templates",
         )
         export_order = (
             "store",
@@ -62,6 +65,7 @@ class UserResource(resources.ModelResource):
             "manager",
             "whatsapp_consent",
             "sin",
+            "all_docusign_templates",
         )
 
     def dehydrate_manager(self, custom_user):
@@ -89,6 +93,13 @@ class UserResource(resources.ModelResource):
             # print(f"Error exporting store for user {obj.username}: {e}")
             raise e
 
+    def dehydrate_all_docusign_templates(self, obj):
+        """Retrieve and format all DocuSign template names for a user."""
+        templates = ProcessedDocsignDocument.objects.filter(user=obj).values_list("template_name", flat=True)
+        if not templates:
+            return "No Documents"
+        return ", ".join(strip_tags(template) for template in templates) 
+
 
 class SINFirstDigitFilter(SimpleListFilter):
     title = "SIN First Digit"  # Display title for the filter
@@ -111,9 +122,19 @@ class SINFirstDigitFilter(SimpleListFilter):
         return queryset
 
 
+# Inline model to display all associated DocuSign documents
+class ProcessedDocusignDocumentInline(admin.TabularInline):  # Or use admin.StackedInline for a different layout
+    model = ProcessedDocsignDocument
+    extra = 0  # Don't show empty extra forms
+    fields = ("template_name", "processed_at")  # Adjust based on available fields
+    readonly_fields = ("template_name", "processed_at")  # Make these fields non-editable
+
+
+# CustomUser model
 class CustomUserAdmin(ExportActionMixin, UserAdmin):
     resource_class = UserResource
     # Customize the fields you want to display
+    inlines = [ProcessedDocusignDocumentInline]
     list_display = (
         "username",
         "email",
@@ -124,7 +145,7 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         "is_active",
         "get_groups",
         "get_consent",
-        "latest_docusign_template",
+        "all_docusign_templates",
     )
     list_filter = ("is_active", "groups", SINFirstDigitFilter)  # Add any filters you need
     search_fields = ("username", "email", "phone_number", "sin")
@@ -136,12 +157,16 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
 
     get_groups.short_description = "Groups"
 
-    def latest_docusign_template(self, obj):
-        """Fetches the latest template name for the user from ProcessedDocusignDocument."""
-        latest_doc = ProcessedDocsignDocument.objects.filter(user=obj).order_by('-processed_at').first()
-        return latest_doc.template_name if latest_doc else "No Documents"
+    def all_docusign_templates(self, obj):
+        """Display all template names for a user in a neat format."""
+        templates = ProcessedDocsignDocument.objects.filter(user=obj).values_list("template_name", flat=True)
+        if not templates:
+            return format_html('<span style="color: grey;">No Documents</span>')
+        # Format each template name with a line break for better readability
+        formatted_templates = "<br>".join(templates)
+        return format_html(formatted_templates)  # Ensure HTML is rendered correctly
 
-    latest_docusign_template.short_description = "Docusign Documents"
+    all_docusign_templates.short_description = "Docusign Documents"
 
     def get_consent(self, obj):
         consent = UserConsent.objects.filter(user=obj,
