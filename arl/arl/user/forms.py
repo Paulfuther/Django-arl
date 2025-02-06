@@ -84,21 +84,6 @@ class CustomUserCreationForm(UserCreationForm):
 
         return cleaned_data
 
-    # def clean_manager_dropdown(self):
-    #  manager = self.cleaned_data.get('manager_dropdown')
-    #  if manager is None:
-    #      raise forms.ValidationError('Invalid manager selection.')
-
-        # Here, we extract the ID from the selected manager
-        # manager_id = manager.id
-        # print(f'Manager ID from clean_manager_dropdown: {manager_id}')
-        # valid_manager_ids = [manager.id for manager in CustomUser.objects.filter(groups__name='Manager', is_active=True)]
-        # if manager_id not in valid_manager_ids:
-        #    raise forms.ValidationError('Invalid manager selection.')
-
-        # Return the manager's ID
-        # return manager_id
-
 
 class TwoFactorAuthenticationForm(forms.Form):
     verification_code = forms.CharField(
