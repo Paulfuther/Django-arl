@@ -160,10 +160,13 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
     def all_docusign_templates(self, obj):
         """Display all template names for a user in a neat format."""
         templates = ProcessedDocsignDocument.objects.filter(user=obj).values_list("template_name", flat=True)
+
         if not templates:
-            return format_html('<span style="color: grey;">No Documents</span>')
-        # Format each template name with a line break for better readability
-        formatted_templates = "<br>".join(templates)
+            return "No Documents"
+
+        # Convert None values to empty strings
+        formatted_templates = "<br>".join(filter(None, templates))
+
         return format_html(formatted_templates)  # Ensure HTML is rendered correctly
 
     all_docusign_templates.short_description = "Docusign Documents"
