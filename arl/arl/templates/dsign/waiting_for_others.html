@@ -9,88 +9,137 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <link rel="stylesheet" type="text/css"
         href="https://cdn.datatables.net/v/dt/jq-3.6.0/jszip-2.5.0/dt-1.12.1/b-2.2.3/b-html5-2.2.3/b-print-2.2.3/r-2.3.0/datatables.min.css" />
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/pdfmake.min.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/vfs_fonts.js"></script>
     <script type="text/javascript"
         src="https://cdn.datatables.net/v/dt/jq-3.6.0/jszip-2.5.0/dt-1.12.1/b-2.2.3/b-html5-2.2.3/b-print-2.2.3/r-2.3.0/datatables.min.js"></script>
 
+    <style>
+        /* Centering the loader */
+        .loading-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100px;
+        }
+
+        /* Bouncing dots animation */
+        .loading-bounce {
+            display: flex;
+            justify-content: space-between;
+            width: 50px;
+        }
+
+        .loading-bounce div {
+            width: 12px;
+            height: 12px;
+            background-color: #007bff;
+            border-radius: 50%;
+            animation: loadingBounce 1.5s infinite ease-in-out;
+        }
+
+        .loading-bounce div:nth-child(1) {
+            animation-delay: 0s;
+        }
+
+        .loading-bounce div:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .loading-bounce div:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes loadingBounce {
+            0%, 80%, 100% {
+                transform: scale(0);
+            }
+            40% {
+                transform: scale(1);
+            }
+        }
+
+        /* Hide content initially */
+        #content {
+            display: none;
+        }
+
+        /* Search box styling */
+        .dataTables_filter input {
+            text-align: left;
+            border-radius: 10px;
+            padding-left: 10px;
+        }
+    </style>
 </head>
 
 <div class="container mb-2" style="height: 95vh;">
     <div class="row justify-content-center">
-        <div class="col-12 col-sm-10 col-md-8 col-lg-8 col-xl-8 mt-2">
-            <legend class="border-bottom mb-4">Outstanding Douments</legend>
+        <div class="col-12 col-sm-10 col-md-8 col-lg-10 col-xl-10">
+            <legend class="border-bottom mb-4">Outstanding Documents</legend>
 
-            <!-- Table for outstanding documents -->
-            <table id="table_id" class="display">
-                <thead>
-                    <tr>
-                        <th>Document Name</th>
-                        <th>Status</th>
-                        <th>Sent Date</th>
-                        <th>Outstanding Signers</th>
-                    </tr>
-                </thead>
-                <!-- Loading indicator -->
-                <div id="loading"
-                    style="display: none; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                    <p>Loading outstanding documents, please wait...</p>
-                    <div class="spinner-border" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
+            <!-- Loading Indicator with Bouncing Dots -->
+            <div id="loading" class="loading-container">
+                <div class="loading-bounce">
+                    <div></div>
+                    <div></div>
+                    <div></div>
                 </div>
-                <tbody id="outstanding-docs-body">
-                    <!-- Rows will be dynamically added here -->
-                </tbody>
-            </table>
+            </div>
+
+            <!-- Table for outstanding documents (Initially Hidden) -->
+            <div id="content">
+                <table id="table_id" class="display responsive" style="width:100%">
+                    <thead>
+                        <tr>
+                            <th>Document Name</th>
+                            <th>Status</th>
+                            <th>Sent Date</th>
+                            <th>Outstanding Signers</th>
+                        </tr>
+                    </thead>
+                    <tbody id="outstanding-docs-body">
+                        <!-- Rows will be dynamically added here -->
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
     $(document).ready(function () {
-        // Initialize DataTable with empty data
+        // Initialize DataTable with empty data (Keep Hidden Initially)
         var table = $('#table_id').DataTable({
             language: { search: "" },
             responsive: true,
+            scrollX: true,
             "pageLength": 10,
-            order: [[2, 'desc']]
+            order: [[2, 'desc']],
+            dom: 'lrtip'  // Removes DataTables' default search bar (use custom styles instead)
         });
 
-        // Set the placeholder without the word "Search"
-        $('.dataTables_filter input[type="search"]').attr('placeholder', 'Search...');
-
-        // Apply custom CSS styles to align the search box to the left
-        $('.dataTables_filter input[type="search"]').css({
-            'text-align': 'left', // Align the text to the left
-            'border-radius': '10px', // Adjust the border-radius as needed
-            'padding-left': '10px' // Add padding to the left for the text
-        });
+        // Initially hide the table and show the loading indicator
+        $('#content').hide();
+        $('#loading').show();
 
         // Function to fetch outstanding documents via AJAX
         function fetchOutstandingDocs() {
-            // Show the loading indicator
-            $('#loading').show();
-
-            // Make the AJAX request
             $.ajax({
                 url: "{% url 'waiting_for_others' %}",
                 method: "GET",
                 success: function (data) {
-                    // Hide the loading indicator
-                    $('#loading').hide();
+                    $('#loading').hide();  // Hide loading animation
+                    $('#content').fadeIn(); // Show content smoothly
 
-                    // Clear the table body
-                    table.clear();
+                    table.clear(); // Clear previous data
 
-                    // Check if there are outstanding envelopes
                     if (data.outstanding_envelopes.length > 0) {
-                        // Populate the table with data
                         data.outstanding_envelopes.forEach(function (envelope) {
                             var signers = envelope.signers.map(function (signer) {
-                                return signer.name + " (" + signer.email + ") - "+ "<br>Role: " + signer.role + "<br>Status: " + signer.status +
-                                    "<br>Store: " + signer.store + "<br>Address: " + signer.address ;
+                                return signer.name + " (" + signer.email + ") - " +
+                                       "<br>Role: " + signer.role + "<br>Status: " + signer.status +
+                                       "<br>Store: " + signer.store + "<br>Address: " + signer.address;
                             }).join('<br><br>');
 
                             table.row.add([
@@ -98,16 +147,16 @@
                                 envelope.status,
                                 envelope.sent_date_time.slice(0, 10),
                                 signers,
-                                
                             ]).draw(false);
                         });
                     } else {
-                        $('#outstanding-docs-body').append('<tr><td colspan="4">No outstanding documents found.</td></tr>');
+                        table.row.add(["No outstanding documents found.", "", "", ""]).draw(false);
                     }
                 },
                 error: function () {
                     $('#loading').hide();
-                    $('#outstanding-docs-body').append('<tr><td colspan="4">An error occurred while fetching outstanding documents. Please try again later.</td></tr>');
+                    $('#content').fadeIn();
+                    table.row.add(["An error occurred while fetching documents.", "", "", ""]).draw(false);
                 }
             });
         }
@@ -116,6 +165,5 @@
         fetchOutstandingDocs();
     });
 </script>
-
 
 {% endblock %}
