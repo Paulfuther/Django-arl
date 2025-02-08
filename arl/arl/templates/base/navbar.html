@@ -1,5 +1,7 @@
 {% load waffle_tags %}
 
+
+
 <nav class="navbar navbar-expand-lg bg-body-tertiary">
   <div class="container">
     <a class="navbar-brand fs-3" href="#">ARL</a>
@@ -72,7 +74,7 @@
           </a>
           <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
             <li><a class="dropdown-item" href="{% url 'comms' %}">Comms Overview</a></li>
-            <li><a class="dropdown-item" href="{% url 'fetch_twilio' %}">SMS Logs</a></li>
+            <li><a class="dropdown-item" href="{% url 'sms_summary_view' %}">SMS Logs</a></li>
             <li><a class="dropdown-item" href="{% url 'fetch_twilio_calls' %}">Call Logs</a></li>
             <li><a class="dropdown-item" href="{% url 'email_event_summary' %}">Email Logs</a></li>
             <li><a class="dropdown-item" href="{% url 'employee_email_report' %}">Employee Email Report</a></li>
@@ -101,3 +103,4 @@
     </div>
   </div>
 </nav>
+

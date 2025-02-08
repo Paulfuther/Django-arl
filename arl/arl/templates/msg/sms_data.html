@@ -1,198 +1,296 @@
 {% extends "../base/base.html" %}
-{% block title %}SMS Dashboard{% endblock %}
+{% block title %}Twilio SMS Log{% endblock %}
 
 {% block template %}
 {% include "../base/navbar.html" %}
 {% load crispy_forms_tags %}
 
 <head>
-    <!-- External Libraries -->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-    <link rel="stylesheet" type="text/css"
-        href="https://cdn.datatables.net/v/dt/jq-3.6.0/jszip-2.5.0/dt-1.12.1/b-2.2.3/b-html5-2.2.3/b-print-2.2.3/r-2.3.0/datatables.min.css" />
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/pdfmake.min.js"></script>
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/vfs_fonts.js"></script>
-    <script type="text/javascript"
-        src="https://cdn.datatables.net/v/dt/jq-3.6.0/jszip-2.5.0/dt-1.12.1/b-2.2.3/b-html5-2.2.3/b-print-2.2.3/r-2.3.0/datatables.min.js"></script>
+  <!-- External Libraries -->
 
-    <style>
-        .table-container {
-        width: 100%;
-        border: 1px solid #ddd; /* Optional border for the table container */
-        margin-bottom: 1rem; /* Add some spacing below the table */
-        }
+  <!-- DataTables CSS -->
+  <link
+    rel="stylesheet"
+    type="text/css"
+    href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css"
+  />
+  <link
+    rel="stylesheet"
+    type="text/css"
+    href="https://cdn.datatables.net/responsive/2.4.1/css/responsive.dataTables.min.css"
+  />
 
-        table {
-            width: 100%; /* Ensure the table spans the full container width */
-            border-collapse: collapse;
-            table-layout: auto; /* Adjust column widths dynamically */
-        }
+  <!-- DataTables + jQuery -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js"></script>
 
-        th, td {
-            padding: 10px;
-            text-align: left;
-            border: 1px solid #ccc;
-            word-wrap: break-word; /* Allow text to break within cells */
-            white-space: nowrap; /* Prevent wrapping for long text */
-        }
+  <style>
+    /* Loader Animation */
+    .loading-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100px;
+    }
 
-        th {
-            background-color: #f2f2f2;
-        }
+    .loading-bounce {
+      display: flex;
+      justify-content: space-between;
+      width: 50px;
+    }
 
-        tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
+    .loading-bounce div {
+      width: 12px;
+      height: 12px;
+      background-color: #007bff;
+      border-radius: 50%;
+      animation: loadingBounce 1.5s infinite ease-in-out;
+    }
 
-        tr:hover {
-            background-color: #e9f5ff;
-        }
+    .loading-bounce div:nth-child(1) {
+      animation-delay: 0s;
+    }
+    .loading-bounce div:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+    .loading-bounce div:nth-child(3) {
+      animation-delay: 0.4s;
+    }
 
-        .spinner {
-            display: inline-block;
-            position: relative;
-            width: 40px;
-            height: 40px;
-        }
+    @keyframes loadingBounce {
+      0%,
+      80%,
+      100% {
+        transform: scale(0);
+      }
+      40% {
+        transform: scale(1);
+      }
+    }
 
-        .double-bounce1, .double-bounce2 {
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            background-color: #3498db;
-            opacity: 0.6;
-            position: absolute;
-            top: 0;
-            left: 0;
-            animation: bounce 2s infinite ease-in-out;
-        }
+    /* ✅ Prevents row stretching */
+    .dataTables_wrapper {
+      width: 100%;
+      overflow-x: auto;
+    }
 
-        .double-bounce2 {
-            animation-delay: -1s;
-        }
+    /* ✅ Ensures headers align */
+    table.dataTable {
+      width: 100% !important;
+      table-layout: auto;
+    }
 
-        @keyframes bounce {
-            0%, 100% {
-                transform: scale(0);
-            }
-            50% {
-                transform: scale(1);
-            }
-        }
-    </style>
+    /* ✅ Truncate text for better alignment */
+    table.dataTable tbody td {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 150px;
+    }
+
+    /* ✅ Expanded Row Content */
+    .expandable-content {
+      padding: 10px;
+      background: #f9f9f9;
+      border-left: 4px solid #007bff;
+    }
+
+    /* ✅ Hide extra columns on mobile */
+    @media screen and (max-width: 768px) {
+      .desktop-only {
+        display: none; /* ✅ Hide unnecessary columns in Mobile */
+      }
+    }
+    /* ✅ Ensure message body expands properly */
+    .expandable-content {
+      padding: 10px;
+      background: #f9f9f9;
+      border-left: 4px solid #007bff;
+      word-wrap: break-word;
+      white-space: normal;
+    }
+
+    /* ✅ Prevent scrolling in expanded message */
+    .message-container {
+      white-space: normal;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      max-width: 100%;
+    }
+  </style>
 </head>
 
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="col-12 col-sm-10 col-md-8 col-lg-10 col-xl-10">
-            <legend class="border-bottom mb-4">Text Logs</legend>
-
-            <!-- CSRF Token Form -->
-            <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="task_id" value="{{ task_id }}">
-            </form>
-
-            <!-- Table -->
-           
-            <table id="table_sms" class="display">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <!--<th>Direction</th>-->
-                        <!-- <th>Date Created</th> -->
-                        <th>Date Sent</th>
-                        <th>Status</th>
-                        <th>Error Code</th>
-                        <th>Error Message</th>
-                        <th>From</th>
-                        <th>To</th>
-                        <th>Name</th>
-                        <!--<th>Cost</th>-->
-                        <th>Body</th>
-                    </tr>
-                </thead>
-                <tbody id="smsTableBody">
-                    <tr>
-                        <td colspan="9" style="text-align: center;">
-                            <div class="spinner">
-                                <div class="double-bounce1"></div>
-                                <div class="double-bounce2"></div>
-                            </div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-            
+<div class="container mb-2" style="height: 95vh">
+  <div class="row justify-content-center">
+    <div class="col-12 col-sm-10 col-md-8 col-lg-10 col-xl-10">
+      <legend class="border-bottom mb-4">Text Logs</legend>
+      <div id="loading-spinner" class="loading-container">
+        <div class="loading-bounce">
+          <div></div>
+          <div></div>
+          <div></div>
         </div>
+      </div>
+
+      <div id="content" style="display: none">
+        <table id="table_sms" class="display" style="width: 100%">
+          <thead>
+            <tr>
+              <th></th>
+              <!-- Expand button column -->
+              <th>Name</th>
+              <th>Date Sent</th>
+              <th>Status</th>
+              <th>Error Code</th>
+              <th>Error Message</th>
+              <th>From</th>
+              <th>To</th>
+              <th>Mesasge</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
+  </div>
 </div>
 
 <script>
-    async function fetchSmsData(taskId) {
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-        const response = await fetch("", {
-            method: "POST",
-            headers: { 
-                "Content-Type": "application/json", 
-                "X-CSRFToken": csrfToken 
-            },
-            body: JSON.stringify({ task_id: taskId })
-        });
-        const data = await response.json();
+  $(document).ready(function () {
+    $("#loading-spinner").show();
+    $("#content").hide();
 
-        if (data.status === "success") {
-            populateTable(data.data);
-            initializeDataTable();
-        } else if (data.status === "pending") {
-            setTimeout(() => fetchSmsData(taskId), 2000); // Retry after 2 seconds
-        } else {
-            alert("Error fetching SMS data: " + data.error);
-        }
+    let table = $("#table_sms").DataTable({
+      data: [],
+      columns: [
+        {
+          data: null,
+          defaultContent: "",
+          className: "dt-control",
+          orderable: false,
+        }, // ✅ Expand button
+        { data: "username", defaultContent: "Unknown" }, // ✅ Always Visible (Mobile & Desktop)
+        { data: "date_sent", defaultContent: "N/A" }, // ✅ Always Visible (Mobile & Desktop)
+        { data: "status", defaultContent: "N/A" }, // ✅ Now Visible in Mobile
+        { data: "error_code", defaultContent: "-", className: "desktop-only" },
+        {
+          data: "error_message",
+          defaultContent: "No error",
+          className: "desktop-only",
+        },
+        { data: "from", defaultContent: "Unknown", className: "desktop-only" },
+        { data: "to", defaultContent: "Unknown", className: "desktop-only" },
+        {
+          data: "body",
+          defaultContent: "No Content",
+          className: "desktop-only",
+          render: function (data, type, row) {
+            if (type === "display" && data.length > 50) {
+              return data.substring(0, 50) + "..."; // ✅ Truncate message
+            }
+            return data;
+          },
+        },
+      ],
+      paging: true,
+      searching: true,
+      ordering: true,
+      responsive: {
+        details: {
+          type: "column",
+          target: 0,
+        },
+      },
+      columnDefs: [
+        { targets: [3], visible: true }, // ✅ Show `Status` in mobile
+        { targets: [4, 5, 6, 7, 8], visible: true, className: "desktop-only" }, // ✅ Hide others in Mobile
+        {
+          targets: [4, 5, 6, 7, 8],
+          visible: false,
+          className: "all",
+          responsivePriority: 2,
+        },
+      ],
+      buttons: ["copy", "excel", "pdf"],
+      lengthMenu: [10, 25, 50, 100, 1000],
+      order: [[2, "desc"]],
+    });
+
+    $.ajax({
+      url: "{% url 'fetch_sms_data' %}",
+      method: "GET",
+      success: function (response) {
+        pollTaskStatus(response.task_id);
+      },
+      error: function () {
+        alert("Error starting task.");
+      },
+    });
+
+    function pollTaskStatus(taskId) {
+      let checkInterval = setInterval(function () {
+        $.ajax({
+          url: `/get-task-status/${taskId}/`,
+          method: "GET",
+          success: function (response) {
+            if (response.status === "success") {
+              clearInterval(checkInterval);
+
+              let processedData = response.result.map((entry) => ({
+                username: String(entry.username || "Unknown"),
+                date_sent: String(entry.date_sent || "N/A"),
+                status: String(entry.status || "N/A"),
+                error_code: String(entry.error_code || "-"),
+                error_message: String(entry.error_message || "No error"),
+                from: String(entry.from || "Unknown"),
+                to: String(entry.to || "Unknown"),
+                body: String(entry.body || "No Content"),
+              }));
+
+              table.clear();
+              table.rows.add(processedData);
+              table.draw();
+
+              $("#loading-spinner").hide();
+              $("#content").show();
+            }
+          },
+          error: function () {
+            clearInterval(checkInterval);
+            alert("Error fetching data.");
+          },
+        });
+      }, 2000);
     }
 
-    function populateTable(smsData) {
-        const tableBody = document.getElementById("smsTableBody");
-        tableBody.innerHTML = ""; // Clear existing rows
-
-        smsData.forEach((sms, index) => {
-            const row = `
-                <tr>
-                    <td>${index + 1}</td>
-                    <!-- <td>${sms.direction}</td> -->
-                    <!-- <td>${ sms.date_created }</td> -->
-                    <td>${sms.date_sent || "N/A"}</td>
-                     <td>${sms.status}</td>
-                    <td>${sms.error_code || "-"}</td>
-                    <td>${sms.error_message || "No error"}</td>
-                    <td>${sms.from}</td>
-                    <td>${sms.to}</td>
-                    <td>${sms.username}</td>
-                   
-                    <td>${sms.body}</td>
-                </tr>
-            `;
-            tableBody.innerHTML += row;
-        });
-    }
-
-    function initializeDataTable() {
-        $('#table_sms').DataTable({
-            dom: 'Bfrtip',
-            responsive: true,
-            buttons: ['copy', 'excel', 'pdf'],
-            order: [[2, 'desc']]  // Order by "Date Created" descending
-        });
-    }
-
-    // Start fetching SMS data
-    window.onload = function () {
-        const taskId = "{{ task_id }}";
-        if (taskId) {
-            fetchSmsData(taskId);
-        }
-    };
+    $("#table_sms tbody").on("click", "td.dt-control", function () {
+      let row = table.row($(this).closest("tr"));
+      if (row.child.isShown()) {
+        row.child.hide();
+      } else {
+        let rowData = row.data();
+        row
+          .child(
+            `
+                <div class="expandable-content">
+                    <strong>Message:</strong> <div class="message-container">${
+                      rowData.body || "No Content"
+                    }</div>
+                    <br>
+                    <strong>Error Code:</strong> ${rowData.error_code}
+                    <br>
+                    <strong>Error Message:</strong> ${rowData.error_message}
+                    <br>
+                    <strong>From:</strong> ${rowData.from}
+                    <br>
+                    <strong>To:</strong> ${rowData.to}
+                </div>
+            `
+          )
+          .show();
+      }
+    });
+  });
 </script>
-
 {% endblock %}
