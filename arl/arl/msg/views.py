@@ -220,46 +220,6 @@ class SendTemplateWhatsAppView(LoginRequiredMixin, UserPassesTestMixin,
         return super().form_valid(form)
 
 
-class FetchTwilioView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
-    template_name = "msg/sms_data.html"
-
-    def test_func(self):
-        return is_member_of_msg_group(self.request.user)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-
-        # Trigger the Celery task to fetch SMS messages
-        task_id = fetch_twilio_sms_task.apply_async().id
-        context["task_id"] = task_id  # Pass the task ID to the template
-        context["sms_data"] = []  # Empty until the task completes
-        return context
-
-    def post(self, request, *args, **kwargs):
-        try:
-            # Parse JSON body
-            body = json.loads(request.body)
-            task_id = body.get("task_id")
-
-            # Handle missing task ID
-            if not task_id:
-                return JsonResponse({"status": "error", "error": "Task ID is missing from the request."})
-
-            # Retrieve the Celery task result
-            task_result = AsyncResult(task_id)
-            if task_result.ready():
-                if task_result.successful():
-                    return JsonResponse({"status": "success", "data": task_result.result})
-                else:
-                    return JsonResponse({"status": "error", "error": str(task_result.result)})
-            return JsonResponse({"status": "pending"})
-        except json.JSONDecodeError:
-            return JsonResponse({"status": "error", "error": "Invalid JSON payload."})
-        except Exception as e:
-            logger.error(f"Error retrieving task result: {e}", exc_info=True)
-            return JsonResponse({"status": "error", "error": "An error occurred while retrieving the task result."})
-
-
 class FetchTwilioCallsView(LoginRequiredMixin, UserPassesTestMixin,
                            TemplateView):
     template_name = "msg/call_data.html"
@@ -360,6 +320,11 @@ def fetch_twilio_data(request):
     return JsonResponse({"task_id": task.id})
 
 
+def fetch_sms_data(request):
+    task = fetch_twilio_sms_task.delay()
+    return JsonResponse({"task_id": task.id})
+
+
 def get_task_status(request, task_id):
     task = AsyncResult(task_id)
     if task.state == "SUCCESS":
@@ -372,6 +337,11 @@ def get_task_status(request, task_id):
 
 def message_summary_view(request):
     return render(request, "msg/message_summary.html")
+
+
+# this is for the summary view
+def sms_summary_view(request):
+    return render(request, "msg/sms_data.html")
 
 
 def comms(request):

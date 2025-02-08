@@ -1,7 +1,7 @@
 from django.urls import path
 
 from arl.msg.views import (EmailEventList, FetchTwilioCallsView,
-                           FetchTwilioView, SendSMSView, SendTemplateEmailView,
+                           SendSMSView, SendTemplateEmailView,
                            SendTemplateWhatsAppView,
                            campaign_setup_view, carwash_targets,
                            click_thank_you, comms, email_event_summary_view,
@@ -11,7 +11,8 @@ from arl.msg.views import (EmailEventList, FetchTwilioCallsView,
                            sendgrid_webhook_view, sms_success_view,
                            template_email_success_view,
                            template_whats_app_success_view, whatsapp_webhook,
-                           tobacco_vape_policy_view)
+                           tobacco_vape_policy_view, sms_summary_view,
+                           fetch_sms_data)
 
 urlpatterns = [
     path("send-sms/", SendSMSView.as_view(), name="send_sms_view"),
@@ -38,7 +39,6 @@ urlpatterns = [
         template_whats_app_success_view,
         name="template_whats_app_success",
     ),
-    path("fetch-twilio/", FetchTwilioView.as_view(), name="fetch_twilio"),
     path(
         "fetch-twilio-calls/", FetchTwilioCallsView.as_view(), name="fetch_twilio_calls"
     ),
@@ -50,6 +50,8 @@ urlpatterns = [
     # Route for summarizing costs
     path('message-summary/', message_summary_view, name='summarize_costs'),
     path('fetch-twilio-data/', fetch_twilio_data, name='fetch_twilio_data'),
+    path('fetch-sms-data/', fetch_sms_data, name='fetch_sms_data'),
+    path('sms-summary-view/', sms_summary_view, name='sms_summary_view'),
     path("get-task-status/<str:task_id>/", get_task_status, name="get_task_status"),
     path('sendgrid-webhook/', sendgrid_webhook_view, name='sendgrid_webhook_view'),
     path('email-event-summary/', email_event_summary_view, name='email_event_summary'),
