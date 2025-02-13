@@ -8,8 +8,9 @@ from arl.incident.views import (IncidentCreateView, IncidentListView,
                                 QueuedIncidentsListView,
                                 generate_incident_pdf_email,
                                 generate_major_incident_pdf, generate_pdf,
-                                generate_pdf_web, send_incident_now
-                                ,mark_do_not_send)
+                                generate_pdf_web, send_incident_now,
+                                mark_do_not_send, generate_restricted_pdf_web,
+                                generate_restricted_incident_pdf_email)
 
 urlpatterns = [
     path("incident/", IncidentCreateView.as_view(), name="create_incident"),
@@ -23,10 +24,14 @@ urlpatterns = [
          name="incident_upload"),
     path("generate_pdf/<int:incident_id>/", generate_pdf, name="generate_pdf"),
     path("generate_pdf_web/<int:incident_id>/", generate_pdf_web, name="generate_pdf_web"),
+    path("generate_restricted_pdf_web/<int:incident_id>/",
+         generate_restricted_pdf_web, name="generate_restricted_pdf_web"),
     path("generate_major_incident_pdf/<int:incident_id>/",
          generate_major_incident_pdf, name="generate_major_incident_pdf"),
     path("email-incident-pdf/<int:incident_id>",
          generate_incident_pdf_email, name="tester"),
+    path("email-restricted-incident-pdf/<int:incident_id>",
+         generate_restricted_incident_pdf_email, name="restricted_incident_pdf_email"), 
     path("incident_list/", IncidentListView.as_view(), name="incident_list"),
     path("major_incident_list/", MajorIncidentListView.as_view(),
          name="major_incident_list"),
@@ -34,7 +39,7 @@ urlpatterns = [
     path('queued-incidents/', QueuedIncidentsListView.as_view(), name='queued_incidents_list'),
     path('send-now/<int:pk>/', send_incident_now, name='send_incident_now'),
     path('do-not-send/<int:pk>/', mark_do_not_send, name='mark_do_not_send'),
-   
+
 ]
 
 handler403 = "arl.incident.views.Permission_Denied_View"

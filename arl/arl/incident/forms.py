@@ -49,6 +49,40 @@ class IncidentForm(forms.ModelForm):
             "stolenothervalue": "Dollar Amount of Other",
             "stolenna": "Information Not Available",
         }
+        widgets = {
+            "causalfactors": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 4,
+                    "placeholder": "Enter any unplanned, unintended contributor to the incident, that if eliminated would have either prevented the occurrence of the incident or reduced its severity or frequency: (i.e. fatigue, acts of nature, improper lifting, removed guard, following too closely, etc.) What equipment/tools were not available or failed? Were there any workarounds from the normal process? What training did you receive to complete the task?",
+                    "style": "font-weight:300; font-style:italic; color:#666;",
+                }
+            ),
+            "determincauses": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 4,
+                    "placeholder": "Understand what happened, including any weaknesses in the process. Do not accept human error as the single cause of the event. Think about the most basic reason and primary driver the incident took place. Consider root cause by using methods such as 5-Why.",
+                    "style": "font-weight:300; font-style:italic; color:#666;",
+                }
+            ),
+            "preventiveactions": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 4,
+                    "placeholder": "Describe the actions or changes that will be made to prevent the same or a similar incident from occurring in the future. Will the action(s) prevent, or significantly reduce the likelihood of, the incident from reoccurring? If the answer is ”No”, revisit the investigation. Ask the worker/victim – what do we need to ensure this incident does not happen again? What safeguard(s) should be in place to allow you to fail safely? Consider recurring hazards. What controls are available to prevent you from being seriously injured? Were they effective? How can we make them more effective?",
+                    "style": "font-weight:300; font-style:italic; color:#666;",
+                }
+            ),
+            "eventtimeline": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 4,
+                    "placeholder": "What happened? Please provide the event facts in a detailed timeline.",
+                    "style": "font-weight:300; font-style:italic; color:#666;",
+                }
+            ),
+        }
 
     eventdate = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
     eventtime = forms.TimeField(widget=forms.TimeInput(attrs={"type": "time"}))

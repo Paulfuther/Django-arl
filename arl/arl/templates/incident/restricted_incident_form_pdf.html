@@ -1,0 +1,494 @@
+<head>
+
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta2/css/all.min.css"
+        integrity="sha512-YWzhKL2whUzgiheMoBFwW8CKV4qpHQAEuvilg9FAn5VJUDwKZZxkJNuGM4XkWuk94WCrrwslk8yWNGmY1EduTA=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.min.js"></script>
+
+
+</head>
+
+{% block content%}
+
+<body>
+
+    <main role="main" class="container">
+
+        
+
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
+            <tr>
+                <td style="background-color: lightgray;"> SECTION 1 - INCIDENT INFORMATION -(always
+                    complete this section)</td>
+            </tr>
+        </table>
+
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
+            <tr>
+                <td
+                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top; border-bottom: none; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    Location
+                </td>
+                <td
+                    style="width: 75%; text-align: left; vertical-align: top; border-bottom: none; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    Store {{ incident.store.number }} - {{ incident.store.address }} - {{ incident.store.address_two }} - {{ incident.store.city }} - {{ incident.store.province }}
+                </td>
+            </tr>
+        </table>
+
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif; ">
+                <tr>
+                    <td
+                        style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                        Event Date </td>
+                    <td
+                        style="width: 25%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                        {{incident.eventdate}} </td>
+                    <td
+                        style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                        Event Time </td>
+                    <td
+                        style="width: 25%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                        {{incident.eventtime}} </td>
+                </tr>
+        </table>
+
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
+            <tr >
+                <td
+                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    Reported By:</td>
+
+                {% if incident.suncoremployee %}
+                <td
+                    style="width: 15%; text-align: left; vertical-align: top;padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-check-square"></i>
+                    Suncor Emp </td>
+                {% else %}
+                <td
+                    style="width: 15%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-square"></i> Suncor Emp
+                </td>
+                {% endif %}
+
+                {% if incident.contractor %}
+                <td
+                    style="width: 15%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-check-square"></i>
+                    Contractor</td>
+                {% else %}
+                <td
+                    style="width: 15%; text-align: left; vertical-align: top;padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-square"></i> Contractor
+                </td>
+                {% endif %}
+
+                {% if incident.associate %}
+                <td
+                    style="width: 15%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-check-square"></i>
+                    Associate </td>
+                {% else %}
+                <td
+                    style="width: 15%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-square"></i> Associate
+                </td>
+                {% endif %}
+
+                {% if incident.generalpublic %}
+                <td
+                    style="width: 15%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-check-square"></i>
+                    General Public</td>
+                {% else %}
+                <td
+                    style="width: 15%; text-align: left; vertical-align: top;padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-square"></i> General
+                    Public </td>
+                {% endif %}
+
+                {% if incident.other %}
+                <td
+                    style="width: 15%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-check-square"></i>
+                    Site Staff: {{incident.othertext}}</td>
+                {% else %}
+                <td
+                    style="width: 15%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-square"></i> Site Staff:
+                    {{incident.othertext}} </td>
+                {% endif %}
+            </tr>
+
+        </table>
+
+            <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif; ">
+            <tr>
+                <td
+                    style="width: 25%; height: 300px; background-color: lightgray; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    Timeline of Events</td>
+                <td
+                    style="width: 75%; height: 300px; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    {{incident.eventtimelinet}} </td>
+            </tr>
+            </table>
+            <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif; ">
+                <tr>
+                <td
+                    style="width: 25%; height: 300px; background-color: lightgray; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    Event Details</td>
+                <td
+                    style="width: 75%; height: 300px; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    {{incident.eventdetails}}</td>
+            </tr>
+            </table>
+
+        
+
+        
+
+        
+
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
+            <tr>
+                <td
+                    style="width: 25%; height: 300px; background-color: lightgray; text-align: left; vertical-align: top;  padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    Immediate Actions Taken</td>
+                <td
+                    style="width: 75%; height: 300px; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    {{incident.actionstaken}} </td>
+            </tr>
+        </table>
+
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
+            <tr >
+                <td
+                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    Emergency Response Plan Actioned By:</td>
+
+                {% if incident.emergency_not_applicable %}
+                <td
+                    style="width: 12%; text-align: left; vertical-align: top;padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-check-square"></i>
+                     N/A </td>
+                {% else %}
+                <td
+                    style="width: 12%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-square"></i> N/A
+                </td>
+                {% endif %}
+
+                {% if incident.emergency_no %}
+                <td
+                    style="width: 12%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-check-square"></i>
+                    No</td>
+                {% else %}
+                <td
+                    style="width: 12%; text-align: left; vertical-align: top;padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-square"></i> No
+                </td>
+                {% endif %}
+
+                {% if incident.emergency_site_staff %}
+                <td
+                    style="width: 12%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-check-square"></i>
+                    Site Staff </td>
+                {% else %}
+                <td
+                    style="width: 12%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-square"></i> Site Staff
+                </td>
+                {% endif %}
+
+                {% if incident.emergency_contractor %}
+                <td
+                    style="width: 12%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-check-square"></i>
+                    Contractor</td>
+                {% else %}
+                <td
+                    style="width: 12%; text-align: left; vertical-align: top;padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-square"></i> Contractor</td>
+                {% endif %}
+
+                {% if incident.emergency_public %}
+                <td
+                    style="width: 12%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-check-square"></i>
+                    Site Staff</td>
+                {% else %}
+                <td
+                    style="width: 12%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-square"></i> Site Staff</td>
+                {% endif %}
+
+                {% if incident.emergency_responders %}
+                <td
+                    style="width: 15%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-check-square"></i>
+                    Emergency Responders</td>
+                {% else %}
+                <td
+                    style="width: 15%; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    <i class="far fa-square"></i> Emergency Responders</td>
+                {% endif %}
+            </tr>
+
+        </table>
+
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
+            <tr>
+                <td style="background-color: lightgray; width:25%;">SPILLS - (complete only if spill
+                    occured)</td>
+            </tr>
+        </table>
+
+
+        <table style="width: 100%; table-layout: fixed; font-family: sans-serif;">
+            <tr>
+                <td rowspan="6"
+                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;border: 1px solid black;padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    Off Property Impact</td>
+                <td
+                    style="width: 25%;  text-align: left; vertical-align: top;padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    {% if incident.sno %}
+                    <i class="far fa-check-square"></i> no
+                    {% else %}
+                    <i class="far fa-square"></i> no
+                    {% endif %}
+                    {% if incident.rna %}
+                    <i class="far fa-check-square"></i> n/a
+                    {% else %}
+                    <i class="far fa-square"></i> n/a
+                    {% endif %}
+                    {% if incident.syes %}
+                    <i class="far fa-check-square"></i> yes
+                    {% else %}
+                    <i class="far fa-square"></i> yes
+                    {% endif %}
+                </td>
+
+                <td rowspan="6"
+                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;border: 1px solid black;padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%">
+                    Regulatory Authorities Notified?</td>
+                <td style="width: 25%;  text-align: left; vertical-align: top;">
+                    {% if incident.rno %}
+                    <i class=" far fa-check-square"></i>no
+                    {% else %}
+                    <i class="far fa-square"></i> no
+                    {% endif %}
+                    {% if incident.ryes %}
+                    <i class="far fa-check-square"></i> yes
+                    {% else %}
+                    <i class="far fa-square"></i> yes
+                    {% endif %}
+                </td>
+
+            </tr>
+
+
+            <tr>
+                <td style="width: 25%;"> comment </td>
+
+                <td style="width: 25%;"> comment </td>
+
+            </tr>
+
+            <tr>
+                <td style="width: 25%; height: 50px; text-align: left; vertical-align: top;border: 1px solid black;">
+                    </tdstyle>{{incident.scomment}}</td>
+
+                <td style="width: 25%; height: 50px; text-align: left; vertical-align: top; border: 1px solid black;">
+                    </tdstyle>{{incident.rcomment }}</td>
+            </tr>
+
+        </table>
+
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
+            <tr>
+                <td rowspan="6"
+                    style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top;border: 1px solid black;padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%">
+                    Product Spilled</td>
+                {% if incident.gas %}
+                <td style="width: 25%"><i class="far fa-check-square"></i> Gas </td>
+                {% else %}
+                <td style="width: 25%"><i class="far fa-square"></i> Gas </td>
+                {% endif %}
+                {% if incident.diesel %}
+                <td style="width: 25%"><i class="far fa-check-square"></i> Diesel </td>
+                {% else %}
+                <td style="width: 25%"><i class="far fa-square"></i> Diesel </td>
+                {% endif %}
+                {% if incident.deiselexhaustfluid %}
+                <td style="width: 25%"><i class="far fa-check-square"></i> Diesel Exhaust </td>
+                {% else %}
+                <td style="width: 25%"><i class="far fa-square"></i> Diesel Exhaust</td>
+                {% endif %}
+
+            </tr>
+
+
+            <tr>
+                {% if incident.sewage %}
+                <td style="width: 25%"><i class="far fa-check-square"></i> Sewage </td>
+                {% else %}
+                <td style="width: 25%"><i class="far fa-square"></i> Sewage</td>
+                {% endif %}
+                {% if incident.chemical %}
+                <td style="width: 25%"><i class="far fa-check-square"></i> Chemical </td>
+                {% else %}
+                <td style="width: 25%"><i class="far fa-square"></i> Chemical</td>
+                {% endif %}
+
+                {% if incident.other %}
+                <td style="width: 25%"><i class="far fa-check-square"></i> Other </td>
+                {% else %}
+                <td style="width: 25%"><i class="far fa-square"></i> Other</td>
+                {% endif %}
+                <td style="width: 25%"></td>
+            </tr>
+            <tr>
+                <td></td>
+                <td>(Please Specify Chemical) </td>
+                <td>(Please Specify) </td>
+            </tr>
+            <tr style="border: 1px solid black;">
+                <td></td>
+                <td>{{incident.chemcomment}} </td>
+                <td>{{incident.s2comment}} </td>
+            </tr>
+
+        </table>
+
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black;">
+            <tr>
+                <td rowspan="2"
+                    style="background-color: lightgray; width:25%; text-align:left; vertical-align:top; border-bottom: none; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%">
+                    Source Impacted </td>
+
+                {% if incident.air %}
+                <td style="width: 25%; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%><i class="
+                    far fa-check-square"></i> Air </td>
+                {% else %}
+                <td style="width: 25%; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%"><i
+                        class="far fa-square"></i> Air</td>
+                {% endif %}
+                {% if incident.water %}
+                <td style="width: 25%; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%"><i
+                        class="far fa-check-square"></i> Water</td>
+                {% else %}
+                <td style="width: 25%; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%"><i
+                        class="far fa-square"></i> Water</td>
+                {% endif %}
+
+                <td style="width: 25%; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%">
+                    Volume Release Estimate </td>
+
+            </tr>
+
+            <tr>
+                {% if incident.wildlife %}
+                <td style="width: 25%; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%"><i
+                        class="far fa-check-square"></i> Wildlife </td>
+                {% else %}
+                <td style="width: 25%; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%"><i
+                        class="far fa-square"></i> Wildlife</td>
+                {% endif %}
+                {%if incident.land %}
+                <td style="width: 25%; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%"><i
+                        class="far fa-check-square"></i> Land</td>
+                {% else %}
+                <td style="width: 25%; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%"><i
+                        class="far fa-square"></i> Land</td>
+                {% endif %}
+                <td style="width: 25%; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%">
+                    {{incident.volumerelease}} </td>
+            </tr>
+        </table>
+
+
+        
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
+            <tr>
+                <td style="background-color: lightgray; padding: 10px">SECTION 2: INVESTIGATION INFORMATION</td>
+            </tr>
+       </table>
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
+            <tr>
+                <td
+                    style="width: 25%; height: 300px; background-color: lightgray; text-align: left; vertical-align: top; border: 1px solid black; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    Causal Factors</td>
+                <td
+                    style="width: 75%; height: 300px; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    {{incident.causalfactors}} </td>
+            </tr>
+
+            <tr style="border-top: 1px solid black;">
+                <td
+                    style="width: 25%; height: 300px; background-color: lightgray; text-align: left; vertical-align: top; border: 1px solid black;padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    Determin Causes</td>
+                <td
+                    style="width: 75%; height: 300px; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    {{incident.determinecauses}} </td>
+            </tr>
+
+            <tr style="border-top: 1px solid black;">
+                <td
+                    style="width: 25%; height: 300px; background-color: lightgray; text-align: left; vertical-align: top; border: 1px solid black;padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    Preventive Actions</td>
+                <td
+                    style="width: 75%; height: 300px; text-align: left; vertical-align: top; padding-left: 5px; padding-top: 10px; padding-bottom: 10px; font-size: 110%;">
+                    {{incident.preventiveactions}} </td>
+            </tr>
+        </table>
+
+        <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
+            <tr>
+                <td style="background-color: lightgray; padding: 10px"> SECTION 3: SHARED LEARNING</td>
+            </tr>
+       </table>
+
+       <table style="width: 100%; table-layout: fixed; border: 1px solid black; font-family: sans-serif;">
+        <tr>
+            <td style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top; padding: 10px;">
+                <strong>Shared Learning</strong>
+            </td>
+            <td style="width: 15%; text-align: center; vertical-align: top; padding: 10px;">
+                <strong>Date</strong>
+            </td>
+            <td style="width: 15%; background-color: lightgray; text-align: center; vertical-align: top; padding: 10px;">
+                <strong>Method</strong>
+            </td>
+            <td style="width: 45%; text-align: left; vertical-align: top; padding: 10px;">
+              
+            </td>
+        </tr>
+    
+        <tr>
+            <td style="width: 25%; background-color: lightgray; text-align: left; vertical-align: top; padding: 10px;">
+                <label><i class="far {% if incident.shared_learning_yes %}fa-check-square{% else %}fa-square{% endif %}"></i> Yes</label><br>
+                <label><i class="far {% if incident.shared_learning_no %}fa-check-square{% else %}fa-square{% endif %}"></i> No</label><br>
+                <label><i class="far {% if incident.shared_learning_na %}fa-check-square{% else %}fa-square{% endif %}"></i> N/A</label>
+            </td>
+    
+            <td style="width: 15%; text-align: center; vertical-align: top; padding: 10px;">
+                {{ incident.shared_learning_date|default:"N/A" }}
+            </td>
+    
+            <td style="width: 15%; background-color: lightgray; text-align: center; vertical-align: top; padding: 10px;">
+                {{ incident.shared_learning_method|default:"N/A" }}
+            </td>
+    
+            <td style="width: 45%; text-align: left; vertical-align: top; padding: 10px;">
+                {{ incident.shared_learning_method_details|default:"No details provided." }}
+            </td>
+        </tr>
+    </table>
+        
+    </main>
+</body>
+
+{% endblock %}

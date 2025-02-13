@@ -20,7 +20,7 @@ from arl.msg.helpers import (create_incident_file_email,
                              send_incident_email)
 from arl.user.models import CustomUser, Employer, Store, ExternalRecipient
 
-from .helpers import create_pdf
+from .helpers import create_pdf, create_restricted_pdf
 from .models import Incident, MajorIncident
 
 logger = logging.getLogger(__name__)
@@ -310,7 +310,7 @@ def upload_file_to_dropbox_task(data):
 
         # Construct the Dropbox file path
         # user_employer = Incident.objects.get(pk=incident_id).user_employer
-        dropbox_file_path = f"/SITEINCIDENT/{pdf_filename}"
+        dropbox_file_path = f"/SITEINCIDENTS/{pdf_filename}"
 
         # Call the helper function to upload the file
         success, message = master_upload_file_to_dropbox(pdf_data,
@@ -444,9 +444,69 @@ def generate_pdf_email_to_user_task(incident_id, user_email):
         logger.error("Error in generate_pdf_task: {}".format(e))
         return {"status": "error", "message": str(e)}
 
+
+# this task emails a restricted pdf to a user as long as
+# the belong to the correct group
+@app.task(name="email_restricted_incident_pdf")
+def generate_restricted_incident_pdf_email_task(incident_id, user_email):
+    try:
+        # Fetch incident data based on incident_id
+        try:
+            incident = Incident.objects.get(pk=incident_id)
+        except ObjectDoesNotExist:
+            raise ValueError(
+                "Incident with ID {} does not exist.".format(incident_id)
+            )
+
+        context = {"incident": incident}
+        html_content = render_to_string(
+            "incident/restricted_incident_form_pdf.html", context
+            )
+        #  Generate the PDF using pdfkit
+        options = {
+            "enable-local-file-access": None,
+            "--keep-relative-links": "",
+            "encoding": "UTF-8",
+        }
+        # create the pdf
+        pdf = pdfkit.from_string(html_content, False, options)
+        #  Create a BytesIO object to store the PDF content
+        pdf_buffer = BytesIO(pdf)
+        # Create a unique file name for the PDF
+        store_number = incident.store.number
+        # Replace with your actual attribute name
+        brief_description = incident.brief_description
+        # Create a unique file name for the PDF
+        # using store number and brief description
+        pdf_filename = (
+            f"{store_number}_{slugify(brief_description)}"
+            f"_report.pdf"
+        )
+
+        # Close the BytesIO buffer to free up resources
+        # Then email to the current user
+
+        subject = f"Your Restricted Incident Report {pdf_filename}"
+        body = "Thank you for using our services. "
+        "Attached is your incident report."
+        # attachment_data = pdf_buffer.getvalue()
+
+        # Call the create_single_email function with
+        # user_email and other details
+        create_incident_file_email(user_email, subject, body,
+                                   pdf_buffer, pdf_filename)
+        # create_single_email(user_email, subject, body, pdf_buffer)
+
+        return {
+            "status": "success",
+            "message": f"Incident {pdf_filename} emailed to {user_email}",
+        }
+    except Exception as e:
+        logger.error("Error in generate_pdf_task: {}".format(e))
+        return {"status": "error", "message": str(e)}
+
+
 # this task sends incident forms to those on the external sedners list
-
-
 @app.task(name='generate_and_send_pdf_task')
 def generate_and_send_pdf_task(incident_id):
     try:
@@ -454,7 +514,7 @@ def generate_and_send_pdf_task(incident_id):
         incident = Incident.objects.get(pk=incident_id)
 
         # Generate the PDF
-        pdf_data = create_pdf(incident_id)  # helper returns "data"
+        pdf_data = create_restricted_pdf(incident_id)  # helper returns "data"
 
         if pdf_data.get("status") == "error":
             raise ValueError(pdf_data.get("message"))
