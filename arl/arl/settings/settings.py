@@ -6,15 +6,17 @@ from dotenv import load_dotenv
 load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-print("BASE_DIR:", BASE_DIR)
+# print("BASE_DIR:", BASE_DIR)
+
 logger = logging.getLogger('django')
-logger.error("TEST LOGGING: This is a test error log.")
+# logger.error("TEST LOGGING: This is a test error log.")
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.environ.get("SECRET_KEY")
+
 
 # SECURITY WARNING: don't run with debug turned on in production!
 # DEBUG = os.environ.get('DEBUG') == 'True'
@@ -27,7 +29,6 @@ ADMINS = [
     # Add more admins if needed
 ]
 
-import os
 
 LOGGING = {
     'version': 1,
@@ -67,7 +68,7 @@ LOGGING = {
         },
         'my_app_name': {  # Example for a specific app
             'handlers': ['file', 'console'],
-            'level': 'DEBUG', # Or a more specific level for your app
+            'level': 'INFO', # Or a more specific level for your app
             'propagate': True,
         },
     },
@@ -215,7 +216,8 @@ AUTHENTICATION_BACKENDS = [
 
 LOGIN_URL = "login/"
 
-BROKER_URL = os.environ.get("CLOUDAMQP_URL")
+#BROKER_URL = os.environ.get("CLOUDAMQP_URL")
+BROKER_URL ="amqps://ctscemmj:HzMGkRB1IsJJtlVT2DwfimyE1PBkocPj@rabbit.lmq.cloudamqp.com/ctscemmj"
 
 EMAIL_BACKEND = "arl.msg.helpers.SendGridEmailBackend"
 
