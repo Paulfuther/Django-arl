@@ -1,6 +1,6 @@
 import logging
 from io import BytesIO
-
+from django.contrib.auth.decorators import login_required, user_passes_test
 from celery import chain, group
 from celery.exceptions import Ignore
 from django.contrib import messages
@@ -29,10 +29,15 @@ from .tasks import (generate_and_send_pdf_task,
                     generate_pdf_email_to_user_task, generate_pdf_task,
                     save_incident_file, save_major_incident_file,
                     send_email_to_group_task, upload_file_to_dropbox_task,
-                    upload_to_linode_task)
+                    upload_to_linode_task, generate_restricted_incident_pdf_email_task)
 
 incident_updated = Signal()
 logger = logging.getLogger(__name__)
+
+
+# Custom decorator to check if the user belongs to abm_incident_report group
+def is_abm_incident_pdf(user):
+    return user.groups.filter(name="abm_incident_pdf").exists()
 
 
 class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin,
@@ -223,6 +228,8 @@ class QueuedIncidentsListView(ListView):
         return context
 
 
+# This route is used to send an incident to anyone
+# on the external recipient list
 def send_incident_now(request, pk):
     """
     This is part of the queued incidents to external sendrs.
@@ -505,6 +512,27 @@ def generate_incident_pdf_email(request, incident_id):
     return redirect("home")
 
 
+# this route is used to email a resricted incident report to a user
+# who passes the test whichis being a member of the group amb_incident_report
+@login_required
+@user_passes_test(is_abm_incident_pdf, login_url="home", redirect_field_name=None)
+def generate_restricted_incident_pdf_email(request, incident_id):
+    """
+    Generates a restricted PDF report and emails it to the requesting user.
+    """
+    user_email = request.user.email
+
+    # Trigger the Celery task
+    generate_restricted_incident_pdf_email_task.delay(incident_id, user_email)
+
+    # Notify the user
+    messages.success(
+        request,
+        "Restricted report is being generated. Check your email shortly."
+    )
+    return redirect("home")
+
+
 def generate_pdf_web(request, incident_id):
     # Fetch incident data based on incident_id
     try:
@@ -519,6 +547,18 @@ def generate_pdf_web(request, incident_id):
     return render(request, "incident/major_incident_form_pdf.html", context)
 
 
+def generate_restricted_pdf_web(request, incident_id):
+    # Fetch incident data based on incident_id
+    try:
+        incident = Incident.objects.get(pk=incident_id)
+    except ObjectDoesNotExist:
+        raise ValueError("Incident with ID {} does not exist."
+                         .format(incident_id))
+
+    context = {"incident": incident}
+    return render(request, "incident/restricted_incident_form_pdf.html", context)
+
+
 class IncidentListView(PermissionRequiredMixin, ListView):
     model = Incident
     template_name = "incident/incident_list.html"
@@ -530,6 +570,9 @@ class IncidentListView(PermissionRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["defer_render"] = True
+        # Check if the user belongs to the "abm_incident_pdf2" group
+        user = self.request.user
+        context["can_view_pdf"] = user.groups.filter(name="abm_incident_pdf").exists()
         # Pass defer_render as context to the template
         return context
 

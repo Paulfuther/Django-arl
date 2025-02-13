@@ -15,6 +15,7 @@ class Incident(models.Model):
 
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='incidents')
     brief_description = models.CharField(max_length=30, default='')
+    eventtimeline = models.TextField(default='')
     eventdetails = models.TextField()
     eventdate = models.DateField(null=True)
     eventtime = models.TimeField(null=True)
@@ -25,7 +26,7 @@ class Incident(models.Model):
     contractor = models.BooleanField(default=False)
     associate = models.BooleanField(default=False)
     generalpublic = models.BooleanField(default=False)
-    other = models.BooleanField(default=False)
+    staff = models.BooleanField(default=False)
     othertext = models.CharField(blank=True)
 
     actionstaken = models.TextField()
@@ -99,13 +100,32 @@ class Incident(models.Model):
     image_folder = models.CharField(max_length=255, null=True)
     user_employer = models.ForeignKey(Employer, on_delete=models.SET_NULL, null=True)
 
+    # Investigation Section
+    causalfactors = models.TextField()
+    determincauses = models.TextField()
+    preventiveactions = models.TextField()
+
+    # Shared Learning Section
+    shared_learning_yes = models.BooleanField(default=False)
+    shared_learning_no = models.BooleanField(default=False)
+    shared_learning_na = models.BooleanField(default=False)
+    shared_learning_date = models.DateField(blank=True, null=True)
+    shared_learning_method = models.CharField(max_length=255, blank=True, null=True)
+
+    # Emergency Response Plan Actioned by
+    emergency_not_applicable = models.BooleanField(default=False)
+    emergency_no = models.BooleanField(default=False)
+    emergency_site_staff = models.BooleanField(default=False)
+    emergency_contractor = models.BooleanField(default=False)
+    emergency_public = models.BooleanField(default=False)
+    emergency_responders = models.BooleanField(default=False)  # Ex. 911, Fire, Police
+
     # New fields for email tracking
     queued_for_sending = models.BooleanField(default=False, help_text="Indicates if this file is queued for sending.")
     sent = models.BooleanField(default=False)
     sent_at = models.DateTimeField(null=True, blank=True, help_text="The timestamp when the file was sent.")
     do_not_send = models.BooleanField(default=False)
 
-    
     def __str__(self):
         return f"Incident {self.pk}"
 

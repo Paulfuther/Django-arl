@@ -32,6 +32,9 @@
                             <th>Date</th>
                             <th>Edit</th>
                             <th>PDF</th>
+                            {% if can_view_pdf %}
+                                        <th>Restricted PDF</th>
+                            {% endif %}
                         </tr>
                     </thead>
                     <tbody>
@@ -48,9 +51,15 @@
                             <td>
                                 <a href="{% url 'tester' incident.id %}" id="pdf-button" class="fa fa-file-pdf-o"
                                     style="font-size:22px;color:red"></a>
-
                             </td>
-                        </tr>
+                            {% if can_view_pdf %}
+                                        <td>
+                                            <a href="{% url 'restricted_incident_pdf_email' incident.id %}" id="restricted-pdf-button" 
+                                                class="fa fa-file-pdf-o" style="font-size:22px;color:green"></a>
+                                        </td>
+                                
+                            {% endif %}
+                            </tr>
                         {% endfor %}
                     </tbody>
                 </table>
