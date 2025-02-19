@@ -42,6 +42,7 @@ def generate_carwash_status_report():
                 "closed_at": closed_at.strftime("%Y-%m-%d %I:%M %p") if closed_at else None,
                 "opened_at": opened_at.strftime("%Y-%m-%d %I:%M %p") if opened_at else None,
                 "duration_closed": format_duration(closed_seconds),
+                "reason": duration.get("reason", "No reason provided")
             })
 
             # Group by month and sum total closed time

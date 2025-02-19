@@ -4,60 +4,185 @@
 {% block template %}
 {% include "../base/navbar.html" %}
 
+<!-- DataTables CSS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.4.1/css/responsive.dataTables.min.css">
 
+<!-- jQuery & DataTables JS -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
 
-<div class="container">
+<style>
+    .status-dot {
+        height: 12px;
+        width: 12px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 5px;
+    }
+    .status-open { background-color: green; }
+    .status-closed { background-color: red; }
+    .dt-control {
+        cursor: pointer;
+        color: green;
+        font-size: 18px;
+        text-align: center;
+    }
+
+    .expanded-container {
+    width: 100%;
+    padding: 10px;
+    background: #f8f9fa; /* Light background */
+    display: block;
+    overflow: hidden;
+}
+
+.table-wrapper {
+    max-width: 100%;
+    overflow-x: auto; /* Enable horizontal scrolling */
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling for iOS */
+}
+
+.table-wrapper table {
+    min-width: 100%;
+    border-collapse: collapse;
+}
+
+@media (max-width: 768px) {
+    .expanded-container {
+        padding: 5px;
+    }
+
+    .table-wrapper {
+        overflow-x: auto;
+        display: block;
+        max-width: 100%;
+    }
+
+    .table-wrapper table {
+        width: 100%;
+    }
+}
+</style>
+
+<div class="container mt-4">
     <div class="row justify-content-center">
-        <div class="col-12 col-sm-10 col-md-8 col-lg-10 col-xl-10">
+        <div class="col-12 col-lg-10">
             <legend class="border-bottom mb-4">Carwash Status List</legend>
 
-    {% for entry in data %}
-    <h3>Store {{ entry.store_number }}</h3>
-    <table table border="1" class="table table-striped">
-        <thead>
-            <tr>
-                <th>Closed At</th>
-                <th>Opened At</th>
-                <th>Duration Closed</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for duration in entry.durations %}
-                <tr>
-                    <td>{{ duration.closed_at }}</td>
-                    <td>{{ duration.opened_at }}</td>
-                    <td>{{ duration.duration_closed }}</td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+            <table id="carwashTable" class="display nowrap table table-striped table-bordered" style="width:100%">
+                <thead>
+                    <tr>
+                        <th></th> <!-- Expand button -->
+                        <th>Store</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in data %}
+                        <tr data-store-id="{{ entry.store_number }}">
+                            <td class="dt-control"></td>
+                            <td>Store {{ entry.store_number }}</td>
+                            <td>
+                                {% with last_entry=entry.durations|last %}
+                                    {% if last_entry and last_entry.opened_at %}
+                                        <span class="status-dot status-open"></span> Open
+                                    {% else %}
+                                        <span class="status-dot status-closed"></span> Closed
+                                    {% endif %}
+                                {% endwith %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
 
-    <h4>Monthly Summary</h4>
-                {% if entry.monthly_summary %}
-                    <table border="1" class="table table-striped">
+        </div>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function () {
+        var table = $('#carwashTable').DataTable({
+            responsive: true,
+            dom: 'Bfrtip',
+            buttons: ['copy', 'csv', 'excel', 'pdf', 'print']
+        });
+
+        // ✅ Correctly store Django data in JavaScript
+        let storeData = {% autoescape off %}[
+            {% for entry in data %}
+                {
+                    store_number: "{{ entry.store_number }}",
+                    durations: {{ entry.durations|safe }},
+                    monthly_summary: {{ entry.monthly_summary|safe }}
+                }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ]{% endautoescape %};
+
+        // ✅ Expand Row Details using DataTables built-in functionality
+        $('#carwashTable tbody').on('click', 'td.dt-control', function () {
+    var tr = $(this).closest('tr');
+    var row = table.row(tr);
+
+    if (row.child.isShown()) {
+        row.child.hide();
+    } else {
+        let store_number = tr.data("store-id");
+        let entry = storeData.find(s => s.store_number == store_number);
+
+        if (!entry) {
+            row.child("<p class='text-center'>No details available.</p>").show();
+            return;
+        }
+
+        let detailsTable = `
+            <div class="expanded-container">
+                <div class="table-wrapper">
+                    <table class="table table-bordered">
                         <thead>
-                            <tr>
-                                <th>Month</th>
-                                <th>Total Time Closed</th>
-                            </tr>
+                            <tr><th>Closed At</th><th>Opened At</th><th>Duration Closed</th><th>Reason</th></tr>
                         </thead>
                         <tbody>
-                            {% for month, total_time in entry.monthly_summary.items %}
+                            ${entry.durations.map(d => `
                                 <tr>
-                                    <td>{{ month }}</td>
-                                    <td>{{ total_time }}</td>
+                                    <td>${d.closed_at || "N/A"}</td>
+                                    <td>${d.opened_at || "N/A"}</td>
+                                    <td>${d.duration_closed}</td>
+                                    <td>${d.reason}</td>
                                 </tr>
-                            {% endfor %}
+                            `).join("")}
                         </tbody>
                     </table>
-                {% else %}
-                    <p>No summary data available.</p>
-                {% endif %}
-            {% endfor %}
-</div>
-</div>
-</div>
+                </div>
+                <h5 class="mt-3">Monthly Summary</h5>
+                <div class="table-wrapper">
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr><th>Month</th><th>Total Closed Time</th></tr>
+                        </thead>
+                        <tbody>
+                            ${Object.entries(entry.monthly_summary).map(([month, total_time]) => `
+                                <tr><td>${month}</td><td>${total_time}</td></tr>
+                            `).join("")}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
 
+        row.child($(detailsTable)).show();
 
-
+        // Ensure the expanded row takes full width in mobile
+        $(".expanded-container").css("width", "100%");
+    }
+});
+    });
+</script>
 {% endblock %}
