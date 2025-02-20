@@ -59,7 +59,7 @@ LOGGING = {
     'loggers': {
         'django': {
             'handlers': ['file', 'console'], # Use both file and console
-            'level': 'INFO', # Change to INFO or higher
+            'level': 'DEBUG', # Change to INFO or higher
             'propagate': True,
         },
         '': { # Catch-all logger for other applications
@@ -214,7 +214,7 @@ AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
 ]
 
-LOGIN_URL = "login/"
+LOGIN_URL = "/login/"
 
 #BROKER_URL = os.environ.get("CLOUDAMQP_URL")
 BROKER_URL ="amqps://ctscemmj:HzMGkRB1IsJJtlVT2DwfimyE1PBkocPj@rabbit.lmq.cloudamqp.com/ctscemmj"
