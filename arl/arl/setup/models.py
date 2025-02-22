@@ -1,24 +1,33 @@
 from django.db import models
-from django.contrib.auth import get_user_model
+from arl.user.models import Employer
 
 
-class TenantAPIKeys(models.Model):
-    employer = models.OneToOneField("user.Employer", on_delete=models.CASCADE, related_name="api_keys")
+class TenantApiKeys(models.Model):
+    employer = models.ForeignKey(Employer, on_delete=models.CASCADE, related_name="api_keys")
 
-    # Twilio
-    twilio_account_sid = models.CharField(max_length=100, blank=True, null=True)
-    twilio_auth_token = models.CharField(max_length=100, blank=True, null=True)
-    twilio_service_sid = models.CharField(max_length=100, blank=True, null=True)
+    # Service Name (e.g., Twilio, SendGrid)
+    service_name = models.CharField(max_length=50, choices=[
+        ("twilio", "Twilio"),
+        ("sendgrid", "SendGrid"),
+    ])
 
-    # SendGrid
-    sendgrid_api_key = models.CharField(max_length=255, blank=True, null=True)
+    # Twilio Credentials
+    account_sid = models.CharField(max_length=100, blank=True, null=True)  # Twilio SID
+    auth_token = models.CharField(max_length=100, blank=True, null=True)  # Twilio Auth Token
+    phone_number = models.CharField(max_length=20, blank=True, null=True)  # Twilio Phone
+    messaging_service_sid = models.CharField(max_length=100, blank=True, null=True)  # ✅ Twilio Messaging Service ID
 
-    # Dropbox
-    dropbox_access_token = models.CharField(max_length=255, blank=True, null=True)
+    # SendGrid Credentials
+    sender_email = models.EmailField(blank=True, null=True)  # SendGrid Sender Email
+    verified_sender_email = models.EmailField(blank=True, null=True)  # ✅ SendGrid Verified Email
 
-    # Metadata
+    # Status Tracking
+    status = models.CharField(max_length=50, choices=[("Active", "Active"), ("Error", "Error")], default="Active")
+    is_active = models.BooleanField(default=True)  # Easier filtering
+
+    # Timestamp Fields
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    updated_at = models.DateTimeField(auto_now=True)  # Tracks updates
 
     def __str__(self):
-        return f"API Keys for {self.employer.name}"
+        return f"{self.employer.name} - {self.service_name}"

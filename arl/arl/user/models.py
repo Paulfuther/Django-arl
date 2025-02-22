@@ -21,6 +21,13 @@ class Employer(models.Model):
     phone_number = PhoneNumberField(null=True)
     created = models.DateTimeField(auto_now_add=True, null=True)
     updated = models.DateTimeField(auto_now=True, null=True)
+    verified_sender_email = models.EmailField(
+        max_length=255,
+        unique=True,
+        blank=True,
+        null=True,
+        help_text="The verified sender email in SendGrid for this employer."
+    )
 
     def __str__(self):
         return self.name
@@ -52,7 +59,10 @@ class Store(models.Model):
 
 
 class CustomUser(AbstractUser):
-    phone_number = models.CharField(max_length=20)
+    phone_number = PhoneNumberField(
+        blank=False,
+        null=False,
+        help_text="Enter a phone number")
     sin = models.CharField(
         max_length=9,
         validators=[
@@ -62,6 +72,8 @@ class CustomUser(AbstractUser):
         ],
         null=True,
     )
+    sin_expiration_date = models.DateField(blank=True, null=True, verbose_name="SIN Expiration Date")
+    work_permit_expiration_date = models.DateField(blank=True, null=True, verbose_name="Work Permit Expiration Date")
     dob = models.DateField(blank=True, null=True, verbose_name="Date of Birth")
     address = models.CharField(max_length=100, null=True)
     address_two = models.CharField(max_length=100, null=True, blank=True)
@@ -167,3 +179,30 @@ class EmployeeDocument(models.Model):
 
     def __str__(self):
         return f"{self.document_type.name} for {self.user.username}"
+
+
+class EmployerSMSTask(models.Model):
+    employer = models.ForeignKey(
+        "Employer",
+        on_delete=models.CASCADE,
+        related_name="sms_tasks"
+    )
+    task_name = models.CharField(max_length=255)  # Stores task name
+    is_enabled = models.BooleanField(default=True)  # Toggle SMS per employer
+
+    class Meta:
+        unique_together = ("employer", "task_name")  # Ensure one entry per task per employer
+
+    def __str__(self):
+        return f"{self.employer} - {self.task_name} - {'Enabled' if self.is_enabled else 'Disabled'}"
+    
+
+class PhoneEntry(models.Model):
+    phone_number = PhoneNumberField(
+        blank=False,
+        null=False,
+        help_text="Enter a phone number (e.g., 519-555-1234 or +15195551234)"
+    )
+
+    def __str__(self):
+        return str(self.phone_number)

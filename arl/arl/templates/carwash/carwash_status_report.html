@@ -91,7 +91,7 @@
                             <td>Store {{ entry.store_number }}</td>
                             <td>
                                 {% with last_entry=entry.durations|last %}
-                                    {% if last_entry and last_entry.opened_at %}
+                                    {% if last_entry and last_entry.status == "open" %}
                                         <span class="status-dot status-open"></span> Open
                                     {% else %}
                                         <span class="status-dot status-closed"></span> Closed
@@ -122,6 +122,7 @@
                     store_number: "{{ entry.store_number }}",
                     durations: {{ entry.durations|safe }},
                     monthly_summary: {{ entry.monthly_summary|safe }}
+                    status: "{{ entry.durations|last.status|default:"closed" }}"
                 }{% if not forloop.last %},{% endif %}
             {% endfor %}
         ]{% endautoescape %};

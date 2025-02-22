@@ -561,6 +561,7 @@ def process_docusign_webhook(payload):
 
 @app.task(name="create_docusign_envelope")
 def create_docusign_envelope_task(envelope_args):
+    print("envelope args in task :", envelope_args)
     try:
         signer_name = envelope_args.get("signer_name")
         print(signer_name)

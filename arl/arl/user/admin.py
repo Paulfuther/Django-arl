@@ -15,11 +15,13 @@ from arl.dsign.models import DocuSignTemplate, ProcessedDocsignDocument
 from arl.incident.models import Incident, MajorIncident
 from arl.msg.models import (BulkEmailSendgrid, EmailTemplate, Twimlmessages,
                             UserConsent, WhatsAppTemplate)
+from arl.msg.tasks import EmployerSMSTask
 # from arl.payroll.models import CalendarEvent, PayPeriod, StatutoryHoliday
 from arl.quiz.models import Answer, Question, Quiz, SaltLog
 
 from .models import (CustomUser, DocumentType, EmployeeDocument, Employer,
                      ExternalRecipient, SMSOptOut, Store, UserManager)
+from arl.setup.models import TenantApiKeys
 
 
 class EmailTemplateAdmin(admin.ModelAdmin):
@@ -484,6 +486,21 @@ class SMSOptOutAdmin(ExportActionMixin, admin.ModelAdmin):
         return obj.user.phone_number if obj.user else "N/A"
     get_phone.admin_order_field = "user__phone_number"
     get_phone.short_description = "Phone Number"
+
+
+@admin.register(EmployerSMSTask)
+class EmployerSMSTaskAdmin(admin.ModelAdmin):
+    list_display = ('employer', 'task_name', 'is_enabled')  # Show employer & status
+    list_filter = ('task_name', 'is_enabled')  # Filter by task and status
+    search_fields = ('employer__name', 'task_name')  # Search by employer name
+    list_editable = ('is_enabled',)  # ✅ Allow enabling/disabling directly from the list view
+
+
+@admin.register(TenantApiKeys)
+class TenantApiKeysAdmin(admin.ModelAdmin):
+    list_display = ("employer", "service_name", "account_sid", "phone_number", "sender_email", "status", "created_at")
+    search_fields = ("employer__name", "service_name", "account_sid", "sender_email")
+    list_filter = ("service_name", "status")
 
 
 admin.site.register(Employer)

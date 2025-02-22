@@ -13,8 +13,8 @@ from django.db.models import F, Func, IntegerField, OuterRef, Subquery
 from django.utils import timezone
 from collections import defaultdict
 from arl.celery import app
-from arl.msg.models import EmailEvent, EmailTemplate, Message, SmsLog
-from arl.user.models import CustomUser, SMSOptOut
+from arl.msg.models import EmailEvent, EmailTemplate, Message, SmsLog, EmailLog
+from arl.user.models import CustomUser, SMSOptOut, EmployerSMSTask, Employer
 
 from .helpers import (client, create_master_email, create_single_csv_email,
                       send_bulk_sms, send_monthly_store_phonecall,
@@ -93,12 +93,34 @@ def send_sms_task(phone_number, message):
         return str(e)
 
 
+#
+# APPROVED
+#
+# This task is APPROVED for multi tenant
+# This task takes employers who want the tobacco sms and
+# logs them and their users when sent.
+# The logs are in the SmsLogs model
 @app.task(name="tobacco_compliance_sms_with_download_link")
 def send_bulk_tobacco_sms_link():
     try:
-        # Get active users who have NOT opted out of SMS
+        # Get Employers who have this SMS enabled
+        enabled_employers = EmployerSMSTask.objects.filter(
+            task_name="tobacco_compliance_sms_with_download_link",
+            is_enabled=True
+        ).values_list("employer_id", flat=True)
+
+        if not enabled_employers:
+            logger.warning("No employers enabled for this SMS task.")
+            return
+
+        # Get active users from employers who have SMS enabled
         opted_out_users = SMSOptOut.objects.values_list("user_id", flat=True)
-        active_users = CustomUser.objects.filter(is_active=True).exclude(id__in=opted_out_users)
+        active_users = CustomUser.objects.filter(
+            is_active=True,
+            employer_id__in=enabled_employers  # Only select users from enabled employers
+        ).exclude(id__in=opted_out_users)
+        # Get the unique employers from the active users
+        employer_names = Employer.objects.filter(id__in=enabled_employers).values_list("name", flat=True)
         # active_users = CustomUser.objects.filter(is_active=True)
         gsat = [user.phone_number for user in active_users]
         if not gsat:
@@ -116,16 +138,21 @@ def send_bulk_tobacco_sms_link():
 
         send_bulk_sms(gsat, message)
         # Log the result
+        employer_list = ", ".join(employer_names) if employer_names else "No employers"
         logger.info("Bulk SMS task completed successfully")
-        log_message = f"Bulk SMS sent successfully to {', '.join(gsat)}"
-        log_entry = SmsLog(level="INFO", message=log_message)
-        log_entry.save()
+        log_message = f"Bulk Tobacco SMS sent successfully to {', '.join(gsat)}"
+        log_message_employer = f"Bulk Tobacco SMS sent successfully to {employer_list}"
+        SmsLog.objects.create(level="INFO", message=log_message)
+        SmsLog.objects.create(level="INFO", message=log_message_employer)
+        
     except Exception as e:
         # Log or handle other exceptions
         logger.error(f"An error occurred: {str(e)}")
         SmsLog.objects.create(level="ERROR", message=f"SMS Task Failed: {str(e)}")
 
 
+# This is the old tobacco SMS. It has NOT been approved
+# for multi tenant models.
 @app.task(name="bulk_sms")
 def send_bulk_sms_task():
     try:
@@ -515,22 +542,72 @@ def start_campaign_task(selected_list_id):
     print(f"Campaign scheduled for list {selected_list_id}.")
 
 
+#
+# APPROVED
+#
+# This task is APPROVED for multi tenant
+# This task takes employers who want the tobacco email and
+# logs them and their users when sent.
+# The logs are in the SmsLogs model
 @app.task(name="send_weekly_tobacco_email")
 def send_weekly_tobacco_email():
     success_message = "Weekly Tobacco Emails Sent Successfully"
     template_id = "d-488749fd81d4414ca7bbb2eea2b830db"
     attachments = None
     try:
-        active_users = CustomUser.objects.filter(is_active=True)
-        for user in active_users:
-            create_master_email(user.email, user.username, template_id, attachments)
-        return success_message
-    except CustomUser.DoesNotExist:
-        logger.warning("No active users found to send tobacco emails.")
+        # ✅ Get Employers who have this EMAIL enabled
+        enabled_employers = EmployerSMSTask.objects.filter(
+            task_name="send_weekly_tobacco_email",
+            is_enabled=True
+        ).values_list("employer_id", flat=True)
+
+        if not enabled_employers:
+            logger.warning("No employers enabled for this email task.")
+            return success_message
+        template_name = EmailTemplate.objects.filter(sendgrid_id=template_id).values_list("name", flat=True).first()
+        if not template_name:
+            template_name = "Unknown Template"
+        # ✅ Loop through each employer and send emails to its users
+        for employer_id in enabled_employers:
+            employer = Employer.objects.filter(id=employer_id).first()
+            if not employer:
+                continue  # Skip if employer is missing
+
+            verified_sender = employer.verified_sender_email if employer.verified_sender_email else settings.MAIL_DEFAULT_SENDER
+
+            # ✅ Get active users for this employer
+            active_users = CustomUser.objects.filter(
+                is_active=True,
+                employer_id=employer_id
+            )
+            email_sent = False
+            for user in active_users:
+                success = create_master_email(
+                    to_email=user.email,
+                    name=user.username,
+                    sendgrid_id=template_id,
+                    attachments=attachments,
+                    verified_sender=verified_sender  # ✅ Pass employer-specific sender
+                )
+                if success:
+                    email_sent = True  # ✅ At least one email was successfully sent
+
+            # ✅ Log **only once per employer**, after sending all user emails
+            if email_sent:
+                EmailLog.objects.create(
+                    employer=employer,
+                    sender_email=verified_sender,
+                    template_id=template_id,
+                    template_name=template_name,
+                    status="SUCCESS",
+                )
+
+            logger.info(f"✅ Weekly Tobacco Email sent for employer: {employer.name} ({verified_sender})")
+
         return success_message
 
     except Exception as e:
-        error_message = f"Failed to send tobacco emails. Error: {str(e)}"
+        error_message = f"🚨 Failed to send weekly tobacco emails. Error: {str(e)}"
         logger.error(error_message)
         return error_message
 

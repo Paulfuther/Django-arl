@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Initialize the intlTelInput library
     const phoneInputField = document.querySelector("#phone");
     const phoneInput = window.intlTelInput(phoneInputField, {
-        utilsScript: "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.8/js/utils.js",
+        utilsScript: "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/19.0.2/js/utils.js",
     });
     // Get the original phone number value from a hidden input field
     const originalPhoneNumber = document.querySelector("#phone-number").value;

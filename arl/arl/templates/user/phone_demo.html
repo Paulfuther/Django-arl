@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Phone Number Demo</title>
+</head>
+<body>
+    <h1>Phone Number Input/Output Demo</h1>
+    <form method="post">
+        {% csrf_token %}
+        <label for="phone_number">Enter Phone Number:</label><br>
+        <input type="tel" name="phone_number" id="phone_number" placeholder="e.g., 519-555-1234" value="{{ raw_input }}" required><br><br>
+        <button type="submit">Submit</button>
+    </form>
+
+    {% if e164_output or error %}
+        <h2>Results:</h2>
+        <p><strong>Raw Input:</strong> {{ raw_input }}</p>
+        {% if e164_output %}
+            <p><strong>E.164 Output (Twilio-ready):</strong> {{ e164_output }}</p>
+            <p><strong>National Format:</strong> {{ national_output }}</p>
+        {% endif %}
+        {% if error %}
+            <p style="color:red"><strong>Error:</strong> {{ error }}</p>
+        {% endif %}
+    {% endif %}
+</body>
+</html>

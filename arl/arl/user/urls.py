@@ -4,7 +4,8 @@ from django.urls import path
 from .views import (CheckPhoneNumberUniqueView, RegisterView,
                     TaskResultListView, admin_verification_page,
                     check_verification, fetch_managers, home_view, login_view,
-                    logout_view, request_verification, verification_page)
+                    logout_view, request_verification, verification_page,
+                    verify_twilio_phone_number, phone_format)
 
 urlpatterns = [
     path("", login_view, name="home"),
@@ -51,4 +52,6 @@ urlpatterns = [
     path("home/", home_view, name="home"),
     path("fetch_managers/", fetch_managers, name="fetch_managers"),
     path('task-results/', TaskResultListView.as_view(), name='task_results'),
+    path('verify-phone/<str:phone_number>/', verify_twilio_phone_number, name='verify_twilio_phone'),
+    path('phone-format/', phone_format, name='phone_format'),
 ]
