@@ -59,7 +59,7 @@ LOGGING = {
     'loggers': {
         'django': {
             'handlers': ['file', 'console'], # Use both file and console
-            'level': 'DEBUG', # Change to INFO or higher
+            'level': 'INFO', # Change to INFO or higher
             'propagate': True,
         },
         '': { # Catch-all logger for other applications
@@ -102,9 +102,11 @@ INSTALLED_APPS = [
     "arl.bucket",
     "arl.payroll",
     "arl.carwash",
-    "arl.setup"
+    "arl.setup",
+    "phonenumber_field"
 ]
 
+PHONENUMBER_DEFAULT_REGION = 'CA'
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

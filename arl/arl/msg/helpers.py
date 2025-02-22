@@ -13,6 +13,7 @@ from sendgrid.helpers.mail import (Asm, Attachment, ContentId, Disposition,
                                    FileContent, FileName, FileType, Mail)
 from twilio.base.exceptions import TwilioException
 from twilio.rest import Client
+from arl.setup.models import  TenantApiKeys
 
 
 from arl.user.models import CustomUser, Store
@@ -64,25 +65,44 @@ def create_tobacco_email(to_email, name):
             logger.error(f"SendGrid response status code: {response_status}")
             logger.error(f"SendGrid response body: {response_body}")
 
+
 # this is the master email function
-
-
-def create_master_email(to_email, name, sendgrid_id, attachments=None):
+# It works for a new hire registration for HR data
+# And the onbording of a new hire.
+# This will be the master function going forward.
+def create_master_email(to_email, sendgrid_id, template_data, attachments=None, verified_sender=None):
     try:
         unsubscribe_group_id = 24753
-        # template = EmailTemplate.objects.get(id=template_id)
+        if not isinstance(template_data, dict):
+            raise ValueError(f"❌ Expected dictionary for template_data, got {type(template_data)}")
+        # Ensure to_email is a list, even if a single string is passed
+        if isinstance(to_email, str):
+            to_email = [to_email]  # Convert single email to list
+        print(f"📧 The helper is sending email to: {', '.join(to_email)}")
+        user_email = to_email[0] if isinstance(to_email, list) and to_email else to_email 
+        try:
+            user = CustomUser.objects.get(email=user_email)
+            employer = user.employer
+            print(f"✅ Found user: {user.email}, Employer: {employer}")
+        except CustomUser.DoesNotExist:
+            print(f"❌ No user found with email {user_email}. Using default sender.")
+            sender_email = settings.MAIL_DEFAULT_SENDER
+        else:
+            # ✅ Retrieve the sender email from the Tenant API Key model
+            tenant_api_key = TenantApiKeys.objects.filter(employer=employer).first()
+            sender_email = tenant_api_key.sender_email if tenant_api_key else settings.MAIL_DEFAULT_SENDER
 
+        print(f"📧 Using sender email: {sender_email}")
+
+        
         # Initialize the email message
         message = Mail(
-            from_email=settings.MAIL_DEFAULT_SENDER,
+            from_email=sender_email,
             to_emails=to_email,
         )
-
-        # Add dynamic template data
-        message.dynamic_template_data = {
-            "name": name,
-            "subject": "NONE",
-        }
+        
+        print(f"📜 Email Template Data: {template_data}")
+        message.dynamic_template_data = template_data
         message.template_id = sendgrid_id
         asm = Asm(
             group_id=unsubscribe_group_id,
@@ -159,6 +179,8 @@ def create_hr_newhire_email(**kwargs):
         "country": kwargs["country"],
         "sin_number": kwargs["sin_number"],
         "dob": kwargs["dob"],
+        "sin_expiration_date": kwargs["sin_expiration_date"],
+        "work_permit_expiration_date": kwargs["work_permit_expiration_date"],
     }
     message.template_id = "d-d0806dff1e62449d9ba8cfcb481accaa"
 

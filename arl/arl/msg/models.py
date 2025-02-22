@@ -1,9 +1,9 @@
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from django.utils.timezone import now
 
-
-from arl.user.models import CustomUser
+from arl.user.models import CustomUser, Employer
 
 
 class Twimlmessages(models.Model):
@@ -52,6 +52,25 @@ class SmsLog(models.Model):
 
     def __str__(self):
         return f"{self.timestamp} - {self.level}: {self.message}"
+
+
+class EmailLog(models.Model):
+    employer = models.ForeignKey("user.Employer", on_delete=models.CASCADE, related_name="email_logs")
+    sender_email = models.EmailField(help_text="The verified sender email used")
+    template_id = models.CharField(
+        max_length=100, help_text="SendGrid Template ID used"
+    )
+    template_name = models.CharField(max_length=255, blank=True, null=True)
+    sent_at = models.DateTimeField(default=now)
+    status = models.CharField(
+        max_length=20,
+        choices=[("SUCCESS", "Success"), ("FAILED", "Failed")],
+        default="SUCCESS",
+    )
+    error_message = models.TextField(blank=True, null=True, help_text="Error details if failed")
+
+    def __str__(self):
+        return f"EmailLog {self.id} - {self.employer.name} - {self.sent_at.strftime('%Y-%m-%d %H:%M')}"
 
 
 class EmailTemplate(models.Model):

@@ -3,7 +3,8 @@ from crispy_forms.layout import Submit
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.urls import reverse_lazy
-
+from phonenumber_field.formfields import PhoneNumberField
+from phonenumber_field.widgets import PhoneNumberPrefixWidget
 from .models import CustomUser, Store
 
 
@@ -28,6 +29,8 @@ class CustomUserCreationForm(UserCreationForm):
             "dob",
             "email",
             "sin",
+            "sin_expiration_date",
+            "work_permit_expiration_date",
             "address",
             "address_two",
             "city",
@@ -37,6 +40,8 @@ class CustomUserCreationForm(UserCreationForm):
         )
         widgets = {
             'dob': forms.DateInput(attrs={'type': 'date'}),
+            'sin_expiration_date': forms.DateInput(attrs={'type': 'date'}),
+            'work_permit_expiration_date': forms.DateInput(attrs={'type': 'date'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -53,6 +58,7 @@ class CustomUserCreationForm(UserCreationForm):
         self.fields["sin"].required = True
         self.fields['dob'].required = True
         self.fields['postal'].required = True
+        # self.fields['phone_number'].required = True
         # Populate choices for manager_dropdown
         # managers = CustomUser.objects.filter(groups__name='Manager')
         # manager_choices = [(manager.id, manager.username) for manager in managers]
@@ -81,6 +87,15 @@ class CustomUserCreationForm(UserCreationForm):
             self.add_error("phone_number", "This phone number is already in use.")
         if email and CustomUser.objects.filter(email=email).exists():
             self.add_error("email", "This email is already in use")
+        sin = cleaned_data.get("sin")
+        sin_expiration_date = cleaned_data.get("sin_expiration_date")
+        work_permit_expiration_date = cleaned_data.get("work_permit_expiration_date")
+
+        if sin and sin.startswith('9'):
+            if not sin_expiration_date:
+                self.add_error("sin_expiration_date", "SIN expiration date is required for SINs starting with 9.")
+            if not work_permit_expiration_date:
+                self.add_error("work_permit_expiration_date", "Work permit expiration date is required for SINs starting with 9.")
 
         return cleaned_data
 

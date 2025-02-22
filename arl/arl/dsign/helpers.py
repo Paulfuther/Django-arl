@@ -65,6 +65,8 @@ def get_access_token():
     private_key = in_file.read()
     # print(private_key)
     in_file.close()
+    print("client id:", clientid, "impersonated_user_id :", impersonated_user_id)
+    print("private key in get access token :",private_key)
     # print(settings.DOCUSIGN_OAUTH_HOST_NAME)
     access_token = api_client.request_jwt_user_token(
         client_id=clientid,
@@ -74,20 +76,23 @@ def get_access_token():
         expires_in=3600,
         scopes=SCOPES,
     )
-    # print(access_token)
+    print(access_token)
+    
     return access_token
 
 
 def create_docusign_envelope(envelope_args):
+    print("envelop args in helper :", envelope_args)
     try:
         access_token = get_access_token().access_token
-
+        print("access token :", access_token)
         template = DocuSignTemplate.objects.get(
             template_id=envelope_args["template_id"]
         )
+        print("template :", template)
         template_name = template.template_name if template else "Default Template Name"
         email_subject = f"{envelope_args['signer_name']} - {template_name}"
-
+        print("template name: ", template_name)
         # Create the envelope definition
         envelope_definition = EnvelopeDefinition(
             status="sent",  # requests that the envelope be created and sent.
