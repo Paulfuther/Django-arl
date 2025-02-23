@@ -19,7 +19,6 @@ from django.views import View
 from django.views.generic import ListView
 from django_celery_results.models import TaskResult
 from twilio.base.exceptions import TwilioException
-from arl.dsign.tasks import create_docusign_envelope_task
 from arl.msg.helpers import (check_verification_token,
                              request_verification_token)
 from arl.msg.tasks import send_sms_task
@@ -29,6 +28,7 @@ from .models import CustomUser, Employer, Store
 from .tasks import (create_newhire_data_email, save_user_to_db,
                     send_newhire_template_email_task)
 from arl.msg.helpers import client
+from arl.dsign.tasks import create_docusign_envelope_task
 
 
 class RegisterView(FormView):
@@ -170,7 +170,7 @@ def handle_new_hire_registration(sender, instance, created, **kwargs):
             send_newhire_template_email_task.s(
                 instance.email, instance.first_name, settings.SENDGRID_NEWHIRE_ID
             ),
-            # create_docusign_envelope_task.s(envelope_args),
+            create_docusign_envelope_task.s(envelope_args).set(immutable=True),
             create_newhire_data_email.s(email_data).set(immutable=True),
             send_sms_task.s(
                 formatted_phone,
