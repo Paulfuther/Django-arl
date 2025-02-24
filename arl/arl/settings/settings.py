@@ -59,7 +59,7 @@ LOGGING = {
     'loggers': {
         'django': {
             'handlers': ['file', 'console'], # Use both file and console
-            'level': 'INFO', # Change to INFO or higher
+            'level': 'DEBUG', # Change to INFO or higher
             'propagate': True,
         },
         '': { # Catch-all logger for other applications
