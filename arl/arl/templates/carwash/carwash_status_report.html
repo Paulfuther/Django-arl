@@ -5,13 +5,14 @@
 {% include "../base/navbar.html" %}
 
 <style>
-    /* ✅ Small font for date & time on mobile */
+    /* ✅ Smaller font for date & time, stack them to fit on mobile */
     .date-time {
         font-size: 0.85rem;
         white-space: nowrap;
+        display: block;
     }
 
-    /* ✅ Status Indicator (Green = Open, Red = Closed) */
+    /* ✅ Status Dot Styles */
     .status-dot {
         display: inline-block;
         width: 12px;
@@ -19,13 +20,35 @@
         border-radius: 50%;
         margin-left: 8px;
     }
-    
-    .status-open {
-        background-color: green;
+    .status-open { background-color: green; }
+    .status-closed { background-color: red; }
+
+    /* ✅ Ensure text is left-aligned */
+    .table th, .table td {
+        text-align: left !important;
+        vertical-align: middle;
     }
-    
-    .status-closed {
-        background-color: red;
+
+    /* ✅ Reduce space between rows */
+    .table td {
+        padding: 8px;
+    }
+
+    /* ✅ Expandable Month Headers */
+    .month-header {
+        cursor: pointer;
+        font-weight: bold;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+    }
+
+    /* ✅ Store Headers */
+    .store-header {
+        padding: 8px;
+        background-color: #dfe6f1;
+        font-weight: bold;
+        
     }
 </style>
 
@@ -34,75 +57,101 @@
         <div class="col-12 col-lg-10">
             <legend class="border-bottom mb-4">Carwash Status Report</legend>
 
-            <table class="table table-bordered">
+            <!-- ✅ Store Status Summary -->
+            <table class="table table-bordered text-start mb-4">
+                <thead class="table-light">
+                    <tr>
+                        <th>Store</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
                 <tbody>
-                    {% for entry in data %}
-                        <!-- ✅ Store Header Row with Corrected Status Dot -->
-                        <tr class="table-primary">
-                            <td colspan="4">
-                                <strong>Store {{ entry.store_number }}</strong>
-
-                                <!-- ✅ Find the last known status entry -->
-                                {% with last_entry=entry.durations|last %}
-                                    {% if last_entry and last_entry.opened_at %}
-                                        <span class="status-dot float-end status-open"></span> <!-- 🟢 OPEN -->
-                                    {% else %}
-                                        <span class="status-dot float-end status-closed"></span> <!-- 🔴 CLOSED -->
-                                    {% endif %}
-                                {% endwith %}
-                            </td>
-                        </tr>
-
-                        <!-- ✅ Table Headers -->
-                        <tr>
-                            <th>Closed At</th>
-                            <th>Opened At</th>
-                            <th>Duration</th>
-                            <th>Reason</th>
-                        </tr>
-
-                        {% for duration in entry.durations %}
-                            <tr>
-                                <!-- ✅ Closed Date & Time -->
-                                <td>
-                                    <strong class="date-time">{{ duration.closed_at|slice:":10" }}</strong><br>
-                                    <span class="text-muted date-time">{{ duration.closed_at|slice:"11:" }}</span>
-                                </td>
-                                
-                                <!-- ✅ Opened Date & Time -->
-                                <td>
-                                    {% if duration.opened_at %}
-                                        <strong class="date-time">{{ duration.opened_at|slice:":10" }}</strong><br>
-                                        <span class="text-muted date-time">{{ duration.opened_at|slice:"11:" }}</span>
-                                    {% else %}
-                                        <span class="text-danger">Still Closed</span>
-                                    {% endif %}
-                                </td>
-                                
-                                <td>{{ duration.duration_closed }}</td>
-                                <td>{{ duration.reason }}</td>
-                            </tr>
-                        {% endfor %}
-
-                        <!-- ✅ Monthly Summary Section -->
-                        {% if entry.monthly_summary %}
-                            <tr class="table-light">
-                                <td colspan="4"><strong>Monthly Summary</strong></td>
-                            </tr>
-                            <tr>
-                                <th>Month</th>
-                                <th colspan="3">Total Closed Time</th>
-                            </tr>
-                            {% for month, total in entry.monthly_summary.items %}
+                    {% for month, data in data.items %}
+                        {% for store in data.stores %}
+                            {% with last_entry=store.durations|last %}
                                 <tr>
-                                    <td class="date-time"><strong>{{ month }}</strong></td>
-                                    <td colspan="3">{{ total }}</td>
+                                    <td>Store {{ store.store_number }}</td>
+                                    <td>
+                                        {% if last_entry and last_entry.opened_at is None %}
+                                            <span class="status-dot status-closed"></span> Closed
+                                        {% else %}
+                                            <span class="status-dot status-open"></span> Open
+                                        {% endif %}
+                                    </td>
                                 </tr>
-                            {% endfor %}
-                        {% endif %}
+                            {% endwith %}
+                        {% endfor %}
                     {% endfor %}
                 </tbody>
             </table>
+
+            {% for month, data in data.items %}
+                <!-- ✅ Clickable Month Header -->
+                <div class="month-header mt-3" data-bs-toggle="collapse" data-bs-target="#month-{{ month }}">
+                    {{ month }} <span class="float-end">▼</span>
+                </div>
+
+                <div id="month-{{ month }}" class="collapse">
+                    
+                    <!-- ✅ Monthly Summary Table -->
+                    <div class="p-2 bg-white border">
+                        <strong>Monthly Summary:</strong>
+                        <table class="table table-bordered mt-2 text-start">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Store</th>
+                                    <th>Total Time Closed</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for store, total in data.summary.items %}
+                                    <tr>
+                                        <td>Store {{ store }}</td>
+                                        <td>{{ total.duration }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- ✅ Store-wise Breakdown -->
+                    {% for store in data.stores %}
+                        <div class="store-header mt-3">
+                            Store {{ store.store_number }}
+                        </div>
+
+                        <!-- ✅ Closure Data Table -->
+                        <table class="table table-bordered text-start mt-2">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Closed</th>
+                                    <th>Opened</th>
+                                    <th>Duration</th>
+                                    <th>Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for duration in store.durations %}
+                                    <tr>
+                                        <td>
+                                            <span class="date-time">{{ duration.closed_at|slice:":10" }}<br>{{ duration.closed_at|slice:"11:" }}</span>
+                                        </td>
+                                        <td>
+                                            {% if duration.opened_at %}
+                                                <span class="date-time">{{ duration.opened_at|slice:":10" }}<br>{{ duration.opened_at|slice:"11:" }}</span>
+                                            {% else %}
+                                                <span class="date-time">Still Closed</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ duration.duration_closed }}</td>
+                                        <td>{{ duration.reason }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% endfor %}
+                </div>
+            {% endfor %}
         </div>
     </div>
 </div>
