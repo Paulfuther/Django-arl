@@ -32,11 +32,22 @@ def carwash_status_list_view(request):
 
 @login_required
 def carwash_status_report(request):
-    """Trigger Celery task and fetch carwash status report."""
+    """Generate a carwash status report and ensure unique stores."""
     task = generate_carwash_status_report.delay()
     report_data = json.loads(task.get(timeout=30))  # ✅ Ensure proper JSON
-    
-    # ✅ DEBUG: Print the data in console to verify the structure
-    # print("🚀 Report Data:", json.dumps(report_data, indent=4))
 
-    return render(request, "carwash/carwash_status_report.html", {"data": report_data})
+    # ✅ Extract unique stores across all months
+    unique_stores = {}
+    for month, data in report_data.items():
+        for store in data["stores"]:
+            if store["store_number"] not in unique_stores:
+                unique_stores[store["store_number"]] = store  # ✅ Store only once!
+
+    return render(
+        request,
+        "carwash/carwash_status_report.html",
+        {
+            "data": report_data,
+            "unique_stores": unique_stores,  # ✅ Ensure stores are unique
+        },
+    )
