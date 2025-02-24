@@ -58,33 +58,30 @@
             <legend class="border-bottom mb-4">Carwash Status Report</legend>
 
             <!-- ✅ Store Status Summary -->
-            <table class="table table-bordered text-start mb-4">
-                <thead class="table-light">
-                    <tr>
-                        <th>Store</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for month, data in data.items %}
-                        {% for store in data.stores %}
-                            {% with last_entry=store.durations|last %}
-                                <tr>
-                                    <td>Store {{ store.store_number }}</td>
-                                    <td>
-                                        {% if last_entry and last_entry.opened_at is None %}
-                                            <span class="status-dot status-closed"></span> Closed
-                                        {% else %}
-                                            <span class="status-dot status-open"></span> Open
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                            {% endwith %}
-                        {% endfor %}
-                    {% endfor %}
-                </tbody>
-            </table>
-
+<table class="table table-bordered text-start mb-4">
+    <thead class="table-light">
+        <tr>
+            <th>Store</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for store_number, store_data in unique_stores.items %}
+            {% with last_entry=store_data.durations|last %}
+                <tr>
+                    <td>Store {{ store_number }}</td>
+                    <td>
+                        {% if last_entry and last_entry.opened_at is None %}
+                            <span class="status-dot status-closed"></span> Closed
+                        {% else %}
+                            <span class="status-dot status-open"></span> Open
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endwith %}
+        {% endfor %}
+    </tbody>
+</table>
             {% for month, data in data.items %}
                 <!-- ✅ Clickable Month Header -->
                 <div class="month-header mt-3" data-bs-toggle="collapse" data-bs-target="#month-{{ month }}">
