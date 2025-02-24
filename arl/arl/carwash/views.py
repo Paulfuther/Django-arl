@@ -1,9 +1,10 @@
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import redirect, render
-
+import json
 from .forms import CarwashStatusForm
 from .models import CarwashStatus
 from .tasks import generate_carwash_status_report
+from django.utils.safestring import mark_safe
 
 
 @login_required
@@ -31,8 +32,11 @@ def carwash_status_list_view(request):
 
 @login_required
 def carwash_status_report(request):
-    """View to trigger Celery task and fetch the carwash status report."""
-    task = generate_carwash_status_report.delay()  # Start the Celery task
-    report_data = task.get(timeout=30)  # Wait for the task to finish (max 30s)
+    """Trigger Celery task and fetch carwash status report."""
+    task = generate_carwash_status_report.delay()
+    report_data = json.loads(task.get(timeout=30))  # ✅ Ensure proper JSON
+    
+    # ✅ DEBUG: Print the data in console to verify the structure
+    # print("🚀 Report Data:", json.dumps(report_data, indent=4))
 
     return render(request, "carwash/carwash_status_report.html", {"data": report_data})
