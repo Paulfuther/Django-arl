@@ -151,11 +151,10 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         "work_permit_expiration_date",
         "all_docusign_templates",
     )
-    list_filter = ("is_active", "groups", SINFirstDigitFilter)
+    list_filter = ("is_active", "groups", 'sin_expiration_date', 'work_permit_expiration_date', SINFirstDigitFilter)
     search_fields = ("username", "email", "phone_number", "sin")
     list_editable = ('sin_expiration_date', 'work_permit_expiration_date')
-    list_filter = ('sin_expiration_date', 'work_permit_expiration_date')
-    list_per_page = 25
+    list_per_page = 15
     # def has_delete_permission(self, request, obj=None):
     #    return False  # Disables the ability to delete users
 
