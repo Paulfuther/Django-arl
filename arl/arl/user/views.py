@@ -248,37 +248,32 @@ def check_verification(request):
 
 def login_view(request):
     if request.user.is_authenticated:
-        # If the user is already logged in,
-        # redirect them to the homepage or any other URL.
         return redirect("home")
+
     if request.method == "POST":
         form = AuthenticationForm(request, request.POST)
         if form.is_valid():
             user = form.get_user()
-            # Commented out the two-factor authentication section for now
             if user.phone_number:
-                print(user.phone_number)
+                print(f"DEBUG: Phone number before sending: {str(user.phone_number)}")
                 try:
-                    phone_number = user.phone_number
+                    phone_number = str(user.phone_number)  # Ensure string conversion
                     request.session["user_id"] = user.id
-                    # Request the verification code from Twilio
-                    request_verification_token(phone_number)
-                    request.session["phone_number"] = phone_number
-                    # Verification request successful
-                    # Redirect to the verification page
+                    request_verification_token(phone_number)  # ✅ Pass string to Twilio
+                    request.session["phone_number"] = phone_number  # ✅ Ensure session stores string
                     return redirect("verification_page")
                 except TwilioException:
-                    # Handle TwilioException if verification request fails
                     return render(
                         request,
                         "user/login.html",
                         {"form": form, "verification_error": True},
                     )
             return redirect("home")
-
     else:
         form = AuthenticationForm(request)
+
     return render(request, "user/login.html", {"form": form})
+    
 
 
 def verification_page(request):
