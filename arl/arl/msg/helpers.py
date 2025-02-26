@@ -279,6 +279,8 @@ def send_sms(phone_number, body):
     return None
 
 
+# This function has flters for sms activated
+# but still needs to filter for proper settings
 def send_bulk_sms(numbers, body):
     try:
         # ✅ Remove empty or invalid numbers before processing

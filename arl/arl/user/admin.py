@@ -141,6 +141,7 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         "username",
         "email",
         "store",
+        'employer',
         "phone_number",
         "sin",
         "last_login",
@@ -162,6 +163,20 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         return ", ".join([group.name for group in obj.groups.all()])
 
     get_groups.short_description = "Groups"
+
+    def expandable_groups(self, obj):
+        """Creates an expandable section for groups."""
+        groups = ", ".join([group.name for group in obj.groups.all()]) or "No Groups"
+        return format_html(
+            '<button class="expand-btn" onclick="toggleGroups(this)">Show Groups</button>'
+            '<div class="group-list" style="display: none; padding: 5px; border: 1px solid #ddd; background: #f9f9f9;">{}</div>',
+            groups
+        )
+
+    expandable_groups.short_description = "Groups"
+
+    class Media:
+        js = ('/admin/custom_admin.js',)
 
     def all_docusign_templates(self, obj):
         """Display all template names for a user in a neat format."""
