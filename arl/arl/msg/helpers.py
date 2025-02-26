@@ -281,14 +281,11 @@ def send_sms(phone_number, body):
 
 def send_bulk_sms(numbers, body):
     try:
-        # Your existing code
-
-        bindings = list(
-            map(
-                lambda number: json.dumps({"binding_type": "sms", "address": number}),
-                numbers,
-            )
-        )
+        # ✅ Remove empty or invalid numbers before processing
+        bindings = [
+            json.dumps({"binding_type": "sms", "address": str(number)})
+            for number in numbers
+        ]
         print("=====> To Bindings :>", bindings, "<: =====")
         notification = client.notify.services(
             settings.TWILIO_NOTIFY_SERVICE_SID

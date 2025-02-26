@@ -115,14 +115,18 @@ def send_bulk_tobacco_sms_link():
 
         # Get active users from employers who have SMS enabled
         opted_out_users = SMSOptOut.objects.values_list("user_id", flat=True)
+
         active_users = CustomUser.objects.filter(
             is_active=True,
-            employer_id__in=enabled_employers  # Only select users from enabled employers
-        ).exclude(id__in=opted_out_users)
+            employer_id__in=enabled_employers
+        ).exclude(id__in=opted_out_users
+                  ).exclude(phone_number__isnull=True
+                            ).exclude(phone_number="")
         # Get the unique employers from the active users
         employer_names = Employer.objects.filter(id__in=enabled_employers).values_list("name", flat=True)
         # active_users = CustomUser.objects.filter(is_active=True)
-        gsat = [user.phone_number for user in active_users]
+        gsat = [str(user.phone_number) for user in active_users]
+        print("numbers :", gsat)
         if not gsat:
             logger.warning("No valid phone numbers found to send SMS.")
             print("no valid phone numbers")
