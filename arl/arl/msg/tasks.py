@@ -558,6 +558,7 @@ def send_weekly_tobacco_email():
     success_message = "Weekly Tobacco Emails Sent Successfully"
     template_id = "d-488749fd81d4414ca7bbb2eea2b830db"
     attachments = None
+
     try:
         # ✅ Get Employers who have this EMAIL enabled
         enabled_employers = EmployerSMSTask.objects.filter(
@@ -568,52 +569,67 @@ def send_weekly_tobacco_email():
         if not enabled_employers:
             logger.warning("No employers enabled for this email task.")
             return success_message
-        template_name = EmailTemplate.objects.filter(sendgrid_id=template_id).values_list("name", flat=True).first()
-        if not template_name:
-            template_name = "Unknown Template"
-        # ✅ Loop through each employer and send emails to its users
-        for employer_id in enabled_employers:
-            employer = Employer.objects.filter(id=employer_id).first()
-            if not employer:
-                continue  # Skip if employer is missing
 
-            verified_sender = employer.verified_sender_email if employer.verified_sender_email else settings.MAIL_DEFAULT_SENDER
+        # ✅ Pre-fetch employers and store them in a dictionary (avoid multiple DB hits)
+        employers = Employer.objects.filter(id__in=enabled_employers).values("id", "name", "verified_sender_email")
+        employer_dict = {
+            emp["id"]: {
+                "name": emp["name"],
+                "sender": emp["verified_sender_email"] if emp["verified_sender_email"] else settings.MAIL_DEFAULT_SENDER
+            }
+            for emp in employers
+        }
 
-            # ✅ Get active users for this employer
-            active_users = CustomUser.objects.filter(
-                is_active=True,
-                employer_id=employer_id
-            )
+        # ✅ Fetch all active users in one query (reduce DB hits)
+        active_users = CustomUser.objects.filter(
+            is_active=True,
+            employer_id__in=enabled_employers
+        ).values("id", "email", "username", "employer_id")
+
+        # ✅ Get template name in one query
+        template_name = EmailTemplate.objects.filter(sendgrid_id=template_id).values_list("name", flat=True).first() or "Unknown Template"
+
+        # ✅ Group users by employer_id
+        employer_user_map = {}
+        for user in active_users:
+            employer_user_map.setdefault(user["employer_id"], []).append(user)
+
+        # ✅ Loop through employers and process emails
+        for employer_id, employer_info in employer_dict.items():
+            users = employer_user_map.get(employer_id, [])
+            verified_sender = employer_info["sender"]
+            employer_name = employer_info["name"]
+
             email_sent = False
-            for user in active_users:
+
+            # ✅ Process emails in bulk for efficiency
+            for user in users:
                 success = create_master_email(
-                    to_email=user.email,
-                    name=user.username,
+                    to_email=user["email"],
                     sendgrid_id=template_id,
+                    template_data={"name": user["username"]},
                     attachments=attachments,
-                    verified_sender=verified_sender  # ✅ Pass employer-specific sender
+                    verified_sender=verified_sender  # ✅ Employer-specific sender
                 )
                 if success:
                     email_sent = True  # ✅ At least one email was successfully sent
 
-            # ✅ Log **only once per employer**, after sending all user emails
-            if email_sent:
-                EmailLog.objects.create(
-                    employer=employer,
-                    sender_email=verified_sender,
-                    template_id=template_id,
-                    template_name=template_name,
-                    status="SUCCESS",
-                )
+            # ✅ Log **once per employer** (whether success or failure)
+            EmailLog.objects.create(
+                employer_id=employer_id,
+                sender_email=verified_sender,
+                template_id=template_id,
+                template_name=template_name,
+                status="SUCCESS" if email_sent else "FAILED",
+            )
 
-            logger.info(f"✅ Weekly Tobacco Email sent for employer: {employer.name} ({verified_sender})")
+            logger.info(f"✅ Weekly Tobacco Email sent for employer: {employer_name} ({verified_sender})")
 
         return success_message
 
     except Exception as e:
-        error_message = f"🚨 Failed to send weekly tobacco emails. Error: {str(e)}"
-        logger.error(error_message)
-        return error_message
+        logger.error(f"Error in send_weekly_tobacco_email: {e}", exc_info=True)
+        return "Error sending weekly tobacco emails"
 
 
 @app.task(name="monthly_store_calls")
