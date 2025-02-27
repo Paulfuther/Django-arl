@@ -41,7 +41,13 @@ class UserResource(resources.ModelResource):
     manager = export_fields.Field()
     whatsapp_consent = export_fields.Field()
     store = fields.Field(column_name="store", readonly=True)
-    all_docusign_templates = fields.Field(column_name="Docusign Documents", attribute="all_docusign_templates")
+    all_docusign_templates = fields.Field(column_name="Docusign Documents",
+                                          attribute="all_docusign_templates")
+    work_permit_expiration_date = fields.Field(column_name="Permit Expiration",
+                                               attribute=(
+                                                "work_permit_expiration_date"))
+    sin_expiration_date = fields.Field(column_name="SIN Expiration",
+                                       attribute="sin_expiration_date")
 
     class Meta:
         model = CustomUser
@@ -55,6 +61,8 @@ class UserResource(resources.ModelResource):
             "manager",
             "whatsapp_consent",
             "sin",
+            "sin_expiration_date",
+            "work_permit_expiration_date",
             "all_docusign_templates",
         )
         export_order = (
@@ -67,7 +75,10 @@ class UserResource(resources.ModelResource):
             "manager",
             "whatsapp_consent",
             "sin",
+            "sin_expiration_date",
+            "work_permit_expiration_date",
             "all_docusign_templates",
+            
         )
 
     def dehydrate_manager(self, custom_user):
@@ -158,6 +169,9 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
     list_per_page = 15
     # def has_delete_permission(self, request, obj=None):
     #    return False  # Disables the ability to delete users
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
     def get_groups(self, obj):
         return ", ".join([group.name for group in obj.groups.all()])
