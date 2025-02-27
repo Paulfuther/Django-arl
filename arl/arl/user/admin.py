@@ -1,5 +1,5 @@
 from datetime import datetime
-
+from django.forms.widgets import TextInput
 from django import forms
 from django.contrib import admin
 from django.contrib.admin import SimpleListFilter
@@ -65,31 +65,15 @@ class UserResource(resources.ModelResource):
             "work_permit_expiration_date",
             "all_docusign_templates",
         )
-        export_order = (
-            "store",
-            "username",
-            "first_name",
-            "last_name",
-            "email",
-            "phone_number",
-            "manager",
-            "whatsapp_consent",
-            "sin",
-            "sin_expiration_date",
-            "work_permit_expiration_date",
-            "all_docusign_templates",
-            
-        )
+        export_order = fields
+        queryset = CustomUser.objects.select_related("store").prefetch_related(
+            "managed_users")
+        queryset = CustomUser.objects.prefetch_related(
+            "processeddocsigndocument_set")
 
     def dehydrate_manager(self, custom_user):
-        # Assuming a reverse ForeignKey from
-        # UserManager to CustomUser as 'managed_users'
-        user_manager = UserManager.objects.filter(user=custom_user).first()
-        return (
-            user_manager.manager.username
-            if user_manager and user_manager.manager
-            else "None"
-        )
+        return custom_user.managed_users.manager.username if hasattr(
+            custom_user, "managed_users") else "None"
 
     def dehydrate_whatsapp_consent(self, custom_user):
         consent = UserConsent.objects.filter(
@@ -98,20 +82,13 @@ class UserResource(resources.ModelResource):
         return "Granted" if consent and consent.is_granted else "Not Granted"
 
     def dehydrate_store(self, obj):
-        try:
-            store_name = obj.store.number if obj.store else "No Store Assigned"
-            # print(f"Exporting store for user {obj.username}: {store_name}")
-            return store_name
-        except Exception as e:
-            # print(f"Error exporting store for user {obj.username}: {e}")
-            raise e
+        return obj.store.number if obj.store else "No Store Assigned"
 
     def dehydrate_all_docusign_templates(self, obj):
-        """Retrieve and format all DocuSign template names for a user."""
-        templates = ProcessedDocsignDocument.objects.filter(user=obj).values_list("template_name", flat=True)
-        if not templates:
-            return "No Documents"
-        return ", ".join(strip_tags(template) for template in templates) 
+        templates = obj.processeddocsigndocument_set.values_list(
+            "template_name", flat=True)
+        return ", ".join(strip_tags(template) for template in templates
+                         ) if templates else "No Documents"
 
 
 class SINFirstDigitFilter(SimpleListFilter):
@@ -146,6 +123,11 @@ class ProcessedDocusignDocumentInline(admin.TabularInline):  # Or use admin.Stac
 # CustomUser model
 class CustomUserAdmin(ExportActionMixin, UserAdmin):
     resource_class = UserResource
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name in ["sin_expiration_date", "work_permit_expiration_date"]:
+            kwargs["widget"] = TextInput(attrs={"type": "date"})  # ✅ Uses native date input, no calendar
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
     # Customize the fields you want to display
     inlines = [ProcessedDocusignDocumentInline]
     list_display = (
@@ -163,12 +145,19 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         "work_permit_expiration_date",
         "all_docusign_templates",
     )
-    list_filter = ("is_active", "groups", 'sin_expiration_date', 'work_permit_expiration_date', SINFirstDigitFilter)
+    list_filter = ("is_active", "groups", 'sin_expiration_date',
+                   'work_permit_expiration_date', SINFirstDigitFilter)
     search_fields = ("username", "email", "phone_number", "sin")
     list_editable = ('sin_expiration_date', 'work_permit_expiration_date')
     list_per_page = 15
     # def has_delete_permission(self, request, obj=None):
     #    return False  # Disables the ability to delete users
+
+    def get_readonly_fields(self, request, obj=None):
+        """Make phone_number read-only after the user is saved."""
+        if obj:  # If the object exists (i.e., it has already been saved)
+            return self.readonly_fields + ("phone_number",)
+        return self.readonly_fields  # Keep fields editable for new users
 
     def has_delete_permission(self, request, obj=None):
         return False
@@ -180,7 +169,8 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
 
     def expandable_groups(self, obj):
         """Creates an expandable section for groups."""
-        groups = ", ".join([group.name for group in obj.groups.all()]) or "No Groups"
+        groups = ", ".join([group.name for group in obj.groups.all()]
+                           ) or "No Groups"
         return format_html(
             '<button class="expand-btn" onclick="toggleGroups(this)">Show Groups</button>'
             '<div class="group-list" style="display: none; padding: 5px; border: 1px solid #ddd; background: #f9f9f9;">{}</div>',
@@ -189,12 +179,12 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
 
     expandable_groups.short_description = "Groups"
 
-    class Media:
-        js = ('/admin/custom_admin.js',)
-
     def all_docusign_templates(self, obj):
         """Display all template names for a user in a neat format."""
-        templates = ProcessedDocsignDocument.objects.filter(user=obj).values_list("template_name", flat=True)
+        templates = ProcessedDocsignDocument.objects.filter(
+            user=obj
+                ).values_list(
+                    "template_name", flat=True)
 
         if not templates:
             return "No Documents"
@@ -202,7 +192,7 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         # Convert None values to empty strings
         formatted_templates = "<br>".join(filter(None, templates))
 
-        return format_html(formatted_templates)  # Ensure HTML is rendered correctly
+        return format_html(formatted_templates)
 
     all_docusign_templates.short_description = "Docusign Documents"
 
