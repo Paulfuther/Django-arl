@@ -144,9 +144,6 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         'employer',
         "phone_number",
         "sin",
-        
-        
-        
         "get_consent",
         "sin_expiration_date",
         "work_permit_expiration_date",
@@ -157,7 +154,7 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
     list_filter = ("is_active", "groups", 'sin_expiration_date',
                    'work_permit_expiration_date', SINFirstDigitFilter)
     search_fields = ("username", "email", "phone_number", "sin")
-    list_editable = ('sin_expiration_date', 'work_permit_expiration_date')
+    list_editable = ('sin_expiration_date', 'work_permit_expiration_date', 'phone_number')
     list_per_page = 15
     # def has_delete_permission(self, request, obj=None):
     #    return False  # Disables the ability to delete users
@@ -167,12 +164,6 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         return obj.store.number if obj.store else "None"
 
     store_number.short_description = "Store"
-
-    def get_readonly_fields(self, request, obj=None):
-        """Make phone_number read-only after the user is saved."""
-        if obj:  # If the object exists (i.e., it has already been saved)
-            return self.readonly_fields + ("phone_number",)
-        return self.readonly_fields  # Keep fields editable for new users
 
     def has_delete_permission(self, request, obj=None):
         return False
@@ -270,8 +261,12 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
     )
 
     def save_model(self, request, obj, form, change):
-        # Ensure 'phone_number' is saved when creating/updating a user
-        obj.phone_number = form.cleaned_data.get("phone_number", "")
+        """Ensure phone_number is not overwritten when updating other fields."""
+        if "phone_number" in form.cleaned_data and form.cleaned_data["phone_number"]:  
+            obj.phone_number = form.cleaned_data["phone_number"]  # ✅ Update if provided
+        else:
+            obj.phone_number = CustomUser.objects.get(pk=obj.pk).phone_number  # ✅ Keep existing phone number
+
         super().save_model(request, obj, form, change)
 
 
