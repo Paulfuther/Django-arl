@@ -72,8 +72,13 @@ class UserResource(resources.ModelResource):
             "processeddocsigndocument_set")
 
     def dehydrate_manager(self, custom_user):
-        return custom_user.managed_users.manager.username if hasattr(
-            custom_user, "managed_users") else "None"
+        # Fetch the first related UserManager object
+        user_manager = UserManager.objects.filter(user=custom_user).first()
+
+        # Check if the user_manager exists and has a manager
+        if user_manager and user_manager.manager:
+            return user_manager.manager.username
+        return "None"
 
     def dehydrate_whatsapp_consent(self, custom_user):
         consent = UserConsent.objects.filter(
@@ -85,10 +90,11 @@ class UserResource(resources.ModelResource):
         return obj.store.number if obj.store else "No Store Assigned"
 
     def dehydrate_all_docusign_templates(self, obj):
-        templates = obj.processeddocsigndocument_set.values_list(
-            "template_name", flat=True)
-        return ", ".join(strip_tags(template) for template in templates
-                         ) if templates else "No Documents"
+        """Retrieve and format all DocuSign template names for a user."""
+        templates = ProcessedDocsignDocument.objects.filter(user=obj).values_list("template_name", flat=True)
+        if not templates:
+            return "No Documents"
+        return ", ".join(strip_tags(template) for template in templates) 
 
 
 class SINFirstDigitFilter(SimpleListFilter):
