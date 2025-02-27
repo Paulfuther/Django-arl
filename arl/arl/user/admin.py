@@ -137,19 +137,22 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
     # Customize the fields you want to display
     inlines = [ProcessedDocusignDocumentInline]
     list_display = (
+        "is_active",
         "username",
         "email",
-        "store",
+        "store_number",
         'employer',
         "phone_number",
         "sin",
-        "last_login",
-        "is_active",
-        "get_groups",
+        
+        
+        
         "get_consent",
         "sin_expiration_date",
         "work_permit_expiration_date",
         "all_docusign_templates",
+        "last_login",
+        "get_groups",
     )
     list_filter = ("is_active", "groups", 'sin_expiration_date',
                    'work_permit_expiration_date', SINFirstDigitFilter)
@@ -158,6 +161,12 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
     list_per_page = 15
     # def has_delete_permission(self, request, obj=None):
     #    return False  # Disables the ability to delete users
+
+    def store_number(self, obj):
+        """Retrieve only the store number for display in the admin."""
+        return obj.store.number if obj.store else "None"
+
+    store_number.short_description = "Store"
 
     def get_readonly_fields(self, request, obj=None):
         """Make phone_number read-only after the user is saved."""
