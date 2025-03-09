@@ -1,5 +1,5 @@
 from __future__ import absolute_import, unicode_literals
-
+from django.conf import settings
 import logging
 from io import BytesIO
 
@@ -22,8 +22,26 @@ from arl.user.models import CustomUser, Employer, Store, ExternalRecipient
 
 from .helpers import create_pdf, create_restricted_pdf
 from .models import Incident, MajorIncident
+from arl.setup.models import TenantApiKeys
 
 logger = logging.getLogger(__name__)
+
+
+# this is needed for the correct sender email for all
+# employers. Each empoloyer has their own.
+# Else, it defaults to the default.
+def get_employer_sender_email(employer_id):
+    """Fetch the sender email for a given employer."""
+    try:
+        employer = Employer.objects.get(id=employer_id)
+        tenant_api_key = TenantApiKeys.objects.filter(
+            employer=employer, is_active=True
+        ).first()
+
+        return tenant_api_key.sender_email if tenant_api_key else settings.MAIL_DEFAULT_SENDER
+    except Employer.DoesNotExist:
+        logger.warning(f"⚠️ Employer ID {employer_id} not found. Using default sender.")
+        return settings.MAIL_DEFAULT_SENDER
 
 
 # Once a new Major Incident File has been submitted
@@ -341,15 +359,20 @@ def upload_file_to_dropbox_task(data):
 
 
 @app.task(name="email_incident_pdf_to_group")
-def send_email_to_group_task(data, group_name, subject):
+def send_email_to_group_task(data, group_name, subject, employer_id):
     try:
         # Fetch the emails of active users in the specified group
         to_emails = CustomUser.objects.filter(
-            Q(is_active=True) & Q(groups__name=group_name)
+            Q(is_active=True) & 
+            Q(groups__name=group_name) & 
+            Q(employer_id=employer_id)  # ✅ Filter by employer
         ).values_list("email", flat=True)
 
         if not to_emails:
             raise ValueError(f"No active users found in group: {group_name}")
+        sender_email = get_employer_sender_email(employer_id)
+        if not sender_email:
+            raise ValueError(f"No sender email configured for employer ID {employer_id}")
 
         # Convert the PDF bytes back to BytesIO for attachment
         pdf_buffer = BytesIO(data["pdf_buffer"])
@@ -365,6 +388,7 @@ def send_email_to_group_task(data, group_name, subject):
             ),
             attachment_buffer=pdf_buffer,
             attachment_filename=pdf_filename,
+            sender_email=sender_email,
         )
 
         return {
@@ -457,7 +481,15 @@ def generate_restricted_incident_pdf_email_task(incident_id, user_email):
             raise ValueError(
                 "Incident with ID {} does not exist.".format(incident_id)
             )
+        employer = incident.user_employer if hasattr(incident, "user_employer") else None
 
+        # ✅ Fetch the sender email from Tenant API Keys
+        sender_email = settings.MAIL_DEFAULT_SENDER  # Default sender
+        if employer:
+            tenant_api_key = TenantApiKeys.objects.filter(employer=employer).first()
+            sender_email = tenant_api_key.sender_email if tenant_api_key else sender_email
+
+        # ✅ Render HTML for PDF
         context = {"incident": incident}
         html_content = render_to_string(
             "incident/restricted_incident_form_pdf.html", context
@@ -494,7 +526,8 @@ def generate_restricted_incident_pdf_email_task(incident_id, user_email):
         # Call the create_single_email function with
         # user_email and other details
         create_incident_file_email(user_email, subject, body,
-                                   pdf_buffer, pdf_filename)
+                                   pdf_buffer, pdf_filename,
+                                   sender_email=sender_email)
         # create_single_email(user_email, subject, body, pdf_buffer)
 
         return {

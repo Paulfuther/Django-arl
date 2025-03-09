@@ -40,18 +40,18 @@ class CreateEnvelopeView(UserPassesTestMixin, View):
         return is_member_of_msg_group(self.request.user)
 
     def get(self, request):
-        form = NameEmailForm()
+        form = NameEmailForm(user=request.user)
         return render(request, "dsign/name_email_form.html", {"form": form})
 
     def post(self, request):
-        form = NameEmailForm(request.POST)
+        form = NameEmailForm(request.POST, user=request.user)
         if form.is_valid():
             d_name = form.cleaned_data["name"]
             d_email = form.cleaned_data["email"]
             ds_template = form.cleaned_data.get("template_id")
             print(ds_template, d_name, d_email)
             # Fetch the template name based on the ID
-            template = get_object_or_404(DocuSignTemplate, template_id=ds_template)
+            template = form.cleaned_data["template_name"]
             template_name = template.template_name if template else "Unknown Template"
             envelope_args = {
                 "signer_email": d_email,

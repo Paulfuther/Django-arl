@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 import logging
 from dotenv import load_dotenv
-
+import socket
 load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -59,7 +59,7 @@ LOGGING = {
     'loggers': {
         'django': {
             'handlers': ['file', 'console'], # Use both file and console
-            'level': 'DEBUG', # Change to INFO or higher
+            'level': 'ERROR', # Change to INFO or higher
             'propagate': True,
         },
         '': { # Catch-all logger for other applications
@@ -190,7 +190,10 @@ TIME_ZONE = "America/New_York"
 
 USE_TZ = True
 
-
+if socket.gethostname() == "":
+    SITE_URL = "https://www.1553690ontarioinc.com"
+else:
+    SITE_URL = "http://127.0.0.1:8000"  # Local development
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
@@ -275,6 +278,8 @@ SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
 MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER")
 SENDGRID_NEWHIRE_ID = os.environ.get("SENDGRID_NEWHIRE_ID")
 SENDGRID_NEW_HIRE_FILE_ID = os.environ.get("SENDGRID_NEW_HIRE_FILE_ID")
+SENDGRID_SENDER_VERIFICATION_URL = os.environ.get("SENDGRID_SENDER_VERIFICATION_URL")
+
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
@@ -288,8 +293,17 @@ EMAIL_USE_TLS = True
 BACKUP_FILE_PATH = os.environ.get("BACKUP_FILE_PATH_DEV")
 BACKUP_DUMP_PATH = os.environ.get("BACKUP_DUMP_PATH_DEV")
 
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY_DEV")
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET_DEV")
+STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
 
 
+# STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY")
+# STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET")
+# STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
+
+
+BASE_URL = "https://de31-2607-fea8-2840-b200-3990-38a-44a9-269a.ngrok-free.app"
 
 try:
     from .local_settings import *

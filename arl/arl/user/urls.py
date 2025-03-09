@@ -5,11 +5,16 @@ from .views import (CheckPhoneNumberUniqueView, RegisterView,
                     TaskResultListView, admin_verification_page,
                     check_verification, fetch_managers, home_view, login_view,
                     logout_view, request_verification, verification_page,
-                    verify_twilio_phone_number, phone_format)
+                    verify_twilio_phone_number, phone_format,
+                    EmployerRegistrationView, landing_page,
+                    hr_invite_new_hire, approve_employer,
+                    reject_employer)
+from django.views.generic import TemplateView
+
 
 urlpatterns = [
-    path("", login_view, name="home"),
-    path("register", RegisterView.as_view(), name="register"),
+    path("login", login_view, name="login"),
+    path("register/<str:token>/", RegisterView.as_view(), name="register"),
     path(
         "check_phone_number_unique/",
         CheckPhoneNumberUniqueView.as_view(),
@@ -54,4 +59,12 @@ urlpatterns = [
     path('task-results/', TaskResultListView.as_view(), name='task_results'),
     path('verify-phone/<str:phone_number>/', verify_twilio_phone_number, name='verify_twilio_phone'),
     path('phone-format/', phone_format, name='phone_format'),
+    path("register-employer/", EmployerRegistrationView.as_view(), name="register_employer"),
+    path("registration-success/",
+         TemplateView.as_view(template_name="user/employer_success.html"),
+         name="employer_registration_success"),
+    path("", landing_page, name="landing"),
+    path("hr/invite/", hr_invite_new_hire, name="hr_invite"),
+    path("approve-employer/<int:pk>/", approve_employer, name="approve_employer"),
+    
 ]
