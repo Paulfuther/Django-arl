@@ -302,7 +302,7 @@ STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
 # STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET")
 # STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
 
-
+# BASE URL DEV
 BASE_URL = "https://de31-2607-fea8-2840-b200-3990-38a-44a9-269a.ngrok-free.app"
 
 try:
