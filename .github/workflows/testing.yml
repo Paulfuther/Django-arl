@@ -4,11 +4,11 @@ on:
   push:
     branches:
       - dev-v1.0.01
-      - multi-tenant-integration
+      - Multi-tenant-integration
   pull_request:
     branches:
       - dev-v1.0.01
-      - multi-tenant-integration
+      - Multi-tenant-integration
 
 jobs:
   build:
