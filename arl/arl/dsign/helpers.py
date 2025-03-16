@@ -86,11 +86,18 @@ def create_docusign_envelope(envelope_args):
     try:
         access_token = get_access_token().access_token
         print("access token :", access_token)
-        template = DocuSignTemplate.objects.get(
-            template_id=envelope_args["template_id"]
-        )
+        
+        template = envelope_args["template_id"]
+        
         print("template :", template)
-        template_name = template.template_name if template else "Default Template Name"
+        if isinstance(template, str):  
+            template = DocuSignTemplate.objects.filter(template_id=template).first()
+
+        if not template:
+            print("⚠️ No matching template found. Using default name.")
+            template_name = "Default Template Name"
+        else:
+            template_name = template.template_name
         email_subject = f"{envelope_args['signer_name']} - {template_name}"
         print("template name: ", template_name)
         # Create the envelope definition

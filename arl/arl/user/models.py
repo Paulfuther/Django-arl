@@ -17,7 +17,7 @@ class Employer(models.Model):
     # Add any additional fields for the employer
     email = models.EmailField(null=True, blank=True)  # No unique=True
     address = models.CharField(max_length=100, null=True)
-    address_two = models.CharField(max_length=100, null=True)
+    address_two = models.CharField(max_length=100, null=True, blank=True)
     city = models.CharField(max_length=100, null=True)
     state_province = models.CharField(max_length=100, null=True)
     country = CountryField(null=True)
@@ -45,21 +45,11 @@ class Employer(models.Model):
         help_text="This is the full email generated based on your input."
     )
     is_active = models.BooleanField(default=False)
+    subscription_id = models.CharField(max_length=255, blank=True, null=True)
 
     def save(self, *args, **kwargs):
-        """Automatically generate the full verified sender email using senior_contact_name before saving."""
-        if self.senior_contact_name:
-            self.verified_sender_local = self.senior_contact_name.lower().replace(" ", "").replace(".", "")
-        else:
-            self.verified_sender_local = None  # Clear if there's no senior_contact_name
-
-        if self.verified_sender_local:
-            self.verified_sender_email = f"{self.verified_sender_local}@1553690ontarioinc.com"
-        else:
-            self.verified_sender_email = None  # Ensure this field is cleared if no local is set
-
         super().save(*args, **kwargs)
-        
+
     def __str__(self):
         return self.name
 
@@ -274,7 +264,7 @@ class NewHireInvite(models.Model):
     employer = models.ForeignKey("user.Employer", on_delete=models.CASCADE, related_name="invites")
     email = models.EmailField(unique=True)
     name = models.CharField(max_length=255)
-    role = models.CharField(max_length=100, choices=[("CSR", "CSR"), ("HR", "HR"), ("Manager", "Manager")])
+    role = models.CharField(max_length=100, choices=[("GSA", "GSA"), ("HR", "HR"), ("Manager", "Manager")])
     token = models.CharField(max_length=64, unique=True, default=generate_random_token)
     created_at = models.DateTimeField(auto_now_add=True)
     used = models.BooleanField(default=False)

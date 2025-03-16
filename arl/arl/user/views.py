@@ -38,7 +38,8 @@ from arl.dsign.models import DocuSignTemplate
 from .helpers import send_new_hire_invite
 import stripe
 import logging
-
+import os
+from twilio.rest import Client
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +84,7 @@ class RegisterView(FormView):
             save_user_to_db.delay(**serialized_data)
             messages.success(
                 self.request,
-                "Thank you for registering. Please check your email for your New Hire File from Docusign.",
+                "Thank you for registering. Check your email for a new hire file from Docusign.",
             )
             return redirect("home")
 
@@ -172,10 +173,21 @@ def handle_new_hire_registration(sender, instance, created, **kwargs):
         return  # Exit early if the user was just updated
 
     try:
-        # Assign user to "GSA" group
-        gsa_group, _ = Group.objects.get_or_create(name="GSA")
-        instance.groups.add(gsa_group)
-        # Get Employer
+        # ✅ Find the invite that was used for registration
+        invite = NewHireInvite.objects.filter(email=instance.email, used=False).first()
+
+        if invite:
+            role = invite.role  # ✅ Assign the role from the invite
+            invite.used = True  # ✅ Mark the invite as used
+            invite.save()
+        else:
+            print(f"❌ No invite found for {instance.email}. Defaulting to GSA.")
+            role = "GSA"  # Default role if no invite is found
+
+        # ✅ Assign the user to the correct group based on the role
+        role_group, _ = Group.objects.get_or_create(name=role)
+        instance.groups.add(role_group)
+        print(f"✅ User {instance.email} assigned to group: {role}")
         # ✅ Get Employer
         employer = instance.employer
         if not employer:
@@ -212,6 +224,7 @@ def handle_new_hire_registration(sender, instance, created, **kwargs):
             ).first()
 
         template_id = docusign_template.template_id if docusign_template else None
+        print("Docusign Template id :", template_id)
         email_template = EmailTemplate.objects.filter(
             employers=employer, name="New_Hire_Onboarding"
         ).first()
@@ -637,7 +650,7 @@ def hr_invite_new_hire(request):
     employer = request.user.employer  # Get employer from logged-in user
 
     # ✅ Allow access if user is a Manager or Employer
-    if not employer or not request.user.groups.filter(name__in=["Manager", "Employer"]).exists():
+    if not employer or not request.user.groups.filter(name__in=["Manager", "EMPLOYER"]).exists():
         messages.error(request, "You must be an employer or manager to invite new hires.")
         return redirect("home")  # Redirect to home if unauthorized
 
@@ -676,6 +689,10 @@ def approve_employer(request, pk):
         messages.warning(request, "This request has already been processed.")
         return redirect("/admin/user/employerrequest/")
 
+    # ✅ Generate verified sender local & email
+    verified_sender_local_email = employer_request.verified_sender_local.lower().replace(" ", "").replace(".", "")
+    verified_sender_email = f"{verified_sender_local_email}@1553690ontarioinc.com"
+
     # ✅ Create an Employer instance
     employer, created = Employer.objects.get_or_create(
         name=employer_request.name,
@@ -687,12 +704,17 @@ def approve_employer(request, pk):
             "state_province": employer_request.state_province,
             "country": employer_request.country,
             "senior_contact_name": employer_request.senior_contact_name,
+            "verified_sender_local": verified_sender_local_email,  # ✅ Add local sender
+            "verified_sender_email": verified_sender_email,  # ✅ Add verified sender email
             "is_active": False,
         }
     )
     # ✅ If the employer already exists, update missing fields
     if not created:
-        for field in ["email", "phone_number", "address", "city", "state_province", "country", "senior_contact_name"]:
+        for field in [
+            "email", "phone_number", "address", "city", "state_province",
+            "country", "senior_contact_name", "verified_sender_local", "verified_sender_email"
+        ]:
             if getattr(employer, field) is None and getattr(employer_request, field):
                 setattr(employer, field, getattr(employer_request, field))
         employer.save()
@@ -709,7 +731,7 @@ def approve_employer(request, pk):
     )
 
     # ✅ Send email with payment link
-    send_payment_email_task.delay(employer.email, checkout_session.url)
+    send_payment_email_task.delay(employer.email, checkout_session.url, employer.name)
 
     # ✅ Update request status
     employer_request.status = "approved"
@@ -735,3 +757,21 @@ def reject_employer(request, pk):
     return redirect("/admin/user/employerrequest/")
 
 
+@login_required
+def close_twilio_sub(request, subaccount_sid):
+    """
+    View to close a Twilio subaccount.
+    """
+    account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+    
+    if not account_sid or not auth_token:
+        return HttpResponse("❌ Twilio credentials not found.", status=400)
+
+    try:
+        client = Client(account_sid, auth_token)
+        account = client.api.v2010.accounts(subaccount_sid).update(status="closed")
+        return HttpResponse(f"✅ Twilio subaccount {subaccount_sid} closed successfully.", status=200)
+    
+    except Exception as e:
+        return HttpResponse(f"❌ Error closing Twilio subaccount: {str(e)}", status=500)

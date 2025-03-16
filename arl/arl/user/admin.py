@@ -532,7 +532,7 @@ class EmployerSMSTaskAdmin(admin.ModelAdmin):
 
 @admin.register(TenantApiKeys)
 class TenantApiKeysAdmin(admin.ModelAdmin):
-    list_display = ("employer", "account_sid", "phone_number", "sender_email", "status", "created_at")
+    list_display = ("employer", "account_sid", "phone_number", "verified_sender_email", "status", "created_at")
     search_fields = ("employer__name", "service_name", "account_sid", "sender_email")
 
 
@@ -564,7 +564,7 @@ class EmployerSettingsAdmin(admin.ModelAdmin):
 
 @admin.register(Employer)
 class EmployerAdmin(admin.ModelAdmin):
-    list_display = ["name", "email", "is_active", "toggle_active_button"]
+    list_display = ["name", "email", "is_active", "verified_sender_email", "toggle_active_button"]
     actions = ["activate_selected", "deactivate_selected"]
     search_fields = ("name", "phone_number", "verified_sender_local", "verified_sender_email", "senior_contact_name")
     readonly_fields = ("verified_sender_email",)  # Prevent editing full email
@@ -662,7 +662,6 @@ class EmployerRequestAdmin(admin.ModelAdmin):
         return redirect("/admin/user/employerrequest/")
 
     approve_selected_requests.short_description = "Approve selected employer requests"
-
 
 
 admin.site.register(EmployerRequest, EmployerRequestAdmin)

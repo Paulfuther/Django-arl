@@ -9,14 +9,14 @@ class DocuSignTemplate(models.Model):
         related_name="docusign_templates",
         help_text="Employer associated with this template",
     )
-    template_id = models.CharField(max_length=100, unique=True)
+    template_id = models.CharField(max_length=100)
     template_name = models.CharField(max_length=255)
 
     class Meta:
         unique_together = ("employer", "template_id")  # Ensure uniqueness per employer
 
     def __str__(self):
-        return f"{self.template_name} ({self.employer})"
+        return f"{self.template_name} (Employer: {self.employer})"
 
 
 class ProcessedDocsignDocument(models.Model):

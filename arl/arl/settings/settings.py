@@ -59,7 +59,7 @@ LOGGING = {
     'loggers': {
         'django': {
             'handlers': ['file', 'console'], # Use both file and console
-            'level': 'ERROR', # Change to INFO or higher
+            'level': 'INFO', # Change to INFO or higher
             'propagate': True,
         },
         '': { # Catch-all logger for other applications
@@ -279,7 +279,7 @@ MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER")
 SENDGRID_NEWHIRE_ID = os.environ.get("SENDGRID_NEWHIRE_ID")
 SENDGRID_NEW_HIRE_FILE_ID = os.environ.get("SENDGRID_NEW_HIRE_FILE_ID")
 SENDGRID_SENDER_VERIFICATION_URL = os.environ.get("SENDGRID_SENDER_VERIFICATION_URL")
-
+SENDGRID_EMPLOYER_REGISTER_AS_USER = os.environ.get("SENDGRID_EMPLOYER_REGISTER_AS_USER")
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
@@ -303,7 +303,7 @@ STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
 # STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
 
 # BASE URL DEV
-BASE_URL = "https://de31-2607-fea8-2840-b200-3990-38a-44a9-269a.ngrok-free.app"
+BASE_URL = "https://bdb0-2607-fea8-2840-b200-79f0-4773-6079-2c28.ngrok-free.app"
 
 try:
     from .local_settings import *

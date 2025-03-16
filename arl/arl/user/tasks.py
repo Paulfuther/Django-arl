@@ -117,22 +117,14 @@ def save_user_to_db(**kwargs):
 
 
 @app.task(name="send_payment_email")
-def send_payment_email_task(to_email, payment_link):
+def send_payment_email_task(to_email, payment_link, employer_name):
     """Send an email with the Stripe payment link using the master email function."""
     sendgrid_id = "d-e31a2d72f8b145de98ba8d9fa267bc04"  # 🔹 Use your SendGrid template ID
     try:
-        # ✅ Find the user by email
-        user = CustomUser.objects.select_related("employer").filter(email=to_email).first()
-        
-        if not user or not user.employer:
-            employer_name = "Your Company"  # Default if employer not found
-        else:
-            employer_name = user.employer.name  # ✅ Get employer name
-
-        # ✅ Template data with employer name
+        # ✅ Use the employer name passed from the approval process
         template_data = {
             "payment_link": payment_link,
-            "name": employer_name,  # Pass employer's name
+            "name": employer_name,  # ✅ Ensure we use the correct employer name
             "subject": "Complete Your Registration - Payment Required",
             "body": f"'{payment_link}'"
         }
@@ -143,4 +135,3 @@ def send_payment_email_task(to_email, payment_link):
     except Exception as e:
         print(f"❌ Error sending payment email: {str(e)}")
         return False
-

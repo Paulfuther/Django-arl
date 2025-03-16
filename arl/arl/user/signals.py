@@ -7,15 +7,17 @@ from django.conf import settings
 
 
 from arl.user.models import EmployerRequest
-
+from arl.setup.tasks import setup_twilio_for_employer
 from arl.user.sendgrid_helpers import add_sendgrid_verified_sender
-from arl.user.twilio_helpers import create_twilio_subaccount
+
 
 logger = logging.getLogger(__name__)
 SENDGRID_API_KEY = settings.SENDGRID_API_KEY
 SENDGRID_SENDER_VERIFICATION_URL = settings.SENDGRID_SENDER_VERIFICATION_URL
 
 
+# Once you approve a request from the employer request model
+# a new Employer is created
 @receiver(post_save, sender=Employer)
 def handle_new_employer(sender, instance, created, **kwargs):
     """
@@ -35,7 +37,7 @@ def handle_new_employer(sender, instance, created, **kwargs):
     # ✅ Add SendGrid Verified Sender
     if add_sendgrid_verified_sender(instance):
         # ✅ Proceed with Twilio setup **only if SendGrid is successful**
-        create_twilio_subaccount(instance)
+        setup_twilio_for_employer.delay(instance.id)
 
 
 @receiver(post_save, sender=EmployerRequest)

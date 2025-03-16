@@ -1,5 +1,9 @@
 from django.db import models
 from arl.user.models import Employer
+from twilio.rest import Client
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class TenantApiKeys(models.Model):
@@ -26,4 +30,4 @@ class TenantApiKeys(models.Model):
     updated_at = models.DateTimeField(auto_now=True)  # Tracks updates
 
     def __str__(self):
-        return f"{self.employer.name} - Twilio & SendGrid Keys"
+        return f"API Keys for {self.employer.name}"

@@ -8,7 +8,7 @@ from .views import (CheckPhoneNumberUniqueView, RegisterView,
                     verify_twilio_phone_number, phone_format,
                     EmployerRegistrationView, landing_page,
                     hr_invite_new_hire, approve_employer,
-                    reject_employer)
+                    reject_employer, close_twilio_sub)
 from django.views.generic import TemplateView
 
 
@@ -66,5 +66,7 @@ urlpatterns = [
     path("", landing_page, name="landing"),
     path("hr/invite/", hr_invite_new_hire, name="hr_invite"),
     path("approve-employer/<int:pk>/", approve_employer, name="approve_employer"),
+    path("close-twilio-sub/<str:subaccount_sid>", close_twilio_sub, name = "close_twilio_sub"),
+   
     
 ]

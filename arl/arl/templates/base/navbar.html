@@ -21,9 +21,12 @@
           <a class="nav-link" href="{% url 'logout' %}">Logout</a>
         </li>
       
+        
         <li class="nav-item">
-          <a class="nav-link" href="{% url 'hr_invite' %}">Invite</a>
+          <a class="nav-link" href="{% url 'hr_invite' %}">HR</a>
         </li>
+        
+
         {% if user.is_dropbox %}
         <li class="nav-item">
           <a class="nav-link" href="{% url 'list_folders' %}">Dropbox</a>

@@ -2,10 +2,12 @@ import logging
 import traceback
 from django.http import JsonResponse
 from django.conf import settings
-from arl.user.models import Employer
+from arl.user.models import Employer, NewHireInvite
+from arl.msg.helpers import create_master_email
 from django.views.decorators.csrf import csrf_exempt
 import stripe
 from django.shortcuts import render
+from django.utils.crypto import get_random_string
 
 logger = logging.getLogger("django")
 
@@ -70,6 +72,42 @@ def stripe_webhook(request):
             employer.is_active = True
             employer.subscription_id = session.get("subscription")  # Store subscription ID if available
             employer.save()
+            
+
+            # ✅ Check if an invite already exists
+            existing_invite = NewHireInvite.objects.filter(email=customer_email, used=False).first()
+            if not existing_invite:
+                # 🔹 Create a unique invite token
+                invite_token = get_random_string(64)
+                invite = NewHireInvite.objects.create(
+                    employer=employer,
+                    email=customer_email,
+                    name=employer.name,
+                    role="EMPLOYER",
+                    token=invite_token
+                )
+
+                print(f"📩 Invite Created! Use this link: /register/{invite.token}/")
+
+
+            # ✅ Send email using SendGrid template
+            sendgrid_template_id = settings.SENDGRID_EMPLOYER_REGISTER_AS_USER
+            # ✅ Generate an invite link for the employer
+            invite_link = f"{settings.SITE_URL}/register/employer/"  # Ensure this URL is correct
+            email_data = {
+                "to_email": employer.email,
+                "sendgrid_id": sendgrid_template_id,
+                "template_data": {
+                    "employer_name": employer.name,
+                    "invite_link": invite_link,
+                    "sender_contact_name": "Support Team",
+                },
+                "verified_sender": employer.verified_sender_email,
+            }
+
+            create_master_email(**email_data)  # ✅ Send email using helper function
+            print(f"✅ Employer registration email sent to {employer.email}")
+
         else:
             print(f"⚠️ No employer found with email: {customer_email}")
 

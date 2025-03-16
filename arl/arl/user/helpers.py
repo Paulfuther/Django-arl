@@ -20,11 +20,11 @@ def send_new_hire_invite(new_hire_email, new_hire_name, role, start_date, employ
         # ✅ Ensure the employer has a verified sender
         # ✅ Retrieve verified sender email from TenantApiKeys
         tenant_api_key = TenantApiKeys.objects.filter(employer=employer).first()
-        verified_sender = tenant_api_key.sender_email if tenant_api_key else settings.MAIL_DEFAULT_SENDER
+        verified_sender = tenant_api_key.verified_sender_email if tenant_api_key else settings.MAIL_DEFAULT_SENDER
         if not verified_sender:
             print(f"❌ Employer {employer.name} does not have a verified sender email.")
             return False
-
+        print("Verified sender email :", verified_sender)
         # ✅ Check if an invite already exists for this email
         invite, created = NewHireInvite.objects.get_or_create(
             employer=employer,
@@ -56,7 +56,7 @@ def send_new_hire_invite(new_hire_email, new_hire_name, role, start_date, employ
             "invite_link": invite_link,
             "sender_contact_name": employer.senior_contact_name or "HR Team",
         }
-
+        print("Template Data :", template_data)
         # ✅ Call the master email function
         return create_master_email(
             to_email=new_hire_email,

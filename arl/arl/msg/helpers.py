@@ -79,22 +79,26 @@ def create_master_email(to_email, sendgrid_id, template_data, attachments=None, 
         if isinstance(to_email, str):
             to_email = [to_email]  # Convert single email to list
         print(f"📧 The helper is sending email to: {', '.join(to_email)}")
-        user_email = to_email[0] if isinstance(to_email, list) and to_email else to_email 
-        try:
-            user = CustomUser.objects.get(email=user_email)
-            employer = user.employer
-            print(f"✅ Found user: {user.email}, Employer: {employer}")
-        except CustomUser.DoesNotExist:
-            print(f"❌ No user found with email {user_email}. Using default sender.")
-            sender_email = settings.MAIL_DEFAULT_SENDER
+        # ✅ If `verified_sender` is explicitly provided, use it without any lookup
+        if verified_sender:
+            sender_email = verified_sender
+            print(f"✅ Using explicitly provided sender email: {verified_sender}")
         else:
-            # ✅ Retrieve the sender email from the Tenant API Key model
-            tenant_api_key = TenantApiKeys.objects.filter(employer=employer).first()
-            sender_email = tenant_api_key.sender_email if tenant_api_key else settings.MAIL_DEFAULT_SENDER
+            # ✅ Look up the employer and their verified sender email
+            user_email = to_email[0] if isinstance(to_email, list) and to_email else to_email
+            try:
+                user = CustomUser.objects.get(email=user_email)
+                employer = user.employer
+                print(f"✅ Found user: {user.email}, Employer: {employer}")
+            except CustomUser.DoesNotExist:
+                print(f"❌ No user found with email {user_email}. Using default sender.")
+                sender_email = settings.MAIL_DEFAULT_SENDER
+            else:
+                # ✅ Retrieve the sender email from the Tenant API Key model
+                tenant_api_key = TenantApiKeys.objects.filter(employer=employer).first()
+                sender_email = tenant_api_key.verified_sender_email if tenant_api_key else settings.MAIL_DEFAULT_SENDER
 
-        print(f"📧 Using sender email: {sender_email}")
-
-        
+        print(f"📧 Final sender email: {sender_email}")
         # Initialize the email message
         message = Mail(
             from_email=sender_email,
