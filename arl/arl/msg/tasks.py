@@ -51,10 +51,11 @@ def master_email_send_task(recipients, sendgrid_id, attachments=None, employer_i
         # ✅ Retrieve employer-specific sender
         if employer_id:
             employer = Employer.objects.filter(id=employer_id).first()
+            print("Employer :", employer)
             if employer:
                 tenant_api_key = TenantApiKeys.objects.filter(employer=employer).first()
-                if tenant_api_key and tenant_api_key.sender_email:
-                    verified_sender = tenant_api_key.sender_email  # ✅ Set verified sender
+                if tenant_api_key and tenant_api_key.verified_sender_email:
+                    verified_sender = tenant_api_key.verified_sender_email  # ✅ Set verified sender
 
         print(f"📧 Using verified sender: {verified_sender}")
 
@@ -64,13 +65,18 @@ def master_email_send_task(recipients, sendgrid_id, attachments=None, employer_i
             try:
                 email = recipient.get("email")
                 name = recipient.get("name")
+                senior_contact_name = employer.senior_contact_name
+                company_name = employer.name
 
                 if not email:
                     print(f"Skipping recipient with no email: {recipient}")
                     continue  # Skip if no email is provided
 
                 # ✅ Ensure name is part of `template_data`
-                template_data = {"name": name}  # Add more dynamic values if needed
+                template_data = {
+                    "name": name,
+                    "senior_contact_name": senior_contact_name,
+                    "company_name": company_name}  # Add more dynamic values if needed
 
                 # ✅ Pass `verified_sender` directly to `create_master_email`
                 success = create_master_email(
@@ -282,7 +288,7 @@ def send_one_off_bulk_sms_task(group_id, message, user_id):
     twilio_keys = TenantApiKeys.objects.filter(
         employer=employer, is_active=True
     ).values("account_sid", "auth_token", "notify_service_sid").first()
-
+    print("Employer, Twilio keys :", employer, twilio_keys)
     if not twilio_keys:
         logger.error(f"🚨 No active Twilio credentials for employer: {employer.name}. SMS not sent.")
         return

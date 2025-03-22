@@ -2,26 +2,37 @@ from __future__ import absolute_import, unicode_literals
 
 import logging
 from datetime import datetime, timedelta
-
+import json
 from django.conf import settings
 from django.db.models import Q
 from docusign_esign import ApiClient, EnvelopesApi
 from docusign_esign.client.api_exception import ApiException
-
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 from arl.celery import app
-
+from arl.bucket.helpers import upload_to_linode_object_storage
 from arl.dsign.models import DocuSignTemplate, ProcessedDocsignDocument
 from arl.msg.tasks import send_bulk_sms
 from arl.user.models import CustomUser
-
+from arl.dsign.models import SignedDocumentFile
+from django.db import IntegrityError
+from arl.setup.models import TenantApiKeys, Employer
+from django.contrib.auth import get_user_model
 from .helpers import (create_docusign_envelope,
                       create_docusign_envelope_new_hire_quiz, get_access_token,
                       get_docusign_envelope, get_docusign_envelope_quiz,
                       get_docusign_template_name_from_template,
                       get_template_id, get_waiting_for_others_envelopes,
                       parse_sent_date_time)
+import uuid
+import zipfile
+from io import BytesIO
+import os
+
+
 
 logger = logging.getLogger(__name__)
+User = get_user_model()
 
 
 def get_template_name(template_id):
@@ -394,169 +405,289 @@ def get_outstanding_docs():
         return []
 
 
+def extract_recipient_email(payload):
+    """Extracts recipient email, falls back to sender email if unavailable."""
+    recipient_email = (
+        payload.get("data", {})
+        .get("recipients", {})
+        .get("signers", [{}])[0]
+        .get("email", "")
+    )
+    
+    # Fallback to sender email if no recipient email is found
+    if not recipient_email:
+        recipient_email = payload.get("data", {}).get("sender", {}).get("email", "")
+
+    return recipient_email
+
 @app.task(name="docusign_webhook")
 def process_docusign_webhook(payload):
-    envelope_id = payload.get("data", {}).get("envelopeId", "")
-    if not envelope_id:
-        logging.error("Envelope ID not found in the payload.")
-        return
-    # Assuming get_template_id is defined to extract
-    # the template ID from the payload
-    template_id = get_template_id(payload)
-    if not template_id:
-        print("No Template ID found.")
-        return
-    else:
-        print(f"Template ID: {template_id}")
-    # Use the envelopeId to get the template name
-    template_name = get_docusign_template_name_from_template(template_id)
-    print(f"template name is:  {template_name}")
-    # Extract status and envelope summary from the payload
-    status = payload.get("event", "")
-    print(f"Status: {status}")
-    envelope_summary = payload.get("data", {}).get("envelopeSummary", {})
-    recipients = envelope_summary.get("recipients", {})
-    signers = recipients.get("signers", [])
-    recipient = signers[0]  # Assuming the first signer is
-    recipient_email = recipient.get("email", "")
-    if status == "envelope-sent":
+    """Handles DocuSign Webhook events for sent, signed, and template saved documents."""
+    try:
+        event_type = payload.get("event")
+        envelope_id = payload.get("data", {}).get("envelopeId", "")
+        template_id = get_template_id(payload)
+        template_name = get_docusign_template_name_from_template(template_id)
+        logger.info(f"📄 Template Name: {template_name}")
 
-        recipients = envelope_summary.get("recipients", {})
-        signers = recipients.get("signers", [])
-        if signers:
-            print(f"Template Name second time: {template_name}")
+        envelope_summary = payload.get("data", {}).get("envelopeSummary", {})
+        signers = envelope_summary.get("recipients", {}).get("signers", [])
 
-            recipient = signers[0]  # Assuming the first signer is
-            # the recipient
-            recipient_email = recipient.get("email", "")
+        if not signers:
+            logger.error("❌ No signers found in the payload.")
+            return {"error": "No signers found"}
 
-            # Optionally, fetch and print the recipient user's details
-            # from CustomUser model
-            try:
-                user = CustomUser.objects.get(email=recipient_email)
-                full_name = user.get_full_name()
+        recipient_email = signers[0].get("email", "")
+        
+        print("recipeitn email :", recipient_email)
+        # ✅ Fallback to sender email if recipient is empty
+        if not recipient_email:
+            recipient_email = payload.get("data", {}).get("sender", {}).get("email", "")
 
-                # print("fullname", full_name)
-                # print(f"{template_name} sent to:
-                # # {full_name} at {recipient_email}")
-                hr_users = CustomUser.objects.filter(
-                    Q(is_active=True) & Q(groups__name="dsign_sms")
-                ).values_list("phone_number", flat=True)
-                message_body = (
-                    f"{template_name} sent to: {full_name} at "
-                    f"{recipient_email}"
+        if not envelope_id or not recipient_email:
+            logger.error(f"❌ Missing envelope ID or recipient email: {envelope_id}, {recipient_email}")
+            return {"error": "Invalid payload"}
+
+        # ✅ Handle "templateSaved" event
+        if event_type == "templateSaved":
+            template_id = payload.get("templateId")
+            user_email = payload.get("userEmail")  # The user who created the template
+            if template_id and user_email:
+                handle_template_saved_task.delay(template_id, user_email)
+                return {"status": "template saved task triggered"}
+
+        if event_type == "envelope-sent":
+            handle_envelope_sent(recipient_email, template_name)  # 🚀 Pass extracted template_name
+            return {"status": "envelope-sent task triggered"}
+
+        # ✅ Handle "recipient-completed" event
+        if event_type == "recipient-completed":
+            return handle_recipient_completed(envelope_id, recipient_email, template_id, template_name)
+
+        logger.info(f"ℹ️ Unhandled DocuSign event type: {event_type}")
+        return {"status": "ignored"}
+
+    except json.JSONDecodeError:
+        logger.error("❌ Invalid JSON payload")
+        return {"error": "Invalid JSON payload"}
+    except Exception as e:
+        logger.error(f"❌ Error processing DocuSign webhook: {str(e)}")
+        return {"error": str(e)}
+    
+
+# ✅ Handles the "templateSaved" event
+def handle_template_saved(template_id, user_email):
+    if not template_id or not user_email:
+        logger.error("❌ Missing templateId or userEmail in templateSaved event.")
+        return {"error": "Missing templateId or userEmail"}
+
+    try:
+        user = User.objects.get(email=user_email)
+        if user and user.employer:
+            # Prevent duplicate template entries
+            if not DocuSignTemplate.objects.filter(template_id=template_id, employer=user.employer).exists():
+                DocuSignTemplate.objects.create(
+                    employer=user.employer,
+                    template_id=template_id,
+                    name=f"Template {template_id}",
+                    created_by=user
                 )
-                send_bulk_sms(hr_users, message_body)
-                logger.info(
-                    f"Sent SMS for 'sent' status to HR:{full_name}"
-                    f" {message_body}"
-                )
-                return (
-                    f"Sent SMS for 'sent' status to HR: {full_name}"
-                    f" {template_name} {message_body}"
-                )
+                logger.info(f"✅ Template {template_id} saved for employer {user.employer}")
+            else:
+                logger.info(f"ℹ️ Template {template_id} already exists for employer {user.employer}")
+        return {"status": "success"}
+    except User.DoesNotExist:
+        logger.error(f"❌ User with email {user_email} not found")
+        return {"error": "User not found"}
 
-            except CustomUser.DoesNotExist:
-                logging.error(
-                    f"User with email {recipient_email} "
-                    f"not found in the database."
-                )
-            except Exception as e:
-                logging.error(f"Error processing recipient data: {e}")
 
-    elif status == "recipient-completed":
-        # Check if the document is a Standard Release and exit if it is
-        if "Standard Release" in template_name:
-            print(
-                f"Processed Standard Release for {recipient_email}"
-                f", no further action."
+def handle_envelope_sent(recipient_email, template_name):
+    """Handles document sent events and notifies HR via SMS."""
+    try:
+        if not recipient_email or not template_name:
+            logger.error(f"❌ Missing recipient_email or template_name: {recipient_email}, {template_name}")
+            return {"error": "Missing recipient email or template name"}
+
+        # ✅ Fetch user to determine employer
+        user = CustomUser.objects.filter(email=recipient_email).select_related("employer").first()
+        if not user:
+            logger.error(f"❌ User with email {recipient_email} not found.")
+            return {"error": "User not found"}
+
+        employer = user.employer
+        if not employer:
+            logger.error(f"❌ Employer not found for user {user.email}.")
+            return {"error": "Employer not found"}
+
+        # ✅ Notify HR
+        notify_hr.delay(template_name, user.get_full_name(), recipient_email, employer.id, event_type="sent")
+
+        logger.info(f"📨 Sent HR notification for envelope sent: {template_name} to {recipient_email}")
+        return {"status": "HR notified"}
+
+    except Exception as e:
+        logger.error(f"❌ Error in handle_envelope_sent: {str(e)}")
+        return {"error": str(e)}
+
+
+# ✅ Handles "recipient-completed" event
+def handle_recipient_completed(envelope_id, recipient_email,
+                               template_id, template_name):
+    """Handles recipient completion events by saving the signed document."""
+    try:
+        # ✅ Fetch user
+        user = CustomUser.objects.filter(email=recipient_email).select_related("employer").first()
+        print("user :", user)
+        if not user:
+            logger.error(f"❌ User with email {recipient_email} not found.")
+            return {"error": "User not found"}
+
+        # ✅ Ensure employer exists
+        employer = user.employer
+        if not employer:
+            logger.error(f"❌ Employer not found for user {user.email}.")
+            return {"error": "Employer not found"}
+
+        # ✅ Save the processed document
+        try:
+            processed_doc = ProcessedDocsignDocument.objects.create(
+                envelope_id=envelope_id,
+                template_name=template_name,
+                user=user,
+                employer=employer
             )
+            logger.info(f"✅ Saved signed document: {processed_doc}")
+        except IntegrityError as e:
+            logger.error(f"❌ Error saving signed document: {str(e)}")
+            return {"error": "Database integrity error"}
+        
+        user_id = user.id
+        employer_id = employer.id
+
+        fetch_and_upload_signed_documents.delay(envelope_id, user_id,
+                                                employer_id, template_name)
+        # ✅ Notify HR via SMS (uses the correct Twilio API keys)
+        notify_hr.delay(template_name, user.get_full_name(), recipient_email,
+                        employer.id, event_type="completed")
+
+        return {"status": "success", "document_id": processed_doc.id}
+
+    except Exception as e:
+        logger.error(f"❌ Error in handle_recipient_completed: {str(e)}")
+        return {"error": str(e)}
+
+
+# ✅ Sends SMS notifications to HR using the correct Twilio API keys
+@app.task(name="notify_hr_task")
+def notify_hr(template_name, full_name, recipient_email,
+              employer_id, event_type):
+    try:
+        employer = Employer.objects.get(id=employer_id)
+        logger.info(f"🔹 Employer found: {employer.name}")
+
+        # ✅ Retrieve the Twilio credentials for the employer
+        try:
+            tenant_keys = TenantApiKeys.objects.get(employer=employer)
+            twilio_account_sid = tenant_keys.account_sid
+            twilio_auth_token = tenant_keys.auth_token
+            twilio_notify_sid = tenant_keys.notify_service_sid
+            logger.info(f"✅ Retrieved Twilio keys for employer {employer.name}")
+
+        except TenantApiKeys.DoesNotExist:
+            logger.error(f"❌ No Twilio API keys found for employer {employer}. Skipping SMS.")
             return
 
-        try:
-            user = CustomUser.objects.get(email=recipient_email)
-        except CustomUser.DoesNotExist:
-            logging.error(
-                f"User with email {recipient_email} not found in the database."
-            )
-            return  # Optionally handle the case where the user doesn't exist
+        # ✅ Fetch HR users for this employer
+        hr_users = User.objects.filter(
+            Q(is_active=True) & Q(groups__name="dsign_sms"),
+            employer=employer
+        ).values_list("phone_number", flat=True)
 
-        full_name = user.get_full_name()
-        print(f"Template Name 3: {template_name}")
+        if not hr_users:
+            logger.warning(f"ℹ️ No HR users found for employer {employer}.")
+            return
 
-        if "New Hire File" in template_name:
-            # Check if the user has already completed a new hire file
-            user = CustomUser.objects.get(
-                email=recipient_email
-            )  # Assuming you have the user's email
-            full_name = user.get_full_name()
-            already_completed = ProcessedDocsignDocument.objects.filter(
-                user=user, template_name="New Hire File"
-            ).exists()
-            if not already_completed:
-                # Record this file to the db
-                ProcessedDocsignDocument.objects.create(
-                    user=user, envelope_id=template_id,
-                    template_name=template_name
-                )
-                # Logic to send another file called New Hire Quiz
-                # The quiz is not sent here.
-                # it is sent through a post save signal to the documents
-                # model
-
-                get_docusign_envelope(envelope_id, full_name, template_name)
-
-                print(f"New Hire Quiz needs to be sent to {user.email}")
-            else:
-                print("User has already completed a New Hire File.")
-
-            # get the file for uplad
-
-            hr_users = CustomUser.objects.filter(
-                Q(is_active=True) & Q(groups__name="dsign_sms")
-            ).values_list("phone_number", flat=True)
-
-            message_body = (
-                f"{template_name} completed by: {full_name} "
-                f"at {recipient_email}"
-            )
-            send_bulk_sms(hr_users, message_body)
-            logger.info(
-                f"Sent SMS for 'completed' status to HR: {full_name} "
-                f"{message_body}"
-            )
-            return (
-                f"Sent SMS for 'completed' status to HR: "
-                f"{full_name} {template_name} {message_body}"
-            )
+        # ✅ Determine message based on event type
+        if event_type == "sent":
+            message_body = f"DocuSign document '{template_name}' was sent to {recipient_email}"
         else:
-            # Record the completed non-new-hire file in
-            # ProcessedDocsignDocument
-            user = CustomUser.objects.get(email=recipient_email)
-            print(full_name, recipient_email)
-            ProcessedDocsignDocument.objects.create(
-                user=user, envelope_id=template_id, template_name=template_name
-            )
-            print(f"Recorded completed file {template_name} for {user.email}")
-            get_docusign_envelope_quiz(envelope_id, full_name, template_name)
-            hr_users = CustomUser.objects.filter(
-                Q(is_active=True) & Q(groups__name="dsign_sms")
-            ).values_list("phone_number", flat=True)
-            message_body = (
-                f"{template_name} completed by: {full_name} "
-                f"at {recipient_email}"
-            )
-            send_bulk_sms(hr_users, message_body)
-            logger.info(
-                f"Sent SMS for 'completed' status to HR:{full_name}"
-                f" {message_body}"
-            )
-            return (
-                f"Sent SMS for 'completed' status to HR: {full_name} "
-                f"{template_name} {message_body}"
-            )
+            message_body = f"{template_name} completed by: {full_name} at {recipient_email}"
 
-    print("Done.")
+        # ✅ Send SMS
+        success = send_bulk_sms(hr_users, message_body, twilio_account_sid, twilio_auth_token, twilio_notify_sid)
+
+        if success:
+            logger.info(f"📨 SMS sent successfully for 'completed' status: {message_body}")
+        else:
+            logger.error(f"❌ Failed to send SMS for 'completed' status: {message_body}")
+
+    except Employer.DoesNotExist:
+        logger.error(f"❌ Employer with ID {employer_id} not found.")
+    except Exception as e:
+        logger.error(f"❌ Unexpected error in notify_hr_task: {str(e)}")
+
+
+@app.task(name="handle_template_saved_task")
+def handle_template_saved_task(template_id, user_email):
+    """
+    Celery task to handle 'templateSaved' event and store the template.
+    """
+    if not template_id or not user_email:
+        logger.error("❌ Missing templateId or userEmail in templateSaved event.")
+        return {"error": "Missing templateId or userEmail"}
+
+    try:
+        user = User.objects.get(email=user_email)
+        if user and user.employer:
+            employer = user.employer
+
+            # ✅ Prevent duplicate template entries
+            if not DocuSignTemplate.objects.filter(template_id=template_id, employer=employer).exists():
+                DocuSignTemplate.objects.create(
+                    employer=employer,
+                    template_id=template_id,
+                    name=f"Template {template_id}",
+                    created_by=user
+                )
+                logger.info(f"✅ Template {template_id} saved for employer {employer.name}")
+            else:
+                logger.info(f"ℹ️ Template {template_id} already exists for employer {employer.name}")
+        
+        return {"status": "success"}
+
+    except User.DoesNotExist:
+        logger.error(f"❌ User with email {user_email} not found")
+        return {"error": "User not found"}
+    except Exception as e:
+        logger.error(f"❌ Error processing templateSaved event: {str(e)}")
+        return {"error": str(e)}
+    
+
+@app.task(name="upload_signed_document_to_linode")
+def upload_signed_document_to_linode(document_id):
+    """Uploads signed documents to Linode Object Storage."""
+    from .models import ProcessedDocsignDocument
+
+    try:
+        document = ProcessedDocsignDocument.objects.get(envelope_id=document_id)
+        employer_name = document.employer.name.replace(" ", "_")
+        object_key = f"DOCUMENTS/{employer_name}/{document.envelope_id}.pdf"
+
+        # Retrieve document (replace with actual method)
+        response = get_docusign_envelope(document.envelope_id)
+
+        if response.status_code == 200:
+            document_bytes = BytesIO(response.content)
+            upload_to_linode_object_storage(document_bytes, object_key)
+        else:
+            logger.error(f"Failed to fetch document from DocuSign for envelope {document.envelope_id}. Status: {response.status_code}")
+
+    except ProcessedDocsignDocument.DoesNotExist:
+        logger.error(f"❌ Document {document_id} not found.")
+
+
+# ======================================================== 
+# end of webhook functions
 
 
 @app.task(name="create_docusign_envelope")
@@ -610,3 +741,65 @@ def send_new_hire_quiz(envelope_args):
             f"Error creating Docusign New Hire Quiz for {signer_name}"
             f"envelope: {str(e)}"
         )
+
+
+# This is the FINAL version of the task to upload to linode.
+@app.task(name="fetch_and_upload_signed_documents")
+def fetch_and_upload_signed_documents(envelope_id, user_id, employer_id, template_name):
+    try:
+        user = CustomUser.objects.get(id=user_id)
+        employer = Employer.objects.get(id=employer_id)
+    except Exception as e:
+        logger.error(f"❌ User or employer not found: {e}")
+        return
+
+    try:
+        access_token = get_access_token().access_token
+        api_client = ApiClient()
+        api_client.host = settings.DOCUSIGN_API_CLIENT_HOST
+        api_client.set_default_header("Authorization", f"Bearer {access_token}")
+
+        envelopes_api = EnvelopesApi(api_client)
+
+        # ✅ Get the path to the zip file
+        zip_path = envelopes_api.get_document(
+            settings.DOCUSIGN_ACCOUNT_ID,
+            "archive",
+            envelope_id
+        )
+
+        logger.warning(f"📦 Zip file obtained at: {zip_path}")
+
+        # ✅ Read the file from disk
+        if isinstance(zip_path, str) and os.path.exists(zip_path):
+            with open(zip_path, "rb") as f:
+                zip_bytes = f.read()
+        else:
+            logger.error(f"❌ ZIP path not found or invalid: {zip_path}")
+            return
+
+        zip_buffer = BytesIO(zip_bytes)
+        folder_name = f"{uuid.uuid4().hex[:8]}"
+        upload_path_prefix = f"DOCUMENTS/{employer.name.replace(' ', '_')}/{folder_name}/"
+
+        with zipfile.ZipFile(zip_buffer, "r") as zip_ref:
+            for file_name in zip_ref.namelist():
+                with zip_ref.open(file_name) as file:
+                    file_content = file.read()
+                    linode_path = f"{upload_path_prefix}{file_name}"
+
+                    upload_to_linode_object_storage(BytesIO(file_content), linode_path)
+                    logger.info(f"✅ Uploaded {file_name} to Linode at {linode_path}")
+
+                    # ✅ Save to SignedDocumentFile
+                    SignedDocumentFile.objects.create(
+                        user=user,
+                        employer=employer,
+                        envelope_id=envelope_id,
+                        file_name=file_name,
+                        file_path=linode_path,
+                        template_name=template_name,
+                    )
+
+    except Exception as e:
+        logger.error(f"❌ Failed to fetch/upload signed DocuSign docs: {str(e)}")

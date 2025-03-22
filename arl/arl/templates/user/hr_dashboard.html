@@ -1,0 +1,155 @@
+{% extends "../base/base.html" %}
+{% block title %}HR Dashboard{% endblock %}
+
+{% block template %}
+{% load static %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+
+<style>
+    @media (max-width: 576px) { /* Applies only on small screens */
+        .mobile-btn {
+            font-size: 14px;  /* Smaller text */
+            padding: 8px 12px; /* Less padding */
+        }
+    }
+</style>
+
+
+<div class="container mt-4">
+    <legend>HR Dashboard</legend>
+
+    <!-- ✅ Navigation Tabs -->
+    <ul class="nav nav-tabs" id="hrTabs">
+        <li class="nav-item">
+            <a class="nav-link active" data-bs-toggle="tab" href="#docusign">DocuSign Templates</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#employees">Employee Management</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#signed-documents">Signed Documents</a>
+        </li>
+    </ul>
+
+    <div class="tab-content mt-3">
+        <!-- 📄 DocuSign Templates Section -->
+        <div id="docusign" class="tab-pane fade show active">
+            
+                <a href="{% url 'create_new_document_page' %}" 
+                class="btn btn-success btn-md  mobile-btn">
+                <i class="fas fa-plus"></i> Create Document</a>
+                <legend>Saved DocuSign Templates</legend>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Template ID</th>
+                        <th>Created At</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for template in templates %}
+                    <tr>
+                        <td>{{ template.template_name }}</td>
+                        <td>{{ template.template_id }}</td>
+                        <td>{{ template.created_at }}</td>
+                        <td>
+                            <a href="{% url 'edit_document_page' template.template_id %}" class="btn btn-primary btn-sm">Edit</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="4">No templates found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 👥 Employee Management Section -->
+        <div id="employees" class="tab-pane fade">
+            <h3>Invite a New Hire</h3>
+
+            
+
+            <!-- ✅ Display messages -->
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert 
+                        {% if message.tags == 'error' %}alert-danger
+                        {% elif message.tags == 'success' %}alert-success
+                        {% elif message.tags == 'warning' %}alert-warning
+                        {% elif message.tags == 'info' %}alert-info
+                        {% endif %}" role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <!-- ✅ Invite Form -->
+            <form method="post" class="card p-4 shadow-sm">
+                {% csrf_token %}
+                {{ form|crispy }}
+                <button type="submit" class="btn btn-primary mt-2">Invite</button>
+            </form>
+
+            <br>
+            <h4>Pending Invitations</h4>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Sent Date</th>
+                        <th>Invite Link</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for invite in pending_invites %}
+                    <tr>
+                        <td>{{ invite.name }}</td>
+                        <td>{{ invite.email }}</td>
+                        <td>{{ invite.get_role_display }}</td>
+                        <td>{{ invite.created_at|date:"Y-m-d H:i" }}</td>
+                        <td>
+                            <a href="{{ invite.get_invite_link }}" target="_blank" class="btn btn-sm btn-primary">Copy Link</a>
+                        </td>
+                        <td>
+                            <a href="{% url 'resend_invite' invite.id %}" class="btn btn-sm btn-warning">Resend</a>
+                            <a href="{% url 'cancel_invite' invite.id %}" class="btn btn-sm btn-danger" 
+                               onclick="return confirm('Are you sure you want to cancel this invite?');">Cancel</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6">No pending invitations.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <!-- ✅ HR Dashboard Tab: Signed Documents with Expandable Rows -->
+            <div id="signed-documents" class="tab-pane fade">
+                <h4>Search Signed Documents</h4>
+
+                <!-- 🔍 Search form -->
+                <form method="get" class="mb-3" hx-get="{% url 'hr_document_view' %}" hx-target="#employee-table" hx-trigger="submit">
+                    <input type="text" name="q" placeholder="Search by name or email" class="form-control mb-2" />
+                    <button type="submit" class="btn btn-primary">Search</button>
+                </form>
+
+                <!-- 👥 Employee table -->
+                <div id="employee-table">
+                    {% include "dsign/partials/employee_document_table.html" %}
+                </div>
+            </div>
+    </div>
+
+    <a href="{% url 'home' %}" class="btn btn-secondary mt-3">Back</a>
+</div>
+
+
+
+
+
+{% endblock %}

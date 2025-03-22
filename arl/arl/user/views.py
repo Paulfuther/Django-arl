@@ -3,6 +3,8 @@ from django.http import JsonResponse
 from django.conf import settings
 from phonenumbers import (parse, format_number, is_valid_number,
                           PhoneNumberFormat)
+from django.urls import reverse
+from django.http import HttpResponseRedirect
 from phonenumbers.phonenumberutil import NumberParseException
 from django.urls import reverse_lazy
 from django.contrib import messages
@@ -22,24 +24,27 @@ from django_celery_results.models import TaskResult
 from twilio.base.exceptions import TwilioException
 from arl.msg.helpers import (check_verification_token,
                              request_verification_token)
+from django.db.models import Q
 from arl.msg.models import EmailTemplate
 from arl.msg.tasks import send_sms_task
+from arl.bucket.helpers import download_from_s3
 from celery import chain
 from .forms import (CustomUserCreationForm, TwoFactorAuthenticationForm,
                     EmployerRegistrationForm, NewHireInviteForm,
                     NewHireInvite)
 from .models import (CustomUser, Employer, EmployerSettings,
-                     EmployerRequest)
+                     EmployerRequest, NewHireInvite)
 from .tasks import (create_newhire_data_email, save_user_to_db,
                     send_newhire_template_email_task,
                     send_payment_email_task)
 from arl.dsign.tasks import create_docusign_envelope_task
-from arl.dsign.models import DocuSignTemplate
+from arl.dsign.models import DocuSignTemplate, SignedDocumentFile
 from .helpers import send_new_hire_invite
 import stripe
 import logging
 import os
 from twilio.rest import Client
+from django.core.paginator import Paginator
 
 logger = logging.getLogger(__name__)
 
@@ -645,40 +650,86 @@ def landing_page(request):
 
 
 @login_required
-def hr_invite_new_hire(request):
-    """Managers and Employers can invite a new hire"""
-    employer = request.user.employer  # Get employer from logged-in user
+def hr_dashboard(request):
+    """HR Dashboard: Invite new hires and manage DocuSign templates."""
+    employer = request.user.employer  # Get employer data
 
-    # ✅ Allow access if user is a Manager or Employer
+    # ✅ Restrict access to Managers & Employers only
     if not employer or not request.user.groups.filter(name__in=["Manager", "EMPLOYER"]).exists():
         messages.error(request, "You must be an employer or manager to invite new hires.")
-        return redirect("home")  # Redirect to home if unauthorized
+        return redirect("home")
+
+    templates = DocuSignTemplate.objects.filter(employer=employer)  # Fetch templates
+    pending_invites = NewHireInvite.objects.filter(employer=employer, used=False)  # Fetch pending invites
 
     if request.method == "POST":
         form = NewHireInviteForm(request.POST, employer=employer)
 
         if form.is_valid():
             email = form.cleaned_data["email"]
-            print(email)
-            # ✅ **Check if user already exists in the system**
+
+            # ✅ **Check if the email is already registered**
             if CustomUser.objects.filter(email=email).exists():
                 messages.error(request, f"A user with email {email} already exists.")
-                return redirect("hr_invite")
+                return HttpResponseRedirect(reverse("hr_dashboard") + "?tab=employees")
+
             invite = form.save()
+
+            # ✅ Send the invite email
             send_new_hire_invite(
                 new_hire_email=invite.email,
                 new_hire_name=invite.name,
                 role=invite.role,
-                start_date="TBD",  # Can be added later
+                start_date="TBD",  # Can be customized later
                 employer=employer
             )
+
             messages.success(request, f"Invite sent to {invite.name} ({invite.email})")
-            return redirect("hr_invite")  # Redirect back to form
+            return HttpResponseRedirect(reverse("hr_dashboard") + "?tab=employees")
 
     else:
         form = NewHireInviteForm(employer=employer)
 
-    return render(request, "user/hr_invite.html", {"form": form})
+    return render(request, "user/hr_dashboard.html", {
+        "templates": templates,
+        "pending_invites": pending_invites,
+        "form": form,  # ✅ Ensure the form is passed to the template
+    })
+
+
+@login_required
+def cancel_invite(request, invite_id):
+    """Allows HR to cancel a new hire invitation."""
+    invite = get_object_or_404(NewHireInvite, id=invite_id, employer=request.user.employer)
+
+    if invite.used:
+        messages.error(request, "This invite has already been used and cannot be canceled.")
+    else:
+        invite.delete()
+        messages.success(request, f"Invite for {invite.email} has been canceled.")
+
+    return HttpResponseRedirect(reverse("hr_dashboard") + "?tab=employees")
+
+
+@login_required
+def resend_invite(request, invite_id):
+    """Allows HR to resend a new hire invitation."""
+    invite = get_object_or_404(NewHireInvite, id=invite_id, employer=request.user.employer)
+
+    if invite.used:
+        messages.error(request, "This invite has already been used and cannot be resent.")
+    else:
+        # ✅ Resend the invite email
+        send_new_hire_invite(
+            new_hire_email=invite.email,
+            new_hire_name=invite.name,
+            role=invite.role,
+            start_date="TBD",
+            employer=invite.employer
+        )
+        messages.success(request, f"Invite for {invite.email} has been resent.")
+
+    return HttpResponseRedirect(reverse("hr_dashboard") + "?tab=employees")
 
 
 @login_required
@@ -764,7 +815,7 @@ def close_twilio_sub(request, subaccount_sid):
     """
     account_sid = os.getenv("TWILIO_ACCOUNT_SID")
     auth_token = os.getenv("TWILIO_AUTH_TOKEN")
-    
+
     if not account_sid or not auth_token:
         return HttpResponse("❌ Twilio credentials not found.", status=400)
 
@@ -772,6 +823,54 @@ def close_twilio_sub(request, subaccount_sid):
         client = Client(account_sid, auth_token)
         account = client.api.v2010.accounts(subaccount_sid).update(status="closed")
         return HttpResponse(f"✅ Twilio subaccount {subaccount_sid} closed successfully.", status=200)
-    
+
     except Exception as e:
         return HttpResponse(f"❌ Error closing Twilio subaccount: {str(e)}", status=500)
+
+
+def hr_document_view(request):
+    query = request.GET.get("q", "").strip()
+    employer = request.user.employer
+
+    employees = CustomUser.objects.filter(employer=employer, is_active=True)
+    if query:
+        employees = employees.filter(
+            Q(first_name__icontains=query) |
+            Q(last_name__icontains=query) |
+            Q(email__icontains=query)
+        )
+
+    employees = employees.prefetch_related("signed_documents")
+
+    return render(request, "dsign/partials/employee_document_table.html", {
+        "employees": employees
+    })
+
+
+def download_signed_document(request, doc_id):
+    try:
+        print(doc_id)
+        # 🔍 Get the uploaded document
+        doc = get_object_or_404(SignedDocumentFile, id=doc_id)
+
+        # 🔑 Use the file path stored in the model (e.g., "DOCUMENTS/employer/uuid/filename.pdf")
+        return download_from_s3(request, doc.file_path)
+
+    except Exception as e:
+        print(f"Error in download_signed_document: {str(e)}")
+        return HttpResponse("Error downloading signed document", status=500)
+
+
+def fetch_signed_docs_by_user(request, user_id):
+    user = get_object_or_404(CustomUser, id=user_id)
+    documents = SignedDocumentFile.objects.filter(user=user).order_by("-uploaded_at")
+
+    # Paginate
+    paginator = Paginator(documents, 10)  # Show 5 per page
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, "user/hr/partials/document_results.html", {
+       "employee_id": user.id,
+        "page_obj": page_obj,
+    })

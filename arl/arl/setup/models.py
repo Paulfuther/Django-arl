@@ -1,9 +1,14 @@
 from django.db import models
 from arl.user.models import Employer
-from twilio.rest import Client
 import logging
+from cryptography.fernet import Fernet
+from django.conf import settings
+
 
 logger = logging.getLogger(__name__)
+
+
+cipher = Fernet(settings.SECRET_ENCRYPTION_KEY)
 
 
 class TenantApiKeys(models.Model):
@@ -28,6 +33,14 @@ class TenantApiKeys(models.Model):
     # Timestamp Fields
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)  # Tracks updates
+
+    def set_auth_token(self, raw_token):
+        """Encrypt and store the Twilio Auth Token securely."""
+        self._auth_token = cipher.encrypt(raw_token.encode())
+
+    def get_auth_token(self):
+        """Decrypt and return the Twilio Auth Token."""
+        return cipher.decrypt(self._auth_token).decode() if self._auth_token else None
 
     def __str__(self):
         return f"API Keys for {self.employer.name}"

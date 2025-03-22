@@ -5,23 +5,24 @@ from celery.result import AsyncResult
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import UserPassesTestMixin
-from django.db.models.signals import post_save
-from django.dispatch import receiver
+
+
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import redirect, render
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
-
+from .helpers import get_docusign_edit_url
 from arl.dsign.helpers import (get_docusign_envelope,
-                               get_docusign_template_name_from_template)
-from arl.dsign.models import DocuSignTemplate
+                               get_docusign_template_name_from_template,
+                               create_docusign_document)
+
 from arl.dsign.tasks import (get_outstanding_docs,
                              list_all_docusign_envelopes_task)
 
 from .forms import NameEmailForm
-from .models import ProcessedDocsignDocument
+
 from .tasks import (create_docusign_envelope_task, process_docusign_webhook,
-                    send_new_hire_quiz)
+                    )
 
 logger = logging.getLogger(__name__)
 
@@ -46,16 +47,14 @@ class CreateEnvelopeView(UserPassesTestMixin, View):
     def post(self, request):
         form = NameEmailForm(request.POST, user=request.user)
         if form.is_valid():
-            d_name = form.cleaned_data["name"]
-            d_email = form.cleaned_data["email"]
-            ds_template = form.cleaned_data.get("template_id")
-            print(ds_template, d_name, d_email)
-            # Fetch the template name based on the ID
+            recipient = form.cleaned_data["recipient"]
+            ds_template = form.cleaned_data["template_id"]
             template = form.cleaned_data["template_name"]
             template_name = template.template_name if template else "Unknown Template"
+
             envelope_args = {
-                "signer_email": d_email,
-                "signer_name": d_name,
+                "signer_email": recipient.email,
+                "signer_name": recipient.get_full_name(),
                 "template_id": ds_template,
             }
 
@@ -64,11 +63,9 @@ class CreateEnvelopeView(UserPassesTestMixin, View):
             create_docusign_envelope_task.delay(envelope_args)
 
             messages.success(
-                request, f"Thank you. The document '{template_name}' has been sent."
+                request, f"Thank you. The document '{template_name}' has been sent to {recipient.get_full_name()}."
             )
             return redirect("home")
-        else:
-            return render(request, "dsign/name_email_form.html", {"form": form})
 
 
 @csrf_exempt  # In production, use proper CSRF protection.
@@ -158,71 +155,6 @@ def get_docusign_template(request):
         )
 
 
-@receiver(post_save, sender=ProcessedDocsignDocument)
-def post_save_processed_docsign_document(sender, instance, created, **kwargs):
-    if created and instance.template_name == "New Hire File":
-        print("A New Hire File was created")
-
-        # Check if a New Hire Quiz has already been sent to this user
-        if not ProcessedDocsignDocument.objects.filter(
-            user=instance.user, template_name="New_Hire_Quiz"
-        ).exists():
-            try:
-                # Attempt to find the "New_Hire_Quiz" template
-                new_hire_quiz_template = DocuSignTemplate.objects.get(
-                    template_name="New_Hire_Quiz"
-                )
-                new_hire_quiz_template_id = new_hire_quiz_template.template_id
-                print(new_hire_quiz_template_id)
-            except DocuSignTemplate.DoesNotExist:
-                # Handle the case where the template does not exist
-                print("New Hire Quiz template not found.")
-                return  # Exit the function if the template is not found
-
-            try:
-                # Fetch the Store instance related to the user
-                user_store = instance.user.store
-
-                if user_store and user_store.manager:
-                    manager_email = user_store.manager.email
-                    manager_name = user_store.manager.get_full_name()
-
-                else:
-                    # Default manager details if no manager is assigned to the store
-                    manager_email = "paul.futher@gmail.com"
-                    manager_name = "Paul Futher"
-
-                print("Manager Email:", manager_email)
-                print("Manager Name:", manager_name)
-                print("User Store:", user_store)
-            except Exception as e:
-                print("An unexpected error occurred:", str(e))
-                # Default manager details if an unexpected error occurs
-                manager_email = "paul.futher@gmail.com"
-                manager_name = "Paul Futher"
-                print("Default Manager Email:", manager_email)
-                print("Default Manager Name:", manager_name)
-
-            # Construct the envelope_args
-            envelope_args = {
-                "signer_email": instance.user.email,
-                "signer_name": instance.user.get_full_name(),
-                "template_id": new_hire_quiz_template_id,
-                "manager_email": manager_email,
-                "manager_name": manager_name,
-            }
-            print("Envelope Args:", envelope_args)
-            # Call the Celery task with the constructed arguments
-            send_new_hire_quiz.delay(envelope_args)
-        else:
-            print(
-                f"User {instance.user.get_full_name()} has already been sent a New Hire Quiz."
-            )
-    else:
-        # If the document is not a New Hire File, exit the function
-        print("The saved document is not a New Hire File. Exiting.")
-
-
 @login_required
 def waiting_for_others_view(request):
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
@@ -232,3 +164,45 @@ def waiting_for_others_view(request):
         return JsonResponse({'outstanding_envelopes': envelopes})
     # Render the template for the initial page load
     return render(request, 'dsign/waiting_for_others.html')
+
+
+@login_required
+def create_new_document_page(request):
+    """Handles creating a new DocuSign document and saving it in Django."""
+
+    if request.method == "POST":
+        template_name = request.POST.get("template_name", "New Document")
+        print("Template Name :", template_name)
+        template_id = create_docusign_document(user=request.user, template_name=template_name)
+
+        if template_id:
+            messages.success(request, f"Document '{template_name}' created successfully!")
+            # ✅ Get the edit URL for the new template
+            edit_url = get_docusign_edit_url(template_id)
+
+            if edit_url:
+                return redirect(edit_url)  # ✅ Immediately open the DocuSign editor
+            else:
+                messages.error(request, "Could not retrieve the edit URL. Please try manually.")
+        else:
+            messages.error(request, "Failed to create a new document.")
+
+        return redirect("hr_dashboard")  # Redirect to HR dashboard
+
+    return render(request, "dsign/create_document.html")
+
+
+@login_required
+def edit_document_page(request, template_id):
+    """Loads an HTML page with an iframe for the DocuSign template editor."""
+    try:
+        edit_url = get_docusign_edit_url(template_id)
+        return render(request, "dsign/dsign_embed.html", {"edit_url": edit_url})
+    except Exception as e:
+        return render(request, "dsign/dsign_embed.html", {"error": str(e)})
+
+
+def docusign_close(request):
+    """Redirects users back to your app after they finish editing."""
+    return redirect("/")
+
