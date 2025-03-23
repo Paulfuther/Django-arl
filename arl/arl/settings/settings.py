@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 import logging
 from dotenv import load_dotenv
-
+import socket
 load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -59,7 +59,7 @@ LOGGING = {
     'loggers': {
         'django': {
             'handlers': ['file', 'console'], # Use both file and console
-            'level': 'DEBUG', # Change to INFO or higher
+            'level': 'INFO', # Change to INFO or higher
             'propagate': True,
         },
         '': { # Catch-all logger for other applications
@@ -190,7 +190,10 @@ TIME_ZONE = "America/New_York"
 
 USE_TZ = True
 
-
+if socket.gethostname() == "":
+    SITE_URL = "https://www.1553690ontarioinc.com"
+else:
+    SITE_URL = "http://127.0.0.1:8000"  # Local development
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
@@ -224,13 +227,13 @@ BROKER_URL ="amqps://ctscemmj:HzMGkRB1IsJJtlVT2DwfimyE1PBkocPj@rabbit.lmq.clouda
 EMAIL_BACKEND = "arl.msg.helpers.SendGridEmailBackend"
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 50485760  # 10MB in bytes
-
+SECRET_ENCRYPTION_KEY = os.environ.get("SECRET_ENCRYPTION_KEY")
 
 DOCUSIGN_BASE_PATH = os.environ.get("DOCUSIGN_BASE_PATH_DEV")
 DOCUSIGN_INTEGRATION_KEY = os.environ.get("DOCUSIGN_INTEGRATION_KEY_DEV")
 DOCUSIGN_USER_ID = os.environ.get("DOCUSIGN_USER_ID_DEV")
 DOCUSIGN_ACCOUNT_ID = os.environ.get("DOCUSIGN_ACCOUNT_ID_DEV")
-DOCUSIGN_BASE_PATH = os.environ.get("DOCUSIGN_BASE_PATH_DEV")
+
 DOCUSIGN_API_CLIENT_HOST = os.environ.get("DOCUSIGN_API_CLIENT_HOST_DEV")
 DOCUSIGN_TEMPLATE_ID = "e02ea9a2-42d4-453f-bd64-8480b9a2dae4"  # SHORTER TEST DOC
 DOCUSIGN_TEMPLATE_ID = "1f4599d9-689a-496d-8a22-24c52529780d"
@@ -275,6 +278,8 @@ SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
 MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER")
 SENDGRID_NEWHIRE_ID = os.environ.get("SENDGRID_NEWHIRE_ID")
 SENDGRID_NEW_HIRE_FILE_ID = os.environ.get("SENDGRID_NEW_HIRE_FILE_ID")
+SENDGRID_SENDER_VERIFICATION_URL = os.environ.get("SENDGRID_SENDER_VERIFICATION_URL")
+SENDGRID_EMPLOYER_REGISTER_AS_USER = os.environ.get("SENDGRID_EMPLOYER_REGISTER_AS_USER")
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
@@ -288,8 +293,17 @@ EMAIL_USE_TLS = True
 BACKUP_FILE_PATH = os.environ.get("BACKUP_FILE_PATH_DEV")
 BACKUP_DUMP_PATH = os.environ.get("BACKUP_DUMP_PATH_DEV")
 
+STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY_DEV")
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET_DEV")
+STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
 
 
+# STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY")
+# STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET")
+# STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
+
+# BASE URL DEV
+BASE_URL = "https://bdb0-2607-fea8-2840-b200-79f0-4773-6079-2c28.ngrok-free.app"
 
 try:
     from .local_settings import *

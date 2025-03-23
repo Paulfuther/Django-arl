@@ -10,6 +10,7 @@ on:
       - dev-v1.0.01
       - multi-tenant-integration
 
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,6 +18,7 @@ jobs:
     env: # Define environment variables for Twilio credentials
       TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
       TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
+      SECRET_ENCRYPTION_KEY: ${{ secrets.SECRET_ENCRYPTION_KEY }}
 
     steps:
     - name: Checkout code

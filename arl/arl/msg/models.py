@@ -74,12 +74,21 @@ class EmailLog(models.Model):
 
 
 class EmailTemplate(models.Model):
-    name = models.CharField(max_length=100, null=True)
-    sendgrid_id = models.TextField()
-    include_in_report = models.BooleanField(default=False)
+    employers = models.ManyToManyField(
+        Employer,
+        blank=True,
+        related_name="email_templates"
+    )
+    name = models.CharField(
+        max_length=100,
+        null=True,
+        help_text="The name of the email template (e.g., 'New Hire Onboarding')"
+    )  # ✅ Allow same name for multiple employers
+    sendgrid_id = models.TextField()  # ✅ Store SendGrid Template ID
+    include_in_report = models.BooleanField(default=False)  # ✅ For analytics
 
     def __str__(self):
-        return self.name
+        return f"{self.name} - {', '.join([emp.name for emp in self.employers.all()])}"
 
 
 class WhatsAppTemplate(models.Model):

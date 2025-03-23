@@ -20,14 +20,12 @@ from arl.msg.tasks import EmployerSMSTask
 from arl.quiz.models import Answer, Question, Quiz, SaltLog
 
 from .models import (CustomUser, DocumentType, EmployeeDocument, Employer,
-                     ExternalRecipient, SMSOptOut, Store, UserManager)
+                     ExternalRecipient, SMSOptOut, Store, UserManager,
+                     EmployerSettings, NewHireInvite, EmployerRequest)
 from arl.setup.models import TenantApiKeys
-
-
-class EmailTemplateAdmin(admin.ModelAdmin):
-    list_display = ('name', 'sendgrid_id', 'include_in_report')  # Display the checkbox
-    list_editable = ('include_in_report',)  # Allow inline editing of the checkbox
-    search_fields = ('name',)
+from django.shortcuts import redirect
+from django.contrib import messages
+from django.urls import path
 
 
 class ExternalRecipientAdmin(admin.ModelAdmin):
@@ -134,6 +132,7 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         if db_field.name in ["sin_expiration_date", "work_permit_expiration_date"]:
             kwargs["widget"] = TextInput(attrs={"type": "date"})  # ✅ Uses native date input, no calendar
         return super().formfield_for_dbfield(db_field, request, **kwargs)
+    
     # Customize the fields you want to display
     inlines = [ProcessedDocusignDocumentInline]
     list_display = (
@@ -154,7 +153,7 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
     list_filter = ("is_active", "groups", 'sin_expiration_date',
                    'work_permit_expiration_date', SINFirstDigitFilter)
     search_fields = ("username", "email", "phone_number", "sin")
-    list_editable = ('sin_expiration_date', 'work_permit_expiration_date', 'phone_number')
+    list_editable = ('sin_expiration_date', 'work_permit_expiration_date','phone_number')
     list_per_page = 15
     # def has_delete_permission(self, request, obj=None):
     #    return False  # Disables the ability to delete users
@@ -164,9 +163,6 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         return obj.store.number if obj.store else "None"
 
     store_number.short_description = "Store"
-
-    def has_delete_permission(self, request, obj=None):
-        return False
 
     def get_groups(self, obj):
         return ", ".join([group.name for group in obj.groups.all()])
@@ -498,11 +494,11 @@ class SMSOptOutForm(forms.ModelForm):
 class SMSOptOutAdmin(ExportActionMixin, admin.ModelAdmin):
     form = SMSOptOutForm
     resource_class = SMSOptOutResource
-    list_display = ("get_first_name", "get_last_name", "get_phone", "user", "reason", "date_added")
-    search_fields = ("user__first_name", "user__last_name", "user__username", "user__phone_number")
+    list_display = ("get_first_name", "get_last_name", "get_phone", "user", "employer", "reason", "date_added")
+    search_fields = ("user__first_name", "user__last_name", "user__username", "user__phone_number", "employer__name")
     ordering = ("user__first_name", "user__last_name", "user__phone_number",)  # Sorts list by phone number
+    list_filter = ("employer",)  # ✅ Filter by employer in Django Admin
 
-    # Enable autocomplete search for the user field
     autocomplete_fields = ["user"]
 
     def get_first_name(self, obj):
@@ -520,6 +516,11 @@ class SMSOptOutAdmin(ExportActionMixin, admin.ModelAdmin):
     get_phone.admin_order_field = "user__phone_number"
     get_phone.short_description = "Phone Number"
 
+    def get_employer(self, obj):
+        return obj.employer.name if obj.employer else "N/A"
+    get_employer.admin_order_field = "employer__name"
+    get_employer.short_description = "Employer"
+
 
 @admin.register(EmployerSMSTask)
 class EmployerSMSTaskAdmin(admin.ModelAdmin):
@@ -531,19 +532,144 @@ class EmployerSMSTaskAdmin(admin.ModelAdmin):
 
 @admin.register(TenantApiKeys)
 class TenantApiKeysAdmin(admin.ModelAdmin):
-    list_display = ("employer", "service_name", "account_sid", "phone_number", "sender_email", "status", "created_at")
+    list_display = ("employer", "account_sid", "phone_number", "verified_sender_email", "status", "created_at")
     search_fields = ("employer__name", "service_name", "account_sid", "sender_email")
-    list_filter = ("service_name", "status")
 
 
-admin.site.register(Employer)
+@admin.register(DocuSignTemplate)
+class DocuSignTemplateAdmin(admin.ModelAdmin):
+    list_display = ("template_name", "employer", "template_id")
+    search_fields = ("template_name", "template_id", "employer__name")
+    list_filter = ("employer",)
+
+
+@admin.register(EmailTemplate)
+class EmailTemplateAdmin(admin.ModelAdmin):
+    list_display = ("name", "get_employers", "sendgrid_id", "include_in_report")
+    search_fields = ("name", "sendgrid_id", "employers__name")
+    list_filter = ("employers",)
+
+    def get_employers(self, obj):
+        """Display multiple employers as a comma-separated string."""
+        return ", ".join([emp.name for emp in obj.employers.all()])
+
+    get_employers.short_description = "Employers"
+
+
+@admin.register(EmployerSettings)
+class EmployerSettingsAdmin(admin.ModelAdmin):
+    list_display = ("employer", "send_new_hire_file")
+    list_filter = ("send_new_hire_file",)
+
+
+@admin.register(Employer)
+class EmployerAdmin(admin.ModelAdmin):
+    list_display = ["name", "email", "is_active", "verified_sender_email", "toggle_active_button"]
+    actions = ["activate_selected", "deactivate_selected"]
+    search_fields = ("name", "phone_number", "verified_sender_local", "verified_sender_email", "senior_contact_name")
+    readonly_fields = ("verified_sender_email",)  # Prevent editing full email
+    list_filter = ("created", "state_province", "country")
+
+    def toggle_active_button(self, obj):
+        """Add a button to toggle employer's active status."""
+        if obj.is_active:
+            return format_html('<a class="button" style="color:red;" href="/admin/user/employer/{}/toggle-active/">Deactivate</a>', obj.pk)
+        return format_html('<a class="button" style="color:green;" href="/admin/user/employer/{}/toggle-active/">Activate</a>', obj.pk)
+
+    toggle_active_button.short_description = "Toggle Active"
+
+    def activate_selected(self, request, queryset):
+        """Action to activate multiple employers at once."""
+        queryset.update(is_active=True)
+        messages.success(request, "Selected employers have been activated.")
+
+    activate_selected.short_description = "Activate selected employers"
+
+    def deactivate_selected(self, request, queryset):
+        """Action to deactivate multiple employers at once."""
+        queryset.update(is_active=False)
+        messages.warning(request, "Selected employers have been deactivated.")
+
+    deactivate_selected.short_description = "Deactivate selected employers"
+
+    def get_urls(self):
+        """Add a custom URL to toggle active status."""
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "<int:pk>/toggle-active/",
+                self.admin_site.admin_view(self.toggle_active),
+                name="employer-toggle-active",
+            ),
+        ]
+        return custom_urls + urls
+
+    def toggle_active(self, request, pk):
+        """Toggle employer's active status."""
+        employer = Employer.objects.get(pk=pk)
+        employer.is_active = not employer.is_active
+        employer.save()
+
+        if employer.is_active:
+            self.message_user(request, f"Employer {employer.name} is now active.", messages.SUCCESS)
+        else:
+            self.message_user(request, f"Employer {employer.name} has been deactivated.", messages.WARNING)
+
+        return redirect("/admin/user/employer/")
+
+
+@admin.register(NewHireInvite)
+class NewHireInviteAdmin(admin.ModelAdmin):
+    list_display = ("name", "email", "role", "employer", "created_at", "used", "invite_link_display")
+    list_filter = ("employer", "role", "used")
+    search_fields = ("name", "email", "employer__name")
+    ordering = ("-created_at",)
+    readonly_fields = ("token", "created_at", "invite_link_display")
+
+    def invite_link_display(self, obj):
+        return obj.get_invite_link()
+    invite_link_display.short_description = "Invite Link"
+
+    fieldsets = (
+        (None, {"fields": ("name", "email", "role", "employer", "used")}),
+        ("Invite Details", {"fields": ("token", "invite_link_display", "created_at")}),
+    )
+
+
+class EmployerRequestAdmin(admin.ModelAdmin):
+    list_display = ["name", "email", "phone_number", "status", "approve_button"]
+    actions = ["approve_selected_requests"]
+
+    def approve_button(self, obj):
+        return format_html('<a class="button" href="/approve-employer/{}/">Approve</a>', obj.pk)
+    approve_button.short_description = "Approve Employer"
+
+    def approve_selected_requests(self, request, queryset):
+        approved_count = 0
+
+        for obj in queryset:
+            if obj.status == "pending":
+                # Call your approval logic here (if needed)
+                obj.status = "approved"
+                obj.save()
+                approved_count += 1
+
+        if approved_count > 0:
+            messages.success(request, f"Successfully approved {approved_count} employer(s).")
+        else:
+            messages.warning(request, "No pending employer requests were selected.")
+
+        return redirect("/admin/user/employerrequest/")
+
+    approve_selected_requests.short_description = "Approve selected employer requests"
+
+
+admin.site.register(EmployerRequest, EmployerRequestAdmin)
 admin.site.register(Twimlmessages)
 admin.site.register(BulkEmailSendgrid)
 admin.site.register(Store, StoreAdmin)
 admin.site.register(Incident, IncidentAdmin)
 admin.site.register(MajorIncident, MajorIncidentAdmin)
-admin.site.register(EmailTemplate)
-admin.site.register(DocuSignTemplate)
 admin.site.register(ProcessedDocsignDocument)
 admin.site.register(CustomUser, CustomUserAdmin)
 admin.site.register(WhatsAppTemplate)

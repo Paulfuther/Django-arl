@@ -5,8 +5,7 @@ from django.db.models import Q
 from celery.utils.log import get_task_logger
 import json
 from arl.celery import app
-from arl.msg.helpers import create_master_email, create_hr_newhire_email
-from arl.msg.models import EmailTemplate
+from arl.msg.helpers import create_master_email
 from arl.user.models import CustomUser, Employer
 
 logger = get_task_logger(__name__)
@@ -14,25 +13,34 @@ logger = get_task_logger(__name__)
 
 # Works
 @app.task(name="send_newhire_template_email")
-def send_newhire_template_email_task(to_email, first_name,
-                                     sendgrid_id, attachments=None):
+def send_newhire_template_email_task(to_email,
+                                     sendgrid_id,
+                                     template_data,
+                                     attachments=None):
+    """
+    Celery task to send an email using SendGrid.
+    """
     try:
-        print(f"📧 Sending email to: {to_email}")
-        print(f"👤 First Name: {first_name}")
-        print(f"📩 SendGrid ID: {sendgrid_id}")
+        # Ensure template_data is a dictionary
+        if not isinstance(template_data, dict):
+            raise ValueError(f"❌ Expected dictionary for template_data, got {type(template_data)}")
 
-        # ✅ Call Master Email Function
+        senior_contact_name = template_data.get("senior_contact_name", "HR Team")
+
+        print(f"📧 Sending New Hire Email to: {to_email}")
+        print(f"📜 Senior Contact Name: {senior_contact_name}")
+        print(f"📜 Email Template Data: {template_data}")
+
+        # Call the helper function, passing template_data
         create_master_email(
             to_email=to_email,
             sendgrid_id=sendgrid_id,
-            template_data={"name": first_name},  # ✅ This will be passed into the email template
+            template_data=template_data,  # ✅ Pass template data
+            attachments=attachments
         )
-
-        logger.info(f"✅ New hire email sent successfully to {to_email}")
-        return f"✅ Email sent successfully to {to_email}"
-
     except Exception as e:
-        return str(e)
+        print(f"Error in send_master_email_task: {e}")
+    return False
 
 
 @app.task(name="create_hr_newhire_email")
@@ -106,3 +114,24 @@ def save_user_to_db(**kwargs):
     except Exception as e:
         # Handle any exceptions that may occur during database save
         print(f"An error occurred during database save: {e}")
+
+
+@app.task(name="send_payment_email")
+def send_payment_email_task(to_email, payment_link, employer_name):
+    """Send an email with the Stripe payment link using the master email function."""
+    sendgrid_id = "d-e31a2d72f8b145de98ba8d9fa267bc04"  # 🔹 Use your SendGrid template ID
+    try:
+        # ✅ Use the employer name passed from the approval process
+        template_data = {
+            "payment_link": payment_link,
+            "name": employer_name,  # ✅ Ensure we use the correct employer name
+            "subject": "Complete Your Registration - Payment Required",
+            "body": f"'{payment_link}'"
+        }
+
+        # ✅ Call the master email function
+        return create_master_email(to_email, sendgrid_id, template_data)
+
+    except Exception as e:
+        print(f"❌ Error sending payment email: {str(e)}")
+        return False

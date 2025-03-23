@@ -3,7 +3,7 @@ from crispy_forms.layout import Submit
 from django import forms
 from django.contrib.auth.models import Group
 from arl.user.models import CustomUser, Store
-
+from django.db import models
 from arl.msg.models import EmailTemplate, WhatsAppTemplate
 from django.contrib.auth import get_user_model
 
@@ -25,14 +25,20 @@ class SMSForm(forms.Form):
     )
 
     selected_group = forms.ModelChoiceField(
-        queryset=Group.objects.all(),
+        queryset=Group.objects.none(),  # Set dynamically in __init__
         required=True,
         label="Select Group to Send SMS",
         widget=forms.Select(attrs={"class": "custom-input"}),
     )
 
     def __init__(self, *args, **kwargs):
+        user = kwargs.pop("user", None)  # Get the logged-in user
         super().__init__(*args, **kwargs)
+
+        if user and user.employer:
+            employer = user.employer
+            self.fields["selected_group"].queryset = Group.objects.filter(user__employer=employer).distinct()
+
         self.helper = FormHelper()
         self.helper.form_method = "post"
         self.helper.add_input(Submit("submit", "Submit"))
@@ -40,7 +46,7 @@ class SMSForm(forms.Form):
 
 class TemplateEmailForm(forms.Form):
     sendgrid_id = forms.ModelMultipleChoiceField(
-        queryset=EmailTemplate.objects.all(),
+        queryset=EmailTemplate.objects.none(),
         widget=forms.CheckboxSelectMultiple,
         required=True,
         label="Select Template",
@@ -61,6 +67,22 @@ class TemplateEmailForm(forms.Form):
     attachment_1 = forms.FileField(required=False, label="Attachment 1")
     attachment_2 = forms.FileField(required=False, label="Attachment 2")
     attachment_3 = forms.FileField(required=False, label="Attachment 3")
+
+    def __init__(self, *args, **kwargs):
+        """Filter email templates based on employer."""
+        user = kwargs.pop("user", None)  # ✅ Get user from kwargs
+        super().__init__(*args, **kwargs)
+
+        if user and hasattr(user, "employer"):  # ✅ Ensure user has employer field
+            employer = user.employer
+            self.fields["sendgrid_id"].queryset = EmailTemplate.objects.filter(
+                models.Q(employers=employer) | models.Q(employers__isnull=True)
+            ).distinct()
+            
+        # ✅ Filter `selected_users` to include only users from the same employer
+            self.fields["selected_users"].queryset = User.objects.filter(
+                employer=employer, is_active=True
+            )
 
     def clean(self):
         cleaned_data = super().clean()

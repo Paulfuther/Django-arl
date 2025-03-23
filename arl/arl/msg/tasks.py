@@ -3,7 +3,7 @@ from __future__ import absolute_import, unicode_literals
 import csv
 import os
 from datetime import datetime, timedelta
-
+from django.contrib.auth import get_user_model
 import pandas as pd
 from celery.utils.log import get_task_logger
 from django.conf import settings
@@ -11,10 +11,10 @@ from django.contrib.auth.models import Group
 from django.db import connection
 from django.db.models import F, Func, IntegerField, OuterRef, Subquery
 from django.utils import timezone
-from collections import defaultdict
 from arl.celery import app
 from arl.msg.models import EmailEvent, EmailTemplate, Message, SmsLog, EmailLog
 from arl.user.models import CustomUser, SMSOptOut, EmployerSMSTask, Employer
+from arl.setup.models import TenantApiKeys
 
 from .helpers import (client, create_master_email, create_single_csv_email,
                       send_bulk_sms, send_monthly_store_phonecall,
@@ -25,41 +25,68 @@ from .helpers import (client, create_master_email, create_single_csv_email,
 logger = get_task_logger(__name__)
 
 
-# this is the master email task.
+#
+# APPROVED
+#
+# This task is APPROVED for multi tenant.
+# It is also the master email task.
 @app.task(name="master_email_send")
-def master_email_send_task(recipients, sendgrid_id, attachments=None):
+def master_email_send_task(recipients, sendgrid_id, attachments=None, employer_id=None):
     """
     Master task to send emails using the provided template and recipient data.
 
     Args:
-        recipients (list): List of dictionaries containing recipient
-        data (name, email).
+        recipients (list): List of dictionaries containing recipient data (name, email).
         sendgrid_id (str): SendGrid template ID to use for the email.
-        attachments (list, optional): List of attachments 
-        (each as a dictionary with file details).
+        attachments (list, optional): List of attachments (each as a dictionary with file details).
+        employer_id (int, optional): Employer ID for logging purposes.
 
     Returns:
         str: Success or error message.
     """
     try:
+        # Default sender (fallback)
+        verified_sender = settings.MAIL_DEFAULT_SENDER
+
+        # ✅ Retrieve employer-specific sender
+        if employer_id:
+            employer = Employer.objects.filter(id=employer_id).first()
+            print("Employer :", employer)
+            if employer:
+                tenant_api_key = TenantApiKeys.objects.filter(employer=employer).first()
+                if tenant_api_key and tenant_api_key.verified_sender_email:
+                    verified_sender = tenant_api_key.verified_sender_email  # ✅ Set verified sender
+
+        print(f"📧 Using verified sender: {verified_sender}")
+
         # Track errors and successes
         failed_emails = []
         for recipient in recipients:
             try:
                 email = recipient.get("email")
                 name = recipient.get("name")
+                senior_contact_name = employer.senior_contact_name
+                company_name = employer.name
 
                 if not email:
                     print(f"Skipping recipient with no email: {recipient}")
                     continue  # Skip if no email is provided
 
-                # Call the helper function to send the email
+                # ✅ Ensure name is part of `template_data`
+                template_data = {
+                    "name": name,
+                    "senior_contact_name": senior_contact_name,
+                    "company_name": company_name}  # Add more dynamic values if needed
+
+                # ✅ Pass `verified_sender` directly to `create_master_email`
                 success = create_master_email(
                     to_email=email,
-                    name=name,
                     sendgrid_id=sendgrid_id,
+                    template_data=template_data,
                     attachments=attachments,
+                    verified_sender=verified_sender,  # ✅ Explicitly passing verified sender
                 )
+                
                 if not success:
                     failed_emails.append(email)
                     print(f"Failed to send email to {email}.")
@@ -67,6 +94,7 @@ def master_email_send_task(recipients, sendgrid_id, attachments=None):
                 email_address = email or "Unknown"
                 failed_emails.append(email_address)
                 print(f"Error sending email to {email_address}: {e}")
+
         # Final status message
         if failed_emails:
             print(f"Emails sent with some failures. Failed emails: {failed_emails}")
@@ -76,21 +104,9 @@ def master_email_send_task(recipients, sendgrid_id, attachments=None):
             return f"All emails sent successfully using template '{sendgrid_id}'."
 
     except Exception as e:
-        # Handle task-wide errors
         error_message = f"Critical error in master_email_send_task: {str(e)}"
         print(error_message)
-    return error_message
-
-# SMS tasks
-
-
-@app.task(name="sms")
-def send_sms_task(phone_number, message):
-    try:
-        send_sms_model(phone_number, message)
-        return "Text message sent successfully"
-    except Exception as e:
-        return str(e)
+        return error_message
 
 
 #
@@ -123,7 +139,7 @@ def send_bulk_tobacco_sms_link():
                   ).exclude(phone_number__isnull=True
                             ).exclude(phone_number="")
         # Get the unique employers from the active users
-        employer_names = Employer.objects.filter(id__in=enabled_employers).values_list("name", flat=True)
+        # employer_names = Employer.objects.filter(id__in=enabled_employers).values_list("name", flat=True)
         # active_users = CustomUser.objects.filter(is_active=True)
         gsat = [str(user.phone_number) for user in active_users]
         print("numbers :", gsat)
@@ -140,19 +156,55 @@ def send_bulk_tobacco_sms_link():
             f"{pdf_url}. "
         )
 
-        send_bulk_sms(gsat, message)
-        # Log the result
-        employer_list = ", ".join(employer_names) if employer_names else "No employers"
-        logger.info("Bulk SMS task completed successfully")
-        log_message = f"Bulk Tobacco SMS sent successfully to {', '.join(gsat)}"
-        log_message_employer = f"Bulk Tobacco SMS sent successfully to {employer_list}"
-        SmsLog.objects.create(level="INFO", message=log_message)
-        SmsLog.objects.create(level="INFO", message=log_message_employer)
-        
+        # ✅ Process each employer separately to ensure correct Twilio credentials
+        for employer_id in enabled_employers:
+            employer = Employer.objects.get(id=employer_id)
+            employer_users = active_users.filter(employer=employer)
+
+            phone_numbers = [str(user.phone_number) for user in employer_users]
+            if not phone_numbers:
+                logger.warning(f"⚠️ No active users for employer: {employer.name}")
+                continue
+
+            # ✅ Fetch employer-specific Twilio credentials
+            twilio_keys = TenantApiKeys.objects.filter(employer=employer, is_active=True).first()
+
+            if not twilio_keys:
+                logger.error(f"🚨 No Twilio API keys found for employer: {employer.name}. Skipping SMS.")
+                continue
+
+            twilio_account_sid = twilio_keys.account_sid
+            twilio_auth_token = twilio_keys.auth_token
+            twilio_notify_sid = twilio_keys.notify_service_sid
+            if not twilio_account_sid or not twilio_auth_token or not twilio_notify_sid:
+                logger.error(f"🚨 Missing required Twilio credentials for employer: {employer.name}. Skipping SMS.")
+                continue
+
+            try:
+                # ✅ Send SMS using employer's credentials
+                send_bulk_sms(
+                    phone_numbers, 
+                    message,
+                    twilio_account_sid,
+                    twilio_auth_token,
+                    twilio_notify_sid,
+                )
+
+                # ✅ Log success per employer
+                log_message = f"📢 Bulk Tobacco SMS sent successfully to {len(phone_numbers)} users for employer: {employer.name}"
+                logger.info(log_message)
+                SmsLog.objects.create(level="INFO", message=log_message)
+
+            except Exception as e:
+                # ✅ Log error per employer
+                error_message = f"🚨 SMS Task Failed for {employer.name}: {str(e)}"
+                logger.error(error_message)
+                SmsLog.objects.create(level="ERROR", message=error_message)
+
     except Exception as e:
-        # Log or handle other exceptions
-        logger.error(f"An error occurred: {str(e)}")
-        SmsLog.objects.create(level="ERROR", message=f"SMS Task Failed: {str(e)}")
+        # ✅ Log critical failure
+        logger.error(f"🚨 Critical error in SMS task: {str(e)}")
+        SmsLog.objects.create(level="ERROR", message=f"Critical SMS Task Failure: {str(e)}")
 
 
 # This is the old tobacco SMS. It has NOT been approved
@@ -201,22 +253,161 @@ def send_bulk_sms_task():
         logger.error(f"An error occurred: {str(e)}")
 
 
+#
+# APPROVED
+#
+# This task is APPROVED for multi tenant.
+# Tenatn api keys are geneated here and passed to the helper.
 @app.task(name="one_off_bulk_sms")
-def send_one_off_bulk_sms_task(group_id, message):
+def send_one_off_bulk_sms_task(group_id, message, user_id):
+    User = get_user_model()
     try:
+        # ✅ Get the user who initiated the SMS
+        user = User.objects.get(id=user_id)
+        employer = user.employer  # Assuming employer is a ForeignKey in User model
+
+    except User.DoesNotExist:
+        logger.error(f"🚨 User {user_id} not found.")
+        return
+
+    try:
+        # ✅ Get the group and active users
         group = Group.objects.get(pk=group_id)
         users_in_group = group.user_set.filter(is_active=True)
-        gsat = [user.phone_number for user in users_in_group]
-        message = message
-        send_bulk_sms(gsat, message)
-        # Log the result
-        logger.info("Bulk SMS task completed successfully")
-        log_message = f"Bulk SMS sent successfully to {', '.join(gsat)}"
-        log_entry = SmsLog(level="INFO", message=log_message)
-        log_entry.save()
+        phone_numbers = [user.phone_number for user in users_in_group]
+
+    except Group.DoesNotExist:
+        logger.error(f"🚨 Group {group_id} not found.")
+        return
+
+    if not phone_numbers:
+        logger.warning(f"⚠️ No active users in group {group.name}. Skipping SMS sending.")
+        return
+
+    # ✅ Get employer-specific Twilio credentials from TenantApiKeys
+    twilio_keys = TenantApiKeys.objects.filter(
+        employer=employer, is_active=True
+    ).values("account_sid", "auth_token", "notify_service_sid").first()
+    print("Employer, Twilio keys :", employer, twilio_keys)
+    if not twilio_keys:
+        logger.error(f"🚨 No active Twilio credentials for employer: {employer.name}. SMS not sent.")
+        return
+
+    twilio_account_sid = twilio_keys.get("account_sid")
+    twilio_auth_token = twilio_keys.get("auth_token")
+    twilio_notify_sid = twilio_keys.get("notify_service_sid")
+
+    if not twilio_account_sid or not twilio_auth_token or not twilio_notify_sid:
+        logger.error(f"🚨 Missing Twilio credentials for employer: {employer.name}.")
+        return
+
+    try:
+        # ✅ Send bulk SMS, now including employer info
+        send_bulk_sms(phone_numbers, message, twilio_account_sid, twilio_auth_token, twilio_notify_sid)
+
+        log_message = f"📢 Bulk SMS sent by {employer.name} to {group.name} ({len(phone_numbers)} recipients)"
+        logger.info(log_message)
+
+        SmsLog.objects.create(level="INFO", message=log_message)
+
     except Exception as e:
-        # Log or handle other exceptions
-        logger.error(f"An error occurred: {str(e)}")
+        logger.error(f"🚨 An error occurred while sending SMS: {str(e)}")
+
+
+#
+# APPROVED
+#
+# This task is APPROVED for multi tenant
+# This task takes employers who want the tobacco email and
+# logs them and their users when sent.
+# The logs are in the SmsLogs model
+@app.task(name="send_weekly_tobacco_email")
+def send_weekly_tobacco_email():
+    success_message = "Weekly Tobacco Emails Sent Successfully"
+    template_id = "d-488749fd81d4414ca7bbb2eea2b830db"
+    attachments = None
+
+    try:
+        # ✅ Get Employers who have this EMAIL enabled
+        enabled_employers = EmployerSMSTask.objects.filter(
+            task_name="send_weekly_tobacco_email",
+            is_enabled=True
+        ).values_list("employer_id", flat=True)
+
+        if not enabled_employers:
+            logger.warning("No employers enabled for this email task.")
+            return success_message
+
+        # ✅ Pre-fetch employers and store them in a dictionary (avoid multiple DB hits)
+        employers = Employer.objects.filter(id__in=enabled_employers).values("id", "name", "verified_sender_email")
+        employer_dict = {
+            emp["id"]: {
+                "name": emp["name"],
+                "sender": emp["verified_sender_email"] if emp["verified_sender_email"] else settings.MAIL_DEFAULT_SENDER
+            }
+            for emp in employers
+        }
+
+        # ✅ Fetch all active users in one query (reduce DB hits)
+        active_users = CustomUser.objects.filter(
+            is_active=True,
+            employer_id__in=enabled_employers
+        ).values("id", "email", "username", "employer_id")
+
+        # ✅ Get template name in one query
+        template_name = EmailTemplate.objects.filter(sendgrid_id=template_id).values_list("name", flat=True).first() or "Unknown Template"
+
+        # ✅ Group users by employer_id
+        employer_user_map = {}
+        for user in active_users:
+            employer_user_map.setdefault(user["employer_id"], []).append(user)
+
+        # ✅ Loop through employers and process emails
+        for employer_id, employer_info in employer_dict.items():
+            users = employer_user_map.get(employer_id, [])
+            verified_sender = employer_info["sender"]
+            employer_name = employer_info["name"]
+
+            email_sent = False
+
+            # ✅ Process emails in bulk for efficiency
+            for user in users:
+                success = create_master_email(
+                    to_email=user["email"],
+                    sendgrid_id=template_id,
+                    template_data={"name": user["username"]},
+                    attachments=attachments,
+                    verified_sender=verified_sender  # ✅ Employer-specific sender
+                )
+                if success:
+                    email_sent = True  # ✅ At least one email was successfully sent
+
+            # ✅ Log **once per employer** (whether success or failure)
+            EmailLog.objects.create(
+                employer_id=employer_id,
+                sender_email=verified_sender,
+                template_id=template_id,
+                template_name=template_name,
+                status="SUCCESS" if email_sent else "FAILED",
+            )
+
+            logger.info(f"✅ Weekly Tobacco Email sent for employer: {employer_name} ({verified_sender})")
+
+        return success_message
+
+    except Exception as e:
+        logger.error(f"Error in send_weekly_tobacco_email: {e}", exc_info=True)
+        return "Error sending weekly tobacco emails"
+
+
+# SMS tasks
+@app.task(name="sms")
+def send_sms_task(phone_number, message):
+    try:
+        send_sms_model(phone_number, message)
+        return "Text message sent successfully"
+    except Exception as e:
+        return str(e)
 
 
 @app.task(name="send whatsapp")
@@ -544,92 +735,6 @@ def start_campaign_task(selected_list_id):
 
     # Log or manage start/end dates for your campaign as needed
     print(f"Campaign scheduled for list {selected_list_id}.")
-
-
-#
-# APPROVED
-#
-# This task is APPROVED for multi tenant
-# This task takes employers who want the tobacco email and
-# logs them and their users when sent.
-# The logs are in the SmsLogs model
-@app.task(name="send_weekly_tobacco_email")
-def send_weekly_tobacco_email():
-    success_message = "Weekly Tobacco Emails Sent Successfully"
-    template_id = "d-488749fd81d4414ca7bbb2eea2b830db"
-    attachments = None
-
-    try:
-        # ✅ Get Employers who have this EMAIL enabled
-        enabled_employers = EmployerSMSTask.objects.filter(
-            task_name="send_weekly_tobacco_email",
-            is_enabled=True
-        ).values_list("employer_id", flat=True)
-
-        if not enabled_employers:
-            logger.warning("No employers enabled for this email task.")
-            return success_message
-
-        # ✅ Pre-fetch employers and store them in a dictionary (avoid multiple DB hits)
-        employers = Employer.objects.filter(id__in=enabled_employers).values("id", "name", "verified_sender_email")
-        employer_dict = {
-            emp["id"]: {
-                "name": emp["name"],
-                "sender": emp["verified_sender_email"] if emp["verified_sender_email"] else settings.MAIL_DEFAULT_SENDER
-            }
-            for emp in employers
-        }
-
-        # ✅ Fetch all active users in one query (reduce DB hits)
-        active_users = CustomUser.objects.filter(
-            is_active=True,
-            employer_id__in=enabled_employers
-        ).values("id", "email", "username", "employer_id")
-
-        # ✅ Get template name in one query
-        template_name = EmailTemplate.objects.filter(sendgrid_id=template_id).values_list("name", flat=True).first() or "Unknown Template"
-
-        # ✅ Group users by employer_id
-        employer_user_map = {}
-        for user in active_users:
-            employer_user_map.setdefault(user["employer_id"], []).append(user)
-
-        # ✅ Loop through employers and process emails
-        for employer_id, employer_info in employer_dict.items():
-            users = employer_user_map.get(employer_id, [])
-            verified_sender = employer_info["sender"]
-            employer_name = employer_info["name"]
-
-            email_sent = False
-
-            # ✅ Process emails in bulk for efficiency
-            for user in users:
-                success = create_master_email(
-                    to_email=user["email"],
-                    sendgrid_id=template_id,
-                    template_data={"name": user["username"]},
-                    attachments=attachments,
-                    verified_sender=verified_sender  # ✅ Employer-specific sender
-                )
-                if success:
-                    email_sent = True  # ✅ At least one email was successfully sent
-
-            # ✅ Log **once per employer** (whether success or failure)
-            EmailLog.objects.create(
-                employer_id=employer_id,
-                sender_email=verified_sender,
-                template_id=template_id,
-                template_name=template_name,
-                status="SUCCESS" if email_sent else "FAILED",
-            )
-
-            logger.info(f"✅ Weekly Tobacco Email sent for employer: {employer_name} ({verified_sender})")
-
-        return success_message
-
-    except Exception as e:
-        logger.error(f"Error in send_weekly_tobacco_email: {e}", exc_info=True)
-        return "Error sending weekly tobacco emails"
 
 
 @app.task(name="monthly_store_calls")

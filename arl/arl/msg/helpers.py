@@ -79,22 +79,26 @@ def create_master_email(to_email, sendgrid_id, template_data, attachments=None, 
         if isinstance(to_email, str):
             to_email = [to_email]  # Convert single email to list
         print(f"📧 The helper is sending email to: {', '.join(to_email)}")
-        user_email = to_email[0] if isinstance(to_email, list) and to_email else to_email 
-        try:
-            user = CustomUser.objects.get(email=user_email)
-            employer = user.employer
-            print(f"✅ Found user: {user.email}, Employer: {employer}")
-        except CustomUser.DoesNotExist:
-            print(f"❌ No user found with email {user_email}. Using default sender.")
-            sender_email = settings.MAIL_DEFAULT_SENDER
+        # ✅ If `verified_sender` is explicitly provided, use it without any lookup
+        if verified_sender:
+            sender_email = verified_sender
+            print(f"✅ Using explicitly provided sender email: {verified_sender}")
         else:
-            # ✅ Retrieve the sender email from the Tenant API Key model
-            tenant_api_key = TenantApiKeys.objects.filter(employer=employer).first()
-            sender_email = tenant_api_key.sender_email if tenant_api_key else settings.MAIL_DEFAULT_SENDER
+            # ✅ Look up the employer and their verified sender email
+            user_email = to_email[0] if isinstance(to_email, list) and to_email else to_email
+            try:
+                user = CustomUser.objects.get(email=user_email)
+                employer = user.employer
+                print(f"✅ Found user: {user.email}, Employer: {employer}")
+            except CustomUser.DoesNotExist:
+                print(f"❌ No user found with email {user_email}. Using default sender.")
+                sender_email = settings.MAIL_DEFAULT_SENDER
+            else:
+                # ✅ Retrieve the sender email from the Tenant API Key model
+                tenant_api_key = TenantApiKeys.objects.filter(employer=employer).first()
+                sender_email = tenant_api_key.verified_sender_email if tenant_api_key else settings.MAIL_DEFAULT_SENDER
 
-        print(f"📧 Using sender email: {sender_email}")
-
-        
+        print(f"📧 Final sender email: {sender_email}")
         # Initialize the email message
         message = Mail(
             from_email=sender_email,
@@ -279,26 +283,50 @@ def send_sms(phone_number, body):
     return None
 
 
-# This function has flters for sms activated
-# but still needs to filter for proper settings
-def send_bulk_sms(numbers, body):
-    try:
-        # ✅ Remove empty or invalid numbers before processing
-        bindings = [
-            json.dumps({"binding_type": "sms", "address": str(number)})
-            for number in numbers
-        ]
-        print("=====> To Bindings :>", bindings, "<: =====")
-        notification = client.notify.services(
-            settings.TWILIO_NOTIFY_SERVICE_SID
-        ).notifications.create(to_binding=bindings, body=body)
+# This function function is APPROVED for multip tenant.
+# It gets its arguments from the task
+def send_bulk_sms(numbers, body, twilio_account_sid, twilio_auth_token, twilio_notify_sid):
+    """
+    Sends bulk SMS using the employer's Twilio Notify credentials.
 
-        # Log a success message
-        logger.info(f"Bulk SMS sent successfully to {', '.join(numbers)}")
+    Args:
+        numbers (list): List of phone numbers.
+        body (str): SMS body message.
+        twilio_account_sid (str): Employer's Twilio Account SID.
+        twilio_auth_token (str): Employer's Twilio Auth Token.
+        twilio_notify_sid (str): Employer's Twilio Notify Service SID.
+
+    Returns:
+        bool: True if SMS was sent successfully, False otherwise.
+    """
+    try:
+        if not twilio_account_sid or not twilio_auth_token or not twilio_notify_sid:
+            logger.error("🚨 Missing Twilio credentials. Cannot send SMS.")
+            return False
+
+        valid_numbers = [str(number) for number in numbers if number]
+
+        if not valid_numbers:
+            logger.warning("⚠️ No valid phone numbers provided for SMS.")
+            return False
+
+        bindings = [json.dumps({"binding_type": "sms", "address": number}) for number in valid_numbers]
+
+        print("=====> To Bindings :>", bindings, "<: =====")
+
+        # ✅ Use the employer's Twilio Account SID & Auth Token
+        client = Client(twilio_account_sid, twilio_auth_token)
+        notification = client.notify.services(twilio_notify_sid).notifications.create(
+            to_binding=bindings,
+            body=body,
+            delivery_callback_url= "https://6c05-2607-fea8-2840-b200-751b-5d20-21ce-303c.ngrok-free.app/webhook/whatsapp/"
+        )
+
+        logger.info(f"📢 Bulk SMS sent successfully to {len(valid_numbers)} numbers.")
         return True
+
     except Exception as e:
-        # Log the exception
-        logger.error(f"Failed to send bulk SMS: {str(e)}")
+        logger.error(f"🚨 Failed to send bulk SMS: {str(e)}")
         return False
 
 
@@ -372,16 +400,19 @@ def send_docusign_email_with_attachment(to_emails, subject, body, file_path):
         print("Error sending email:", str(e))
 
 
+#
+# APPROVED
+#
+# This function is APPROVED for multi tenant.
 # sends a single email to the user with a pdf of
 # the incident file attached.
-
-
 def create_incident_file_email(
-    to_email, subject, body, attachment_buffer=None, attachment_filename=None
+    to_email, subject, body, attachment_buffer=None, attachment_filename=None,
+    sender_email=None
 ):
     try:
         message = Mail(
-            from_email=settings.MAIL_DEFAULT_SENDER,
+            from_email=sender_email,
             to_emails=to_email,
             subject=subject,
             html_content=body,
@@ -417,21 +448,25 @@ def create_incident_file_email(
             logger.error(f"SendGrid response body: {response_body}")
 
 
+#
+# APPROVED
+#
+# This file is APPROVED for multi tenant use.
 # sends new icident pdf to users with the rule
 # incident_form_email
-
-
 def create_incident_file_email_by_rule(to_emails, subject, body,
                                        attachment_buffer=None,
-                                       attachment_filename=None):
+                                       attachment_filename=None,
+                                       sender_email=None):
     results = {"success": [], "failed": []}
+    sender_email = sender_email or settings.MAIL_DEFAULT_SENDER
     try:
         print(to_emails)
         for to_email in to_emails:
             try:
                 # Prepare the email message
                 message = Mail(
-                    from_email=settings.MAIL_DEFAULT_SENDER,
+                    from_email=sender_email,
                     to_emails=to_email,
                     subject=subject,
                     html_content=body,
@@ -449,7 +484,7 @@ def create_incident_file_email_by_rule(to_emails, subject, body,
                         file_type=FileType("application/pdf"),
                         disposition=Disposition("attachment"),
                     )
-                    message.attachment = attachment
+                    message.attachment = [attachment]
                 # Send the email
                 response = sg.send(message)
 

@@ -1,9 +1,12 @@
 import traceback
 from django.http import JsonResponse
+from django.conf import settings
 from phonenumbers import (parse, format_number, is_valid_number,
                           PhoneNumberFormat)
+from django.urls import reverse
+from django.http import HttpResponseRedirect
 from phonenumbers.phonenumberutil import NumberParseException
-from django.conf import settings
+from django.urls import reverse_lazy
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.decorators import login_required
@@ -21,34 +24,60 @@ from django_celery_results.models import TaskResult
 from twilio.base.exceptions import TwilioException
 from arl.msg.helpers import (check_verification_token,
                              request_verification_token)
+from django.db.models import Q
+from arl.msg.models import EmailTemplate
 from arl.msg.tasks import send_sms_task
+from arl.bucket.helpers import download_from_s3
 from celery import chain
-from .forms import CustomUserCreationForm, TwoFactorAuthenticationForm
-from .models import CustomUser, Employer, Store
+from .forms import (CustomUserCreationForm, TwoFactorAuthenticationForm,
+                    EmployerRegistrationForm, NewHireInviteForm,
+                    NewHireInvite)
+from .models import (CustomUser, Employer, EmployerSettings,
+                     EmployerRequest, NewHireInvite)
 from .tasks import (create_newhire_data_email, save_user_to_db,
-                    send_newhire_template_email_task)
-from arl.msg.helpers import client
+                    send_newhire_template_email_task,
+                    send_payment_email_task)
 from arl.dsign.tasks import create_docusign_envelope_task
+from arl.dsign.models import DocuSignTemplate, SignedDocumentFile
+from .helpers import send_new_hire_invite
+import stripe
+import logging
+import os
+from twilio.rest import Client
+from django.core.paginator import Paginator
+
+logger = logging.getLogger(__name__)
 
 
 class RegisterView(FormView):
-    template_name = "user/index.html"
+    template_name = "user/register.html"
     form_class = CustomUserCreationForm
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["Employer"] = Employer.objects.all()
-        context["Store"] = Store.objects.all()
-        return context
+    def get(self, request, *args, **kwargs):
+        """
+        Displays the registration form only if the token is valid.
+        """
+        token = kwargs.get("token")
+        print(f"🔹 Received Token: {token}")
+        invite = get_object_or_404(NewHireInvite, token=token, used=False)  # ✅ Ensure the token is valid
+
+        form = CustomUserCreationForm(
+            initial={"email": invite.email, "employer": invite.employer, "phone_number": ""}
+        )
+        return self.render_form(request, form, invite)
 
     def form_valid(self, form):
         try:
+            print(form.data)
+            token = self.kwargs.get("token")
+            invite = get_object_or_404(NewHireInvite, token=token, used=False)
             verified_phone_number = self.request.POST.get("phone_number")
             if verified_phone_number is None:
                 raise Http404("Phone number not found in form data.")
 
             user = form.save(commit=False)
             user.phone_number = verified_phone_number
+            user.employer = invite.employer
             # Serialize the form data
             serialized_data = self.serialize_user_data(form.cleaned_data)
             print(serialized_data)
@@ -60,7 +89,7 @@ class RegisterView(FormView):
             save_user_to_db.delay(**serialized_data)
             messages.success(
                 self.request,
-                "Thank you for registering. Please check your email for your New Hire File from Docusign.",
+                "Thank you for registering. Check your email for a new hire file from Docusign.",
             )
             return redirect("home")
 
@@ -72,10 +101,24 @@ class RegisterView(FormView):
             return redirect("home")
 
     def form_invalid(self, form):
-        return self.render_to_response(self.get_context_data(form=form))
+        """
+        If the form is invalid, retain pre-filled values.
+        """
+        print(form.data)
+        token = self.kwargs.get("token")
+        invite = get_object_or_404(NewHireInvite, token=token, used=False)
 
-    def get(self, request, *args, **kwargs):
-        return super().get(request, *args, **kwargs)
+        # ✅ Ensure employer and phone_number persist
+        form.data = form.data.copy()  # Make form data mutable
+        form.data["employer"] = invite.employer.id # Set employer ID
+        form.data["phone_number"] = self.request.POST.get("phone_number", "")
+        form.fields["employer"].queryset = Employer.objects.filter(id=invite.employer.id)
+
+        return self.render_form(self.request, form, invite)
+
+    def render_form(self, request, form, invite):
+        """✅ Fix: Helper function to render the form properly"""
+        return render(request, "user/register.html", {"form": form, "invite": invite})
 
     def post(self, request, *args, **kwargs):
         return super().post(request, *args, **kwargs)
@@ -113,6 +156,20 @@ class RegisterView(FormView):
         return form_data
 
 
+class EmployerRegistrationView(FormView):
+    template_name = "user/employer_registration.html"
+    form_class = EmployerRegistrationForm
+    success_url = reverse_lazy("employer_registration_success")
+
+    def form_valid(self, form):
+        employer_request = form.save(commit=False)
+        employer_request.status = "pending"  # Mark as pending
+        employer_request.save()
+
+        messages.success(self.request, "Your request has been submitted for review. You will receive an email once approved.")
+        return super().form_valid(form)
+
+
 # signal to trigger events post save of new use.
 @receiver(post_save, sender=CustomUser)
 def handle_new_hire_registration(sender, instance, created, **kwargs):
@@ -121,9 +178,75 @@ def handle_new_hire_registration(sender, instance, created, **kwargs):
         return  # Exit early if the user was just updated
 
     try:
-        # ✅ Assign user to "GSA" group
-        gsa_group, _ = Group.objects.get_or_create(name="GSA")
-        instance.groups.add(gsa_group)
+        # ✅ Find the invite that was used for registration
+        invite = NewHireInvite.objects.filter(email=instance.email, used=False).first()
+
+        if invite:
+            role = invite.role  # ✅ Assign the role from the invite
+            invite.used = True  # ✅ Mark the invite as used
+            invite.save()
+        else:
+            print(f"❌ No invite found for {instance.email}. Defaulting to GSA.")
+            role = "GSA"  # Default role if no invite is found
+
+        # ✅ Assign the user to the correct group based on the role
+        role_group, _ = Group.objects.get_or_create(name=role)
+        instance.groups.add(role_group)
+        print(f"✅ User {instance.email} assigned to group: {role}")
+        # ✅ Get Employer
+        employer = instance.employer
+        if not employer:
+            print(f"❌ No employer found for user {instance.email}. Skipping new hire setup.")
+            return
+
+        # ✅ Retrieve `send_new_hire_file` setting from `EmployerSettings`
+        send_new_hire_file = (
+            EmployerSettings.objects.filter(employer=employer)
+            .values_list("send_new_hire_file", flat=True)
+            .first()
+            or False
+        )
+
+        # ✅ Fetch Employer Settings
+        employer_settings = EmployerSettings.objects.filter(employer=employer).first()
+
+        # ✅ Ensure Employer Settings exist
+        if not employer_settings:
+            print(f"🚨 No EmployerSettings found for {employer.name}. Defaulting to False.")
+            send_new_hire_file = False
+        else:
+            send_new_hire_file = employer_settings.send_new_hire_file
+            print(f"📌 Employer Settings Found: {bool(employer_settings)}")
+            print(f"📌 send_new_hire_file: {send_new_hire_file} (Expected: True)")
+
+
+        # ✅ Retrieve the correct DocuSign template for this employer (if needed)
+        docusign_template = None
+        template_id = None
+        if send_new_hire_file:
+            docusign_template = DocuSignTemplate.objects.filter(
+                employer=employer, template_name="New_Hire_File"
+            ).first()
+
+        template_id = docusign_template.template_id if docusign_template else None
+        print("Docusign Template id :", template_id)
+        email_template = EmailTemplate.objects.filter(
+            employers=employer, name="New_Hire_Onboarding"
+        ).first()
+
+        if not email_template:
+            print(f"⚠️ No 'New Hire Onboarding' email template assigned to {employer.name}. Skipping email.")
+            sendgrid_id = None 
+
+        sendgrid_id = email_template.sendgrid_id  
+        senior_contact_name = getattr(employer, "senior_contact_name", "HR Team")
+        # ✅ Debugging prints
+        print(f"👔 Employer: {employer.name}")
+        print(f"📩 SendGrid Template: {sendgrid_id}")
+        print(f"👤 Senior Contact Name: {senior_contact_name}")
+        print(f"📜 DocuSign Enabled? {send_new_hire_file}")
+        print(f"📑 DocuSign Template: {docusign_template.template_name if docusign_template else 'None'}")
+        print(f"📜 DocuSign Template ID: {template_id}")
 
         # ✅ Format phone number (if exists)
         formatted_phone = (
@@ -136,11 +259,11 @@ def handle_new_hire_registration(sender, instance, created, **kwargs):
         def serialize_date(date_obj):
             return date_obj.strftime("%Y-%m-%d") if date_obj else None
 
-        # ✅ Prepare DocuSign envelope arguments
-        envelope_args = {
-            "signer_email": instance.email,
-            "signer_name": instance.username,
-            "template_id": settings.DOCUSIGN_TEMPLATE_ID,
+        # ✅ Prepare email template data
+        template_data = {
+            "name": instance.first_name,
+            "senior_contact_name": senior_contact_name,
+            "company_name": employer.name,
         }
 
         # ✅ Prepare email data for HR
@@ -165,20 +288,33 @@ def handle_new_hire_registration(sender, instance, created, **kwargs):
             ),
         }
 
-        # ✅ Chain tasks in order of execution
-        chain(
+        # ✅ First part: Always send new hire template email and HR data
+        initial_tasks = chain(
             send_newhire_template_email_task.s(
-                instance.email, instance.first_name, settings.SENDGRID_NEWHIRE_ID
+                instance.email, sendgrid_id, template_data
             ),
-            create_docusign_envelope_task.s(envelope_args).set(immutable=True),
             create_newhire_data_email.s(email_data).set(immutable=True),
-            send_sms_task.s(
-                formatted_phone,
-                "Welcome Aboard! Thank you for registering. Check your email for a link to DocuSign to complete your new hire file.",
-            ).set(immutable=True),
-        ).apply_async()
+        )
 
-        print("📨 Celery tasks have been chained and dispatched successfully!")
+        # ✅ If DocuSign is enabled, add DocuSign + SMS to chain
+        if send_new_hire_file and template_id:
+            docusign_tasks = chain(
+                create_docusign_envelope_task.s({
+                    "signer_email": instance.email,
+                    "signer_name": instance.username,
+                    "template_id": template_id,  # ✅ Use employer-specific template
+                }).set(immutable=True),
+                send_sms_task.s(
+                    formatted_phone,
+                    "Welcome Aboard! Thank you for registering. Check your email for a link to DocuSign to complete your new hire file.",
+                ).set(immutable=True),
+            )
+            final_task_chain = chain(initial_tasks, docusign_tasks)  # Merge chains
+        else:
+            final_task_chain = initial_tasks  # No DocuSign tasks
+
+        # ✅ Dispatch the task chain
+        final_task_chain.apply_async()
 
     except Exception as e:
         print(f"❌ Error during new hire registration: {e}")
@@ -273,7 +409,6 @@ def login_view(request):
         form = AuthenticationForm(request)
 
     return render(request, "user/login.html", {"form": form})
-    
 
 
 def verification_page(request):
@@ -507,3 +642,235 @@ def phone_format(request):
             return JsonResponse({"error": "Invalid phone number format."}, status=400)
 
     return JsonResponse({"error": "Invalid request method."}, status=405)
+
+
+def landing_page(request):
+    """Landing page where new employers can request access and existing users can log in."""
+    return render(request, "user/landing_page.html")
+
+
+@login_required
+def hr_dashboard(request):
+    """HR Dashboard: Invite new hires and manage DocuSign templates."""
+    employer = request.user.employer  # Get employer data
+
+    # ✅ Restrict access to Managers & Employers only
+    if not employer or not request.user.groups.filter(name__in=["Manager", "EMPLOYER"]).exists():
+        messages.error(request, "You must be an employer or manager to invite new hires.")
+        return redirect("home")
+
+    templates = DocuSignTemplate.objects.filter(employer=employer)  # Fetch templates
+    pending_invites = NewHireInvite.objects.filter(employer=employer, used=False)  # Fetch pending invites
+
+    if request.method == "POST":
+        form = NewHireInviteForm(request.POST, employer=employer)
+
+        if form.is_valid():
+            email = form.cleaned_data["email"]
+
+            # ✅ **Check if the email is already registered**
+            if CustomUser.objects.filter(email=email).exists():
+                messages.error(request, f"A user with email {email} already exists.")
+                return HttpResponseRedirect(reverse("hr_dashboard") + "?tab=employees")
+
+            invite = form.save()
+
+            # ✅ Send the invite email
+            send_new_hire_invite(
+                new_hire_email=invite.email,
+                new_hire_name=invite.name,
+                role=invite.role,
+                start_date="TBD",  # Can be customized later
+                employer=employer
+            )
+
+            messages.success(request, f"Invite sent to {invite.name} ({invite.email})")
+            return HttpResponseRedirect(reverse("hr_dashboard") + "?tab=employees")
+
+    else:
+        form = NewHireInviteForm(employer=employer)
+
+    return render(request, "user/hr_dashboard.html", {
+        "templates": templates,
+        "pending_invites": pending_invites,
+        "form": form,  # ✅ Ensure the form is passed to the template
+    })
+
+
+@login_required
+def cancel_invite(request, invite_id):
+    """Allows HR to cancel a new hire invitation."""
+    invite = get_object_or_404(NewHireInvite, id=invite_id, employer=request.user.employer)
+
+    if invite.used:
+        messages.error(request, "This invite has already been used and cannot be canceled.")
+    else:
+        invite.delete()
+        messages.success(request, f"Invite for {invite.email} has been canceled.")
+
+    return HttpResponseRedirect(reverse("hr_dashboard") + "?tab=employees")
+
+
+@login_required
+def resend_invite(request, invite_id):
+    """Allows HR to resend a new hire invitation."""
+    invite = get_object_or_404(NewHireInvite, id=invite_id, employer=request.user.employer)
+
+    if invite.used:
+        messages.error(request, "This invite has already been used and cannot be resent.")
+    else:
+        # ✅ Resend the invite email
+        send_new_hire_invite(
+            new_hire_email=invite.email,
+            new_hire_name=invite.name,
+            role=invite.role,
+            start_date="TBD",
+            employer=invite.employer
+        )
+        messages.success(request, f"Invite for {invite.email} has been resent.")
+
+    return HttpResponseRedirect(reverse("hr_dashboard") + "?tab=employees")
+
+
+@login_required
+def approve_employer(request, pk):
+    employer_request = get_object_or_404(EmployerRequest, pk=pk)
+
+    if employer_request.status != "pending":
+        messages.warning(request, "This request has already been processed.")
+        return redirect("/admin/user/employerrequest/")
+
+    # ✅ Generate verified sender local & email
+    verified_sender_local_email = employer_request.verified_sender_local.lower().replace(" ", "").replace(".", "")
+    verified_sender_email = f"{verified_sender_local_email}@1553690ontarioinc.com"
+
+    # ✅ Create an Employer instance
+    employer, created = Employer.objects.get_or_create(
+        name=employer_request.name,
+        defaults={
+            "email": employer_request.email,
+            "phone_number": employer_request.phone_number,  # Fixed field name
+            "address": employer_request.address,
+            "city": employer_request.city,
+            "state_province": employer_request.state_province,
+            "country": employer_request.country,
+            "senior_contact_name": employer_request.senior_contact_name,
+            "verified_sender_local": verified_sender_local_email,  # ✅ Add local sender
+            "verified_sender_email": verified_sender_email,  # ✅ Add verified sender email
+            "is_active": False,
+        }
+    )
+    # ✅ If the employer already exists, update missing fields
+    if not created:
+        for field in [
+            "email", "phone_number", "address", "city", "state_province",
+            "country", "senior_contact_name", "verified_sender_local", "verified_sender_email"
+        ]:
+            if getattr(employer, field) is None and getattr(employer_request, field):
+                setattr(employer, field, getattr(employer_request, field))
+        employer.save()
+
+    # ✅ Create Stripe checkout session
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+    checkout_session = stripe.checkout.Session.create(
+        payment_method_types=["card"],
+        mode="subscription",
+        customer_email=employer.email,
+        line_items=[{"price": settings.STRIPE_PRICE_ID, "quantity": 1}],
+        success_url=f"{settings.BASE_URL}/payment-success?session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{settings.BASE_URL}/payment-cancel",
+    )
+
+    # ✅ Send email with payment link
+    send_payment_email_task.delay(employer.email, checkout_session.url, employer.name)
+
+    # ✅ Update request status
+    employer_request.status = "approved"
+    employer_request.save()
+
+    messages.success(request, f"Employer {employer.name} approved successfully.")
+    return redirect("/admin/user/employerrequest/")
+
+
+@login_required
+def reject_employer(request, pk):
+    employer_request = get_object_or_404(EmployerRequest, pk=pk)
+
+    if employer_request.status != "pending":
+        messages.warning(request, "This request has already been processed.")
+        return redirect("/admin/user/employerrequest/")
+
+    # ✅ Mark request as rejected
+    employer_request.status = "rejected"
+    employer_request.save()
+
+    messages.error(request, f"Employer request for {employer_request.name} has been rejected.")
+    return redirect("/admin/user/employerrequest/")
+
+
+@login_required
+def close_twilio_sub(request, subaccount_sid):
+    """
+    View to close a Twilio subaccount.
+    """
+    account_sid = os.getenv("TWILIO_ACCOUNT_SID")
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN")
+
+    if not account_sid or not auth_token:
+        return HttpResponse("❌ Twilio credentials not found.", status=400)
+
+    try:
+        client = Client(account_sid, auth_token)
+        account = client.api.v2010.accounts(subaccount_sid).update(status="closed")
+        return HttpResponse(f"✅ Twilio subaccount {subaccount_sid} closed successfully.", status=200)
+
+    except Exception as e:
+        return HttpResponse(f"❌ Error closing Twilio subaccount: {str(e)}", status=500)
+
+
+def hr_document_view(request):
+    query = request.GET.get("q", "").strip()
+    employer = request.user.employer
+
+    employees = CustomUser.objects.filter(employer=employer, is_active=True)
+    if query:
+        employees = employees.filter(
+            Q(first_name__icontains=query) |
+            Q(last_name__icontains=query) |
+            Q(email__icontains=query)
+        )
+
+    employees = employees.prefetch_related("signed_documents")
+
+    return render(request, "dsign/partials/employee_document_table.html", {
+        "employees": employees
+    })
+
+
+def download_signed_document(request, doc_id):
+    try:
+        print(doc_id)
+        # 🔍 Get the uploaded document
+        doc = get_object_or_404(SignedDocumentFile, id=doc_id)
+
+        # 🔑 Use the file path stored in the model (e.g., "DOCUMENTS/employer/uuid/filename.pdf")
+        return download_from_s3(request, doc.file_path)
+
+    except Exception as e:
+        print(f"Error in download_signed_document: {str(e)}")
+        return HttpResponse("Error downloading signed document", status=500)
+
+
+def fetch_signed_docs_by_user(request, user_id):
+    user = get_object_or_404(CustomUser, id=user_id)
+    documents = SignedDocumentFile.objects.filter(user=user).order_by("-uploaded_at")
+
+    # Paginate
+    paginator = Paginator(documents, 10)  # Show 5 per page
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, "user/hr/partials/document_results.html", {
+       "employee_id": user.id,
+        "page_obj": page_obj,
+    })

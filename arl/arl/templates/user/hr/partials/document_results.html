@@ -1,0 +1,56 @@
+{% if page_obj.object_list %}
+<table class="table table-sm">
+    <thead>
+        <tr>
+            <th>File Name</th>
+            <th>Uploaded At</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for doc in page_obj %}
+        <tr>
+            <td>{{ doc.file_name }}</td>
+            <td>{{ doc.uploaded_at|date:"Y-m-d H:i" }}</td>
+            <td>
+                <a href="{% url 'download_signed_document' doc.id %}" class="btn btn-sm btn-primary">View</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- ✅ Pagination Controls -->
+<div class="d-flex justify-content-center">
+    <nav aria-label="Document pagination">
+        <ul class="pagination pagination-sm">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link"
+                   hx-get="{% url 'fetch_signed_docs_by_user' employee_id %}?page={{ page_obj.previous_page_number }}"
+                   hx-target="#docs-{{ employee_id }} .doc-row-content"
+                   hx-swap="innerHTML">Previous</a>
+            </li>
+            {% endif %}
+            {% for num in page_obj.paginator.page_range %}
+            <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+                <a class="page-link"
+                   hx-get="{% url 'fetch_signed_docs_by_user' employee_id %}?page={{ num }}"
+                   hx-target="#docs-{{ employee_id }} .doc-row-content"
+                   hx-swap="innerHTML">{{ num }}</a>
+            </li>
+            {% endfor %}
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link"
+                   hx-get="{% url 'fetch_signed_docs_by_user' employee_id %}?page={{ page_obj.next_page_number }}"
+                   hx-target="#docs-{{ employee_id }} .doc-row-content"
+                   hx-swap="innerHTML">Next</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+</div>
+{% else %}
+<p class="text-muted">No signed documents available.</p>
+{% endif %}

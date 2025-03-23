@@ -53,24 +53,34 @@ class SendSMSView(LoginRequiredMixin, UserPassesTestMixin, FormView):
     def test_func(self):
         return is_member_of_msg_group(self.request.user)
 
+    def get_form_kwargs(self):
+        """Pass the logged-in user to the form to ensure we know their employer."""
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user  # ✅ Pass the current user
+        return kwargs
+
     def form_valid(self, form):
-        # Fetch the ID
-        selected_group_id = form.cleaned_data["selected_group"].id
+        selected_group = form.cleaned_data["selected_group"]
         message = form.cleaned_data["message"]
+        user_id = self.request.user.id
 
-        # Retrieve the selected group using its ID
-        group = get_object_or_404(Group, pk=selected_group_id)
-        group_id = group.id
-
-        # Call the task to send sms.
-        send_one_off_bulk_sms_task.delay(group_id, message)
+        # ✅ Pass only valid numbers to the SMS task
+        send_one_off_bulk_sms_task.delay(selected_group.id, message, user_id)
 
         return super().form_valid(form)
 
     def get_context_data(self, **kwargs):
+        """Filter groups by employer and pass them to the context."""
         context = super().get_context_data(**kwargs)
-        # Provide groups for form dropdown
-        context["groups"] = Group.objects.all()
+        user = self.request.user
+
+        if user and user.employer:
+            employer = user.employer
+            groups = Group.objects.filter(user__employer=employer).distinct()
+        else:
+            groups = Group.objects.none()  # No groups if no employer is found
+
+        context["groups"] = groups  # ✅ Pass filtered groups
         return context
 
 
@@ -78,6 +88,12 @@ class SendTemplateEmailView(LoginRequiredMixin, UserPassesTestMixin, FormView):
     form_class = TemplateEmailForm
     template_name = "msg/template_email_form.html"
     success_url = reverse_lazy("template_email_success")
+
+    def get_form_kwargs(self):
+        """Pass the current user to the form dynamically."""
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user  # ✅ Pass user here
+        return kwargs
 
     def test_func(self):
         return is_member_of_msg_group(self.request.user)
@@ -97,6 +113,7 @@ class SendTemplateEmailView(LoginRequiredMixin, UserPassesTestMixin, FormView):
         if not selected_groups and not selected_users:
             return JsonResponse({"success": False, "error":
                                 "No recipients selected."}, status=400)
+        employer = self.request.user.employer
 
         # Collect attachments
         attachments = self.collect_attachments()
@@ -116,7 +133,8 @@ class SendTemplateEmailView(LoginRequiredMixin, UserPassesTestMixin, FormView):
         master_email_send_task.delay(
             recipients=recipients,
             sendgrid_id=sendgrid_id,
-            attachments=attachments
+            attachments=attachments,
+            employer_id=employer.id if employer else None
         )
 
         print("sent")
@@ -362,11 +380,13 @@ def whatsapp_webhook(request):
     if request.method != "POST":
         return render(request, "incident/405.html", status=405)
     try:
+        
         user = request.POST.get('From')
         message = request.POST.get('Body')
         print(f'{user} says {message}')
         body_unicode = request.body.decode("utf-8")
         data = urllib.parse.parse_qs(body_unicode)
+        print(f"📩 Twilio Webhook Data: {json.dumps(data, indent=2)}")
         process_whatsapp_webhook.delay(data)
     except Exception as e:
         logger.error(f"Error processing webhook data: {e}")

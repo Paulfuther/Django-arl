@@ -7,6 +7,10 @@ from arl.dsign.views import (
     list_docusign_envelope,
     retrieve_docusign_envelope,
     waiting_for_others_view,
+    edit_document_page, docusign_close,
+    create_new_document_page,
+
+    
 )
 
 urlpatterns = [
@@ -24,4 +28,8 @@ urlpatterns = [
         waiting_for_others_view,
         name="waiting_for_others",
     ),
+    #path("templates/edit/<str:template_id>/", edit_template, name="edit_template"),
+    path("docusign-close/", docusign_close, name="docusign_close"),
+    path("docusign/new-document/", create_new_document_page, name="create_new_document_page"),
+    path("docusign/edit-document/<str:template_id>/", edit_document_page, name="edit_document_page"),
 ]

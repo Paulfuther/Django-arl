@@ -183,18 +183,26 @@ def handle_new_incident_form_creation(sender, instance, created, **kwargs):
     """
     Signal to handle actions on Incident form creation.
     """
+    logger.warning(f"instance: {instance.user_employer} | Employer ID: {instance.user_employer.id}")
     try:
         if created:
-            # Mark the instance as queued for sending
+            employer_id = instance.user_employer.id if instance.user_employer else None
+
+            if not employer_id:
+                logger.warning(f"⚠️ Employer not found for Incident {instance.id}. Skipping email.")
+                return
+
+            # ✅ Mark the instance as queued for sending
             instance.queued_for_sending = True
             instance.save(update_fields=["queued_for_sending"])
-
+            print("empoloyer id :", employer_id)
             # Step 1: Generate PDF and email the group
             chain(
                 generate_pdf_task.s(instance.id),
                 send_email_to_group_task.s(
                     group_name="incident_form_email",
-                    subject="A New Incident Report Has Been Created"
+                    subject="A New Incident Report Has Been Created",
+                    employer_id=employer_id,
                 )
             ).apply_async()
 
@@ -566,6 +574,15 @@ class IncidentListView(PermissionRequiredMixin, ListView):
     permission_required = "incident.view_incident"
     raise_exception = True
     permission_denied_message = "You are not allowed to view incidents."
+
+    def get_queryset(self):
+        """Filter incidents by the employer of the logged-in user."""
+        user = self.request.user
+
+        if not hasattr(user, "employer"):
+            return Incident.objects.none()  # If user has no employer, return empty queryset
+
+        return Incident.objects.filter(user_employer=user.employer)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

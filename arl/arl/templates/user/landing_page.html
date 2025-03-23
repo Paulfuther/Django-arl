@@ -1,0 +1,48 @@
+{% extends "../base/base.html" %}
+{% block template %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+<div class="container min-vh-100 d-flex flex-column justify-content-center align-items-center">
+    <div class="text-center w-100 w-md-75 w-lg-50">
+        <legend>Welcome to Our Platform</legend>
+        <p class="text-muted lead d-none d-md-block">
+            Manage your employees, documents, and communications all in one place.
+        </p>
+        <p class="text-muted small d-md-none mx-auto" style="max-width: 320px;">
+            Manage employees, documents & communications in one place.
+        </p>
+    </div>
+
+    <div class="row mt-3 justify-content-center w-100">
+        <!-- New Employer Card -->
+        <div class="col-md-5 col-lg-4 col-10">
+            <div class="card shadow border-0 rounded-3">
+                <div class="card-body text-center py-4">
+                    <legend class="card-title text-dark h5">New Employer?</legend>
+                    <p class="text-muted">Register your company to get started.</p>
+                    <a href="{% url 'register_employer' %}" 
+                       class="btn btn-primary btn-lg w-100 mt-2">
+                        Request Access
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Existing User Card -->
+        <div class="col-md-5 col-lg-4 col-10 mt-3 mt-md-0">
+            <div class="card shadow border-0 rounded-3">
+                <div class="card-body text-center py-4">
+                    <legend class="card-title text-dark h5">Existing User?</legend>
+                    <p class="text-muted">Log in to access your dashboard.</p>
+                    <a href="{% url 'login' %}" 
+                       class="btn btn-success btn-lg w-100 mt-2">
+                        Login
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

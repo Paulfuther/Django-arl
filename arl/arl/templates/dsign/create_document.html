@@ -1,0 +1,31 @@
+{% extends "../base/base.html" %}
+{% block template %}
+{% load static %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+
+<div class="container mt-4">
+    <h3>Create a New DocuSign Document</h3>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert 
+                {% if message.tags == 'error' %}alert-danger
+                {% elif message.tags == 'success' %}alert-success
+                {% endif %}" role="alert">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+    
+    <form method="post">
+        {% csrf_token %}
+        <div class="mb-3">
+            <label for="template_name" class="form-label">Document Name</label>
+            <input type="text" class="form-control" name="template_name" id="template_name" required>
+        </div>
+        <button type="submit" class="btn btn-success">Create Document</button>
+    </form>
+</div>
+
+{% endblock %}

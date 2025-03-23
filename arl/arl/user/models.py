@@ -8,26 +8,47 @@ from django.db import models
 from django_countries.fields import CountryField
 from phonenumber_field.modelfields import PhoneNumberField
 from django.utils.timezone import now
+from django.utils.crypto import get_random_string
+from django.conf import settings
 
 
 class Employer(models.Model):
     name = models.CharField(max_length=100)
     # Add any additional fields for the employer
+    email = models.EmailField(null=True, blank=True)  # No unique=True
     address = models.CharField(max_length=100, null=True)
-    address_two = models.CharField(max_length=100, null=True)
+    address_two = models.CharField(max_length=100, null=True, blank=True)
     city = models.CharField(max_length=100, null=True)
     state_province = models.CharField(max_length=100, null=True)
     country = CountryField(null=True)
     phone_number = PhoneNumberField(null=True)
+    senior_contact_name = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="The senior contact person for this employer (e.g., HR Manager, Director)."
+    )
     created = models.DateTimeField(auto_now_add=True, null=True)
     updated = models.DateTimeField(auto_now=True, null=True)
+    verified_sender_local = models.CharField(
+        max_length=50,
+        unique=True,
+        blank=True,
+        null=True,
+        help_text="Enter only the part before '@yourdomain.com'"
+    )
     verified_sender_email = models.EmailField(
         max_length=255,
         unique=True,
         blank=True,
         null=True,
-        help_text="The verified sender email in SendGrid for this employer."
+        help_text="This is the full email generated based on your input."
     )
+    is_active = models.BooleanField(default=False)
+    subscription_id = models.CharField(max_length=255, blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
@@ -114,12 +135,30 @@ class CustomUser(AbstractUser):
 
 
 class SMSOptOut(models.Model):
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name="sms_opt_out")
+    user = models.OneToOneField(
+        CustomUser, 
+        on_delete=models.CASCADE, 
+        related_name="sms_opt_out"
+    )
+    employer = models.ForeignKey(
+        "user.Employer",
+        on_delete=models.CASCADE,
+        related_name="sms_opt_outs",
+        null=True,  # Allow null for existing records before employer was added
+        blank=True,  # Allow blank values for optional selection
+        help_text="Employer associated with this opt-out."
+    )
     reason = models.TextField(blank=True, null=True)  # Optional reason why they're opted out
     date_added = models.DateTimeField(auto_now_add=True)
 
+    def save(self, *args, **kwargs):
+        """Ensure employer is assigned based on user, if not manually set."""
+        if not self.employer and self.user and self.user.employer:
+            self.employer = self.user.employer
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"{self.user.username} opted out of SMS"
+        return f"{self.user.username} opted out of SMS ({self.employer.name if self.employer else 'No Employer'})"
 
 
 class UserManager(models.Model):
@@ -206,3 +245,85 @@ class PhoneEntry(models.Model):
 
     def __str__(self):
         return str(self.phone_number)
+    
+
+class EmployerSettings(models.Model):
+    employer = models.OneToOneField(Employer, on_delete=models.CASCADE, related_name="settings")
+    send_new_hire_file = models.BooleanField(default=True)  # ✅ Toggle for new hire file
+
+    def __str__(self):
+        return f"{self.employer.name} - {'Send' if self.send_new_hire_file else 'Do Not Send'} New Hire File"
+
+
+def generate_random_token():
+    """Generate a secure 64-character token."""
+    return get_random_string(64)
+
+
+class NewHireInvite(models.Model):
+    employer = models.ForeignKey("user.Employer", on_delete=models.CASCADE, related_name="invites")
+    email = models.EmailField(unique=True)
+    name = models.CharField(max_length=255)
+    role = models.CharField(max_length=100, choices=[("GSA", "GSA"), ("HR", "HR"), ("Manager", "Manager")])
+    token = models.CharField(max_length=64, unique=True, default=generate_random_token)
+    created_at = models.DateTimeField(auto_now_add=True)
+    used = models.BooleanField(default=False)
+
+    def get_invite_link(self):
+        base_url = settings.SITE_URL  # Set this dynamically
+        return f"{base_url}/register/{self.token}/"
+
+    def __str__(self):
+        return f"Invite for {self.name} ({self.email})"
+
+
+class EmployerRequest(models.Model):
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("approved", "Approved"),
+        ("rejected", "Rejected"),
+    ]
+
+    name = models.CharField(max_length=100)
+    email = models.EmailField(unique=True, help_text="Contact email for the employer")
+    address = models.CharField(max_length=100, null=True, blank=True)
+    address_two = models.CharField(max_length=100, null=True, blank=True)
+    city = models.CharField(max_length=100, null=True, blank=True)
+    state_province = models.CharField(max_length=100, null=True, blank=True)
+    country = CountryField(null=True, blank=True)
+    phone_number = PhoneNumberField(null=True, blank=True)
+    senior_contact_name = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="The senior contact person for this employer (e.g., HR Manager, Director)."
+    )
+    created = models.DateTimeField(auto_now_add=True, null=True)
+    updated = models.DateTimeField(auto_now=True, null=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
+
+    verified_sender_local = models.CharField(
+        max_length=50,
+        unique=True,
+        blank=True,
+        null=True,
+        help_text="Enter only the part before '@yourdomain.com'"
+    )
+    verified_sender_email = models.EmailField(
+        max_length=255,
+        unique=True,
+        blank=True,
+        null=True,
+        help_text="This is the full email generated based on your input."
+    )
+
+    def save(self, *args, **kwargs):
+        """Automatically generate the full verified sender email before saving."""
+        if self.verified_sender_local:
+            self.verified_sender_email = f"{self.verified_sender_local}@1553690ontarioinc.com"
+        else:
+            self.verified_sender_email = None
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.name} ({self.get_status_display()})"

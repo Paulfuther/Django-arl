@@ -1,10 +1,11 @@
 import re
 from datetime import date, datetime
 from urllib.parse import quote, unquote
-
+from django.shortcuts import get_object_or_404
 import boto
 import boto.s3.connection
 from botocore.exceptions import NoCredentialsError
+from arl.dsign.models import SignedDocumentFile
 from django.conf import settings
 from django.http import HttpResponse
 from django.urls import reverse
@@ -30,6 +31,7 @@ except Exception as e:
 def upload_to_linode_object_storage(file_obj, object_key):
     # Connect to Linode Object Storage
     # Get the bucket
+    print("Linode upload to start")
     bucket = conn.get_bucket("paulfuther")
     # Create the S3 key
     key = bucket.new_key(object_key)
@@ -132,31 +134,32 @@ def list_s3_objects(folder_name):
         return []
 
 
-def download_from_s3(request, key):
+def download_from_s3(request, file_path):
     try:
-        # Specify the bucket and key
-        bucket_name = LINODE_BUCKET_NAME
-        bucket = conn.get_bucket(bucket_name)
+        # 🔒 Connect to the bucket
+        bucket = conn.get_bucket(settings.LINODE_BUCKET_NAME)
 
-        # Fetch the S3 object using get_object
-        s3_object = bucket.get_object(key)
+        # 📂 Get the S3 object using the file path
+        key = bucket.get_key(file_path)
+        if not key:
+            return HttpResponse("File not found in storage.", status=404)
 
-        # Generate a pre-signed URL for the S3 object
-        url = s3_object.generate_url(3600, query_auth=True, force_http=True)
+        # ⏳ Generate a pre-signed URL for 1 hour
+        url = key.generate_url(
+            expires_in=3600,
+            query_auth=True,
+            force_http=False  # or False if you want HTTPS
+        )
 
-        # Ensure the filename is URL-encoded
-        filename_encoded = quote(key, safe="")
+        # 🧼 Sanitize filename
+        filename_encoded = quote(key.name.split("/")[-1], safe="")
 
-        # Create a response to redirect to the pre-signed URL
+        # 🔁 Redirect to pre-signed S3 URL
         response = HttpResponse(status=302)
         response["Location"] = url
-
-        # Set the Content-Disposition header to suggest a filename
         response["Content-Disposition"] = f'attachment; filename="{filename_encoded}"'
-
         return response
 
     except Exception as e:
-        # Handle exceptions appropriately (e.g., log the error)
         print(f"Error downloading from S3: {str(e)}")
         return HttpResponse("Error downloading from S3", status=500)
