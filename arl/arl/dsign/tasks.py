@@ -1,26 +1,26 @@
 from __future__ import absolute_import, unicode_literals
 
 import logging
+from collections import defaultdict
 from datetime import datetime, timedelta
 import json
 from django.conf import settings
 from django.db.models import Q
 from docusign_esign import ApiClient, EnvelopesApi
 from docusign_esign.client.api_exception import ApiException
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
 from arl.celery import app
 from arl.bucket.helpers import upload_to_linode_object_storage
 from arl.dsign.models import DocuSignTemplate, ProcessedDocsignDocument
 from arl.msg.tasks import send_bulk_sms
-from arl.user.models import CustomUser
+from arl.msg.models import SmsLog
+from arl.user.models import CustomUser, EmployerSMSTask
 from arl.dsign.models import SignedDocumentFile
 from django.db import IntegrityError
 from arl.setup.models import TenantApiKeys, Employer
 from django.contrib.auth import get_user_model
 from .helpers import (create_docusign_envelope,
                       create_docusign_envelope_new_hire_quiz, get_access_token,
-                      get_docusign_envelope, get_docusign_envelope_quiz,
+                      get_docusign_envelope,
                       get_docusign_template_name_from_template,
                       get_template_id, get_waiting_for_others_envelopes,
                       parse_sent_date_time)
@@ -28,7 +28,6 @@ import uuid
 import zipfile
 from io import BytesIO
 import os
-
 
 
 logger = logging.getLogger(__name__)
@@ -95,121 +94,133 @@ def list_all_docusign_envelopes_task():
 
 @app.task(name="sms for documents behind 48 hrs")
 def check_outstanding_envelopes_task():
+    # 🔍 1. Get employers that have this SMS task enabled
+    enabled_employers = EmployerSMSTask.objects.filter(
+        task_name="sms for documents behind 48 hrs",
+        is_enabled=True
+    ).values_list("employer_id", flat=True)
+
+    if not enabled_employers:
+        logger.info("✅ No employers have enabled the 48-hour document SMS task.")
+        return "No employers enabled."
+
     outstanding_envelopes = get_waiting_for_others_envelopes()
     now = datetime.utcnow()
-    behind_docs = []
-    managers_to_notify = set()
 
+    employer_docs = defaultdict(list)
+    employer_managers = defaultdict(set)
+
+    # 📨 2. Scan each envelope and collect docs per employer
     for envelope in outstanding_envelopes:
         sent_date_time = parse_sent_date_time(envelope["sent_date_time"])
-        if now - sent_date_time >= timedelta(hours=336):
-            # Check if there are any signers
+        if now - sent_date_time >= timedelta(hours=48):
             if envelope["signers"]:
-                # Assuming the primary recipient is the first signer
-                primary_recipient_name = envelope["signers"][0]["name"]
-                # Retrieve the store manager for the primary recipient
                 try:
-                    primary_recipient_email = envelope["signers"][0]["email"]
-                    user = (
-                        CustomUser.objects.get
-                        (email=primary_recipient_email)
+                    primary_email = envelope["signers"][0]["email"]
+                    user = CustomUser.objects.get(email=primary_email)
+                    employer = user.employer
+
+                    if not employer or employer.id not in enabled_employers:
+                        continue
+
+                    # 🧑‍💼 Add store manager to notify
+                    if user.store and user.store.manager and user.store.manager.phone_number:
+                        employer_managers[employer.id].add(user.store.manager.phone_number)
+
+                    # 🧾 Collect signer details
+                    outstanding_signers_info = []
+                    for signer in envelope["signers"]:
+                        if signer["status"] in ["sent", "delivered"]:
+                            try:
+                                signer_user = CustomUser.objects.get(email=signer["email"])
+                                role = signer_user.groups.first().name if signer_user.groups.exists() else "No Role"
+                                store_name = signer_user.store.number if signer_user.store else "No Store"
+                                store_address = signer_user.store.address if signer_user.store else "No Address"
+                            except CustomUser.DoesNotExist:
+                                role, store_name, store_address = "Unknown", "Unknown", "Unknown"
+
+                            signer_info = (
+                                f"Name: {signer['name']}\n"
+                                f"Email: {signer['email']}\n"
+                                f"Role: {role}\n"
+                                f"Store: {store_name}\n"
+                                f"Address: {store_address}\n"
+                            )
+                            outstanding_signers_info.append(signer_info)
+
+                    signer_list = "\n".join(outstanding_signers_info) if outstanding_signers_info else "No outstanding signers"
+
+                    # 🗂️ Add to list of behind documents per employer
+                    employer_docs[employer.id].append(
+                        f"Document: {envelope['template_name']}\n"
+                        f"Sent to: {envelope['signers'][0]['name']}\n"
+                        f"Outstanding Signers:\n{signer_list}"
                     )
-                    store_manager = (
-                        user.store.manager if user.store and
-                        user.store.manager else None
-                    )
-                    if store_manager:
-                        # Add the manager's phone number to
-                        # the notification list
-                        managers_to_notify.add(store_manager.phone_number)
-                    else:
-                        store_manager = "No Manager Assigned"
+
                 except CustomUser.DoesNotExist:
-                    store_manager = "Manager Not Found"
+                    continue
 
-                # Prepare a detailed list of outstanding
-                # signers with their role, store, and address
-                outstanding_signers_info = []
-                for signer in envelope["signers"]:
-                    if signer["status"] in ["sent", "delivered"]:
-                        # Query the CustomUser model for
-                        # store and role based on the signer's email
-                        try:
-                            user = (
-                                CustomUser.objects.get(email=signer["email"])
-                            )
-                            store_name = (
-                                user.store.number if user.store
-                                else "No Store Assigned"
-                            )
-                            store_address = (
-                                user.store.address if user.store
-                                else "No Address Available"
-                            )
-                            role = (
-                                user.groups.first().name if
-                                user.groups.exists()
-                                else "No Role Assigned"
-                            )
-                        except CustomUser.DoesNotExist:
-                            store_name = "User Not Found"
-                            store_address = "Address Not Found"
-                            role = "Role Not Found"
-
-                        signer_info = (
-                            f"Name: {signer['name']}\n"
-                            f"Email: {signer['email']}\n"
-                            f"Role: {role}\n"
-                            f"Store: {store_name}\n"
-                            f"Address: {store_address}\n"
-                        )
-                        outstanding_signers_info.append(signer_info)
-
-                signer_list = (
-                    "\n".join(outstanding_signers_info)
-                    if outstanding_signers_info
-                    else "No outstanding signers"
-                )
-            else:
-                primary_recipient_name = "Unknown Recipient"
-                store_manager = "Manager Not Found"
-                signer_list = "No signers available"
-
-            # Add to the list of behind documents
-            # with detailed signer information
-            behind_docs.append(
-                f"Document: {envelope['template_name']}\n"
-                f"Sent to: {primary_recipient_name}\n"
-                f"Manager: {store_manager}\n"
-                f"Outstanding Signers:\n{signer_list}"
+    # 🔁 3. Send message per employer
+    already_notified_numbers = set()
+    for employer_id, documents in employer_docs.items():
+        try:
+            employer = Employer.objects.get(id=employer_id)
+            message = (
+                f"The following documents are 48+ hours behind:\n\n"
+                + "\n\n".join(documents)
             )
 
-    if behind_docs:
-        document_list = "\n\n".join(behind_docs)
-        message = (
-            f"The following documents are 48 hours behind:\n\n"
-            f"{document_list}"
-        )
+            logger.warning(f"📄 SMS for {employer.name} will include {len(documents)} document(s).")
 
-        # Log the message that will be sent
-        logger.info(f"Sending SMS: {message}")
+            # 🔔 Get HR users for employer (dsign_sms group)
+            hr_users = CustomUser.objects.filter(
+                is_active=True,
+                employer=employer,
+                groups__name="dsign_sms"
+            ).exclude(phone_number__isnull=True).exclude(phone_number="")
 
-        # Get all active users in the 'dsign_sms' group
-        hr_users = CustomUser.objects.filter(
-            Q(is_active=True) & Q(groups__name="dsign_sms")
-        ).values_list("phone_number", flat=True)
-        # Combine HR users and managers into one recipient list
-        recipients = list(hr_users) + list(managers_to_notify)
-        # Send the SMS message to all users in the group
-        # print("recipients:", recipients)
-        send_bulk_sms(recipients, message)
+            hr_numbers = list(hr_users.values_list("phone_number", flat=True))
+            manager_numbers = list(employer_managers[employer_id])
+            all_recipients = list(set(hr_numbers + manager_numbers))
+            unique_recipients = [n for n in all_recipients if n not in already_notified_numbers]
 
-        logger.info(f"Sent SMS for documents 48 hours behind to HR: {message}")
-        return f"Sent SMS for documents 48 hours behind to HR: {document_list}"
+            if not all_recipients:
+                logger.warning(f"⚠️ No recipients found for employer {employer.name}. Skipping.")
+                continue
 
-    else:
-        logger.info("No documents are 48 hours behind.")
-        return "No documents are 48 hours behind."
+            # 🔐 Get Twilio API credentials
+            twilio_keys = TenantApiKeys.objects.filter(employer=employer, is_active=True).first()
+            if not twilio_keys:
+                logger.error(f"❌ No Twilio credentials for {employer.name}")
+                continue
+
+            send_bulk_sms(
+                numbers=all_recipients,
+                body=message,
+                twilio_account_sid=twilio_keys.account_sid,
+                twilio_auth_token=twilio_keys.auth_token,
+                twilio_notify_sid=twilio_keys.notify_service_sid
+            )
+
+            logger.info(f"📬 Sent 48-hour document reminder SMS to {len(all_recipients)} for {employer.name}")
+            SmsLog.objects.create(
+                level="INFO",
+                message=f"📬 Sent 48-hour document reminder SMS to {len(all_recipients)} for {employer.name}"
+            )
+            # Track notified numbers
+            already_notified_numbers.update(unique_recipients)
+        except Exception as e:
+            logger.error(f"❌ Error sending SMS for employer {employer_id}: {e}")
+            SmsLog.objects.create(
+                level="ERROR",
+                message=f"❌ Error sending 48-hour SMS for employer {employer_id}: {e}"
+            )
+
+    if not employer_docs:
+        logger.info("✅ No documents 48+ hours behind.")
+        return "No documents are 48+ hours behind."
+
+    return "✅ Document reminders sent to relevant employers."
 
 
 @app.task(name="weekly sms for documents behind 48 hrs")
