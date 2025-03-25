@@ -195,11 +195,15 @@ def create_new_document_page(request):
 @login_required
 def edit_document_page(request, template_id):
     """Loads an HTML page with an iframe for the DocuSign template editor."""
-    try:
-        edit_url = get_docusign_edit_url(template_id)
-        return render(request, "dsign/dsign_embed.html", {"edit_url": edit_url})
-    except Exception as e:
-        return render(request, "dsign/dsign_embed.html", {"error": str(e)})
+    edit_url = get_docusign_edit_url(template_id)
+    user_agent = request.META.get("HTTP_USER_AGENT", "").lower()
+
+    is_safari = "safari" in user_agent and "chrome" not in user_agent and "chromium" not in user_agent
+
+    if is_safari:
+        return redirect(edit_url)  # Open DocuSign editor in a new tab for Safari
+
+    return render(request, "dsign/dsign_embed.html", {"edit_url": edit_url})
 
 
 def docusign_close(request):
