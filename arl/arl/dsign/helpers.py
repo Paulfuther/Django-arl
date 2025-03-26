@@ -497,7 +497,7 @@ def get_docusign_edit_url(template_id):
     base_url = settings.DOCUSIGN_BASE_PATH  # Example: "https://demo.docusign.net/restapi"
     account_id = settings.DOCUSIGN_ACCOUNT_ID
     access_token = get_access_token().access_token  # Ensure you have a function for authentication
-    print(access_token)
+    # print(access_token)
     url = f"{base_url}/v2.1/accounts/{account_id}/templates/{template_id}/views/edit"
     print("url :", url)
     headers = {
@@ -507,10 +507,11 @@ def get_docusign_edit_url(template_id):
 
     # This return URL ensures they leave DocuSign after editing
     data = {
-        "returnUrl": "https://www.1553690ontarioinc.com/",
-        "suppressNavigation": "true"  # Restricts navigation inside DocuSign
+        # "returnUrl": "https://www.1553690ontarioinc.com/",
+        "returnUrl": f"{settings.SITE_URL}/hr/dashboard/?redirect=1",
+        "suppressNavigation": True  # Restricts navigation inside DocuSign
     }
-
+    
     response = requests.post(url, headers=headers, json=data)
 
     # DEBUG: Print full response
@@ -547,7 +548,7 @@ def get_embedded_envelope_url(user, template_id):
 
     # ✅ Generate an Embedded Signing URL
     recipient_view_request = RecipientViewRequest(
-        return_url=f"{settings.SITE_URL}/dsign/templates/",  # Return after signing
+        return_url =f"{settings.SITE_URL}/hr/dashboard/",
         authentication_method="none",
         user_name=user.get_full_name(),
         email=user.email

@@ -59,7 +59,7 @@ LOGGING = {
     'loggers': {
         'django': {
             'handlers': ['file', 'console'], # Use both file and console
-            'level': 'INFO', # Change to INFO or higher
+            'level': 'ERROR', # Change to INFO or higher
             'propagate': True,
         },
         '': { # Catch-all logger for other applications
@@ -189,11 +189,12 @@ LANGUAGE_CODE = "en-us"
 TIME_ZONE = "America/New_York"
 
 USE_TZ = True
-
-if socket.gethostname() == "":
-    SITE_URL = "https://www.1553690ontarioinc.com"
-else:
-    SITE_URL = "http://127.0.0.1:8000"  # Local development
+SITE_URL = os.getenv("SITE_URL", "http://127.0.0.1:8000")
+print("site ure :", SITE_URL)
+#if socket.gethostname() == "":
+#    SITE_URL = "https://www.1553690ontarioinc.com"
+#else:
+#    SITE_URL = "http://127.0.0.1:8000"  # Local development
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
@@ -304,6 +305,9 @@ STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
 
 # BASE URL DEV
 BASE_URL = "https://bdb0-2607-fea8-2840-b200-79f0-4773-6079-2c28.ngrok-free.app"
+OWNER_EMAIL = os.environ.get("OWNER_EMAIL")
+ADMIN_PHONE_NUMBER = os.environ.get("ADMIN_PHONE_NUMBER")
+
 
 try:
     from .local_settings import *

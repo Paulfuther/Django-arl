@@ -6,12 +6,20 @@
 {% include "../base/navbar.html" %}
 {% load crispy_forms_tags %}
 
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
-  <legend> Registration Successful</legend>
-  <p>Thank you for registering your company. We will review your request and notify you once approved.</p>
-</div>
-</div>
+<div class="container mt-4">
+  <div class="row justify-content-center">
+      <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+
+          <!-- 🎉 Bootstrap Success Alert -->
+          <div class="alert alert-success alert-dismissible fade show" role="alert">
+              <strong>✅ Registration Successful!</strong><br>
+              Thank you for registering your company. We will review your request and notify you once approved.
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+
+          <a href="{% url 'home' %}" class="btn btn-primary mt-3">Back to Home</a>
+
+      </div>
+  </div>
 </div>
 {% endblock %}
