@@ -14,7 +14,8 @@ class DocuSignTemplate(models.Model):
     template_id = models.CharField(max_length=100)
     template_name = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+    is_new_hire_template = models.BooleanField(default=False)
+
     class Meta:
         unique_together = ("employer", "template_id")  # Ensure uniqueness per employer
 

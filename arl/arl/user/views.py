@@ -23,7 +23,8 @@ from django.views.generic import ListView
 from django_celery_results.models import TaskResult
 from twilio.base.exceptions import TwilioException
 from arl.msg.helpers import (check_verification_token,
-                             request_verification_token)
+                             request_verification_token,
+                             send_bulk_sms)
 from django.db.models import Q
 from arl.msg.models import EmailTemplate
 from arl.msg.tasks import send_sms_task
@@ -166,11 +167,32 @@ class EmployerRegistrationView(FormView):
         employer_request.status = "pending"  # Mark as pending
         employer_request.save()
 
-        messages.success(self.request, "Your request has been submitted for review. You will receive an email once approved.")
+        requester_name = employer_request.name
+        requester_email = employer_request.email
+        sms_body = f"🚨 New Employer Access Request: {requester_name} ({requester_email})"
+
+        try:
+            send_bulk_sms(
+                numbers=[+15196707469],  # Replace with your number
+                body=sms_body,
+                twilio_account_sid=settings.TWILIO_ACCOUNT_SID,
+                twilio_auth_token=settings.TWILIO_AUTH_TOKEN,
+                twilio_notify_sid=settings.TWILIO_NOTIFY_SERVICE_SID,
+            )
+            employer_request.save()
+
+        except Exception as e:
+            # ❌ Optionally, log or alert
+            print(f"SMS Error: {e}")
+            messages.error(self.request, "There was a problem submitting your request. Please try again.")
+            return self.form_invalid(form)  # 👈 Rerender the form
+
+        #messages.success(self.request, "Your request has been submitted for review.")
         return super().form_valid(form)
 
 
 # signal to trigger events post save of new use.
+# Approved for Multi Tenant
 @receiver(post_save, sender=CustomUser)
 def handle_new_hire_registration(sender, instance, created, **kwargs):
     """Handles new hire registration by triggering necessary tasks."""
@@ -193,53 +215,57 @@ def handle_new_hire_registration(sender, instance, created, **kwargs):
         role_group, _ = Group.objects.get_or_create(name=role)
         instance.groups.add(role_group)
         print(f"✅ User {instance.email} assigned to group: {role}")
-        # ✅ Get Employer
+
         employer = instance.employer
+
         if not employer:
             print(f"❌ No employer found for user {instance.email}. Skipping new hire setup.")
             return
 
-        # ✅ Retrieve `send_new_hire_file` setting from `EmployerSettings`
-        send_new_hire_file = (
-            EmployerSettings.objects.filter(employer=employer)
-            .values_list("send_new_hire_file", flat=True)
-            .first()
-            or False
-        )
-
-        # ✅ Fetch Employer Settings
+        # ✅ Fetch Employer Settings (once)
         employer_settings = EmployerSettings.objects.filter(employer=employer).first()
 
-        # ✅ Ensure Employer Settings exist
-        if not employer_settings:
-            print(f"🚨 No EmployerSettings found for {employer.name}. Defaulting to False.")
-            send_new_hire_file = False
-        else:
+        # ✅ Default behavior
+        send_new_hire_file = False
+
+        if employer_settings:
             send_new_hire_file = employer_settings.send_new_hire_file
-            print(f"📌 Employer Settings Found: {bool(employer_settings)}")
-            print(f"📌 send_new_hire_file: {send_new_hire_file} (Expected: True)")
+            print(f"📌 Employer Settings Found for {employer.name}")
+            print(f"📌 send_new_hire_file: {send_new_hire_file}")
+        else:
+            print(f"🚨 No EmployerSettings found for {employer.name}. Defaulting to False.")
 
-
-        # ✅ Retrieve the correct DocuSign template for this employer (if needed)
+        # ✅ Retrieve the DocuSign Template
         docusign_template = None
         template_id = None
+
         if send_new_hire_file:
             docusign_template = DocuSignTemplate.objects.filter(
-                employer=employer, template_name="New_Hire_File"
+                employer=employer, is_new_hire_template=True
             ).first()
 
-        template_id = docusign_template.template_id if docusign_template else None
-        print("Docusign Template id :", template_id)
+            if docusign_template:
+                template_id = docusign_template.template_id
+                print(f"📄 New Hire Template Found: {docusign_template.template_name}")
+            else:
+                print("⚠️ No DocuSign template marked as 'new hire' found.")
+
+        print("Docusign Template id:", template_id)
+
+        # ✅ Get Email Template
         email_template = EmailTemplate.objects.filter(
             employers=employer, name="New_Hire_Onboarding"
         ).first()
 
-        if not email_template:
+        sendgrid_id = None
+        if email_template:
+            sendgrid_id = email_template.sendgrid_id
+        else:
             print(f"⚠️ No 'New Hire Onboarding' email template assigned to {employer.name}. Skipping email.")
-            sendgrid_id = None 
 
-        sendgrid_id = email_template.sendgrid_id  
+        # ✅ Default fallback name for sender
         senior_contact_name = getattr(employer, "senior_contact_name", "HR Team")
+
         # ✅ Debugging prints
         print(f"👔 Employer: {employer.name}")
         print(f"📩 SendGrid Template: {sendgrid_id}")
@@ -659,7 +685,7 @@ def hr_dashboard(request):
         messages.error(request, "You must be an employer or manager to invite new hires.")
         return redirect("home")
 
-    templates = DocuSignTemplate.objects.filter(employer=employer)  # Fetch templates
+    templates = DocuSignTemplate.objects.filter(employer=employer).order_by('-is_new_hire_template', 'template_name')
     pending_invites = NewHireInvite.objects.filter(employer=employer, used=False)  # Fetch pending invites
 
     if request.method == "POST":

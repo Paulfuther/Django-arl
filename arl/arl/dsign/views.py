@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import UserPassesTestMixin
 
-
+from django.shortcuts import redirect, get_object_or_404
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.views import View
@@ -18,7 +18,7 @@ from arl.dsign.helpers import (get_docusign_envelope,
 
 from arl.dsign.tasks import (get_outstanding_docs,
                              list_all_docusign_envelopes_task)
-
+from .models import DocuSignTemplate
 from .forms import NameEmailForm
 
 from .tasks import (create_docusign_envelope_task, process_docusign_webhook,
@@ -210,3 +210,16 @@ def docusign_close(request):
     """Redirects users back to your app after they finish editing."""
     return redirect("/")
 
+
+@login_required
+def set_new_hire_template(request, template_id):
+    template = get_object_or_404(DocuSignTemplate, id=template_id, employer=request.user.employer)
+
+    # Unset previous
+    DocuSignTemplate.objects.filter(employer=request.user.employer).update(is_new_hire_template=False)
+
+    # Set selected
+    template.is_new_hire_template = True
+    template.save()
+
+    return redirect("hr_dashboard") 
