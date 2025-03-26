@@ -607,7 +607,7 @@ def process_sendgrid_webhook(payload):
                 timestamp=timestamp,
                 url=url,
                 user=user,
-                username=user.username if user else None,
+                username=user.username if user else "unknown",
                 useragent=useragent,
             )
             logger.info(f"Processed SendGrid event: {event} for {email}")
