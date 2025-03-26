@@ -532,15 +532,15 @@ class EmployerSMSTaskAdmin(admin.ModelAdmin):
 
 @admin.register(TenantApiKeys)
 class TenantApiKeysAdmin(admin.ModelAdmin):
-    list_display = ("employer", "account_sid", "phone_number", "verified_sender_email", "status", "created_at")
+    list_display = ("employer", "account_sid", "phone_number", "sender_email", "status", "created_at")
     search_fields = ("employer__name", "service_name", "account_sid", "sender_email")
 
 
 @admin.register(DocuSignTemplate)
 class DocuSignTemplateAdmin(admin.ModelAdmin):
-    list_display = ("template_name", "employer", "template_id")
-    search_fields = ("template_name", "template_id", "employer__name")
-    list_filter = ("employer",)
+    list_display = ("template_name", "employer", "is_new_hire_template", "created_at")
+    search_fields = ("template_name",)
+    list_filter = ("employer", "is_new_hire_template",)
 
 
 @admin.register(EmailTemplate)

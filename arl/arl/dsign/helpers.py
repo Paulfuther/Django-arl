@@ -507,8 +507,8 @@ def get_docusign_edit_url(template_id):
 
     # This return URL ensures they leave DocuSign after editing
     data = {
-        # "returnUrl": "https://www.1553690ontarioinc.com/",
-        "returnUrl": f"{settings.SITE_URL}/hr/dashboard/?redirect=1",
+        "returnUrl": "https://www.1553690ontarioinc.com/hr/dashboard/",
+        # "returnUrl": f"{settings.SITE_URL}/hr/dashboard/?redirect=1",
         "suppressNavigation": True  # Restricts navigation inside DocuSign
     }
     
