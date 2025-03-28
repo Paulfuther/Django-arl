@@ -892,7 +892,7 @@ def fetch_signed_docs_by_user(request, user_id):
     documents = SignedDocumentFile.objects.filter(user=user).order_by("-uploaded_at")
 
     # Paginate
-    paginator = Paginator(documents, 10)  # Show 5 per page
+    paginator = Paginator(documents, 3)  # Show 5 per page
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 

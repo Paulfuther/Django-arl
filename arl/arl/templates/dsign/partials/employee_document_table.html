@@ -1,34 +1,12 @@
 <style>
-  .employee-card {
-    border: 1px solid #dee2e6;
-    border-radius: 0.5rem;
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-    background-color: #fff;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    position: relative;
-  }
-
-  .employee-name {
-    font-weight: 600;
-    font-size: 1rem;
-    margin-bottom: 0.25rem;
-    word-break: break-word;
-  }
-
-  .employee-email {
-    word-break: break-word;
-    font-size: 0.9rem;
-    color: #555;
-  }
-
+ 
   .view-btn {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
+    flex-shrink: 0;
     font-size: 0.85rem;
     padding: 6px 12px;
     white-space: nowrap;
+    margin-left: auto;
+    margin-top: 0.15rem;
   }
 
   .employee-list {
@@ -52,57 +30,64 @@
 
 <div class="employee-list">
   {% for employee in employees %}
-    <div class="employee-card">
-      <div class="employee-name">{{ employee.get_full_name|default:"(No name)" }}</div>
-      <div class="employee-email">{{ employee.email }}</div>
+    <div class="employee-card" style="border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    background-color: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);">
+      <div class="employee-card-grid" style="display: flex;
+      justify-content: space-between;
+      align-items: center; /* 🔥 This centers vertically */
+      gap: 1rem;
+      flex-wrap: nowrap;">
+        <div class="employee-details" style="flex-grow: 1;
+        min-width: 0;">
+          <div class="employee-name" style="font-weight: 600;
+          font-size: 1rem;
+          margin-bottom: 0.25rem;
+          word-break: break-word;">{{ employee.get_full_name|default:"(No name)" }}</div>
+          <div class="employee-email" style="font-size: 0.9rem;
+          color: #555;
+          word-break: break-word;">{{ employee.email }}</div>
+        </div>
+        {% if employee.signed_documents.exists %}
+          <button class="btn btn-outline-primary btn-sm mobile-btn"
+                  style="margin-right: 0.5rem;"
+                  hx-get="{% url 'fetch_signed_docs_by_user' employee.id %}"
+                  hx-target="#docs-{{ employee.id }}"
+                  hx-swap="innerHTML"
+                  onclick="toggleDocRow({{ employee.id }})">
+            <i class="fas fa-file-alt"></i> View
+          </button>
+        {% else %}
+          <span class="text-muted">No documents</span>
+        {% endif %}
+      </div>
 
-      {% if employee.signed_documents.exists %}
-      <button class="btn btn-outline-primary btn-sm rounded-pill view-btn"
-              title="Click to view signed documents"
-              data-bs-toggle="tooltip"
-              data-bs-placement="top"
-              data-bs-container="body"
-              hx-get="{% url 'fetch_signed_docs_by_user' employee.id %}"
-              hx-target="#docs-{{ employee.id }}"
-              hx-swap="innerHTML"
-              onclick="toggleDocRow({{ employee.id }})">
-        <i class="fas fa-file-alt"></i> View
-      </button>
-      {% else %}
-      <span class="text-muted mt-2 d-block">No documents</span>
-      {% endif %}
-
-      <!-- 🔽 Toggle docs -->
       <div id="docs-{{ employee.id }}" class="doc-row-content mt-3" style="display: none;">
         <p class="text-muted mb-0">Loading signed documents...</p>
       </div>
     </div>
   {% endfor %}
 </div>
+
 <script>
-  function toggleDocRow(employeeId) {
-  // Hide all other open doc rows
-  document.querySelectorAll(".doc-row-content").forEach(row => {
-    if (row.id !== `docs-${employeeId}`) {
-      row.style.display = "none";
+  {
+    // Toggle document view row
+    window.toggleDocRow = function(employeeId) {
+      // Hide all other rows
+      document.querySelectorAll(".doc-row-content").forEach(row => {
+        if (row.id !== `docs-${employeeId}`) {
+          row.style.display = "none";
+        }
+      });
+
+      const targetRow = document.getElementById(`docs-${employeeId}`);
+      const wasHidden = targetRow.style.display === "none";
+
+      // Toggle visibility
+      targetRow.style.display = wasHidden ? "block" : "none";
     }
-  });
-
-  const targetRow = document.getElementById(`docs-${employeeId}`);
-
-  // If already shown, toggle closed
-  if (targetRow.style.display === "block") {
-    targetRow.style.display = "none";
-    return;
   }
-
-  // If it's still showing the "loading" message, allow HTMX to load
-  const isAlreadyLoaded = !targetRow.innerHTML.includes("Loading signed documents...");
-
-  // Show the container
-  targetRow.style.display = "block";
-
-  // If it's already loaded, don't re-trigger HTMX
-  if (isAlreadyLoaded) return;
-}
 </script>
