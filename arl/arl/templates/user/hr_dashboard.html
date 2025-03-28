@@ -99,6 +99,24 @@
     .invite-actions .btn {
       flex: 1 1 auto;
     }
+    .nav-tabs {
+    flex-wrap: nowrap !important;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .nav-tabs .nav-link {
+    font-size: 13px;
+    padding: 6px 8px;
+    white-space: normal; /* allows wrapping */
+    text-align: center;
+    line-height: 1.2;
+    flex: 1 1 33%;
+  }
+
+  .nav-tabs::-webkit-scrollbar {
+    display: none; /* Optional: hides scrollbar */
+  }
   }
 </style>
 
@@ -110,7 +128,7 @@
       <a class="nav-link active" data-bs-toggle="tab" href="#docusign">DocuSign Templates</a>
     </li>
     <li class="nav-item">
-      <a class="nav-link" data-bs-toggle="tab" href="#employees">Employee Management</a>
+      <a class="nav-link" data-bs-toggle="tab" href="#employees">Invite New Employee</a>
     </li>
     <li class="nav-item">
       <a class="nav-link" data-bs-toggle="tab" href="#signed-documents">Signed Documents</a>
@@ -127,13 +145,16 @@
       <div class="card-grid mt-3">
         {% for template in templates %}
         <div class="template-card">
-          <h5>
+          <div style="font-weight: 600;
+          font-size: 1rem;
+          margin-bottom: 0.25rem;
+          word-break: break-word;">
             {{ template.template_name }}
             {% if template.is_new_hire_template %}<span class="ms-2">&#x2705;</span>{% endif %}
-          </h5>
+        </div>
           <p class="template-meta"><strong>Created At:</strong> {{ template.created_at }}</p>
           <div class="template-actions">
-            <a href="{% url 'edit_document_page' template.template_id %}" class="btn btn-sm btn-primary">Edit</a>
+            <a href="{% url 'edit_document_page' template.template_id %}" class="btn btn-outline-primary mobile-btn">Edit</a>
           </div>
           <form method="post" action="{% url 'set_new_hire_template' template.id %}" class="mt-2">
             {% csrf_token %}
@@ -158,7 +179,7 @@
           {% csrf_token %}
           {{ form|crispy }}
           <div class="d-grid d-md-block mt-3">
-            <button type="submit" class="btn btn-primary w-100 w-md-auto">Invite</button>
+            <button type="submit" class="btn btn-outline-primary mobile-btn">Invite</button>
           </div>
         </form>
       </div>
@@ -185,10 +206,10 @@
     </div>
 
     <div id="signed-documents" class="tab-pane fade">
-      <h4 class="mb-3">Search Signed Documents</h4>
+      <legend class="mb-3">Search Signed Documents</legend>
       <form method="get" class="mb-3" hx-get="{% url 'hr_document_view' %}" hx-target="#employee-table" hx-trigger="submit">
         <input type="text" name="q" placeholder="Search by name or email" class="form-control mb-2" />
-        <button type="submit" class="btn btn-primary">Search</button>
+        <button type="submit" class="btn btn-outline-primary mobile-btn">Search</button>
       </form>
       <div id="employee-table">
         {% include "dsign/partials/employee_document_table.html" %}
