@@ -1,10 +1,32 @@
+
+
 {% if employees %}
+
+<style>
+  .email-cell {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
+    max-width: 1px; /* Forces the table cell to shrink-wrap */
+  }
+
+  .break-email {
+    display: inline-block;
+  }
+
+  @media (max-width: 576px) {
+    .email-cell {
+      font-size: 13px;
+    }
+  }
+</style>
+
 <div class="table-responsive">
   <table class="table table-bordered mb-0">
     <thead>
       <tr>
         <th>Employee</th>
-        <th>Email</th>
+       
         <th>Signed Documents</th>
       </tr>
     </thead>
@@ -12,7 +34,7 @@
       {% for employee in employees %}
       <tr>
         <td>{{ employee.get_full_name|default:"(No name)" }}</td>
-        <td>{{ employee.email }}</td>
+       
         <td>
           {% if employee.signed_documents.exists %}
           <button class="btn btn-outline-primary btn-sm rounded-pill px-3 d-flex align-items-center gap-1"
