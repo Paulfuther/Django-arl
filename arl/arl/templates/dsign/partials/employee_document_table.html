@@ -1,72 +1,69 @@
 {% if employees %}
-<table class="table table-bordered">
+<div class="table-responsive">
+  <table class="table table-bordered mb-0">
     <thead>
-        <tr>
-            <th>Employee</th>
-            <th>Email</th>
-            <th>Signed Documents</th>
-        </tr>
+      <tr>
+        <th>Employee</th>
+        <th>Email</th>
+        <th>Signed Documents</th>
+      </tr>
     </thead>
     <tbody>
-        {% for employee in employees %}
-        <tr>
-            <td>{{ employee.get_full_name|default:"(No name)" }}</td>
-            <td>{{ employee.email }}</td>
-            <td>
-                {% if employee.signed_documents.all %}
-                <button class="btn btn-outline-primary btn-sm rounded-pill px-3 d-flex align-items-center gap-1"
-                    title="Click to view signed documents"
-                    data-bs-toggle="tooltip"
-                    data-bs-placement="top"
-                    hx-get="{% url 'fetch_signed_docs_by_user' employee.id %}"
-                    hx-target="#docs-{{ employee.id }} .doc-row-content"
-                    hx-swap="innerHTML"
-                    onclick="toggleDocRow({{ employee.id }})">
-                    <i class="fas fa-file-alt"></i> View Docs
-                </button>
-                {% else %}
-                No documents
-                {% endif %}
-            </td>
-        </tr>
+      {% for employee in employees %}
+      <tr>
+        <td>{{ employee.get_full_name|default:"(No name)" }}</td>
+        <td>{{ employee.email }}</td>
+        <td>
+          {% if employee.signed_documents.exists %}
+          <button class="btn btn-outline-primary btn-sm rounded-pill px-3 d-flex align-items-center gap-1"
+              title="Click to view signed documents"
+              data-bs-toggle="tooltip"
+              data-bs-placement="top"
+              data-bs-container="body"
+              hx-get="{% url 'fetch_signed_docs_by_user' employee.id %}"
+              hx-target="#docs-{{ employee.id }} .doc-row-content"
+              hx-swap="innerHTML"
+              onclick="toggleDocRow({{ employee.id }})">
+              <i class="fas fa-file-alt"></i> View
+          </button>
+          {% else %}
+          <span class="text-muted">No documents</span>
+          {% endif %}
+        </td>
+      </tr>
 
-        <!-- 🔽 Toggle row, hidden by default -->
-        <tr id="docs-{{ employee.id }}" class="doc-row" style="display: none;">
-            <td colspan="3">
-                <div class="doc-row-content">
-                    <!-- Placeholder content shown until HTMX loads paginated content -->
-                    <p class="text-muted mb-0">Loading signed documents...</p>
-                </div>
-            </td>
-        </tr>
-        {% endfor %}
+      <!-- 🔽 Toggle row, hidden until button is clicked -->
+      <tr id="docs-{{ employee.id }}" class="doc-row" style="display: none;">
+        <td colspan="3" class="p-0 border-0">
+          <div class="doc-row-content p-2">
+            <!-- HTMX response will replace this -->
+            <p class="text-muted mb-0">Loading signed documents...</p>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
     </tbody>
-</table>
+  </table>
+</div>
 {% else %}
 <p class="text-muted">No matching employees found.</p>
 {% endif %}
 
 <script>
-    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-    tooltipTriggerList.forEach(function (tooltipTriggerEl) {
-      new bootstrap.Tooltip(tooltipTriggerEl)
-    })
-</script>
+  // Bootstrap tooltip init
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+    new bootstrap.Tooltip(el);
+  });
 
-<script>
-    function toggleDocRow(employeeId) {
-        const allRows = document.querySelectorAll(".doc-row");
-        allRows.forEach(row => {
-            if (row.id !== `docs-${employeeId}`) {
-                row.style.display = "none"; // collapse others
-            }
-        });
+  // Toggle one open document row at a time
+  function toggleDocRow(employeeId) {
+    document.querySelectorAll(".doc-row").forEach(row => {
+      if (row.id !== `docs-${employeeId}`) {
+        row.style.display = "none";
+      }
+    });
 
-        const targetRow = document.getElementById(`docs-${employeeId}`);
-        if (targetRow.style.display === "none") {
-            targetRow.style.display = "table-row"; // expand selected
-        } else {
-            targetRow.style.display = "none"; // collapse if already open
-        }
-    }
+    const targetRow = document.getElementById(`docs-${employeeId}`);
+    targetRow.style.display = (targetRow.style.display === "none") ? "table-row" : "none";
+  }
 </script>
