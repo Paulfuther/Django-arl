@@ -431,6 +431,7 @@ def extract_recipient_email(payload):
 
     return recipient_email
 
+
 @app.task(name="docusign_webhook")
 def process_docusign_webhook(payload):
     """Handles DocuSign Webhook events for sent, signed, and template saved documents."""

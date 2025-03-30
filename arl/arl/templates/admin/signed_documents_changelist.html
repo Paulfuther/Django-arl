@@ -1,0 +1,10 @@
+{% extends "admin/change_list.html" %}
+
+{% block object-tools %}
+  {{ block.super }}
+  <li>
+    <a href="{% url 'admin:signed_document_upload_one' %}" class="button">
+      📄 Upload One Document
+    </a>
+  </li>
+{% endblock %}

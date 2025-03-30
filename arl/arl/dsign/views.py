@@ -5,10 +5,9 @@ from celery.result import AsyncResult
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import UserPassesTestMixin
-
-from django.shortcuts import redirect, get_object_or_404
+from django.contrib.auth.decorators import user_passes_test
+from django.shortcuts import redirect, get_object_or_404, render
 from django.http import JsonResponse
-from django.shortcuts import redirect, render
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from .helpers import get_docusign_edit_url
@@ -20,6 +19,10 @@ from arl.dsign.tasks import (get_outstanding_docs,
                              list_all_docusign_envelopes_task)
 from .models import DocuSignTemplate
 from .forms import NameEmailForm
+import uuid
+from .forms import MultiSignedDocUploadForm
+from .models import SignedDocumentFile
+from arl.bucket.helpers import upload_to_linode_object_storage
 
 from .tasks import (create_docusign_envelope_task, process_docusign_webhook,
                     )
@@ -222,4 +225,39 @@ def set_new_hire_template(request, template_id):
     template.is_new_hire_template = True
     template.save()
 
-    return redirect("hr_dashboard") 
+    return redirect("hr_dashboard")
+
+
+# Bulk upload of forms to S3 bucket
+@user_passes_test(lambda u: u.is_superuser)
+def bulk_upload_signed_documents_view(request):
+    if request.method == "POST":
+        form = MultiSignedDocUploadForm(request.POST)
+        if form.is_valid():
+            user = form.cleaned_data["user"]
+            employer = form.cleaned_data["employer"]
+            files = request.FILES.getlist("files")
+
+            folder = uuid.uuid4().hex[:8]
+            upload_count = 0
+
+            for uploaded_file in files:
+                file_path = f"DOCUMENTS/{employer.name.replace(' ', '_')}/{folder}/{uploaded_file.name}"
+                upload_to_linode_object_storage(uploaded_file, file_path)
+
+                SignedDocumentFile.objects.create(
+                    user=user,
+                    employer=employer,
+                    envelope_id=uuid.uuid4().hex[:10],
+                    file_name=uploaded_file.name,
+                    file_path=file_path,
+                )
+                upload_count += 1
+
+            messages.success(request, f"Successfully uploaded {upload_count} file(s).")
+            return redirect("bulk_upload_signed_documents")
+
+    else:
+        form = MultiSignedDocUploadForm()
+
+    return render(request, "dsign/bulk_upload.html", {"form": form})
