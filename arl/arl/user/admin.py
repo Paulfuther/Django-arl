@@ -9,9 +9,11 @@ from import_export import fields
 from import_export import fields as export_fields
 from import_export import resources
 from import_export.admin import ExportActionMixin
+import uuid
 from django.utils.html import strip_tags
 from arl.carwash.models import CarwashStatus
-from arl.dsign.models import DocuSignTemplate, ProcessedDocsignDocument
+from arl.dsign.models import (DocuSignTemplate, ProcessedDocsignDocument,
+                              SignedDocumentFile)
 from arl.incident.models import Incident, MajorIncident
 from arl.msg.models import (BulkEmailSendgrid, EmailTemplate, Twimlmessages,
                             UserConsent, WhatsAppTemplate)
@@ -26,6 +28,8 @@ from arl.setup.models import TenantApiKeys
 from django.shortcuts import redirect
 from django.contrib import messages
 from django.urls import path
+from arl.bucket.helpers import upload_to_linode_object_storage
+from django.shortcuts import render, redirect
 
 
 class ExternalRecipientAdmin(admin.ModelAdmin):
@@ -618,6 +622,7 @@ class EmployerAdmin(admin.ModelAdmin):
         return redirect("/admin/user/employer/")
 
 
+
 @admin.register(NewHireInvite)
 class NewHireInviteAdmin(admin.ModelAdmin):
     list_display = ("name", "email", "role", "employer", "created_at", "used", "invite_link_display")
@@ -663,6 +668,64 @@ class EmployerRequestAdmin(admin.ModelAdmin):
 
     approve_selected_requests.short_description = "Approve selected employer requests"
 
+
+class SignedDocumentSingleUploadForm(forms.Form):
+    user = forms.ModelChoiceField(
+        queryset=CustomUser.objects.filter(is_active=True),
+        label="Select User"
+    )
+    employer = forms.ModelChoiceField(
+        queryset=Employer.objects.all(),
+        label="Select Employer"
+    )
+    file = forms.FileField(
+        label="Select File to Upload"
+    )
+
+
+@admin.register(SignedDocumentFile)
+class SignedDocumentFileAdmin(admin.ModelAdmin):
+    list_display = ("file_name", "user", "employer", "uploaded_at")
+    change_list_template = "admin/signed_documents_changelist.html"
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path("upload-one/", self.admin_site.admin_view(self.upload_single_view), name="signed_document_upload_one"),
+        ]
+        return custom_urls + urls
+
+    def upload_single_view(self, request):
+        if request.method == "POST":
+            form = SignedDocumentSingleUploadForm(request.POST, request.FILES)
+            if form.is_valid():
+                user = form.cleaned_data["user"]
+                employer = form.cleaned_data["employer"]
+                file = form.cleaned_data["file"]
+
+                folder_name = uuid.uuid4().hex[:8]
+                file_path = f"DOCUMENTS/{employer.name.replace(' ', '_')}/{folder_name}/{file.name}"
+
+                upload_to_linode_object_storage(file, file_path)
+
+                SignedDocumentFile.objects.create(
+                    user=user,
+                    employer=employer,
+                    envelope_id=uuid.uuid4().hex[:10],
+                    file_name=file.name,
+                    file_path=file_path,
+                )
+
+                self.message_user(request, f"Successfully uploaded file for {user}.", level=messages.SUCCESS)
+                return redirect("..")
+        else:
+            form = SignedDocumentSingleUploadForm()
+
+        context = {
+            "form": form,
+        }
+        return render(request, "admin/signed_documents_upload_one.html", context)
+    
 
 admin.site.register(EmployerRequest, EmployerRequestAdmin)
 admin.site.register(Twimlmessages)

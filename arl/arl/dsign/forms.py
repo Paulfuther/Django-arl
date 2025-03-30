@@ -1,7 +1,7 @@
 # forms.py
 from django import forms
 from .models import DocuSignTemplate
-from arl.user.models import CustomUser
+from arl.user.models import CustomUser, Employer
 
 
 class NameEmailForm(forms.Form):
@@ -37,3 +37,14 @@ class NameEmailForm(forms.Form):
         if template_name:
             cleaned_data["template_id"] = template_name.template_id
         return cleaned_data
+
+
+class MultiSignedDocUploadForm(forms.Form):
+    user = forms.ModelChoiceField(
+        queryset=CustomUser.objects.filter(is_active=True),
+        label="Select User"
+    )
+    employer = forms.ModelChoiceField(
+        queryset=Employer.objects.all(),
+        label="Select Employer"
+    )

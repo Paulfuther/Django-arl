@@ -1,0 +1,28 @@
+{% extends "../base/base.html" %}
+{% block template %}
+{% load static %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+
+
+<div class="container mb-2" style="height: 95vh;">
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-10 col-md-8 col-lg-8 col-xl-8 mt-2">
+  <legend>📄 Upload Multiple Signed Documents</legend>
+
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form|crispy }}
+
+    <!-- Manual file input with multiple enabled -->
+    <div class="mb-3">
+      <label for="id_files">Select files:</label>
+      <input type="file" name="files" id="id_files" multiple required class="form-control" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">Upload Files</button>
+  </form>
+</div>
+</div>
+</div>
+{% endblock %}
