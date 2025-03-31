@@ -2,6 +2,9 @@
 from django import forms
 from .models import DocuSignTemplate
 from arl.user.models import CustomUser, Employer
+from django.db.models.functions import Concat
+from django.db.models import Value, F
+from django.db.models import CharField
 
 
 class NameEmailForm(forms.Form):
@@ -41,10 +44,24 @@ class NameEmailForm(forms.Form):
 
 class MultiSignedDocUploadForm(forms.Form):
     user = forms.ModelChoiceField(
-        queryset=CustomUser.objects.filter(is_active=True),
-        label="Select User"
+        queryset=CustomUser.objects.filter(is_active=True)
+                .annotate(
+                full_name_email=Concat(
+                    F('first_name'), Value(' '),
+                    F('last_name'), Value(' <'),
+                    F('email'), Value('>'),
+                    output_field=CharField()
+                )
+            ).order_by('first_name', 'last_name'),
+        label="Select User",
+        to_field_name='id',
     )
+
     employer = forms.ModelChoiceField(
-        queryset=Employer.objects.all(),
+        queryset=Employer.objects.all().order_by('name'),
         label="Select Employer"
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['user'].label_from_instance = lambda obj: obj.full_name_email
