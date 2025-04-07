@@ -13,19 +13,15 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.http import (
-    Http404,
-    HttpResponse,
-    HttpResponseBadRequest,
-    HttpResponseRedirect,
-    JsonResponse,
-)
+from django.http import (Http404, HttpResponse, HttpResponseBadRequest,
+                         HttpResponseRedirect, JsonResponse)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
 from django.views.generic import FormView, ListView
 from django_celery_results.models import TaskResult
-from phonenumbers import PhoneNumberFormat, format_number, is_valid_number, parse
+from phonenumbers import (PhoneNumberFormat, format_number, is_valid_number,
+                          parse)
 from phonenumbers.phonenumberutil import NumberParseException
 from twilio.base.exceptions import TwilioException
 from twilio.rest import Client
@@ -33,23 +29,18 @@ from twilio.rest import Client
 from arl.bucket.helpers import download_from_s3
 from arl.dsign.models import DocuSignTemplate, SignedDocumentFile
 from arl.dsign.tasks import create_docusign_envelope_task
-from arl.msg.helpers import check_verification_token, request_verification_token
+from arl.msg.helpers import (check_verification_token,
+                             request_verification_token)
 from arl.msg.models import EmailTemplate
 from arl.msg.tasks import send_sms_task
 from arl.setup.helpers import employer_hr_required
 
-from .forms import (
-    CustomUserCreationForm,
-    NewHireInviteForm,
-    TwoFactorAuthenticationForm,
-)
+from .forms import (CustomUserCreationForm, NewHireInviteForm,
+                    TwoFactorAuthenticationForm)
 from .helpers import send_new_hire_invite
 from .models import CustomUser, Employer, EmployerSettings, NewHireInvite
-from .tasks import (
-    create_newhire_data_email,
-    save_user_to_db,
-    send_newhire_template_email_task,
-)
+from .tasks import (create_newhire_data_email, save_user_to_db,
+                    send_newhire_template_email_task)
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -863,7 +854,7 @@ def fetch_signed_docs_by_user(request, user_id):
 
     # 🔁 Get per_page from query param or default to 3
     try:
-        per_page = int(request.GET.get("per_page", 3))
+        per_page = int(request.GET.get("per_page", 6))
     except ValueError:
         per_page = 3
 
@@ -874,7 +865,7 @@ def fetch_signed_docs_by_user(request, user_id):
 
     return render(
         request,
-        "user/hr/partials/document_results.html",
+        "dsign/partials/document_results.html",
         {
             "employee_id": user.id,
             "page_obj": page_obj,
