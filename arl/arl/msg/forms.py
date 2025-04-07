@@ -84,6 +84,11 @@ class TemplateEmailForm(forms.Form):
                 employer=employer, is_active=True
             )
 
+            # ✅ Filter groups that have users under this employer
+            self.fields["selected_group"].queryset = Group.objects.filter(
+                user__employer=employer
+            ).distinct()
+
     def clean(self):
         cleaned_data = super().clean()
         selected_group = cleaned_data.get("selected_group")

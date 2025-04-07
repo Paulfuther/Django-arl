@@ -1,0 +1,387 @@
+{% extends "../base/base.html" %}
+{% block title %}Index{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+{{ form|as_crispy_errors }}
+
+
+<div class="container">
+    <div class="row justify-content-center">
+        
+  <legend>🛠️ Incident Dashboard</legend>
+
+  <ul class="nav nav-tabs" id="incidentTabs">
+    <li class="nav-item">
+      <a class="nav-link active" data-bs-toggle="tab" href="#create">New Incident</a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link" data-bs-toggle="tab" href="#update">Update Existing</a>
+    </li>
+  </ul>
+
+  <div class="tab-content mt-3">
+    
+
+    <!-- ✅ New Incident Form -->
+    <div id="create" class="tab-pane fade show active">
+        <form method="post" enctype="multipart/form-data" id="form" class="was-validated">
+          {% csrf_token %}
+          <div class="section mb-3">
+            <div class="card p-3 shadow-sm">
+              <h6 class="mb-2">Employer</h6>
+              {{ form.user_employer|as_crispy_field }}
+              {{ form.user_employer.as_hidden }}
+            </div>
+          </div>
+          <div class="card mb-3 p-3">
+            <h5>Section 1: Incident Information</h5>
+            <h6>Primary Incident Type</h6>
+            {{ form.injuryorillness|as_crispy_field }}
+            {{ form.environmental|as_crispy_field }}
+            {{ form.regulatory|as_crispy_field }}
+            {{ form.economicdamage|as_crispy_field }}
+            {{ form.reputation|as_crispy_field }}
+            {{ form.security|as_crispy_field }}
+            {{ form.fire|as_crispy_field }}
+          </div>
+      
+          <div class="card mb-3 p-3">
+            <h5>Incident Details</h5>
+            {{ form.store|as_crispy_field }}
+            {{ form.brief_description|as_crispy_field }}
+            {{ form.eventtimeline|as_crispy_field }}
+            {{ form.eventdetails|as_crispy_field }}
+            {{ form.eventdate|as_crispy_field }}
+            {{ form.eventtime|as_crispy_field }}
+            {{ form.reportedby|as_crispy_field }}
+            {{ form.reportedbynumber|as_crispy_field }}
+            <h6>Is the person a:</h6>
+            {{ form.suncoremployee|as_crispy_field }}
+            {{ form.contractor|as_crispy_field }}
+            {{ form.associate|as_crispy_field }}
+            {{ form.generalpublic|as_crispy_field }}
+            {{ form.staff|as_crispy_field }}
+            {{ form.othertext|as_crispy_field }}
+          </div>
+      
+          <div class="card mb-3 p-3">
+            <h5>Actions Taken</h5>
+            {{ form.actionstaken|as_crispy_field }}
+            {{ form.correctiveactions|as_crispy_field }}
+          </div>
+      
+          <div class="card mb-3 p-3">
+            <h5>Section 2: Spills</h5>
+            <h6>Complete if spill occurred</h6>
+            {{ form.sno|as_crispy_field }}
+            {{ form.syes|as_crispy_field }}
+            {{ form.scomment|as_crispy_field }}
+            <h6>Were Regulatory Authorities Notified</h6>
+            {{ form.rna|as_crispy_field }}
+            {{ form.rno|as_crispy_field }}
+            {{ form.ryes|as_crispy_field }}
+            {{ form.rcomment|as_crispy_field }}
+            <h6>Product Spilled</h6>
+            {{ form.gas|as_crispy_field }}
+            {{ form.diesel|as_crispy_field }}
+            {{ form.sewage|as_crispy_field }}
+            {{ form.deiselexhaustfluid|as_crispy_field }}
+            {{ form.chemical|as_crispy_field }}
+            {{ form.chemcomment|as_crispy_field }}
+            {{ form.sother|as_crispy_field }}
+            {{ form.s2comment|as_crispy_field }}
+            <h6>Source Impacted</h6>
+            {{ form.air|as_crispy_field }}
+            {{ form.water|as_crispy_field }}
+            {{ form.wildlife|as_crispy_field }}
+            {{ form.land|as_crispy_field }}
+            {{ form.volumerelease|as_crispy_field }}
+          </div>
+      
+          <div class="card mb-3 p-3">
+            <h5>Section 3: Security</h5>
+            {{ form.pyes|as_crispy_field }}
+            {{ form.pno|as_crispy_field }}
+            {{ form.pna|as_crispy_field }}
+            {{ form.pcase|as_crispy_field }}
+            {{ form.stolentransactions|as_crispy_field }}
+            {{ form.stoltransactions|as_crispy_field }}
+            {{ form.stolencards|as_crispy_field }}
+            {{ form.stolcards|as_crispy_field }}
+            {{ form.stolentobacco|as_crispy_field }}
+            {{ form.stoltobacco|as_crispy_field }}
+            {{ form.stolenlottery|as_crispy_field }}
+            {{ form.stollottery|as_crispy_field }}
+            {{ form.stolenfuel|as_crispy_field }}
+            {{ form.stolfuel|as_crispy_field }}
+            {{ form.stolenother|as_crispy_field }}
+            {{ form.stolother|as_crispy_field }}
+            {{ form.stolenothervalue|as_crispy_field }}
+            {{ form.stolenna|as_crispy_field }}
+          </div>
+      
+          <div class="card mb-3 p-3">
+            <h5>Section 4: Suspect Details</h5>
+            {{ form.gender|as_crispy_field }}
+            {{ form.height|as_crispy_field }}
+            {{ form.weight|as_crispy_field }}
+            {{ form.haircolor|as_crispy_field }}
+            {{ form.haircut|as_crispy_field }}
+            {{ form.complexion|as_crispy_field }}
+            {{ form.beardmoustache|as_crispy_field }}
+            {{ form.eyeeyeglasses|as_crispy_field }}
+            {{ form.licencenumber|as_crispy_field }}
+            {{ form.makemodel|as_crispy_field }}
+            {{ form.color|as_crispy_field }}
+            {{ form.scars|as_crispy_field }}
+            {{ form.tatoos|as_crispy_field }}
+            {{ form.hat|as_crispy_field }}
+            {{ form.shirt|as_crispy_field }}
+            {{ form.trousers|as_crispy_field }}
+            {{ form.shoes|as_crispy_field }}
+            {{ form.voice|as_crispy_field }}
+            {{ form.bumpersticker|as_crispy_field }}
+            {{ form.direction|as_crispy_field }}
+            {{ form.damage|as_crispy_field }}
+          </div>
+      
+          <div class="card mb-3 p-3">
+            <h5>Section 5: Investigative Details</h5>
+            {{ form.causalfactors|as_crispy_field }}
+            {{ form.determincauses|as_crispy_field }}
+            {{ form.preventiveactions|as_crispy_field }}
+          </div>
+      
+          <div class="card mb-3 p-3">
+            <h5>Section 6: Shared Learning</h5>
+            {{ form.shared_learning_yes|as_crispy_field }}
+            {{ form.shared_learning_no|as_crispy_field }}
+            {{ form.shared_learning_na|as_crispy_field }}
+            {{ form.shared_learning_date|as_crispy_field }}
+            {{ form.shared_learning_method|as_crispy_field }}
+          </div>
+      
+          <div class="card mb-3 p-3">
+            <h5>Section 7: Emergency Response Plan</h5>
+            {{ form.emergency_not_applicable|as_crispy_field }}
+            {{ form.emergency_no|as_crispy_field }}
+            {{ form.emergency_site_staff|as_crispy_field }}
+            {{ form.emergency_contractor|as_crispy_field }}
+            {{ form.emergency_public|as_crispy_field }}
+            {{ form.emergency_responders|as_crispy_field }}
+          </div>
+      
+          {% if existing_images %}
+          <div class="card mb-3 p-3 text-center">
+            <h5>Existing Images</h5>
+            <div class="d-flex flex-wrap justify-content-center">
+              {% for image_url in existing_images %}
+              <img src="{{ image_url }}" alt="Existing Image" width="100" height="100" class="m-1">
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+      
+          <div class="card mb-3 p-3 text-center">
+            <h5>Upload Images</h5>
+            <small>Pictures Only — Max 4 — No Video</small>
+            <div class="form-group mt-2">
+              <div class="dropzone" id="my-dropzone"></div>
+            </div>
+          </div>
+      
+          <div class="text-center">
+            <button type="submit" id="submit" class="btn btn-primary mt-2 mb-4">Submit</button>
+          </div>
+        </form>
+    </div>
+  
+    <!-- ✅ Dropzone Modal -->
+    <div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Upload Complete</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">Your files have been uploaded successfully.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+    <!-- 🗂️ Incident List -->
+<div id="update" class="tab-pane fade">
+    {% if incidents %}
+    <div class="incident-grid">
+      {% for incident in incidents %}
+      <div class="incident-card card p-3 mb-3 shadow-sm">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <h5 class="mb-1">{{ incident.brief_description }}</h5>
+            <p class="mb-1 text-muted">{{ incident.eventdate }} at {{ incident.store }}</p>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-primary"
+                    hx-get="{% url 'htmx_edit_incident' incident.id %}"
+                    hx-target="#edit-{{ incident.id }}"
+                    hx-swap="innerHTML toggle">
+              📝
+            </button>
+          </div>
+        </div>
+  
+        <!-- 🔽 HTMX Loaded Form -->
+        <div id="edit-{{ incident.id }}" class="mt-3"></div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted">No incidents found.</p>
+    {% endif %}
+  </div>
+ 
+</div>
+</div>
+
+
+<style>
+
+    /* General card styling */
+  .card {
+    border-radius: 10px;
+    padding: 1rem;
+  }
+
+  .card h5 {
+    font-size: 1.1rem;
+    margin-bottom: 0.8rem;
+  }
+
+  .card h6 {
+    font-size: 1rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0.3rem;
+  }
+
+  /* Form spacing */
+  .form-group {
+    margin-bottom: 0.6rem;
+  }
+
+  .incident-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .incident-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (min-width: 992px) {
+    .incident-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  .incident-card h5 {
+    font-size: 1.1rem;
+  }
+
+  /* Smaller font and tighter spacing on mobile */
+  @media (max-width: 576px) {
+    body {
+      font-size: 0.875rem; /* Slightly smaller font */
+    }
+
+    .container {
+      padding: 0 10px;
+    }
+
+    .card {
+      padding: 0.75rem;
+    }
+
+    .card h5 {
+      font-size: 1rem;
+    }
+
+    .card h6 {
+      font-size: 0.95rem;
+    }
+
+    .form-group {
+      margin-bottom: 0.4rem;
+    }
+
+    label {
+      font-size: 0.85rem;
+    }
+
+    input, select, textarea, .form-control {
+      font-size: 0.85rem;
+      padding: 0.375rem 0.5rem;
+    }
+
+    .btn {
+      font-size: 0.875rem;
+      padding: 0.375rem 0.75rem;
+    }
+
+    .dropzone {
+      min-height: 120px;
+      padding: 0.5rem;
+    }
+
+    .dz-message {
+      font-size: 0.85rem;
+    }
+  }
+</style>
+
+
+
+<script>
+  function getCSRFToken() {
+    let csrfToken = null;
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === 'csrftoken') {
+        csrfToken = decodeURIComponent(value);
+        break;
+      }
+    }
+    return csrfToken;
+  }
+
+  let myDropzone = new Dropzone("#my-dropzone", {
+    url: "{% url 'incident_upload' %}",
+    maxFilesize: 5, // MB
+    maxFiles: 4,
+    acceptedFiles: "image/*",
+    headers: {
+      "X-CSRFToken": getCSRFToken(),
+    },
+  });
+
+  const submitButton = document.getElementById("submit");
+  submitButton.disabled = false;
+
+  myDropzone.on("sending", function (file, xhr, formData) {
+    var imageFolderValue = document.getElementById('id_image_folder').value;
+    formData.append("image_folder", imageFolderValue);
+    submitButton.disabled = true;
+  });
+
+  myDropzone.on("success", function (file, response) {
+    submitButton.disabled = false;
+    $("#successModal").modal("show");
+  });
+</script>
+{% endblock %}

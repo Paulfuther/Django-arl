@@ -1,0 +1,38 @@
+{% for user in users %}
+  <div class="card mb-3 p-3">
+    <h5 class="mb-2" style="font-size: 1.25rem;">
+      {{ user.get_full_name }} <small class="text-muted">{{ user.email }}</small>
+    </h5>
+
+    <form 
+  method="post"
+  hx-post="{% url 'update_user_roles' user.id %}" 
+  hx-target="#user-role-table" 
+  hx-swap="innerHTML"
+>
+  {% csrf_token %}
+  
+  <div class="row">
+    {% for group in all_groups %}
+      <div class="col-12 col-md-6 col-lg-4">
+        <div class="form-check">
+          <input 
+            class="form-check-input" 
+            type="checkbox" 
+            name="groups" 
+            value="{{ group.id }}" 
+            id="group_{{ group.id }}_user_{{ user.id }}"
+            {% if group in user.groups.all %}checked{% endif %}
+          >
+          <label class="form-check-label" for="group_{{ group.id }}_user_{{ user.id }}">
+            {{ group.name }}
+          </label>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <button type="submit" class="btn btn-primary mt-2">Update</button>
+</form>
+  </div>
+{% endfor %}

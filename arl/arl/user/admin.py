@@ -1,41 +1,57 @@
+import uuid
 from datetime import datetime
-from django.forms.widgets import TextInput
+
 from django import forms
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.admin import SimpleListFilter
 from django.contrib.auth.admin import UserAdmin
-from django.utils.html import format_html
-from import_export import fields
+from django.forms.widgets import TextInput
+from django.shortcuts import redirect, render
+from django.urls import path
+from django.utils.html import format_html, strip_tags
+from import_export import fields, resources
 from import_export import fields as export_fields
-from import_export import resources
 from import_export.admin import ExportActionMixin
-import uuid
-from django.utils.html import strip_tags
+
+from arl.bucket.helpers import upload_to_linode_object_storage
 from arl.carwash.models import CarwashStatus
-from arl.dsign.models import (DocuSignTemplate, ProcessedDocsignDocument,
-                              SignedDocumentFile)
+from arl.dsign.models import (
+    DocuSignTemplate,
+    ProcessedDocsignDocument,
+    SignedDocumentFile,
+)
 from arl.incident.models import Incident, MajorIncident
-from arl.msg.models import (BulkEmailSendgrid, EmailTemplate, Twimlmessages,
-                            UserConsent, WhatsAppTemplate)
+from arl.msg.models import (
+    BulkEmailSendgrid,
+    EmailTemplate,
+    Twimlmessages,
+    UserConsent,
+    WhatsAppTemplate,
+)
 from arl.msg.tasks import EmployerSMSTask
+
 # from arl.payroll.models import CalendarEvent, PayPeriod, StatutoryHoliday
 from arl.quiz.models import Answer, Question, Quiz, SaltLog
+from arl.setup.models import StripePayment, StripePlan, TenantApiKeys
 
-from .models import (CustomUser, DocumentType, EmployeeDocument, Employer,
-                     ExternalRecipient, SMSOptOut, Store, UserManager,
-                     EmployerSettings, NewHireInvite, EmployerRequest)
-from arl.setup.models import TenantApiKeys
-from django.shortcuts import redirect
-from django.contrib import messages
-from django.urls import path
-from arl.bucket.helpers import upload_to_linode_object_storage
-from django.shortcuts import render, redirect
+from .models import (
+    CustomUser,
+    DocumentType,
+    EmployeeDocument,
+    Employer,
+    EmployerSettings,
+    ErrorLog,
+    ExternalRecipient,
+    NewHireInvite,
+    SMSOptOut,
+    Store,
+    UserManager,
+)
 
 
 class ExternalRecipientAdmin(admin.ModelAdmin):
-    list_display = ('first_name', 'last_name', 'company', 'email', 'group')
-    search_fields = ('first_name', 'last_name', 'company', 'email',
-                     'group__name')
+    list_display = ("first_name", "last_name", "company", "email", "group")
+    search_fields = ("first_name", "last_name", "company", "email", "group__name")
 
 
 # This calss is used for exporting
@@ -43,13 +59,15 @@ class UserResource(resources.ModelResource):
     manager = export_fields.Field()
     whatsapp_consent = export_fields.Field()
     store = fields.Field(column_name="store", readonly=True)
-    all_docusign_templates = fields.Field(column_name="Docusign Documents",
-                                          attribute="all_docusign_templates")
-    work_permit_expiration_date = fields.Field(column_name="Permit Expiration",
-                                               attribute=(
-                                                "work_permit_expiration_date"))
-    sin_expiration_date = fields.Field(column_name="SIN Expiration",
-                                       attribute="sin_expiration_date")
+    all_docusign_templates = fields.Field(
+        column_name="Docusign Documents", attribute="all_docusign_templates"
+    )
+    work_permit_expiration_date = fields.Field(
+        column_name="Permit Expiration", attribute=("work_permit_expiration_date")
+    )
+    sin_expiration_date = fields.Field(
+        column_name="SIN Expiration", attribute="sin_expiration_date"
+    )
 
     class Meta:
         model = CustomUser
@@ -69,9 +87,9 @@ class UserResource(resources.ModelResource):
         )
         export_order = fields
         queryset = CustomUser.objects.select_related("store").prefetch_related(
-            "managed_users")
-        queryset = CustomUser.objects.prefetch_related(
-            "processeddocsigndocument_set")
+            "managed_users"
+        )
+        queryset = CustomUser.objects.prefetch_related("processeddocsigndocument_set")
 
     def dehydrate_manager(self, custom_user):
         # Fetch the first related UserManager object
@@ -93,10 +111,12 @@ class UserResource(resources.ModelResource):
 
     def dehydrate_all_docusign_templates(self, obj):
         """Retrieve and format all DocuSign template names for a user."""
-        templates = ProcessedDocsignDocument.objects.filter(user=obj).values_list("template_name", flat=True)
+        templates = ProcessedDocsignDocument.objects.filter(user=obj).values_list(
+            "template_name", flat=True
+        )
         if not templates:
             return "No Documents"
-        return ", ".join(strip_tags(template) for template in templates) 
+        return ", ".join(strip_tags(template) for template in templates)
 
 
 class SINFirstDigitFilter(SimpleListFilter):
@@ -121,11 +141,16 @@ class SINFirstDigitFilter(SimpleListFilter):
 
 
 # Inline model to display all associated DocuSign documents
-class ProcessedDocusignDocumentInline(admin.TabularInline):  # Or use admin.StackedInline for a different layout
+class ProcessedDocusignDocumentInline(
+    admin.TabularInline
+):  # Or use admin.StackedInline for a different layout
     model = ProcessedDocsignDocument
     extra = 0  # Don't show empty extra forms
     fields = ("template_name", "processed_at")  # Adjust based on available fields
-    readonly_fields = ("template_name", "processed_at")  # Make these fields non-editable
+    readonly_fields = (
+        "template_name",
+        "processed_at",
+    )  # Make these fields non-editable
 
 
 # CustomUser model
@@ -134,9 +159,11 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         if db_field.name in ["sin_expiration_date", "work_permit_expiration_date"]:
-            kwargs["widget"] = TextInput(attrs={"type": "date"})  # ✅ Uses native date input, no calendar
+            kwargs["widget"] = TextInput(
+                attrs={"type": "date"}
+            )  # ✅ Uses native date input, no calendar
         return super().formfield_for_dbfield(db_field, request, **kwargs)
-    
+
     # Customize the fields you want to display
     inlines = [ProcessedDocusignDocumentInline]
     list_display = (
@@ -144,7 +171,7 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         "username",
         "email",
         "store_number",
-        'employer',
+        "employer",
         "phone_number",
         "sin",
         "get_consent",
@@ -154,10 +181,19 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         "last_login",
         "get_groups",
     )
-    list_filter = ("is_active", "groups", 'sin_expiration_date',
-                   'work_permit_expiration_date', SINFirstDigitFilter)
+    list_filter = (
+        "is_active",
+        "groups",
+        "sin_expiration_date",
+        "work_permit_expiration_date",
+        SINFirstDigitFilter,
+    )
     search_fields = ("username", "email", "phone_number", "sin")
-    list_editable = ('sin_expiration_date', 'work_permit_expiration_date','phone_number')
+    list_editable = (
+        "sin_expiration_date",
+        "work_permit_expiration_date",
+        "phone_number",
+    )
     list_per_page = 15
     # def has_delete_permission(self, request, obj=None):
     #    return False  # Disables the ability to delete users
@@ -175,22 +211,20 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
 
     def expandable_groups(self, obj):
         """Creates an expandable section for groups."""
-        groups = ", ".join([group.name for group in obj.groups.all()]
-                           ) or "No Groups"
+        groups = ", ".join([group.name for group in obj.groups.all()]) or "No Groups"
         return format_html(
             '<button class="expand-btn" onclick="toggleGroups(this)">Show Groups</button>'
             '<div class="group-list" style="display: none; padding: 5px; border: 1px solid #ddd; background: #f9f9f9;">{}</div>',
-            groups
+            groups,
         )
 
     expandable_groups.short_description = "Groups"
 
     def all_docusign_templates(self, obj):
         """Display all template names for a user in a neat format."""
-        templates = ProcessedDocsignDocument.objects.filter(
-            user=obj
-                ).values_list(
-                    "template_name", flat=True)
+        templates = ProcessedDocsignDocument.objects.filter(user=obj).values_list(
+            "template_name", flat=True
+        )
 
         if not templates:
             return "No Documents"
@@ -203,8 +237,7 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
     all_docusign_templates.short_description = "Docusign Documents"
 
     def get_consent(self, obj):
-        consent = UserConsent.objects.filter(user=obj,
-                                             consent_type="WhatsApp").first()
+        consent = UserConsent.objects.filter(user=obj, consent_type="WhatsApp").first()
         return "Granted" if consent and consent.is_granted else "Not Granted"
 
     get_consent.short_description = "WhatsApp Consent"
@@ -262,10 +295,14 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
 
     def save_model(self, request, obj, form, change):
         """Ensure phone_number is not overwritten when updating other fields."""
-        if "phone_number" in form.cleaned_data and form.cleaned_data["phone_number"]:  
-            obj.phone_number = form.cleaned_data["phone_number"]  # ✅ Update if provided
+        if "phone_number" in form.cleaned_data and form.cleaned_data["phone_number"]:
+            obj.phone_number = form.cleaned_data[
+                "phone_number"
+            ]  # ✅ Update if provided
         else:
-            obj.phone_number = CustomUser.objects.get(pk=obj.pk).phone_number  # ✅ Keep existing phone number
+            obj.phone_number = CustomUser.objects.get(
+                pk=obj.pk
+            ).phone_number  # ✅ Keep existing phone number
 
         super().save_model(request, obj, form, change)
 
@@ -292,7 +329,6 @@ class UserManagerAdmin(admin.ModelAdmin):
     get_manager.short_description = "Manager"
 
     def user_creation_date(self, obj):
-
         return obj.user.date_joined.strftime("%Y-%m-%d")
 
     user_creation_date.short_description = "User Creation Date"
@@ -302,8 +338,7 @@ class UserManagerAdmin(admin.ModelAdmin):
 
 @admin.register(UserConsent)
 class UserConsentAdmin(admin.ModelAdmin):
-    list_display = ("user", "consent_type", "is_granted", "granted_on",
-                    "revoked_on")
+    list_display = ("user", "consent_type", "is_granted", "granted_on", "revoked_on")
     list_filter = ("consent_type", "is_granted")
     search_fields = ("user__username",)
 
@@ -316,7 +351,7 @@ class StoreAdmin(admin.ModelAdmin):
 class AnswerInline(admin.TabularInline):
     model = Answer
     extra = 1  # Allow adding one extra answer by default
-    fields = ['text', 'is_correct']
+    fields = ["text", "is_correct"]
 
 
 class QuestionInline(admin.StackedInline):
@@ -328,13 +363,12 @@ class QuestionInline(admin.StackedInline):
 class QuizAdmin(admin.ModelAdmin):
     inlines = [QuestionInline]
     # Display questions inline within the Quiz admin view
-    list_display = ('title', 'description')
+    list_display = ("title", "description")
     # Display quiz title and description in the list view
 
     def get_queryset(self, request):
         # Preload related questions and answers to avoid multiple database hits
-        return (super().get_queryset(request).
-                prefetch_related('questions__answers'))
+        return super().get_queryset(request).prefetch_related("questions__answers")
 
     def view_questions_and_answers(self, obj):
         # Display questions and their answers as a
@@ -349,47 +383,71 @@ class QuizAdmin(admin.ModelAdmin):
                 f"{'(Correct)' if answer.is_correct else ''}<br>"
         return format_html(html)
 
-    view_questions_and_answers.short_description = 'Questions and Answers'
+    view_questions_and_answers.short_description = "Questions and Answers"
 
 
 class QuestionAdmin(admin.ModelAdmin):
     inlines = [AnswerInline]  # Include AnswerInline in the QuestionAdmin
-    list_display = ('text', 'quiz', 'display_answers')
+    list_display = ("text", "quiz", "display_answers")
     # Display the question text, quiz, and answers
 
     def display_answers(self, obj):
         answers = obj.answers.all()
         return [f"{answer.text} " for answer in answers]
 
-    display_answers.short_description = 'Answers'
+    display_answers.short_description = "Answers"
 
 
 class TaskResultAdmin(admin.ModelAdmin):
-    list_display = ('task_id', 'task_name', 'status', 'date_done', 'worker', 'short_result', 'created_datetime', 'completed_datetime')
-    readonly_fields = (
-        'task_id', 'task_name', 'status', 'worker', 
-        'result_content_type', 'result_encoding', 'result', 
-        'parameters', 'traceback', 'meta', 
-        'created_datetime', 'completed_datetime'
+    list_display = (
+        "task_id",
+        "task_name",
+        "status",
+        "date_done",
+        "worker",
+        "short_result",
+        "created_datetime",
+        "completed_datetime",
     )
-    list_filter = ('status', 'date_done')
-    search_fields = ('task_id', 'task_name')
+    readonly_fields = (
+        "task_id",
+        "task_name",
+        "status",
+        "worker",
+        "result_content_type",
+        "result_encoding",
+        "result",
+        "parameters",
+        "traceback",
+        "meta",
+        "created_datetime",
+        "completed_datetime",
+    )
+    list_filter = ("status", "date_done")
+    search_fields = ("task_id", "task_name")
 
     def short_result(self, obj):
         """Shorten the result for list view."""
         if obj.result:
-            return str(obj.result)[:75] + "..." if len(str(obj.result)) > 75 else obj.result
+            return (
+                str(obj.result)[:75] + "..."
+                if len(str(obj.result)) > 75
+                else obj.result
+            )
         return "No result"
-    short_result.short_description = 'Result (short)'
+
+    short_result.short_description = "Result (short)"
 
     def created_datetime(self, obj):
         """Convert created datetime to local timezone for better readability."""
         return self._format_datetime(obj.date_created)
+
     created_datetime.short_description = "Created DateTime"
 
     def completed_datetime(self, obj):
         """Convert completed datetime to local timezone for better readability."""
         return self._format_datetime(obj.date_done)
+
     completed_datetime.short_description = "Completed DateTime"
 
     def _format_datetime(self, value):
@@ -407,7 +465,8 @@ class TaskResultAdmin(admin.ModelAdmin):
             args,
             kwargs,
         )
-    parameters.short_description = 'Task Parameters'
+
+    parameters.short_description = "Task Parameters"
 
 
 @admin.register(DocumentType)
@@ -418,24 +477,35 @@ class DocumentTypeAdmin(admin.ModelAdmin):
 
 @admin.register(EmployeeDocument)
 class EmployeeDocumentAdmin(admin.ModelAdmin):
-    list_display = ("user", "document_type", "issue_date", "expiration_date", "is_expired")
+    list_display = (
+        "user",
+        "document_type",
+        "issue_date",
+        "expiration_date",
+        "is_expired",
+    )
     list_filter = ("document_type", "expiration_date")
-    search_fields = ("user__username", "user__email", "document_type__name", "document_number")
+    search_fields = (
+        "user__username",
+        "user__email",
+        "document_type__name",
+        "document_number",
+    )
     date_hierarchy = "expiration_date"
 
 
 @admin.register(SaltLog)
 class SaltLogAdmin(admin.ModelAdmin):
     list_display = (
-        'store',
-        'user',
-        'area_salted',
-        'date_salted',
-        'time_salted',
-        'hidden_timestamp',
+        "store",
+        "user",
+        "area_salted",
+        "date_salted",
+        "time_salted",
+        "hidden_timestamp",
     )
-    list_filter = ('store', 'date_salted')
-    search_fields = ('store__name', 'area_salted')
+    list_filter = ("store", "date_salted")
+    search_fields = ("store__name", "area_salted")
 
 
 @admin.register(CarwashStatus)
@@ -460,14 +530,25 @@ class CarwashStatusAdmin(admin.ModelAdmin):
 
 class SMSOptOutResource(resources.ModelResource):
     """Defines the data to export"""
+
     first_name = resources.Field()
     last_name = resources.Field()
     phone_number = resources.Field()
 
     class Meta:
         model = SMSOptOut
-        fields = ("user__first_name", "user__last_name", "user__phone_number", "date_added")
-        export_order = ("user__first_name", "user__last_name", "user__phone_number", "date_added")
+        fields = (
+            "user__first_name",
+            "user__last_name",
+            "user__phone_number",
+            "date_added",
+        )
+        export_order = (
+            "user__first_name",
+            "user__last_name",
+            "user__phone_number",
+            "date_added",
+        )
 
     def dehydrate_first_name(self, obj):
         return obj.user.first_name if obj.user else ""
@@ -487,7 +568,9 @@ class SMSOptOutForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Sort users by phone number (or change to 'first_name'/'last_name')
-        self.fields["user"].queryset = CustomUser.objects.filter(is_active=True).order_by("phone_number")
+        self.fields["user"].queryset = CustomUser.objects.filter(
+            is_active=True
+        ).order_by("phone_number")
         self.fields["user"].label_from_instance = self.format_user_label
 
     def format_user_label(self, user):
@@ -498,53 +581,92 @@ class SMSOptOutForm(forms.ModelForm):
 class SMSOptOutAdmin(ExportActionMixin, admin.ModelAdmin):
     form = SMSOptOutForm
     resource_class = SMSOptOutResource
-    list_display = ("get_first_name", "get_last_name", "get_phone", "user", "employer", "reason", "date_added")
-    search_fields = ("user__first_name", "user__last_name", "user__username", "user__phone_number", "employer__name")
-    ordering = ("user__first_name", "user__last_name", "user__phone_number",)  # Sorts list by phone number
+    list_display = (
+        "get_first_name",
+        "get_last_name",
+        "get_phone",
+        "user",
+        "employer",
+        "reason",
+        "date_added",
+    )
+    search_fields = (
+        "user__first_name",
+        "user__last_name",
+        "user__username",
+        "user__phone_number",
+        "employer__name",
+    )
+    ordering = (
+        "user__first_name",
+        "user__last_name",
+        "user__phone_number",
+    )  # Sorts list by phone number
     list_filter = ("employer",)  # ✅ Filter by employer in Django Admin
 
     autocomplete_fields = ["user"]
 
     def get_first_name(self, obj):
         return obj.user.first_name if obj.user else "N/A"
+
     get_first_name.admin_order_field = "user__first_name"
     get_first_name.short_description = "First Name"
 
     def get_last_name(self, obj):
         return obj.user.last_name if obj.user else "N/A"
+
     get_last_name.admin_order_field = "user__last_name"
     get_last_name.short_description = "Last Name"
 
     def get_phone(self, obj):
         return obj.user.phone_number if obj.user else "N/A"
+
     get_phone.admin_order_field = "user__phone_number"
     get_phone.short_description = "Phone Number"
 
     def get_employer(self, obj):
         return obj.employer.name if obj.employer else "N/A"
+
     get_employer.admin_order_field = "employer__name"
     get_employer.short_description = "Employer"
 
 
 @admin.register(EmployerSMSTask)
 class EmployerSMSTaskAdmin(admin.ModelAdmin):
-    list_display = ('employer', 'task_name', 'is_enabled')  # Show employer & status
-    list_filter = ('task_name', 'is_enabled')  # Filter by task and status
-    search_fields = ('employer__name', 'task_name')  # Search by employer name
-    list_editable = ('is_enabled',)  # ✅ Allow enabling/disabling directly from the list view
+    list_display = ("employer", "task_name", "is_enabled")  # Show employer & status
+    list_filter = ("task_name", "is_enabled")  # Filter by task and status
+    search_fields = ("employer__name", "task_name")  # Search by employer name
+    list_editable = (
+        "is_enabled",
+    )  # ✅ Allow enabling/disabling directly from the list view
 
 
 @admin.register(TenantApiKeys)
 class TenantApiKeysAdmin(admin.ModelAdmin):
-    list_display = ("employer", "account_sid", "phone_number", "sender_email", "status", "created_at")
-    search_fields = ("employer__name", "service_name", "account_sid", "sender_email")
+    list_display = (
+        "employer",
+        "account_sid",
+        "phone_number",
+        "verified_sender_email",
+        "status",
+        "created_at",
+    )
+    search_fields = (
+        "employer__name",
+        "service_name",
+        "account_sid",
+        "verified_sender_email",
+    )
 
 
 @admin.register(DocuSignTemplate)
 class DocuSignTemplateAdmin(admin.ModelAdmin):
     list_display = ("template_name", "employer", "is_new_hire_template", "created_at")
     search_fields = ("template_name",)
-    list_filter = ("employer", "is_new_hire_template",)
+    list_filter = (
+        "employer",
+        "is_new_hire_template",
+    )
 
 
 @admin.register(EmailTemplate)
@@ -568,17 +690,35 @@ class EmployerSettingsAdmin(admin.ModelAdmin):
 
 @admin.register(Employer)
 class EmployerAdmin(admin.ModelAdmin):
-    list_display = ["name", "email", "is_active", "verified_sender_email", "toggle_active_button"]
+    list_display = [
+        "name",
+        "email",
+        "is_active",
+        "verified_sender_email",
+        "toggle_active_button",
+    ]
     actions = ["activate_selected", "deactivate_selected"]
-    search_fields = ("name", "phone_number", "verified_sender_local", "verified_sender_email", "senior_contact_name")
+    search_fields = (
+        "name",
+        "phone_number",
+        "verified_sender_local",
+        "verified_sender_email",
+        "senior_contact_name",
+    )
     readonly_fields = ("verified_sender_email",)  # Prevent editing full email
     list_filter = ("created", "state_province", "country")
 
     def toggle_active_button(self, obj):
         """Add a button to toggle employer's active status."""
         if obj.is_active:
-            return format_html('<a class="button" style="color:red;" href="/admin/user/employer/{}/toggle-active/">Deactivate</a>', obj.pk)
-        return format_html('<a class="button" style="color:green;" href="/admin/user/employer/{}/toggle-active/">Activate</a>', obj.pk)
+            return format_html(
+                '<a class="button" style="color:red;" href="/admin/user/employer/{}/toggle-active/">Deactivate</a>',
+                obj.pk,
+            )
+        return format_html(
+            '<a class="button" style="color:green;" href="/admin/user/employer/{}/toggle-active/">Activate</a>',
+            obj.pk,
+        )
 
     toggle_active_button.short_description = "Toggle Active"
 
@@ -615,17 +755,30 @@ class EmployerAdmin(admin.ModelAdmin):
         employer.save()
 
         if employer.is_active:
-            self.message_user(request, f"Employer {employer.name} is now active.", messages.SUCCESS)
+            self.message_user(
+                request, f"Employer {employer.name} is now active.", messages.SUCCESS
+            )
         else:
-            self.message_user(request, f"Employer {employer.name} has been deactivated.", messages.WARNING)
+            self.message_user(
+                request,
+                f"Employer {employer.name} has been deactivated.",
+                messages.WARNING,
+            )
 
         return redirect("/admin/user/employer/")
 
 
-
 @admin.register(NewHireInvite)
 class NewHireInviteAdmin(admin.ModelAdmin):
-    list_display = ("name", "email", "role", "employer", "created_at", "used", "invite_link_display")
+    list_display = (
+        "name",
+        "email",
+        "role",
+        "employer",
+        "created_at",
+        "used",
+        "invite_link_display",
+    )
     list_filter = ("employer", "role", "used")
     search_fields = ("name", "email", "employer__name")
     ordering = ("-created_at",)
@@ -633,6 +786,7 @@ class NewHireInviteAdmin(admin.ModelAdmin):
 
     def invite_link_display(self, obj):
         return obj.get_invite_link()
+
     invite_link_display.short_description = "Invite Link"
 
     fieldsets = (
@@ -641,46 +795,14 @@ class NewHireInviteAdmin(admin.ModelAdmin):
     )
 
 
-class EmployerRequestAdmin(admin.ModelAdmin):
-    list_display = ["name", "email", "phone_number", "status", "approve_button"]
-    actions = ["approve_selected_requests"]
-
-    def approve_button(self, obj):
-        return format_html('<a class="button" href="/approve-employer/{}/">Approve</a>', obj.pk)
-    approve_button.short_description = "Approve Employer"
-
-    def approve_selected_requests(self, request, queryset):
-        approved_count = 0
-
-        for obj in queryset:
-            if obj.status == "pending":
-                # Call your approval logic here (if needed)
-                obj.status = "approved"
-                obj.save()
-                approved_count += 1
-
-        if approved_count > 0:
-            messages.success(request, f"Successfully approved {approved_count} employer(s).")
-        else:
-            messages.warning(request, "No pending employer requests were selected.")
-
-        return redirect("/admin/user/employerrequest/")
-
-    approve_selected_requests.short_description = "Approve selected employer requests"
-
-
 class SignedDocumentSingleUploadForm(forms.Form):
     user = forms.ModelChoiceField(
-        queryset=CustomUser.objects.filter(is_active=True),
-        label="Select User"
+        queryset=CustomUser.objects.filter(is_active=True), label="Select User"
     )
     employer = forms.ModelChoiceField(
-        queryset=Employer.objects.all(),
-        label="Select Employer"
+        queryset=Employer.objects.all(), label="Select Employer"
     )
-    file = forms.FileField(
-        label="Select File to Upload"
-    )
+    file = forms.FileField(label="Select File to Upload")
 
 
 @admin.register(SignedDocumentFile)
@@ -691,7 +813,11 @@ class SignedDocumentFileAdmin(admin.ModelAdmin):
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
-            path("upload-one/", self.admin_site.admin_view(self.upload_single_view), name="signed_document_upload_one"),
+            path(
+                "upload-one/",
+                self.admin_site.admin_view(self.upload_single_view),
+                name="signed_document_upload_one",
+            ),
         ]
         return custom_urls + urls
 
@@ -716,7 +842,11 @@ class SignedDocumentFileAdmin(admin.ModelAdmin):
                     file_path=file_path,
                 )
 
-                self.message_user(request, f"Successfully uploaded file for {user}.", level=messages.SUCCESS)
+                self.message_user(
+                    request,
+                    f"Successfully uploaded file for {user}.",
+                    level=messages.SUCCESS,
+                )
                 return redirect("..")
         else:
             form = SignedDocumentSingleUploadForm()
@@ -725,9 +855,29 @@ class SignedDocumentFileAdmin(admin.ModelAdmin):
             "form": form,
         }
         return render(request, "admin/signed_documents_upload_one.html", context)
-    
 
-admin.site.register(EmployerRequest, EmployerRequestAdmin)
+
+@admin.register(StripePlan)
+class StripePlanAdmin(admin.ModelAdmin):
+    list_display = ("name", "amount", "stripe_price_id")
+    search_fields = ("name", "stripe_price_id")
+
+
+@admin.register(StripePayment)
+class StripePaymentAdmin(admin.ModelAdmin):
+    list_display = ("employer", "amount", "is_paid", "payment_date")
+    search_fields = ("employer__name", "stripe_customer_id", "stripe_subscription_id")
+    list_filter = ("is_paid",)
+
+
+@admin.register(ErrorLog)
+class ErrorLogAdmin(admin.ModelAdmin):
+    list_display = ("timestamp", "path", "method", "status_code")
+    list_filter = ("status_code", "method")
+    search_fields = ("path", "error_message")
+    ordering = ("-timestamp",)
+
+
 admin.site.register(Twimlmessages)
 admin.site.register(BulkEmailSendgrid)
 admin.site.register(Store, StoreAdmin)

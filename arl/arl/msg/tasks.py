@@ -273,7 +273,7 @@ def send_one_off_bulk_sms_task(group_id, message, user_id):
     try:
         # ✅ Get the group and active users
         group = Group.objects.get(pk=group_id)
-        users_in_group = group.user_set.filter(is_active=True)
+        users_in_group = group.user_set.filter(is_active=True, employer=employer)
         phone_numbers = [user.phone_number for user in users_in_group]
 
     except Group.DoesNotExist:

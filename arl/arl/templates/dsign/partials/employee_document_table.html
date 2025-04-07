@@ -52,7 +52,7 @@
           word-break: break-word;">{{ employee.email }}</div>
         </div>
         {% if employee.signed_documents.exists %}
-          <button class="btn btn-outline-primary btn-sm mobile-btn"
+          <button class="btn btn-outline-primary btn-sm rounded-pill view-btn"
                   style="margin-right: 0.5rem;"
                   hx-get="{% url 'fetch_signed_docs_by_user' employee.id %}"
                   hx-target="#docs-{{ employee.id }}"

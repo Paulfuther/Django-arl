@@ -19,6 +19,30 @@
     gap: 1rem;
   }
 
+  .group-checkbox-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .group-checkbox-grid .form-check {
+    margin-bottom: 0;
+  }
+
+  .user-role-wrapper {
+    width: 100%;
+  }
+
+  .user-card {
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background-color: #fff;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  }
+
   @media (min-width: 768px) {
     .card-grid {
       grid-template-columns: repeat(2, 1fr);
@@ -135,6 +159,9 @@
     <li class="nav-item">
       <a class="nav-link" data-bs-toggle="tab" href="#signed-documents">Signed Documents</a>
     </li>
+    <li class="nav-item">
+      <a class="nav-link" data-bs-toggle="tab" href="#user-roles">User Roles</a>
+    </li>
   </ul>
 
   <div class="tab-content mt-3">
@@ -154,7 +181,13 @@
             {{ template.template_name }}
             {% if template.is_new_hire_template %}<span class="ms-2">&#x2705;</span>{% endif %}
         </div>
-          <p class="template-meta"><strong>Created At:</strong> {{ template.created_at }}</p>
+          <p class="template-meta"><strong>Created At:</strong> {{ template.created_at }}
+            {% if template.template_status == "Ready to Send" %}
+            <span class="badge bg-success">{{ template.template_status }}</span>
+          {% else %}
+            <span class="badge bg-warning text-dark">{{ template.template_status }}</span>
+          {% endif %}
+          </p>
           <div class="template-actions">
             <a href="{% url 'edit_document_page' template.template_id %}" class="btn btn-outline-primary mobile-btn">Edit</a>
           </div>
@@ -207,21 +240,42 @@
       {% else %}<p class="text-muted">No pending invitations.</p>{% endif %}
     </div>
 
-    <div id="signed-documents" class="tab-pane fade">
-      <legend class="mb-3">Search Signed Documents</legend>
-      <form method="get" class="mb-3" hx-get="{% url 'hr_document_view' %}" hx-target="#employee-table" hx-trigger="submit">
-        <input type="text" name="q" placeholder="Search by name or email" class="form-control mb-2" />
-        <button type="submit" class="btn btn-outline-primary mobile-btn">Search</button>
-      </form>
-      <div id="employee-table">
-        {% include "dsign/partials/employee_document_table.html" %}
-      </div>
-    </div>
+        <div id="signed-documents" class="tab-pane fade">
+          <legend class="mb-3">Search Signed Documents</legend>
+              <form method="get" class="mb-3" 
+                    hx-get="{% url 'hr_document_view' %}" 
+                    hx-target="#employee-table" 
+                    hx-trigger="submit">
+                <input type="text" name="q" placeholder="Search by name or email" class="form-control mb-2" />
+                <button type="submit" class="btn btn-outline-primary mobile-btn">Search</button>
+              </form>
+          <div id="employee-table">
+            {% include "dsign/partials/employee_document_table.html" %}
+          </div>
+        </div>
+
+        <div id="user-roles" class="tab-pane fade">
+          <legend class="mb-3">User Roles</legend>
+            <form method="get" hx-get="{% url 'search_user_roles' %}" hx-target="#user-role-table">
+              <input type="text" name="query" placeholder="Search users..." class="form-control" />
+              <button type="submit" class="btn btn-primary mt-2">Search</button>
+            </form>
+      
+            <div id="user-role-table" class="mt-3">
+              {% include "user/hr/partials/user_role_list.html" %}
+            </div>
+            </div>
+
+
   </div>
+
+  
+
   
 </div>
 <a href="{% url 'home' %}" class="btn btn-outline-secondary mt-3">Back</a>
 </div>
 
+    
 
 {% endblock %}

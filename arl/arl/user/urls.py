@@ -6,11 +6,12 @@ from .views import (CheckPhoneNumberUniqueView, RegisterView,
                     check_verification, fetch_managers, home_view, login_view,
                     logout_view, request_verification, verification_page,
                     verify_twilio_phone_number, phone_format,
-                    EmployerRegistrationView, landing_page,
-                    approve_employer, reject_employer, close_twilio_sub,
+                    landing_page,
+                    close_twilio_sub,
                     hr_dashboard, cancel_invite, resend_invite,
                     hr_document_view, download_signed_document,
-                    fetch_signed_docs_by_user)
+                    fetch_signed_docs_by_user, search_user_roles,
+                    update_user_roles)
 from django.views.generic import TemplateView
 
 
@@ -61,7 +62,6 @@ urlpatterns = [
     path('task-results/', TaskResultListView.as_view(), name='task_results'),
     path('verify-phone/<str:phone_number>/', verify_twilio_phone_number, name='verify_twilio_phone'),
     path('phone-format/', phone_format, name='phone_format'),
-    path("register-employer/", EmployerRegistrationView.as_view(), name="register_employer"),
     path("registration-success/",
          TemplateView.as_view(template_name="user/employer_success.html"),
          name="employer_registration_success"),
@@ -72,8 +72,7 @@ urlpatterns = [
     path("hr/documents/", hr_document_view, name="hr_document_view"),
     path("hr/documents/fetch/<int:user_id>/", fetch_signed_docs_by_user, name="fetch_signed_docs_by_user"),
     path("hr/documents/download/<int:doc_id>/", download_signed_document, name="download_signed_document"),
-    path("approve-employer/<int:pk>/", approve_employer, name="approve_employer"),
     path("close-twilio-sub/<str:subaccount_sid>", close_twilio_sub, name = "close_twilio_sub"),
-   
-    
+    path("hr/search-user-roles/", search_user_roles, name="search_user_roles"),
+    path("hr/update-user-role/<int:user_id>/", update_user_roles, name="update_user_roles"),
 ]
