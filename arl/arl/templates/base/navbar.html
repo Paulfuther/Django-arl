@@ -32,6 +32,7 @@
           <a class="nav-link" href="{% url 'list_folders' %}">Dropbox</a>
         </li>
         {% endif %}
+
         <li class="nav-item">
           <a class="nav-link" href="{% url 'create_salt_log' %}">Create Salt Log</a>
         </li>
@@ -46,10 +47,6 @@
           <a class="nav-link" href="{% url 'incident_list' %}">View/Edit Incident Form</a>
         </li>
      
-
-        
-          
-
         {% flag 'enable_nav_link' %}
         <li class="nav-item">
           <a class="nav-link" href="{% url 'quiz_list' %}">Quiz</a>
@@ -59,7 +56,7 @@
         {% if user.is_comms %}
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-            Comms 
+            Communications
           </a>
           <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
             <li><a class="dropdown-item" href="{% url 'comms' %}">Comms Overview</a></li>
@@ -67,10 +64,7 @@
             <li><a class="dropdown-item" href="{% url 'fetch_twilio_calls' %}">Call Logs</a></li>
             <li><a class="dropdown-item" href="{% url 'email_event_summary' %}">Email Logs</a></li>
             <li><a class="dropdown-item" href="{% url 'employee_email_report' %}">Employee Email Report</a></li>
-            <li><a class="dropdown-item" href="{% url 'waiting_for_others' %}">Outstanding Docs</a></li>
-            <li><a class="dropdown-item" href="{% url 'queued_incidents_list' %}">Queued Incidents</a></li>
-            <li><a class="dropdown-item" href="{% url 'summarize_costs' %}">Message Summary</a></li>
-            <li><a class="dropdown-item" href="{% url 'task_results' %}">Task Results</a></li>
+            
           </ul>
         </li>
         {% endif %}
@@ -79,17 +73,19 @@
         <li class="nav-item">
           <a class="nav-link" href="{% url 'admin:index' %}">Admin</a>
         </li>
-        <li>
-          <a class="nav-link" href="{% url 'incident_dashboard' %}">Incident</a>
-         </li>
          <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-            Carwash
+            Ideas
           </a>
           <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
               <li><a class="dropdown-item" href="{% url 'carwash_status' %}">Carwash Update</a></li>
               <li><a class="dropdown-item" href="{% url 'carwash_status_list' %}">Carwash List</a></li>
               <li><a class="dropdown-item" href="{% url 'carwash_status_report' %}">Carwash Report</a></li>
+              <li><a class="dropdown-item" href="{% url 'waiting_for_others' %}">Outstanding Docs</a></li>
+              <li><a class="dropdown-item" href="{% url 'queued_incidents_list' %}">Queued Incidents</a></li>
+              <li><a class="dropdown-item" href="{% url 'summarize_costs' %}">Message Summary</a></li>
+              <li><a class="dropdown-item" href="{% url 'task_results' %}">Task Results</a></li>
+              <li><a class="nav-link" href="{% url 'incident_dashboard' %}">Incident</a></li>
           </ul>
         </li>
 
