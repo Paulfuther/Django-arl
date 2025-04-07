@@ -10,12 +10,15 @@ from arl.incident.views import (IncidentCreateView, IncidentListView,
                                 generate_major_incident_pdf, generate_pdf,
                                 generate_pdf_web, send_incident_now,
                                 mark_do_not_send, generate_restricted_pdf_web,
-                                generate_restricted_incident_pdf_email)
+                                generate_restricted_incident_pdf_email,
+                                htmx_edit_incident, incident_dashboard)
 
 urlpatterns = [
     path("incident/", IncidentCreateView.as_view(), name="create_incident"),
+    path("incident/dashboard/", incident_dashboard, name="incident_dashboard"),
     path("incident/<int:pk>/", IncidentUpdateView.as_view(),
          name="update_incident"),
+    path("incident/edit/<int:pk>/", htmx_edit_incident, name="htmx_edit_incident"),
     path("major_incident/", MajorIncidentCreateView.as_view(),
          name="create_major_incident"),
     path("major_incident/<int:pk>/", MajorIncidentUpdateView.as_view(),

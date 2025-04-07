@@ -1,0 +1,16 @@
+<div class="incident-card" id="incident-{{ incident.id }}-container">
+    <div class="d-flex justify-content-between align-items-center">
+      <div>
+        <strong>{{ incident.title }}</strong><br>
+        <small class="text-muted">{{ incident.date|date:"M d, Y" }}</small>
+      </div>
+      <div>
+        <button class="btn btn-sm btn-outline-primary"
+                hx-get="{% url 'htmx_edit_incident' incident.id %}"
+                hx-target="#incident-{{ incident.id }}-container"
+                hx-swap="outerHTML">
+          ✏️ Update
+        </button>
+      </div>
+    </div>
+  </div>

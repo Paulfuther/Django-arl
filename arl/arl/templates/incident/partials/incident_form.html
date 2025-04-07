@@ -1,0 +1,35 @@
+{% extends "../base/base.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}New Incident{% endblock %}
+{% block content %}
+
+{% include "../base/navbar.html" %}
+
+<div class="container my-4">
+  <div class="row justify-content-center">
+    <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+
+      <form method="post" enctype="multipart/form-data" class="was-validated">
+            {% if incident %}
+              hx-post="{% url 'htmx_edit_incident' incident.id %}"
+              hx-target="#incident-{{ incident.id }}-container"
+              hx-swap="outerHTML"
+            {% endif %}>
+        
+        {% csrf_token %}
+
+        {{ form|crispy }}
+        {{ form|as_crispy_errors }}
+
+        <div class="d-flex justify-content-end mt-2">
+          <button type="submit" class="btn btn-success btn-sm me-2">Save</button>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="window.location.reload()">Cancel</button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+
+{% endblock %}

@@ -179,6 +179,9 @@ class ErrorLog(models.Model):
     status_code = models.IntegerField()
     error_message = models.TextField()
 
+    def __str__(self):
+        return f"[{self.status_code}] {self.path} at {self.timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
+
 
 class ExternalRecipient(models.Model):
     first_name = models.CharField(max_length=50, blank=True, null=True)
@@ -277,53 +280,3 @@ class NewHireInvite(models.Model):
         return f"Invite for {self.name} ({self.email})"
 
 
-class EmployerRequest(models.Model):
-    STATUS_CHOICES = [
-        ("pending", "Pending"),
-        ("approved", "Approved"),
-        ("rejected", "Rejected"),
-    ]
-
-    name = models.CharField(max_length=100)
-    email = models.EmailField(unique=True, help_text="Contact email for the employer")
-    address = models.CharField(max_length=100, null=True, blank=True)
-    address_two = models.CharField(max_length=100, null=True, blank=True)
-    city = models.CharField(max_length=100, null=True, blank=True)
-    state_province = models.CharField(max_length=100, null=True, blank=True)
-    country = CountryField(null=True, blank=True)
-    phone_number = PhoneNumberField(null=True, blank=True)
-    senior_contact_name = models.CharField(
-        max_length=255,
-        null=True,
-        blank=True,
-        help_text="The senior contact person for this employer (e.g., HR Manager, Director)."
-    )
-    created = models.DateTimeField(auto_now_add=True, null=True)
-    updated = models.DateTimeField(auto_now=True, null=True)
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
-
-    verified_sender_local = models.CharField(
-        max_length=50,
-        unique=True,
-        blank=True,
-        null=True,
-        help_text="Enter only the part before '@yourdomain.com'"
-    )
-    verified_sender_email = models.EmailField(
-        max_length=255,
-        unique=True,
-        blank=True,
-        null=True,
-        help_text="This is the full email generated based on your input."
-    )
-
-    def save(self, *args, **kwargs):
-        """Automatically generate the full verified sender email before saving."""
-        if self.verified_sender_local:
-            self.verified_sender_email = f"{self.verified_sender_local}@1553690ontarioinc.com"
-        else:
-            self.verified_sender_email = None
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f"{self.name} ({self.get_status_display()})"

@@ -62,6 +62,11 @@ LOGGING = {
             'level': 'INFO', # Change to INFO or higher
             'propagate': True,
         },
+            'django.template': {
+            'handlers': ['file'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
         '': { # Catch-all logger for other applications
             'handlers': ['file', 'console'],
             'level': 'INFO', # Change to INFO or higher
@@ -295,7 +300,7 @@ BACKUP_FILE_PATH = os.environ.get("BACKUP_FILE_PATH_DEV")
 BACKUP_DUMP_PATH = os.environ.get("BACKUP_DUMP_PATH_DEV")
 
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY_DEV")
-STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET_DEV")
+STRIPE_WEBHOOK_SECRET = "whsec_MLSUcBWyIC20anxyl7wSWarBqjyMCoSH"
 STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
 
 
@@ -304,7 +309,8 @@ STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
 # STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
 
 # BASE URL DEV
-BASE_URL = "https://bdb0-2607-fea8-2840-b200-79f0-4773-6079-2c28.ngrok-free.app"
+BASE_URL = "http://localhost:8000"
+SITE_URL = BASE_URL
 OWNER_EMAIL = os.environ.get("OWNER_EMAIL")
 ADMIN_PHONE_NUMBER = os.environ.get("ADMIN_PHONE_NUMBER")
 

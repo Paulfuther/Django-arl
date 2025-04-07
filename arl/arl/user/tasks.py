@@ -1,9 +1,10 @@
 from __future__ import absolute_import, unicode_literals
 
-from datetime import datetime
-from django.db.models import Q
-from celery.utils.log import get_task_logger
 import json
+from datetime import datetime
+
+from celery.utils.log import get_task_logger
+
 from arl.celery import app
 from arl.msg.helpers import create_master_email
 from arl.user.models import CustomUser, Employer
@@ -13,17 +14,18 @@ logger = get_task_logger(__name__)
 
 # Works
 @app.task(name="send_newhire_template_email")
-def send_newhire_template_email_task(to_email,
-                                     sendgrid_id,
-                                     template_data,
-                                     attachments=None):
+def send_newhire_template_email_task(
+    to_email, sendgrid_id, template_data, attachments=None
+):
     """
     Celery task to send an email using SendGrid.
     """
     try:
         # Ensure template_data is a dictionary
         if not isinstance(template_data, dict):
-            raise ValueError(f"❌ Expected dictionary for template_data, got {type(template_data)}")
+            raise ValueError(
+                f"❌ Expected dictionary for template_data, got {type(template_data)}"
+            )
 
         senior_contact_name = template_data.get("senior_contact_name", "HR Team")
 
@@ -36,7 +38,7 @@ def send_newhire_template_email_task(to_email,
             to_email=to_email,
             sendgrid_id=sendgrid_id,
             template_data=template_data,  # ✅ Pass template data
-            attachments=attachments
+            attachments=attachments,
         )
     except Exception as e:
         print(f"Error in send_master_email_task: {e}")
@@ -46,22 +48,41 @@ def send_newhire_template_email_task(to_email,
 @app.task(name="create_hr_newhire_email")
 def create_newhire_data_email(email_data):
     try:
-        print("Task email dat: ", email_data)
-        print(f"🔍 Type of email_data before processing: {type(email_data)}")
-        # Ensure email_data is a dictionary
+        logger.info("📩 New hire data email task started")
+        logger.debug(f"Raw email data: {email_data}")
+
+        # Handle stringified input
         if isinstance(email_data, str):
-            print("⚠️ email_data is a string, converting back to dictionary...")
             email_data = json.loads(email_data)
 
-        print(f"✅ Type of email_data after processing: {type(email_data)}")
+        employer_id = email_data.get("employer_id")
+        if not employer_id:
+            raise ValueError("Missing employer_id in email data")
 
-        # ✅ Get all active HR users
+        employer = Employer.objects.filter(id=employer_id).first()
+        if not employer:
+            raise ValueError(f"No employer found with ID {employer_id}")
+
+        email_data["company_name"] = employer.name
+
+        # ✅ Get active users in the correct employer and group
         hr_users = CustomUser.objects.filter(
-            Q(is_active=True) & Q(groups__name="new_hire_data_email")
+            is_active=True, employer_id=employer_id, groups__name="new_hire_data_email"
         )
-        # ✅ Extract email addresses
+
         to_emails = [user.email for user in hr_users]
-        print("going to master email function :", to_emails)
+        # 🔁 Fallback to employer email if none found
+        if not to_emails:
+            if employer.email:
+                logger.warning(
+                    f"⚠️ No HR users found. Falling back to employer email: {employer.email}"
+                )
+                to_emails = [employer.email]
+            else:
+                error_msg = f"❌ No HR or fallback email for employer ID {employer_id}"
+                logger.error(error_msg)
+                return error_msg
+
         # ✅ Send via Master Email Function
         create_master_email(
             to_email=to_emails,
@@ -79,8 +100,7 @@ def create_newhire_data_email(email_data):
 
     except Exception as e:
         logger.error(
-            f"Error creating new hire email "
-            f"for {email_data.get('email')}: {str(e)}"
+            f"Error creating new hire email for {email_data.get('email')}: {str(e)}"
         )
         return f"Error creating new hire email: {str(e)}"
 
@@ -98,12 +118,16 @@ def save_user_to_db(**kwargs):
         # ✅ Convert and assign SIN Expiration Date if it exists
         sin_expiration_date = kwargs.get("sin_expiration_date")
         if sin_expiration_date:
-            user.sin_expiration_date = datetime.fromisoformat(sin_expiration_date).date()
+            user.sin_expiration_date = datetime.fromisoformat(
+                sin_expiration_date
+            ).date()
 
         # ✅ Convert and assign Work Permit Expiration Date if it exists
         work_permit_expiration_date = kwargs.get("work_permit_expiration_date")
         if work_permit_expiration_date:
-            user.work_permit_expiration_date = datetime.fromisoformat(work_permit_expiration_date).date()
+            user.work_permit_expiration_date = datetime.fromisoformat(
+                work_permit_expiration_date
+            ).date()
         # Deserialize the data if needed
         # Convert employer_pk, manager_dropdown_pk, and dob_isoformat back
         # to their original types
@@ -119,14 +143,16 @@ def save_user_to_db(**kwargs):
 @app.task(name="send_payment_email")
 def send_payment_email_task(to_email, payment_link, employer_name):
     """Send an email with the Stripe payment link using the master email function."""
-    sendgrid_id = "d-e31a2d72f8b145de98ba8d9fa267bc04"  # 🔹 Use your SendGrid template ID
+    sendgrid_id = (
+        "d-e31a2d72f8b145de98ba8d9fa267bc04"  # 🔹 Use your SendGrid template ID
+    )
     try:
         # ✅ Use the employer name passed from the approval process
         template_data = {
             "payment_link": payment_link,
             "name": employer_name,  # ✅ Ensure we use the correct employer name
             "subject": "Complete Your Registration - Payment Required",
-            "body": f"'{payment_link}'"
+            "body": f"'{payment_link}'",
         }
 
         # ✅ Call the master email function

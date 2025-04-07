@@ -1,31 +1,32 @@
 import json
 import logging
+import uuid
 
 from celery.result import AsyncResult
+from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.mixins import UserPassesTestMixin
-from django.contrib.auth.decorators import user_passes_test
-from django.shortcuts import redirect, get_object_or_404, render
 from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
-from .helpers import get_docusign_edit_url
-from arl.dsign.helpers import (get_docusign_envelope,
-                               get_docusign_template_name_from_template,
-                               create_docusign_document)
+from docusign_esign import TemplatesApi
 
-from arl.dsign.tasks import (get_outstanding_docs,
-                             list_all_docusign_envelopes_task)
-from .models import DocuSignTemplate
-from .forms import NameEmailForm
-import uuid
-from .forms import MultiSignedDocUploadForm
-from .models import SignedDocumentFile
 from arl.bucket.helpers import upload_to_linode_object_storage
+from arl.dsign.helpers import (
+    create_api_client,
+    create_docusign_document,
+    get_access_token,
+    get_docusign_envelope,
+    get_docusign_template_name_from_template,
+)
+from arl.dsign.tasks import get_outstanding_docs, list_all_docusign_envelopes_task
 
-from .tasks import (create_docusign_envelope_task, process_docusign_webhook,
-                    )
+from .forms import MultiSignedDocUploadForm, NameEmailForm
+from .helpers import get_docusign_edit_url
+from .models import DocuSignTemplate, SignedDocumentFile
+from .tasks import create_docusign_envelope_task, process_docusign_webhook
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +67,8 @@ class CreateEnvelopeView(UserPassesTestMixin, View):
             create_docusign_envelope_task.delay(envelope_args)
 
             messages.success(
-                request, f"Thank you. The document '{template_name}' has been sent to {recipient.get_full_name()}."
+                request,
+                f"Thank you. The document '{template_name}' has been sent to {recipient.get_full_name()}.",
             )
             return redirect("home")
 
@@ -160,13 +162,13 @@ def get_docusign_template(request):
 
 @login_required
 def waiting_for_others_view(request):
-    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
         # Handle the AJAX request to fetch the outstanding documents
         result = get_outstanding_docs.delay()
         envelopes = result.get(timeout=10)  # Adjust the timeout as needed
-        return JsonResponse({'outstanding_envelopes': envelopes})
+        return JsonResponse({"outstanding_envelopes": envelopes})
     # Render the template for the initial page load
-    return render(request, 'dsign/waiting_for_others.html')
+    return render(request, "dsign/waiting_for_others.html")
 
 
 @login_required
@@ -176,17 +178,23 @@ def create_new_document_page(request):
     if request.method == "POST":
         template_name = request.POST.get("template_name", "New Document")
         print("Template Name :", template_name)
-        template_id = create_docusign_document(user=request.user, template_name=template_name)
+        template_id = create_docusign_document(
+            user=request.user, template_name=template_name
+        )
 
         if template_id:
-            messages.success(request, f"Document '{template_name}' created successfully!")
+            messages.success(
+                request, f"Document '{template_name}' created successfully!"
+            )
             # ✅ Get the edit URL for the new template
             edit_url = get_docusign_edit_url(template_id)
 
             if edit_url:
                 return redirect(edit_url)  # ✅ Immediately open the DocuSign editor
             else:
-                messages.error(request, "Could not retrieve the edit URL. Please try manually.")
+                messages.error(
+                    request, "Could not retrieve the edit URL. Please try manually."
+                )
         else:
             messages.error(request, "Failed to create a new document.")
 
@@ -201,7 +209,11 @@ def edit_document_page(request, template_id):
     edit_url = get_docusign_edit_url(template_id)
     user_agent = request.META.get("HTTP_USER_AGENT", "").lower()
 
-    is_safari = "safari" in user_agent and "chrome" not in user_agent and "chromium" not in user_agent
+    is_safari = (
+        "safari" in user_agent
+        and "chrome" not in user_agent
+        and "chromium" not in user_agent
+    )
 
     if is_safari:
         return redirect(edit_url)  # Open DocuSign editor in a new tab for Safari
@@ -209,17 +221,76 @@ def edit_document_page(request, template_id):
     return render(request, "dsign/dsign_embed.html", {"edit_url": edit_url})
 
 
+def check_docusign_template_ready(template_id):
+    access_token = get_access_token().access_token
+    base_path = settings.DOCUSIGN_BASE_PATH
+    account_id = settings.DOCUSIGN_ACCOUNT_ID
+    api_client = create_api_client(base_path, access_token)
+    templates_api = TemplatesApi(api_client)
+
+    template = templates_api.get(account_id, template_id)
+
+    has_docs = len(template.documents) > 0
+    has_recipients = bool(template.recipients and template.recipients.signers)
+    has_subject = bool(template.email_subject and template.email_subject.strip())
+
+    print(
+        f"📄 Docs: {has_docs}, 👤 Recipients: {has_recipients}, ✉️ Subject: {has_subject}"
+    )
+
+    return has_docs and has_recipients and has_subject
+
+
+def update_template_readiness(template):
+    is_ready = all(
+        [
+            template.document_file,  # Must be uploaded
+            template.signer_role,  # Must be set
+            template.subject,  # Must be set
+            template.has_tabs_set,  # Optional: if you track that tabs were added
+        ]
+    )
+    template.is_ready_to_send = is_ready
+    template.save(update_fields=["is_ready_to_send"])
+
+
 def docusign_close(request):
-    """Redirects users back to your app after they finish editing."""
-    return redirect("/")
+    template_id = request.GET.get("template_id")
+    if template_id:
+        # ✅ Mark the template as ready to send
+        try:
+            template = DocuSignTemplate.objects.get(template_id=template_id)
+
+            if check_docusign_template_ready(template_id):
+                template.is_ready_to_send = True
+                template.save(update_fields=["is_ready_to_send"])
+                messages.success(
+                    request, f"✅ '{template.template_name}' is ready to send!"
+                )
+            else:
+                template.is_ready_to_send = False
+                template.save(update_fields=["is_ready_to_send"])
+                messages.warning(
+                    request,
+                    f"⚠️ '{template.template_name}' is still incomplete. Please finish setup.",
+                )
+
+        except DocuSignTemplate.DoesNotExist:
+            messages.warning(request, "Template not found to update.")
+
+    return redirect("hr_dashboard")
 
 
 @login_required
 def set_new_hire_template(request, template_id):
-    template = get_object_or_404(DocuSignTemplate, id=template_id, employer=request.user.employer)
+    template = get_object_or_404(
+        DocuSignTemplate, id=template_id, employer=request.user.employer
+    )
 
     # Unset previous
-    DocuSignTemplate.objects.filter(employer=request.user.employer).update(is_new_hire_template=False)
+    DocuSignTemplate.objects.filter(employer=request.user.employer).update(
+        is_new_hire_template=False
+    )
 
     # Set selected
     template.is_new_hire_template = True

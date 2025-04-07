@@ -1,10 +1,11 @@
 import json
 import logging
-import zipfile
 import uuid
-from io import BytesIO
+import zipfile
 from datetime import datetime, timedelta
-import docusign_esign
+from io import BytesIO
+
+import requests
 from django.conf import settings
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
@@ -13,13 +14,13 @@ from docusign_esign import (
     EnvelopeDefinition,
     EnvelopesApi,
     RecipientEmailNotification,
+    RecipientViewRequest,
     SignerAttachment,
     TemplateRole,
     TemplatesApi,
-    RecipientViewRequest,
 )
-import requests
 from docusign_esign.client.api_exception import ApiException
+
 from arl.bucket.helpers import upload_to_linode_object_storage
 from arl.dbox.helpers import upload_to_dropbox, upload_to_dropbox_quiz
 from arl.dsign.models import DocuSignTemplate
@@ -82,7 +83,7 @@ def get_access_token():
         scopes=SCOPES,
     )
     # print(access_token)
-    
+
     return access_token
 
 
@@ -91,11 +92,11 @@ def create_docusign_envelope(envelope_args):
     try:
         access_token = get_access_token().access_token
         print("access token :", access_token)
-        
+
         template = envelope_args["template_id"]
-        
+
         print("template :", template)
-        if isinstance(template, str):  
+        if isinstance(template, str):
             template = DocuSignTemplate.objects.filter(template_id=template).first()
 
         if not template:
@@ -178,7 +179,10 @@ def create_docusign_envelope(envelope_args):
 
 def get_docusign_template_name_from_template(template_id):
     try:
-        print("This is from the task get_docusign_template_name_from_template template id:", template_id)
+        print(
+            "This is from the task get_docusign_template_name_from_template template id:",
+            template_id,
+        )
         # Authenticate with DocuSign API (use your own authentication method)
         access_token = get_access_token()  # Replace with your authentication method
         access_token = access_token.access_token
@@ -397,7 +401,7 @@ def get_waiting_for_others_envelopes():
                         "email": signer.email,
                         "status": signer.status,
                         "recipient_id": signer.recipient_id,
-                        "routing_order": signer.routing_order
+                        "routing_order": signer.routing_order,
                     }
                     outstanding_signers.append(signer_info)
 
@@ -424,7 +428,9 @@ def get_waiting_for_others_envelopes():
                     print("Template name not found.")
 
                 # Append the details to the list of outstanding envelopes
-                sent_date_time_as_date_time = parse_sent_date_time(envelope.sent_date_time)
+                sent_date_time_as_date_time = parse_sent_date_time(
+                    envelope.sent_date_time
+                )
                 print(sent_date_time_as_date_time)
                 outstanding_envelopes.append(
                     {
@@ -481,9 +487,11 @@ def get_template_name_from_envelope(envelope_id):
 
 
 def parse_sent_date_time(sent_date_time_str):
-    if '.' in sent_date_time_str:
-        sent_date_time_str = sent_date_time_str[:sent_date_time_str.index('Z')]  # Remove the trailing 'Z'
-        date_part, fraction_part = sent_date_time_str.split('.')
+    if "." in sent_date_time_str:
+        sent_date_time_str = sent_date_time_str[
+            : sent_date_time_str.index("Z")
+        ]  # Remove the trailing 'Z'
+        date_part, fraction_part = sent_date_time_str.split(".")
         fraction_part = fraction_part[:6]  # Keep only up to 6 digits for microseconds
         sent_date_time_str = f"{date_part}.{fraction_part}Z"
     # Parse the datetime string
@@ -494,24 +502,29 @@ def get_docusign_edit_url(template_id):
     """
     Generates an editing URL for a DocuSign template.
     """
-    base_url = settings.DOCUSIGN_BASE_PATH  # Example: "https://demo.docusign.net/restapi"
+    base_url = (
+        settings.DOCUSIGN_BASE_PATH
+    )  # Example: "https://demo.docusign.net/restapi"
     account_id = settings.DOCUSIGN_ACCOUNT_ID
-    access_token = get_access_token().access_token  # Ensure you have a function for authentication
+    access_token = (
+        get_access_token().access_token
+    )  # Ensure you have a function for authentication
     # print(access_token)
     url = f"{base_url}/v2.1/accounts/{account_id}/templates/{template_id}/views/edit"
     print("url :", url)
     headers = {
         "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
     }
 
     # This return URL ensures they leave DocuSign after editing
     data = {
-        "returnUrl": "https://www.1553690ontarioinc.com/hr/dashboard/",
-        # "returnUrl": f"{settings.SITE_URL}/hr/dashboard/?redirect=1",
-        "suppressNavigation": True  # Restricts navigation inside DocuSign
+        # "returnUrl": "https://8eda-2607-fea8-2840-b200-6d51-3f0b-e11b-22a2.ngrok-free.app/hr/dashboard",
+        # "returnUrl": "https://www.1553690ontarioinc.com/hr/dashboard/",
+        "returnUrl": f"{settings.SITE_URL}/docusign-close/?template_id={template_id}",
+        "suppressNavigation": True,  # Restricts navigation inside DocuSign
     }
-    
+
     response = requests.post(url, headers=headers, json=data)
 
     # DEBUG: Print full response
@@ -536,28 +549,27 @@ def get_embedded_envelope_url(user, template_id):
     # ✅ Create Envelope Definition from Template
     envelope_definition = EnvelopeDefinition(
         template_id=template_id,
-        status="sent"  # Set to 'created' if you need to edit before sending
+        status="sent",  # Set to 'created' if you need to edit before sending
     )
 
     # ✅ Create an Envelope
     envelopes_api = EnvelopesApi(api_client)
     envelope_summary = envelopes_api.create_envelope(
-        settings.DOCUSIGN_ACCOUNT_ID,
-        envelope_definition
+        settings.DOCUSIGN_ACCOUNT_ID, envelope_definition
     )
 
     # ✅ Generate an Embedded Signing URL
     recipient_view_request = RecipientViewRequest(
-        return_url =f"{settings.SITE_URL}/hr/dashboard/",
+        return_url=f"{settings.SITE_URL}/hr/dashboard/",
         authentication_method="none",
         user_name=user.get_full_name(),
-        email=user.email
+        email=user.email,
     )
 
     response = envelopes_api.create_recipient_view(
         settings.DOCUSIGN_ACCOUNT_ID,
         envelope_summary.envelope_id,
-        recipient_view_request
+        recipient_view_request,
     )
 
     return response.url  # 🔹 Embed this in your Django template
@@ -575,7 +587,7 @@ def create_docusign_document(user, template_name="New Document"):
 
     headers = {
         "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
     }
 
     # Define a blank document
@@ -583,15 +595,15 @@ def create_docusign_document(user, template_name="New Document"):
         "name": template_name,
         "emailSubject": "Please sign this document",
         "recipients": {
-        "signers": [
-            {
-                "roleName": "GSA",               # ✅ This is the role you’ll use later
-                "recipientId": "1",
-                "routingOrder": "1",
-            }
-        ]
-    },
-}
+            "signers": [
+                {
+                    "roleName": "GSA",  # ✅ This is the role you’ll use later
+                    "recipientId": "1",
+                    "routingOrder": "1",
+                }
+            ]
+        },
+    }
 
     response = requests.post(url, headers=headers, json=data)
 
@@ -630,9 +642,9 @@ def get_docusign_envelope(envelope_id, recipient_name=None, document_name=None):
 
         zip_file = envelopes_api.get_document(account_id, envelope_type, envelope_id)
         # print(temp_file)
-        
+
         upload_to_dropbox(zip_file)
-        logger.info(f"☁️ Uploaded ZIP file to Dropbox.")
+        logger.info("☁️ Uploaded ZIP file to Dropbox.")
         print("Uploaded zip file to dropox")
         # ✅ Extract ZIP contents
         zip_buffer = BytesIO(zip_file)
@@ -659,10 +671,16 @@ def get_docusign_envelope(envelope_id, recipient_name=None, document_name=None):
                 with zip_ref.open(file_name) as file:
                     file_data = file.read()
                     object_key = f"{upload_folder_path}{file_name}"
-                    print(f"🔄 Preparing to upload {len(extracted_files)} files to Linode...")
-                    logger.info(f"🔄 Preparing to upload {len(extracted_files)} files to Linode...")
-                    upload_result = upload_to_linode_object_storage(BytesIO(file_data), object_key)
-                    
+                    print(
+                        f"🔄 Preparing to upload {len(extracted_files)} files to Linode..."
+                    )
+                    logger.info(
+                        f"🔄 Preparing to upload {len(extracted_files)} files to Linode..."
+                    )
+                    upload_result = upload_to_linode_object_storage(
+                        BytesIO(file_data), object_key
+                    )
+
                     if upload_result:
                         logger.info(f"✅ Uploaded {file_name} to Linode: {object_key}")
                         print(f"✅ Uploaded {file_name} to Linode: {object_key}")
@@ -695,3 +713,51 @@ def get_docusign_envelope(envelope_id, recipient_name=None, document_name=None):
             f"An unexpected error occurred: {error_message}", status=500
         )
 
+
+def template_has_file(template_id, account_id):
+    client = create_api_client()
+    templates_api = TemplatesApi(client)
+
+    template = templates_api.get(account_id, template_id)
+    return bool(template.documents)  # List of docs attached to the template
+
+
+def template_has_signers_and_tabs(template_id, account_id):
+    client = create_api_client()
+    templates_api = TemplatesApi(client)
+
+    recipients = templates_api.list_recipients(account_id, template_id)
+    if not recipients.signers:
+        return False
+
+    # Check for tabs in at least one signer
+    for signer in recipients.signers:
+        if signer.tabs:
+            return True
+
+    return False
+
+
+def is_template_ready_to_send(template_id, account_id):
+    return template_has_file(template_id, account_id) and template_has_signers_and_tabs(
+        template_id, account_id
+    )
+
+
+def check_docusign_template_readiness(template_id, employer):
+    try:
+        api_client = create_api_client(employer)
+        templates_api = TemplatesApi(api_client)
+        account_id = employer.docusign_account_id
+
+        template = templates_api.get(account_id, template_id)
+
+        has_documents = bool(template.documents)
+        has_recipients = bool(template.recipients and template.recipients.signers)
+        has_subject = bool(template.email_subject)
+
+        return has_documents and has_recipients and has_subject
+
+    except Exception as e:
+        print(f"⚠️ Error checking template readiness: {e}")
+        return False

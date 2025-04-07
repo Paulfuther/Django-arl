@@ -23,7 +23,7 @@ google.json
 __pycache__
 db.sqlite3
 media
-
+prod_config.md
 # Backup files # 
 *.bak 
 

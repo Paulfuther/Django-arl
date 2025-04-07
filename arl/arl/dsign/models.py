@@ -1,6 +1,6 @@
 from django.db import models
+
 from arl.user.models import CustomUser, Employer
-import uuid
 
 
 class DocuSignTemplate(models.Model):
@@ -15,6 +15,7 @@ class DocuSignTemplate(models.Model):
     template_name = models.CharField(max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
     is_new_hire_template = models.BooleanField(default=False)
+    is_ready_to_send = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ("employer", "template_id")  # Ensure uniqueness per employer
@@ -25,20 +26,25 @@ class DocuSignTemplate(models.Model):
 
 class ProcessedDocsignDocument(models.Model):
     envelope_id = models.CharField(max_length=255)
-    template_name = models.CharField(max_length=255, blank=True, null=True)  # Added field
+    template_name = models.CharField(
+        max_length=255, blank=True, null=True
+    )  # Added field
     processed_at = models.DateTimeField(auto_now_add=True)
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE,
-                             related_name='processed_documents')
-    employer = models.ForeignKey("user.Employer",
-                                 on_delete=models.CASCADE,
-                                 related_name="processed_documents")
+    user = models.ForeignKey(
+        CustomUser, on_delete=models.CASCADE, related_name="processed_documents"
+    )
+    employer = models.ForeignKey(
+        "user.Employer", on_delete=models.CASCADE, related_name="processed_documents"
+    )
 
     def __str__(self):
         return f"{self.envelope_id} - {self.user.username} - {self.template_name}"
 
 
 class SignedDocumentFile(models.Model):
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="signed_documents")
+    user = models.ForeignKey(
+        CustomUser, on_delete=models.CASCADE, related_name="signed_documents"
+    )
     employer = models.ForeignKey(Employer, on_delete=models.CASCADE)
     envelope_id = models.CharField(max_length=255)
     file_name = models.CharField(max_length=255)

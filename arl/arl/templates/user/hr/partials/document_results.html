@@ -19,27 +19,24 @@
       font-size: 13px;
       overflow: hidden;
       word-wrap: break-word;
-      min-height: 90px; /* ✅ ensures even height for pagination flow */
+      min-height: 90px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
     }
-    
 
     .doc-card h6 {
-      
       font-size: 13px;
       line-height: 1.3;
-      max-height: 2.6em; /* 2 lines of text */
+      max-height: 2.6em;
       overflow: hidden;
       text-overflow: ellipsis;
       display: -webkit-box;
-      -webkit-line-clamp: 2;     /* Only show 2 lines */
+      -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       white-space: normal;
       word-break: break-word;
       margin-bottom: 0.4rem;
-
     }
 
     .upload-date {
@@ -72,6 +69,23 @@
         padding: 1rem;
       }
     }
+
+    /* Pagination responsiveness */
+    .doc-row-content nav {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: 0.5rem;
+    }
+
+    .doc-row-content nav ul.pagination {
+      flex-wrap: nowrap;
+      min-width: max-content;
+    }
+
+    .pagination .page-link {
+      padding: 4px 8px;
+      font-size: 0.75rem;
+    }
   </style>
 
   {% if page_obj.object_list %}
@@ -93,7 +107,7 @@
         {% if page_obj.has_previous %}
         <li class="page-item">
           <a class="page-link"
-             hx-get="{% url 'fetch_signed_docs_by_user' employee_id %}?page={{ page_obj.previous_page_number }}"
+             hx-get="{% url 'fetch_signed_docs_by_user' employee_id %}?page={{ page_obj.previous_page_number }}&per_page={{ page_obj.paginator.per_page }}"
              hx-target="#docs-{{ employee_id }} .doc-row-content"
              hx-swap="innerHTML">Previous</a>
         </li>
@@ -101,7 +115,7 @@
         {% for num in page_obj.paginator.page_range %}
         <li class="page-item {% if page_obj.number == num %}active{% endif %}">
           <a class="page-link"
-             hx-get="{% url 'fetch_signed_docs_by_user' employee_id %}?page={{ num }}"
+             hx-get="{% url 'fetch_signed_docs_by_user' employee_id %}?page={{ num }}&per_page={{ page_obj.paginator.per_page }}"
              hx-target="#docs-{{ employee_id }} .doc-row-content"
              hx-swap="innerHTML">{{ num }}</a>
         </li>
@@ -109,7 +123,7 @@
         {% if page_obj.has_next %}
         <li class="page-item">
           <a class="page-link"
-             hx-get="{% url 'fetch_signed_docs_by_user' employee_id %}?page={{ page_obj.next_page_number }}"
+             hx-get="{% url 'fetch_signed_docs_by_user' employee_id %}?page={{ page_obj.next_page_number }}&per_page={{ page_obj.paginator.per_page }}"
              hx-target="#docs-{{ employee_id }} .doc-row-content"
              hx-swap="innerHTML">Next</a>
         </li>
@@ -121,3 +135,32 @@
   <p class="text-muted">No signed documents available.</p>
   {% endif %}
 </div>
+
+<script>
+window.toggleDocRow = function(employeeId) {
+  const isDesktop = window.innerWidth >= 992;
+  const perPage = isDesktop ? 9 : 3;
+
+  const url = `{% url 'fetch_signed_docs_by_user' 0 %}`.replace("0", employeeId);
+  const finalUrl = `${url}?per_page=${perPage}`;
+
+  const target = document.getElementById(`docs-${employeeId}`);
+  const button = document.querySelector(`button[onclick*="toggleDocRow(${employeeId})"]`);
+
+  // Hide other rows
+  document.querySelectorAll(".doc-row-content").forEach(row => {
+    if (row.id !== `docs-${employeeId}`) {
+      row.style.display = "none";
+    }
+  });
+
+  const wasHidden = target.style.display === "none";
+  target.style.display = wasHidden ? "block" : "none";
+
+  if (wasHidden) {
+    // Trigger HTMX manually
+    button.setAttribute("hx-get", finalUrl);
+    button.click();
+  }
+}
+</script
