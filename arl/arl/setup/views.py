@@ -186,7 +186,7 @@ class EmployerRegistrationView(FormView):
         employer_request.status = "pending"  # Mark as pending
         employer_request.save()
 
-        requester_name = employer_request.name
+        requester_name = employer_request.company_name
         requester_email = employer_request.email
         sms_body = (
             f"🚨 New Employer Access Request: {requester_name} ({requester_email})"
