@@ -36,7 +36,7 @@ class EmailEvent(models.Model):
     sg_template_name = models.CharField(max_length=255)
     timestamp = models.DateTimeField()
     url = models.URLField()
-    useragent = models.TextField()
+    useragent = models.TextField(max_length=1000)
 
     def __str__(self):
         return f"{self.email} - {self.event}"
