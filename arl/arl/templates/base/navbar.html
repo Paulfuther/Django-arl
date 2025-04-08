@@ -16,6 +16,7 @@
         <li class="nav-item">
           <a class="nav-link active" aria-current="page" href="{% url 'home' %}">Home</a>
         </li>
+        
         {% if user.is_authenticated %}
         <li class="nav-item">
           <a class="nav-link" href="{% url 'logout' %}">Logout</a>
@@ -32,6 +33,11 @@
           <a class="nav-link" href="{% url 'list_folders' %}">Dropbox</a>
         </li>
         {% endif %}
+
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'help_page' %}">Help</a>
+        </li>
+
 
         <li class="nav-item">
           <a class="nav-link" href="{% url 'create_salt_log' %}">Create Salt Log</a>
@@ -90,6 +96,7 @@
         </li>
 
         {% endif %}
+
         {% else %}
         <li class="nav-item">
           <a class="nav-link" href="{% url 'login' %}">Login</a>
