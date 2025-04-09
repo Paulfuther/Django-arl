@@ -702,16 +702,16 @@ def hr_dashboard(request):
             departed_name = form.cleaned_data.get("departed_name")
             departed_email = form.cleaned_data.get("departed_email")
 
+            if CustomUser.objects.filter(email=email).exists():
+                messages.error(request, f"A user with email {email} already exists.")
+                return HttpResponseRedirect(reverse("hr_dashboard") + "?tab=employees")
+
             if departed_name or departed_email:
                 notify_hr_about_departure.delay(
                     departed_name=departed_name,
                     departed_email=departed_email,
                     employer_id=request.user.employer_id,
                 )
-
-            if CustomUser.objects.filter(email=email).exists():
-                messages.error(request, f"A user with email {email} already exists.")
-                return HttpResponseRedirect(reverse("hr_dashboard") + "?tab=employees")
 
             invite = form.save()
 
