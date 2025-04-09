@@ -37,10 +37,11 @@ from arl.setup.helpers import employer_hr_required
 
 from .forms import (CustomUserCreationForm, NewHireInviteForm,
                     TwoFactorAuthenticationForm)
-from .helpers import send_new_hire_invite
 from .models import CustomUser, Employer, EmployerSettings, NewHireInvite
 from .tasks import (create_newhire_data_email, save_user_to_db,
-                    send_newhire_template_email_task)
+                    send_newhire_template_email_task,
+                    notify_hr_about_departure,
+                    send_new_hire_invite_task)
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -698,38 +699,58 @@ def hr_dashboard(request):
 
         if form.is_valid():
             email = form.cleaned_data["email"]
+            departed_name = form.cleaned_data.get("departed_name")
+            departed_email = form.cleaned_data.get("departed_email")
 
-            # ✅ **Check if the email is already registered**
+            if departed_name or departed_email:
+                notify_hr_about_departure.delay(
+                    departed_name=departed_name,
+                    departed_email=departed_email,
+                    employer_id=request.user.employer_id,
+                )
+
             if CustomUser.objects.filter(email=email).exists():
                 messages.error(request, f"A user with email {email} already exists.")
                 return HttpResponseRedirect(reverse("hr_dashboard") + "?tab=employees")
 
             invite = form.save()
 
-            # ✅ Send the invite email
-            send_new_hire_invite(
+            send_new_hire_invite_task.delay(
                 new_hire_email=invite.email,
                 new_hire_name=invite.name,
                 role=invite.role,
-                start_date="TBD",  # Can be customized later
-                employer=employer,
+                start_date="TBD",
+                employer_id=employer.id,
             )
 
-            messages.success(request, f"Invite sent to {invite.name} ({invite.email})")
+            messages.success(request, f"Invite sent to {invite.name}  {invite.email}")
             return HttpResponseRedirect(reverse("hr_dashboard") + "?tab=employees")
 
+        else:
+            # Save the form in the session to repopulate it after redirect (optional)
+            request.session['form_errors'] = form.errors
+            request.session['form_data'] = request.POST
+            messages.error(request, "Please correct the errors in the form.")
+            return HttpResponseRedirect(reverse("hr_dashboard") + "?tab=employees")
+
+    # ✅ Handle GET request
+    if 'form_errors' in request.session:
+        form = NewHireInviteForm(
+            data=request.session.get('form_data'),
+            employer=employer
+        )
+        form._errors = request.session.pop('form_errors')
+        request.session.pop('form_data', None)
     else:
         form = NewHireInviteForm(employer=employer)
-
-    return render(
-        request,
-        "user/hr_dashboard.html",
-        {
-            "templates": templates,
-            "pending_invites": pending_invites,
-            "form": form,  # ✅ Ensure the form is passed to the template
-        },
-    )
+        form = NewHireInviteForm(employer=employer)
+    return render(request, "user/hr_dashboard.html", {
+        "form": form,
+        "templates": templates,
+        "pending_invites": pending_invites,
+        "active_tab": request.GET.get("tab", "docusign"),
+        "employer": employer,
+    })
 
 
 @login_required

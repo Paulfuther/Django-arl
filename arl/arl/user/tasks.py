@@ -4,10 +4,15 @@ import json
 from datetime import datetime
 
 from celery.utils.log import get_task_logger
+from django.conf import settings
+from django.contrib.auth.models import Group
+from django.core.exceptions import ObjectDoesNotExist
+from django.utils.crypto import get_random_string
 
 from arl.celery import app
 from arl.msg.helpers import create_master_email
-from arl.user.models import CustomUser, Employer
+from arl.setup.models import TenantApiKeys
+from arl.user.models import CustomUser, Employer, NewHireInvite
 
 logger = get_task_logger(__name__)
 
@@ -160,4 +165,124 @@ def send_payment_email_task(to_email, payment_link, employer_name):
 
     except Exception as e:
         print(f"❌ Error sending payment email: {str(e)}")
+        return False
+
+
+@app.task(name="notify_hr_employee_left")
+def notify_hr_about_departure(departed_name, departed_email, employer_id):
+    try:
+        # Try to deactivate the user if found
+        user = CustomUser.objects.get(
+            email__iexact=departed_email, employer_id=employer_id
+        )
+        user.is_active = False
+        user.save()
+        status = "Marked inactive"
+    except ObjectDoesNotExist:
+        status = "Could not be found"
+    except Exception as e:
+        print(f"Error updating user: {e}")
+        status = "Error while deactivating"
+
+    try:
+        employer = Employer.objects.get(id=employer_id)
+        employer_name = employer.name
+    except Employer.DoesNotExist:
+        print("Employer not found.")
+
+    try:
+        # Get verified HR email and SendGrid ID
+        tenant_keys = TenantApiKeys.objects.get(employer_id=employer_id)
+        verified_sender = tenant_keys.verified_sender_email
+
+    except TenantApiKeys.DoesNotExist:
+        print("No tenant API keys found for employer.")
+        return
+    except Exception as e:
+        print(f"Error retrieving HR email: {e}")
+        return
+
+    try:
+        # Get all active users at this employer in HR group (CSR)
+        hr_group = Group.objects.get(name="HR")
+        hr_users = CustomUser.objects.filter(
+            employer_id=employer_id, is_active=True, groups=hr_group
+        )
+
+        if not hr_users.exists():
+            print("No active HR users found for this employer.")
+            return
+
+        for hr_user in hr_users:
+            try:
+                create_master_email(
+                    to_email=hr_user.email,
+                    sendgrid_id="d-06a7434fdfb745c893eff524c9e1f026",
+                    template_data={
+                        "departed_name": departed_name,
+                        "departed_email": departed_email,
+                        "company_name": employer_name,
+                        "status": status,
+                    },
+                    verified_sender=verified_sender,
+                )
+            except Exception as e:
+                print(f"Failed to notify HR {hr_user.email}: {e}")
+    except Exception as e:
+        print(f"Error finding HR users: {e}")
+
+
+@app.task(name="send_new_hire_invite_task")
+def send_new_hire_invite_task(
+    new_hire_email, new_hire_name, role, start_date, employer_id
+):
+    try:
+        employer = Employer.objects.get(id=employer_id)
+        tenant_api_key = TenantApiKeys.objects.filter(employer=employer).first()
+        verified_sender = (
+            tenant_api_key.verified_sender_email
+            if tenant_api_key
+            else settings.MAIL_DEFAULT_SENDER
+        )
+
+        if not verified_sender:
+            print(f"❌ Employer {employer.name} does not have a verified sender email.")
+            return False
+
+        invite, created = NewHireInvite.objects.get_or_create(
+            employer=employer,
+            email=new_hire_email,
+            defaults={
+                "name": new_hire_name,
+                "role": role,
+                "token": get_random_string(64),
+                "used": False,
+            },
+        )
+
+        if not created and not invite.token:
+            invite.token = get_random_string(64)
+            invite.save()
+
+        invite_link = invite.get_invite_link()
+
+        template_data = {
+            "name": new_hire_name,
+            "senior_contact_name": employer.senior_contact_name or "HR Team",
+            "company_name": employer.name,
+            "role": role,
+            "start_date": start_date,
+            "invite_link": invite_link,
+            "sender_contact_name": employer.senior_contact_name or "HR Team",
+        }
+
+        return create_master_email(
+            to_email=new_hire_email,
+            sendgrid_id="d-88bef48e049c477b83f28764b842c7a2",
+            template_data=template_data,
+            verified_sender=verified_sender,
+        )
+
+    except Exception as e:
+        print(f"🚨 Error in new hire invite task: {e}")
         return False

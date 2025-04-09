@@ -18,8 +18,8 @@ urlpatterns = [
     path("quiz/", include("arl.quiz.urls")),
     path("", include("arl.payroll.urls")),
     path("", include("arl.carwash.urls")),
-    path("", include("arl.setup.urls"))
-    
+    path("", include("arl.setup.urls")),
+    path("", include("arl.helpdesk.urls"))
 ]
 
 

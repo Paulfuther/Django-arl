@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import logging
 from dotenv import load_dotenv
+from django.contrib.messages import constants as messages
 import socket
 load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -108,7 +109,8 @@ INSTALLED_APPS = [
     "arl.payroll",
     "arl.carwash",
     "arl.setup",
-    "phonenumber_field"
+    "phonenumber_field",
+    "arl.helpdesk"
 ]
 
 PHONENUMBER_DEFAULT_REGION = 'CA'
@@ -313,7 +315,9 @@ BASE_URL = "http://localhost:8000"
 SITE_URL = BASE_URL
 OWNER_EMAIL = os.environ.get("OWNER_EMAIL")
 ADMIN_PHONE_NUMBER = os.environ.get("ADMIN_PHONE_NUMBER")
-
+MESSAGE_TAGS = {
+    messages.ERROR: 'danger',  # ✅ this converts 'error' → 'danger' for Bootstrap styling
+}
 
 try:
     from .local_settings import *

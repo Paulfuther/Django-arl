@@ -142,6 +142,18 @@ class TwoFactorAuthenticationForm(forms.Form):
 class NewHireInviteForm(forms.ModelForm):
     """Form for inviting a new hire with a role selection."""
 
+    # Optional inputs for who left
+    departed_name = forms.CharField(
+        required=False,
+        label="Departing Employee Name",
+        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "If replacing someone, enter their name"})
+    )
+    departed_email = forms.EmailField(
+        required=False,
+        label="Departing Employee Email",
+        widget=forms.EmailInput(attrs={"class": "form-control", "placeholder": "If replacing someone, enter their email"})
+    )
+
     class Meta:
         model = NewHireInvite
         fields = ["email", "name", "role"]
@@ -178,4 +190,3 @@ class NewHireInviteForm(forms.ModelForm):
         if commit:
             invite.save()
         return invite
-
