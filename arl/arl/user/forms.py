@@ -1,18 +1,17 @@
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Submit
+from crispy_forms.layout import HTML, Div, Field, Layout, Submit
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.urls import reverse_lazy
-from .models import CustomUser, Store, Employer, NewHireInvite
-
 from django.utils.crypto import get_random_string
+from .models import CustomUser, Employer, NewHireInvite, Store
 
 
 class CustomUserCreationForm(UserCreationForm):
     store = forms.ModelChoiceField(
         queryset=Store.objects.none(),
         required=False,  # ✅ Make store optional for employers
-        widget=forms.Select(attrs={'class': 'form-control'})
+        widget=forms.Select(attrs={"class": "form-control"}),
     )
     employer = forms.ModelChoiceField(
         queryset=Employer.objects.all(),
@@ -44,9 +43,9 @@ class CustomUserCreationForm(UserCreationForm):
             "postal",
         )
         widgets = {
-            'dob': forms.DateInput(attrs={'type': 'date'}),
-            'sin_expiration_date': forms.DateInput(attrs={'type': 'date'}),
-            'work_permit_expiration_date': forms.DateInput(attrs={'type': 'date'}),
+            "dob": forms.DateInput(attrs={"type": "date"}),
+            "sin_expiration_date": forms.DateInput(attrs={"type": "date"}),
+            "work_permit_expiration_date": forms.DateInput(attrs={"type": "date"}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -62,7 +61,9 @@ class CustomUserCreationForm(UserCreationForm):
             if user_role == "EMPLOYER":
                 # ✅ Employers do not need a store
                 self.fields["store"].queryset = Store.objects.none()
-                self.fields["store"].widget.attrs["disabled"] = "disabled"  # Prevent selection
+                self.fields["store"].widget.attrs["disabled"] = (
+                    "disabled"  # Prevent selection
+                )
                 self.fields["store"].empty_label = "No store (You can add one later)"
                 self.fields["store"].required = False
             else:
@@ -76,14 +77,24 @@ class CustomUserCreationForm(UserCreationForm):
             self.fields["store"].queryset = Store.objects.none()
 
         # ✅ Ensure phone number retains input after a failed form submission
-        phone_number_value = self.data.get("phone_number") or (self.instance.phone_number if self.instance else None)
+        phone_number_value = self.data.get("phone_number") or (
+            self.instance.phone_number if self.instance else None
+        )
         if phone_number_value:
             self.fields["phone_number"].initial = phone_number_value
 
         # ✅ Required fields
         required_fields = [
-            "first_name", "last_name", "address", "city", "state_province",
-            "country", "postal", "email", "sin", "dob"
+            "first_name",
+            "last_name",
+            "address",
+            "city",
+            "state_province",
+            "country",
+            "postal",
+            "email",
+            "sin",
+            "dob",
         ]
         for field in required_fields:
             self.fields[field].required = True
@@ -102,12 +113,15 @@ class CustomUserCreationForm(UserCreationForm):
 
     def clean_phone_number(self):
         phone_number = self.cleaned_data.get("phone_number")
-        if phone_number and CustomUser.objects.filter(phone_number=phone_number).exists():
+        if (
+            phone_number
+            and CustomUser.objects.filter(phone_number=phone_number).exists()
+        ):
             raise forms.ValidationError("This phone number is already in use.")
         return phone_number
 
     def clean_email(self):
-        email = self.cleaned_data['email'].lower()
+        email = self.cleaned_data["email"].lower()
         if CustomUser.objects.filter(email=email).exists():
             raise forms.ValidationError("This email is already in use.")
         return email
@@ -118,11 +132,17 @@ class CustomUserCreationForm(UserCreationForm):
         sin_expiration_date = cleaned_data.get("sin_expiration_date")
         work_permit_expiration_date = cleaned_data.get("work_permit_expiration_date")
 
-        if sin and sin.startswith('9'):
+        if sin and sin.startswith("9"):
             if not sin_expiration_date:
-                self.add_error("sin_expiration_date", "SIN expiration date is required for SINs starting with 9.")
+                self.add_error(
+                    "sin_expiration_date",
+                    "SIN expiration date is required for SINs starting with 9.",
+                )
             if not work_permit_expiration_date:
-                self.add_error("work_permit_expiration_date", "Work permit expiration date is required for SINs starting with 9.")
+                self.add_error(
+                    "work_permit_expiration_date",
+                    "Work permit expiration date is required for SINs starting with 9.",
+                )
 
         return cleaned_data
 
@@ -131,12 +151,14 @@ class TwoFactorAuthenticationForm(forms.Form):
     verification_code = forms.CharField(
         max_length=12,
         required=True,
-        widget=forms.TextInput(attrs={'class': 'form-control'}),
+        widget=forms.TextInput(attrs={"class": "form-control"}),
     )
 
     def __init__(self, *args, **kwargs):
         super(TwoFactorAuthenticationForm, self).__init__(*args, **kwargs)
-        self.fields['verification_code'].widget.attrs.update({'style': 'margin: 10px 0;'})
+        self.fields["verification_code"].widget.attrs.update(
+            {"style": "margin: 10px 0;"}
+        )
 
 
 class NewHireInviteForm(forms.ModelForm):
@@ -146,21 +168,35 @@ class NewHireInviteForm(forms.ModelForm):
     departed_name = forms.CharField(
         required=False,
         label="Departing Employee Name",
-        widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "If replacing someone, enter their name"})
+        widget=forms.TextInput(
+            attrs={
+                "class": "form-control mb-2 placeholder-light",
+                "placeholder": "If replacing someone, enter their name",
+            }
+        ),
     )
     departed_email = forms.EmailField(
         required=False,
         label="Departing Employee Email",
-        widget=forms.EmailInput(attrs={"class": "form-control", "placeholder": "If replacing someone, enter their email"})
+        widget=forms.EmailInput(
+            attrs={
+                "class": "form-control mb-2 placeholder-light",
+                "placeholder": "If replacing someone, enter their email",
+            }
+        ),
     )
 
     class Meta:
         model = NewHireInvite
         fields = ["email", "name", "role"]
         widgets = {
-            "email": forms.EmailInput(attrs={"class": "form-control", "placeholder": "Enter new hire's email"}),
-            "name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Full Name"}),
-            "role": forms.Select(attrs={"class": "form-control"}),
+            "email": forms.EmailInput(
+                attrs={"class": "form-control placeholder-light", "placeholder": "Enter new hire's email"}
+            ),
+            "name": forms.TextInput(
+                attrs={"class": "form-control placeholder-light", "placeholder": "Full Name"}
+            ),
+            "role": forms.Select(attrs={"class": "form-control mb-4"}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -174,6 +210,19 @@ class NewHireInviteForm(forms.ModelForm):
             ("CSR", "HR"),
         ]
 
+        self.helper = FormHelper()
+        self.helper.layout = Layout(
+            "email",
+            "name",
+            "role",
+            Div(
+                HTML("<hr><h6 class='mt-3'>Optional: Who is this replacing?</h6>"),
+                Field("departed_name", wrapper_class="mb-2"),
+                Field("departed_email"),
+                css_class="p-3 border rounded bg-light mt-3",
+            ),
+        )
+
     def clean_email(self):
         """Ensure the email isn't already invited and unused."""
         email = self.cleaned_data["email"].lower()
@@ -185,7 +234,9 @@ class NewHireInviteForm(forms.ModelForm):
         """Ensure employer is assigned & token is generated if missing."""
         invite = super().save(commit=False)
         invite.employer = self.employer  # ✅ Assign employer automatically
-        invite.token = invite.token or get_random_string(64)  # ✅ Generate token if missing
+        invite.token = invite.token or get_random_string(
+            64
+        )  # ✅ Generate token if missing
 
         if commit:
             invite.save()
