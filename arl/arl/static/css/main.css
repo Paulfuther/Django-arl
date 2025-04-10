@@ -35,6 +35,13 @@
     white-space: nowrap;
 }
 
+.scroll-box {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    padding: 10px;
+    border-radius: 5px;
+  }
 
 button span {
     cursor: pointer;

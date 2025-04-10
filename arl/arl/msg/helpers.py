@@ -5,19 +5,27 @@ import traceback  # For detailed error reporting
 
 from celery.utils.log import get_task_logger
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.http import HttpResponse
+from django.shortcuts import render
 from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import (Asm, Attachment, ContentId, Disposition,
-                                   FileContent, FileName, FileType, Mail)
+from sendgrid.helpers.mail import (
+    Asm,
+    Attachment,
+    ContentId,
+    Disposition,
+    FileContent,
+    FileName,
+    FileType,
+    Mail,
+)
 from twilio.base.exceptions import TwilioException
 from twilio.rest import Client
-from arl.setup.models import  TenantApiKeys
 
-
+from arl.setup.models import TenantApiKeys
 from arl.user.models import CustomUser, Store
-
 
 logger = get_task_logger(__name__)
 
@@ -70,11 +78,15 @@ def create_tobacco_email(to_email, name):
 # It works for a new hire registration for HR data
 # And the onbording of a new hire.
 # This will be the master function going forward.
-def create_master_email(to_email, sendgrid_id, template_data, attachments=None, verified_sender=None):
+def create_master_email(
+    to_email, sendgrid_id, template_data, attachments=None, verified_sender=None
+):
     try:
         unsubscribe_group_id = 24753
         if not isinstance(template_data, dict):
-            raise ValueError(f"❌ Expected dictionary for template_data, got {type(template_data)}")
+            raise ValueError(
+                f"❌ Expected dictionary for template_data, got {type(template_data)}"
+            )
         # Ensure to_email is a list, even if a single string is passed
         if isinstance(to_email, str):
             to_email = [to_email]  # Convert single email to list
@@ -85,18 +97,26 @@ def create_master_email(to_email, sendgrid_id, template_data, attachments=None, 
             print(f"✅ Using explicitly provided sender email: {verified_sender}")
         else:
             # ✅ Look up the employer and their verified sender email
-            user_email = to_email[0] if isinstance(to_email, list) and to_email else to_email
+            user_email = (
+                to_email[0] if isinstance(to_email, list) and to_email else to_email
+            )
             try:
                 user = CustomUser.objects.get(email=user_email)
                 employer = user.employer
                 print(f"✅ Found user: {user.email}, Employer: {employer}")
             except CustomUser.DoesNotExist:
-                print(f"❌ No user found with email {user_email}. Using default sender.")
+                print(
+                    f"❌ No user found with email {user_email}. Using default sender."
+                )
                 sender_email = settings.MAIL_DEFAULT_SENDER
             else:
                 # ✅ Retrieve the sender email from the Tenant API Key model
                 tenant_api_key = TenantApiKeys.objects.filter(employer=employer).first()
-                sender_email = tenant_api_key.verified_sender_email if tenant_api_key else settings.MAIL_DEFAULT_SENDER
+                sender_email = (
+                    tenant_api_key.verified_sender_email
+                    if tenant_api_key
+                    else settings.MAIL_DEFAULT_SENDER
+                )
 
         print(f"📧 Final sender email: {sender_email}")
         # Initialize the email message
@@ -104,7 +124,7 @@ def create_master_email(to_email, sendgrid_id, template_data, attachments=None, 
             from_email=sender_email,
             to_emails=to_email,
         )
-        
+
         print(f"📜 Email Template Data: {template_data}")
         message.dynamic_template_data = template_data
         message.template_id = sendgrid_id
@@ -120,8 +140,10 @@ def create_master_email(to_email, sendgrid_id, template_data, attachments=None, 
                     attachment_instance = Attachment(
                         FileContent(encoded_content),
                         FileName(attachment.get("file_name", "file")),
-                        FileType(attachment.get("file_type", "application/octet-stream")),
-                        Disposition("attachment")
+                        FileType(
+                            attachment.get("file_type", "application/octet-stream")
+                        ),
+                        Disposition("attachment"),
                     )
                     message.attachment = attachment_instance
 
@@ -134,13 +156,15 @@ def create_master_email(to_email, sendgrid_id, template_data, attachments=None, 
             print(f"Email sent successfully to {to_email}.")
             return True
         else:
-            print(f"Failed to send email to {to_email}. Status code: {response.status_code}")
+            print(
+                f"Failed to send email to {to_email}. Status code: {response.status_code}"
+            )
             return False
 
     except Exception as e:
         # Extract detailed error information if available
         error_details = str(e)
-        if hasattr(e, 'body'):
+        if hasattr(e, "body"):
             error_details += f" Response body: {e.body}"
 
         # Log error details for debugging
@@ -232,19 +256,19 @@ def create_single_email(to_email, name, template_id=None, attachments=None):
     # Add ASM (Advanced Suppression Manager) for unsubscribe
     asm = Asm(
         group_id=unsubscribe_group_id,
-        )
+    )
     message.asm = asm
     print(message)
     # Add attachments if provided
     if attachments:
         for attachment in attachments:
-            encoded_file = base64.b64encode(attachment['file_content']).decode()
+            encoded_file = base64.b64encode(attachment["file_content"]).decode()
 
             attached_file = Attachment(
                 FileContent(encoded_file),
-                FileName(attachment['file_name']),
-                FileType(attachment['file_type']),
-                Disposition('attachment')
+                FileName(attachment["file_name"]),
+                FileType(attachment["file_type"]),
+                Disposition("attachment"),
             )
             message.add_attachment(attached_file)
 
@@ -285,7 +309,9 @@ def send_sms(phone_number, body):
 
 # This function function is APPROVED for multip tenant.
 # It gets its arguments from the task
-def send_bulk_sms(numbers, body, twilio_account_sid, twilio_auth_token, twilio_notify_sid):
+def send_bulk_sms(
+    numbers, body, twilio_account_sid, twilio_auth_token, twilio_notify_sid
+):
     """
     Sends bulk SMS using the employer's Twilio Notify credentials.
 
@@ -310,7 +336,10 @@ def send_bulk_sms(numbers, body, twilio_account_sid, twilio_auth_token, twilio_n
             logger.warning("⚠️ No valid phone numbers provided for SMS.")
             return False
 
-        bindings = [json.dumps({"binding_type": "sms", "address": number}) for number in valid_numbers]
+        bindings = [
+            json.dumps({"binding_type": "sms", "address": number})
+            for number in valid_numbers
+        ]
 
         print("=====> To Bindings :>", bindings, "<: =====")
 
@@ -319,7 +348,7 @@ def send_bulk_sms(numbers, body, twilio_account_sid, twilio_auth_token, twilio_n
         notification = client.notify.services(twilio_notify_sid).notifications.create(
             to_binding=bindings,
             body=body,
-            delivery_callback_url= "https://6c05-2607-fea8-2840-b200-751b-5d20-21ce-303c.ngrok-free.app/webhook/whatsapp/"
+            delivery_callback_url="https://6c05-2607-fea8-2840-b200-751b-5d20-21ce-303c.ngrok-free.app/webhook/whatsapp/",
         )
 
         logger.info(f"📢 Bulk SMS sent successfully to {len(valid_numbers)} numbers.")
@@ -407,8 +436,12 @@ def send_docusign_email_with_attachment(to_emails, subject, body, file_path):
 # sends a single email to the user with a pdf of
 # the incident file attached.
 def create_incident_file_email(
-    to_email, subject, body, attachment_buffer=None, attachment_filename=None,
-    sender_email=None
+    to_email,
+    subject,
+    body,
+    attachment_buffer=None,
+    attachment_filename=None,
+    sender_email=None,
 ):
     try:
         message = Mail(
@@ -454,10 +487,14 @@ def create_incident_file_email(
 # This file is APPROVED for multi tenant use.
 # sends new icident pdf to users with the rule
 # incident_form_email
-def create_incident_file_email_by_rule(to_emails, subject, body,
-                                       attachment_buffer=None,
-                                       attachment_filename=None,
-                                       sender_email=None):
+def create_incident_file_email_by_rule(
+    to_emails,
+    subject,
+    body,
+    attachment_buffer=None,
+    attachment_filename=None,
+    sender_email=None,
+):
     results = {"success": [], "failed": []}
     sender_email = sender_email or settings.MAIL_DEFAULT_SENDER
     try:
@@ -501,7 +538,9 @@ def create_incident_file_email_by_rule(to_emails, subject, body,
             except Exception as e:
                 # Handle errors for a specific recipient
                 results["failed"].append(to_email)
-                logger.error(f"An error occurred while sending email to {to_email}: {str(e)}")
+                logger.error(
+                    f"An error occurred while sending email to {to_email}: {str(e)}"
+                )
 
     except Exception as e:
         # Handle general errors in the function
@@ -524,7 +563,7 @@ def send_incident_email(
             )
             print(to_email)
             if attachment_buffer and attachment_filename:
-                attachment_buffer.seek(0)  
+                attachment_buffer.seek(0)
                 # Ensure the buffer is at the beginning
                 attachment_content = base64.b64encode(attachment_buffer.read()).decode()
                 attachment = Attachment()
@@ -581,8 +620,9 @@ def send_whats_app_template(content_sid, from_sid, user_name, to_number):
         return None
 
 
-def send_whats_app_carwash_sites_template(content_sid, from_sid, user_name, 
-                                          to_number, content_vars):
+def send_whats_app_carwash_sites_template(
+    content_sid, from_sid, user_name, to_number, content_vars
+):
     # Ensure phone number is in the correct format
     whatsapp_number = f"whatsapp:+{to_number}"
     # Properly format the content variables for the template
@@ -657,8 +697,12 @@ def send_whats_app_template_autoreply(content_sid, from_sid, to_number):
 
 def get_inactive_contact_ids():
     """Retrieve contact IDs of inactive users from SendGrid based on email."""
-    inactive_emails = CustomUser.objects.filter(is_active=False).values_list('email', flat=True)
-    inactive_emails = [email for email in inactive_emails if email]  # Filter out empty emails
+    inactive_emails = CustomUser.objects.filter(is_active=False).values_list(
+        "email", flat=True
+    )
+    inactive_emails = [
+        email for email in inactive_emails if email
+    ]  # Filter out empty emails
     contact_ids = []
 
     for email in inactive_emails:
@@ -666,8 +710,8 @@ def get_inactive_contact_ids():
             request_body={"query": f"email LIKE '{email}'"}
         )
         data = json.loads(response.body)  # Convert the response to JSON (dictionary)
-        if 'result' in data and len(data['result']) > 0:
-            contact_ids.append(data['result'][0]['id'])
+        if "result" in data and len(data["result"]) > 0:
+            contact_ids.append(data["result"][0]["id"])
 
     print("Contact IDs for deletion:", contact_ids)  # Debugging print
     return contact_ids
@@ -676,12 +720,14 @@ def get_inactive_contact_ids():
 def delete_contacts_by_ids(contact_ids):
     """Delete contacts from SendGrid using their contact IDs."""
     if contact_ids:
-        ids_string = ','.join(contact_ids)
+        ids_string = ",".join(contact_ids)
         try:
             delete_response = sg.client.marketing.contacts.delete(
                 query_params={"ids": ids_string}
             )
-            print("Deletion response:", delete_response.status_code, delete_response.body)
+            print(
+                "Deletion response:", delete_response.status_code, delete_response.body
+            )
         except Exception as e:
             print("Deletion error:", e)
     else:
@@ -691,20 +737,23 @@ def delete_contacts_by_ids(contact_ids):
 def add_active_contacts(selected_list_id):
     """Add active users to SendGrid with first name, last name, and email."""
     # Retrieve active users with first name, last name, and email
-    active_users = CustomUser.objects.filter(is_active=True).values('email', 'first_name', 'last_name')
+    active_users = CustomUser.objects.filter(is_active=True).values(
+        "email", "first_name", "last_name"
+    )
     contacts = [
         {
-            "email": user['email'],
-            "first_name": user['first_name'],
-            "last_name": user['last_name']
+            "email": user["email"],
+            "first_name": user["first_name"],
+            "last_name": user["last_name"],
         }
-        for user in active_users if user['email']  # Ensure no empty emails
+        for user in active_users
+        if user["email"]  # Ensure no empty emails
     ]
     print(contacts)
     if contacts:
         data = {
             "list_ids": [selected_list_id],  # Specify the target list ID
-            "contacts": contacts
+            "contacts": contacts,
         }
         try:
             add_response = sg.client.marketing.contacts.put(request_body=data)
@@ -724,9 +773,96 @@ def get_all_contact_lists():
     """Retrieve all contact lists and their IDs from SendGrid."""
     try:
         response = sg.client.marketing.lists.get()
-        lists = response.to_dict.get('result', [])
+        lists = response.to_dict.get("result", [])
         for contact_list in lists:
             print(f"List Name: {contact_list['name']}, List ID: {contact_list['id']}")
         return lists
     except Exception as e:
         print("Error retrieving contact lists:", e)
+
+
+def collect_attachments(request):
+    attachments = []
+    for field_name in ["attachment_1", "attachment_2", "attachment_3"]:
+        file = request.FILES.get(field_name)
+        if file:
+            if file.size > 10 * 1024 * 1024:
+                messages.error(request, f"{file.name} exceeds 10MB limit.")
+                return None
+            attachments.append(
+                {
+                    "file_name": file.name,
+                    "file_type": file.content_type,
+                    "file_content": base64.b64encode(file.read()).decode("utf-8"),
+                }
+            )
+    return attachments
+
+
+def prepare_recipient_data(user, selected_groups, selected_users):
+    recipients = []
+    employer = user.employer
+
+    if selected_groups:
+        for group in selected_groups:
+            for u in group.user_set.filter(is_active=True, employer=employer):
+                recipients.append(
+                    {
+                        "name": u.get_full_name(),
+                        "email": u.email,
+                        "status": "Active",
+                    }
+                )
+
+    if selected_users:
+        for u in selected_users:
+            recipients.append(
+                {
+                    "name": u.get_full_name(),
+                    "email": u.email,
+                    "status": "Active",
+                }
+            )
+
+    unique_recipients = {r["email"]: r for r in recipients}
+    return list(unique_recipients.values())
+
+
+def is_member_of_msg_group(user):
+    is_member = user.groups.filter(name="SendSMS").exists()
+    if is_member:
+        logger.info(f"{user} is a member of 'SendSMS' group.")
+    else:
+        logger.info(f"{user} is not a member of 'SendSMS' group.")
+    return is_member
+
+
+def is_member_of_email_group(user):
+    is_member = user.groups.filter(name="SendEMAIL").exists()
+    if is_member:
+        logger.info(f"{user} is a member of 'SendEMAIL' group.")
+    else:
+        logger.info(f"{user} is not a member of 'SendEMAIL' group.")
+    return is_member
+
+
+def is_member_of_docusign_group(user):
+    is_member = user.groups.filter(name="SendDOCUSIGN").exists()
+    if is_member:
+        logger.info(f"{user} is a member of 'SendDOCUSIGN' group.")
+    else:
+        logger.info(f"{user} is not a member of 'SendDOCUSIGN' group.")
+    return is_member
+
+
+def is_member_of_comms_group(user):
+    is_member = user.groups.filter(name="SendCOMMS").exists()
+    if is_member:
+        logger.info(f"{user} is a member of 'SendCOMMS' group.")
+    else:
+        logger.info(f"{user} is not a member of 'SendCOMMS' group.")
+    return is_member
+
+
+def custom_permission_denied(request, message=None):
+    return render(request, "incident/403.html", {"message": message}, status=403)

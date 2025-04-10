@@ -1,28 +1,21 @@
 {% extends "../base/base.html" %}
 {% block title %}Index{% endblock %}
-
 {% block template %}
-
 {% load crispy_forms_tags %}
 
-
-<form method="post" action="{% url 'send_one_off_sms_view' %}">
-  <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
-        <legend class="border-bottm mb-4">Send SMS By Group</legend>
-        {% csrf_token %}
-        {{ form|crispy }}
-        <button type="submit" class="btn btn-primary mt-2 mb-1">Send</button>
-      </div>
+{% if messages %}
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
-  </div>
-
+  {% endfor %}
+{% endif %}
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="form_type" value="sms">
+  {{ sms_form|crispy }}
+  <button type="submit" class="btn btn-outline-primary mobile-btn mt-3">Send</button>
 </form>
-
-
-
-
-
 
 {% endblock %}
