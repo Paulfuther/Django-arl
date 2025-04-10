@@ -1,12 +1,10 @@
-from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Submit
 from django import forms
-from django.contrib.auth.models import Group
-from arl.user.models import CustomUser, Store
-from django.db import models
-from arl.msg.models import EmailTemplate, WhatsAppTemplate
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.db import models
 
+from arl.msg.models import EmailTemplate, WhatsAppTemplate
+from arl.user.models import CustomUser, Store
 
 User = get_user_model()
 
@@ -37,28 +35,36 @@ class SMSForm(forms.Form):
 
         if user and user.employer:
             employer = user.employer
-            self.fields["selected_group"].queryset = Group.objects.filter(user__employer=employer).distinct()
+            self.fields["selected_group"].queryset = Group.objects.filter(
+                user__employer=employer
+            ).distinct()
 
-        self.helper = FormHelper()
-        self.helper.form_method = "post"
-        self.helper.add_input(Submit("submit", "Submit"))
+        self.fields["selected_group"].empty_label = "Select a group..."
+
+    def clean_message(self):
+        message = self.cleaned_data.get("message", "").strip()
+        if not message:
+            raise forms.ValidationError("Message cannot be empty.")
+        return message
 
 
 class TemplateEmailForm(forms.Form):
     sendgrid_id = forms.ModelMultipleChoiceField(
         queryset=EmailTemplate.objects.none(),
-        widget=forms.CheckboxSelectMultiple,
+        widget=forms.RadioSelect,
         required=True,
         label="Select Template",
     )
+
     selected_group = forms.ModelMultipleChoiceField(
-        queryset=Group.objects.all(),
+        queryset=Group.objects.none(),
         widget=forms.CheckboxSelectMultiple,
         required=False,
         label="Select Groups",
     )
+
     selected_users = forms.ModelMultipleChoiceField(
-        queryset=User.objects.filter(is_active=True),
+        queryset=User.objects.none(),
         widget=forms.CheckboxSelectMultiple,
         required=False,
         label="Select Active Users",
@@ -69,38 +75,44 @@ class TemplateEmailForm(forms.Form):
     attachment_3 = forms.FileField(required=False, label="Attachment 3")
 
     def __init__(self, *args, **kwargs):
-        """Filter email templates based on employer."""
-        user = kwargs.pop("user", None)  # ✅ Get user from kwargs
+        user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
+        # ✅ Style file fields for Bootstrap consistency
+        self.fields["attachment_1"].widget.attrs.update({"class": "form-control form-control-sm custom-upload"})
+        self.fields["attachment_2"].widget.attrs.update({"class": "form-control form-control-sm custom-upload"})
+        self.fields["attachment_3"].widget.attrs.update({"class": "form-control form-control-sm custom-upload"})
 
-        if user and hasattr(user, "employer"):  # ✅ Ensure user has employer field
+        if user and hasattr(user, "employer"):
             employer = user.employer
+
+            # ✅ Email templates visible to this employer
             self.fields["sendgrid_id"].queryset = EmailTemplate.objects.filter(
                 models.Q(employers=employer) | models.Q(employers__isnull=True)
             ).distinct()
-            
-        # ✅ Filter `selected_users` to include only users from the same employer
-            self.fields["selected_users"].queryset = User.objects.filter(
-                employer=employer, is_active=True
-            )
 
-            # ✅ Filter groups that have users under this employer
+            # ✅ Groups that include users from this employer
             self.fields["selected_group"].queryset = Group.objects.filter(
                 user__employer=employer
             ).distinct()
+
+            # ✅ Active users from this employer
+            self.fields["selected_users"].queryset = User.objects.filter(
+                employer=employer, is_active=True
+            )
 
     def clean(self):
         cleaned_data = super().clean()
         selected_group = cleaned_data.get("selected_group")
         selected_users = cleaned_data.get("selected_users")
 
-        # Ensure at least one is selected, but not both
         if not selected_group and not selected_users:
-            raise forms.ValidationError("You must select "
-                                        "either a group or at least one user.")
+            raise forms.ValidationError(
+                "You must select either a group or at least one user."
+            )
         if selected_group and selected_users:
-            raise forms.ValidationError("You cannot select "
-                                        "both a group and individual users.")
+            raise forms.ValidationError(
+                "You cannot select both a group and individual users."
+            )
 
         return cleaned_data
 
@@ -120,28 +132,26 @@ class TemplateWhatsAppForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field_name, field in self.fields.items():
-            if field_name != 'csrfmiddlewaretoken':  # Skip CSRF token field
-                field.widget.attrs.update({'class': 'custom-input'})
+            if field_name != "csrfmiddlewaretoken":  # Skip CSRF token field
+                field.widget.attrs.update({"class": "custom-input"})
 
 
 class SendGridFilterForm(forms.Form):
     date_from = forms.DateField(
         required=False,
-        widget=forms.DateInput(attrs={'type':
-                                      'date', 'class': 'form-control'}),
-        label="From"
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+        label="From",
     )
     date_to = forms.DateField(
         required=False,
-        widget=forms.DateInput(attrs={'type':
-                                      'date', 'class': 'form-control'}),
-        label="To"
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+        label="To",
     )
     template_id = forms.ModelChoiceField(
         queryset=EmailTemplate.objects.all(),
         required=True,
-        widget=forms.Select(attrs={'class': 'form-control'}),
-        label="Template Name"
+        widget=forms.Select(attrs={"class": "form-control"}),
+        label="Template Name",
     )
 
 
@@ -149,20 +159,18 @@ class TemplateFilterForm(forms.Form):
     template_id = forms.ModelChoiceField(
         queryset=EmailTemplate.objects.all(),
         required=True,
-        widget=forms.Select(attrs={'class': 'form-control'}),
-        label="Template Name"
+        widget=forms.Select(attrs={"class": "form-control"}),
+        label="Template Name",
     )
     start_date = forms.DateField(
         required=False,
-        widget=forms.DateInput(attrs={"type":
-                                      "date", "class": "form-control"}),
-        label="Start Date"
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+        label="Start Date",
     )
     end_date = forms.DateField(
         required=False,
-        widget=forms.DateInput(attrs={"type":
-                                      "date", "class": "form-control"}),
-        label="End Date"
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+        label="End Date",
     )
 
 
@@ -183,24 +191,25 @@ class EmployeeSearchForm(forms.Form):
         queryset=CustomUser.objects.filter(is_active=True),
         required=False,
         widget=forms.Select(attrs={"class": "form-control"}),
-        label="Select Employee"
+        label="Select Employee",
     )
 
 
 # Form for selecting a group
 class GroupSelectForm(forms.Form):
-    group = forms.ModelChoiceField(queryset=Group.objects.all(),
-                                   required=True, label="Select Group")
+    group = forms.ModelChoiceField(
+        queryset=Group.objects.all(), required=True, label="Select Group"
+    )
 
 
 class StoreTargetForm(forms.ModelForm):
-    sales_target = forms.IntegerField(required=True, label='Sales Target')
+    sales_target = forms.IntegerField(required=True, label="Sales Target")
 
     class Meta:
         model = Store
-        fields = ['number', 'sales_target']
+        fields = ["number", "sales_target"]
 
     def __init__(self, *args, **kwargs):
         super(StoreTargetForm, self).__init__(*args, **kwargs)
-        self.fields['number'].disabled = True
-        self.fields['number'].label = "Store Number"
+        self.fields["number"].disabled = True
+        self.fields["number"].label = "Store Number"

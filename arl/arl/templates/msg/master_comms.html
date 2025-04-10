@@ -1,53 +1,80 @@
 {% extends "../base/base.html" %}
+{% block title %}Communications{% endblock %}
 {% block template %}
-{% load static %}
+
 {% include "../base/navbar.html" %}
 {% load crispy_forms_tags %}
 
 
-<head>
-    <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}">
-   
-</head>
 
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+<style>
+  .tab-pane {
+    padding-top: 1rem;
+  }
 
-            <div class="radio-navigation mt-3 mb-3">
-                <input type="radio" id="tab1" name="tab" data-form-url="{% url 'send_template_email_view' %}">
-                <label for="tab1">Email</label>
+  .nav-tabs {
+    margin-top: 2rem;
+  }
 
-                <input type="radio" id="tab2" name="tab" data-form-url="{% url 'send_one_off_sms_view' %}">
-                <label for="tab2">SMS</label>
+  .nav-tabs .nav-link {
+    font-size: 14px;
+    padding: 6px 12px;
+  }
 
-                <input type="radio" id="tab3" name="tab" data-form-url="{% url 'CreateEnvelope' %}">
-                <label for="tab3">DSign</label>
-                <!--
-                <input type="radio" id="tab3" name="tab" data-form-url="{% url 'send_whats_app_template_view' %}">
-                <label for="tab3">WhatsApp</label>
 
-                <input type="radio" id="tab1" name="tab" data-form-url="{% url 'campaign_setup' %}">
-                <label for="tab1">Email Campaign</label>
-                -->
-            </div>
-        </div>
+</style>
+
+<div class="container mb-4">
+  <div class="row justify-content-center pt-5 mt-5"></div>
+  <div class="row justify-content-center">
+  <legend>Communications</legend>
+
+  <!-- Nav Tabs -->
+  <ul class="nav nav-tabs" id="commsTabs">
+    {% if can_send_email %}
+    <li class="nav-item">
+      <a class="nav-link {% if active_tab == 'email' %}active{% endif %}" data-bs-toggle="tab" href="#email">Email</a>
+    </li>
+    {% endif %}
+    {% if can_send_sms %}
+    <li class="nav-item">
+      <a class="nav-link {% if active_tab == 'sms' %}active{% endif %}" data-bs-toggle="tab" href="#sms">SMS</a>
+    </li>
+    {% endif %}
+    {% if can_send_docusign %}
+    <li class="nav-item">
+      <a class="nav-link {% if active_tab == 'docusign' %}active{% endif %}" data-bs-toggle="tab" href="#docusign">DSign</a>
+    </li>
+    {% endif %}
+  </ul>
+
+  <!-- Tab Content -->
+  <div class="tab-content mt-3">
+    <div id="email" class="tab-pane fade {% if active_tab == 'email' %}show active{% endif %}">
+      {% include "msg/template_email_form.html" %}
     </div>
+
+    <div id="sms" class="tab-pane fade {% if active_tab == 'sms' %}show active{% endif %}">
+      {% include "msg/sms_form.html" %}
+    </div>
+
+    <div id="docusign" class="tab-pane fade {% if active_tab == 'docusign' %}show active{% endif %}">
+      {% include "dsign/name_email_form.html" %}
+    </div>
+  </div>
 </div>
 
-<div class="form-container">
-    <div id="form-container">
-        <!-- Form content will be dynamically loaded here -->
-    </div>
-</div>
-
-
-<script src="{% static '/utils/comms.js' %}"></script>
+<!-- Script to activate correct tab on reload -->
 <script>
-   $(document).ready(function () {
-    // Call the initTabs function from helper.js
-    initTabs();
-});
+  document.addEventListener("DOMContentLoaded", function () {
+    const activeTab = "{{ active_tab|default:'email' }}";
+    if (activeTab) {
+      const triggerTab = document.querySelector(`a[data-bs-toggle="tab"][href="#${activeTab}"]`);
+      if (triggerTab) {
+        const tab = new bootstrap.Tab(triggerTab);
+        tab.show();
+      }
+    }
+  });
 </script>
-
 {% endblock %}

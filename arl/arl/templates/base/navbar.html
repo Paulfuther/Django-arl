@@ -1,105 +1,124 @@
 {% load waffle_tags %}
 
+<style>
+  .navbar-nav .nav-link {
+    font-weight: 500;
+    font-size: 0.95rem;
+  }
 
+  .nav-link.active {
+    font-weight: 600;
+    border-bottom: 2px solid #0d6efd;
+  }
 
-<nav class="navbar navbar-expand-lg bg-body-tertiary">
+  .dropdown-menu {
+    border-radius: 0.5rem;
+  }
+</style>
+
+<nav class="navbar navbar-expand-lg navbar-light bg-white fixed-top shadow-sm">
   <div class="container">
-    <a class="navbar-brand fs-3" href="#">ARL</a>
+    <a class="navbar-brand fs-4 fw-bold" href="{% url 'home' %}">ARL</a>
 
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
-      aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar"
+      aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
 
-    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+    <div class="collapse navbar-collapse" id="mainNavbar">
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-        <li class="nav-item">
-          <a class="nav-link active" aria-current="page" href="{% url 'home' %}">Home</a>
-        </li>
-        
-        {% if user.is_authenticated %}
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'logout' %}">Logout</a>
-        </li>
-      
-        
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'hr_dashboard' %}">HR</a>
-        </li>
-        
 
+        {% if user.is_authenticated %}
+        <!-- HR -->
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'hr_dashboard' %}">
+            <i class="fas fa-user-shield me-1"></i> HR
+          </a>
+        </li>
+
+        <!-- Reports & Forms -->
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="formsDropdown" role="button" data-bs-toggle="dropdown">
+            <i class="fas fa-file-alt me-1"></i> Forms & Reports
+          </a>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="{% url 'create_salt_log' %}">Create Salt Log</a></li>
+            <li><a class="dropdown-item" href="{% url 'salt_log_list' %}">Update Salt Log</a></li>
+            <li><a class="dropdown-item" href="{% url 'create_incident' %}">Make Incident Form</a></li>
+            <li><a class="dropdown-item" href="{% url 'incident_list' %}">Edit Incident Form</a></li>
+          </ul>
+        </li>
+
+        <!-- Dropbox (if enabled) -->
         {% if user.is_dropbox %}
         <li class="nav-item">
-          <a class="nav-link" href="{% url 'list_folders' %}">Dropbox</a>
+          <a class="nav-link" href="{% url 'list_folders' %}">
+            <i class="fa-solid fa-cloud  me-1"></i> Dropbox
+          </a>
         </li>
         {% endif %}
 
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'help_page' %}">Help</a>
-        </li>
-
-
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'create_salt_log' %}">Create Salt Log</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'salt_log_list' %}">Update Salt Log</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'create_incident' %}">Make Incident Form</a>
-        </li>
-
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'incident_list' %}">View/Edit Incident Form</a>
-        </li>
-     
-        {% flag 'enable_nav_link' %}
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'quiz_list' %}">Quiz</a>
-        </li>
-        {% endflag %}
-
+        <!-- Communications -->
         {% if user.is_comms %}
+        <li class="nav-item">
+            <a class="nav-link" href="{% url 'comms' %}" >
+              <i class="fa-solid fa-message me-1"></i> Communications</a>
+            </li>
+        {% endif %}
+
+        <!-- Admin Tools -->
+        {% if user.is_staff %}
         <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-            Communications
+          <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown">
+            <i class="fas fa-tools me-1"></i> Admin Tools
           </a>
-          <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
-            <li><a class="dropdown-item" href="{% url 'comms' %}">Comms Overview</a></li>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="{% url 'admin:index' %}">Django Admin</a></li>
+            <li><a class="dropdown-item" href="{% url 'carwash_status' %}">Carwash Update</a></li>
+            <li><a class="dropdown-item" href="{% url 'carwash_status_list' %}">Carwash List</a></li>
+            <li><a class="dropdown-item" href="{% url 'carwash_status_report' %}">Carwash Report</a></li>
+            <li><a class="dropdown-item" href="{% url 'waiting_for_others' %}">Outstanding Docs</a></li>
+            <li><a class="dropdown-item" href="{% url 'queued_incidents_list' %}">Queued Incidents</a></li>
+            <li><a class="dropdown-item" href="{% url 'summarize_costs' %}">Message Summary</a></li>
+            <li><a class="dropdown-item" href="{% url 'task_results' %}">Task Results</a></li>
+            <li><a class="dropdown-item" href="{% url 'incident_dashboard' %}">Incident Dashboard</a></li>
             <li><a class="dropdown-item" href="{% url 'sms_summary_view' %}">SMS Logs</a></li>
             <li><a class="dropdown-item" href="{% url 'fetch_twilio_calls' %}">Call Logs</a></li>
             <li><a class="dropdown-item" href="{% url 'email_event_summary' %}">Email Logs</a></li>
             <li><a class="dropdown-item" href="{% url 'employee_email_report' %}">Employee Email Report</a></li>
-            
           </ul>
         </li>
         {% endif %}
 
-        {% if user.is_staff %}
+        <!-- Feature Flag: Quiz -->
+        {% flag 'enable_nav_link' %}
         <li class="nav-item">
-          <a class="nav-link" href="{% url 'admin:index' %}">Admin</a>
-        </li>
-         <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-            Ideas
+          <a class="nav-link" href="{% url 'quiz_list' %}">
+            <i class="fas fa-question-circle me-1"></i> Quiz
           </a>
-          <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
-              <li><a class="dropdown-item" href="{% url 'carwash_status' %}">Carwash Update</a></li>
-              <li><a class="dropdown-item" href="{% url 'carwash_status_list' %}">Carwash List</a></li>
-              <li><a class="dropdown-item" href="{% url 'carwash_status_report' %}">Carwash Report</a></li>
-              <li><a class="dropdown-item" href="{% url 'waiting_for_others' %}">Outstanding Docs</a></li>
-              <li><a class="dropdown-item" href="{% url 'queued_incidents_list' %}">Queued Incidents</a></li>
-              <li><a class="dropdown-item" href="{% url 'summarize_costs' %}">Message Summary</a></li>
-              <li><a class="dropdown-item" href="{% url 'task_results' %}">Task Results</a></li>
-              <li><a class="nav-link" href="{% url 'incident_dashboard' %}">Incident</a></li>
-          </ul>
+        </li>
+        {% endflag %}
+
+        <!-- Help -->
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'help_page' %}">
+            <i class="fas fa-circle-info me-1"></i> Help
+          </a>
         </li>
 
-        {% endif %}
+        <!-- Logout -->
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'logout' %}">
+            <i class="fas fa-sign-out-alt me-1"></i> Logout
+          </a>
+        </li>
 
         {% else %}
+        <!-- Guest: Login -->
         <li class="nav-item">
-          <a class="nav-link" href="{% url 'login' %}">Login</a>
+          <a class="nav-link" href="{% url 'login' %}">
+            <i class="fas fa-sign-in-alt me-1"></i> Login
+          </a>
         </li>
         {% endif %}
 
@@ -107,4 +126,3 @@
     </div>
   </div>
 </nav>
-

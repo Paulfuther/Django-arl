@@ -1,25 +1,33 @@
-import base64
 import json
 import logging
 import urllib.parse
 
 from celery.result import AsyncResult
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import Group
 from django.forms import modelformset_factory
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.template.loader import render_to_string
 from django.urls import reverse_lazy
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormView
 from waffle.decorators import waffle_flag
 
+from arl.dsign.forms import NameEmailForm
+from arl.dsign.tasks import create_docusign_envelope_task
 from arl.msg.helpers import (
     client,
+    collect_attachments,
+    custom_permission_denied,
     get_all_contact_lists,
+    is_member_of_comms_group,
+    is_member_of_docusign_group,
+    is_member_of_email_group,
+    is_member_of_msg_group,
+    prepare_recipient_data,
     send_whats_app_carwash_sites_template,
 )
 from arl.msg.tasks import (
@@ -52,194 +60,6 @@ from .tasks import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def is_member_of_msg_group(user):
-    is_member = user.groups.filter(name="SendSMS").exists()
-    if is_member:
-        logger.info(f"{user} is a member of 'SendSMS' group.")
-    else:
-        logger.info(f"{user} is not a member of 'SendSMS' group.")
-    return is_member
-
-
-class SendSMSView(LoginRequiredMixin, UserPassesTestMixin, FormView):
-    form_class = SMSForm
-    template_name = "msg/sms_form.html"
-    success_url = reverse_lazy("sms_success")  # URL name for success page
-
-    def test_func(self):
-        return is_member_of_msg_group(self.request.user)
-
-    def get_form_kwargs(self):
-        """Pass the logged-in user to the form to ensure we know their employer."""
-        kwargs = super().get_form_kwargs()
-        kwargs["user"] = self.request.user  # ✅ Pass the current user
-        return kwargs
-
-    def form_valid(self, form):
-        selected_group = form.cleaned_data["selected_group"]
-        message = form.cleaned_data["message"]
-        user_id = self.request.user.id
-
-        # ✅ Pass only valid numbers to the SMS task
-        send_one_off_bulk_sms_task.delay(selected_group.id, message, user_id)
-
-        return super().form_valid(form)
-
-    def get_context_data(self, **kwargs):
-        """Filter groups by employer and pass them to the context."""
-        context = super().get_context_data(**kwargs)
-        user = self.request.user
-
-        if user and user.employer:
-            employer = user.employer
-            groups = Group.objects.filter(user__employer=employer).distinct()
-        else:
-            groups = Group.objects.none()  # No groups if no employer is found
-
-        context["groups"] = groups  # ✅ Pass filtered groups
-        return context
-
-
-class SendTemplateEmailView(LoginRequiredMixin, UserPassesTestMixin, FormView):
-    form_class = TemplateEmailForm
-    template_name = "msg/template_email_form.html"
-    success_url = reverse_lazy("template_email_success")
-
-    def get_form_kwargs(self):
-        """Pass the current user to the form dynamically."""
-        kwargs = super().get_form_kwargs()
-        kwargs["user"] = self.request.user  # ✅ Pass user here
-        return kwargs
-
-    def test_func(self):
-        return is_member_of_msg_group(self.request.user)
-
-    def form_valid(self, form):
-        # Retrieve the template ID and fetch the corresponding instance
-        sendgrid_template = form.cleaned_data.get("sendgrid_id").first()
-        print(sendgrid_template.id)
-        if not sendgrid_template:
-            return JsonResponse(
-                {"success": False, "error": "No email template selected."}, status=400
-            )
-        # Use the SendGrid ID directly
-        sendgrid_id = sendgrid_template.sendgrid_id
-        selected_groups = form.cleaned_data.get("selected_group")
-        selected_users = form.cleaned_data.get("selected_users")
-
-        if not selected_groups and not selected_users:
-            return JsonResponse(
-                {"success": False, "error": "No recipients selected."}, status=400
-            )
-        employer = self.request.user.employer
-
-        # Collect attachments
-        attachments = self.collect_attachments()
-        if attachments is None:
-            return JsonResponse(
-                {
-                    "success": False,
-                    "error": "One or more attachments exceed the 10MB size limit.",
-                },
-                status=400,
-            )
-
-        # Gather recipient data
-        recipients = self.prepare_recipient_data(selected_groups, selected_users)
-
-        # Debugging: Log recipient data
-        print("Prepared recipient data:", recipients, sendgrid_id)
-
-        # Pass data to the task
-        master_email_send_task.delay(
-            recipients=recipients,
-            sendgrid_id=sendgrid_id,
-            attachments=attachments,
-            employer_id=employer.id if employer else None,
-        )
-
-        print("sent")
-        if self.request.headers.get("x-requested-with") == "XMLHttpRequest":
-            return JsonResponse(
-                {
-                    "success": True,
-                    "message": "Emails processed! Refresh after closing this message.",
-                }
-            )
-
-        return super().form_valid(form)
-
-    def form_invalid(self, form):
-        print("Form validation failed. Errors:", form.errors)
-
-        if self.request.headers.get("x-requested-with") == "XMLHttpRequest":
-            # Render the form with errors as HTML
-            html = render_to_string(self.template_name, {"form": form}, self.request)
-            return JsonResponse({"success": False, "html": html})
-
-        return self.render_to_response(self.get_context_data(form=form))
-
-    def collect_attachments(self):
-        attachments = []
-        for field_name in ["attachment_1", "attachment_2", "attachment_3"]:
-            file = self.request.FILES.get(field_name)
-            if file:
-                # Validate file size (10 MB limit)
-                if file.size > 10 * 1024 * 1024:
-                    messages.error(
-                        self.request, f"{file.name} exceeds the 10MB size limit."
-                    )
-                    return None
-
-                # Serialize the attachment
-                attachments.append(
-                    {
-                        "file_name": file.name,
-                        "file_type": file.content_type,
-                        "file_content": base64.b64encode(file.read()).decode("utf-8"),
-                    }
-                )
-                print(file.name)
-        return attachments
-
-    def prepare_recipient_data(self, selected_groups, selected_users):
-        """
-        Gather user names and email addresses from selected groups and users.
-        """
-        recipients = []  # Use a list to store dictionaries with name and email
-        employer = self.request.user.employer
-
-        if selected_groups:
-            for group in selected_groups:
-                for user in group.user_set.filter(is_active=True, employer=employer):
-                    recipients.append(
-                        {
-                            "name": user.get_full_name(),
-                            "email": user.email,
-                            "status": "Active",
-                        }
-                    )
-
-        if selected_users:
-            for user in selected_users:
-                recipients.append(
-                    {
-                        "name": user.get_full_name(),
-                        "email": user.email,
-                        "status": "Active",
-                    }
-                )
-
-        # Remove duplicates based on email
-        unique_recipients = {
-            recipient["email"]: recipient for recipient in recipients
-        }.values()
-        # Debugging: Print recipient data
-        for recipient in unique_recipients:
-            print(recipient["email"], recipient["status"])
-        return list(unique_recipients)
 
 
 class SendTemplateWhatsAppView(LoginRequiredMixin, UserPassesTestMixin, FormView):
@@ -390,8 +210,140 @@ def sms_summary_view(request):
     return render(request, "msg/sms_data.html")
 
 
-def comms(request):
-    return render(request, "msg/master_comms.html")
+@login_required
+@user_passes_test(is_member_of_comms_group)
+def communications(request):
+    user = request.user
+    active_tab = request.GET.get("tab", "email")
+
+    # Determine what tabs the user has access to
+    valid_tabs = []
+    if is_member_of_email_group(user):
+        valid_tabs.append("email")
+    if is_member_of_msg_group(user):
+        valid_tabs.append("sms")
+    if is_member_of_docusign_group(user):
+        valid_tabs.append("docusign")
+
+    # If they try to access a tab they don't have permission for, redirect to the first valid tab
+    if active_tab not in valid_tabs:
+        active_tab = valid_tabs[0] if valid_tabs else None
+
+    # Default forms
+    sms_form = SMSForm(user=user)
+    email_form = TemplateEmailForm(user=user)
+    docusign_form = NameEmailForm(user=user)
+
+    if request.method == "POST":
+        form_type = request.POST.get("form_type")
+
+        if form_type == "email":
+            active_tab = "email"
+            if not is_member_of_email_group(user):
+                return custom_permission_denied(
+                    request, "You do not have permission to send email."
+                )
+
+            email_form = TemplateEmailForm(request.POST, request.FILES, user=user)
+
+            if email_form.is_valid():
+                sendgrid_template = email_form.cleaned_data.get("sendgrid_id").first()
+                if not sendgrid_template:
+                    messages.error(request, "No email template selected.")
+                    return redirect("comms")
+
+                sendgrid_id = sendgrid_template.sendgrid_id
+                selected_groups = email_form.cleaned_data.get("selected_group")
+                selected_users = email_form.cleaned_data.get("selected_users")
+
+                if not selected_groups and not selected_users:
+                    messages.error(request, "No recipients selected.")
+                    return redirect("comms")
+
+                employer = user.employer
+                attachments = collect_attachments(request)
+                if attachments is None:
+                    return redirect("comms")
+
+                recipients = prepare_recipient_data(
+                    user, selected_groups, selected_users
+                )
+
+                master_email_send_task.delay(
+                    recipients=recipients,
+                    sendgrid_id=sendgrid_id,
+                    attachments=attachments,
+                    employer_id=employer.id if employer else None,
+                )
+
+                messages.success(request, "Emails have been queued for delivery.")
+                return redirect("comms")
+
+        elif form_type == "sms":
+            active_tab = "sms"
+            if not is_member_of_msg_group(user):
+                return custom_permission_denied(
+                    request, "You do not have permission to send text messages."
+                )
+
+            sms_form = SMSForm(request.POST, user=user)
+
+            if sms_form.is_valid():
+                group = sms_form.cleaned_data["selected_group"]
+                message = sms_form.cleaned_data["message"]
+
+                send_one_off_bulk_sms_task.delay(group.id, message, user.id)
+                messages.success(request, "SMS is being sent.")
+                return redirect("/comms/?tab=sms")
+
+        elif form_type == "docusign":
+            active_tab = "docusign"
+            if not is_member_of_docusign_group(user):
+                return custom_permission_denied(
+                    request, "You do not have permission to send DocuSign documents."
+                )
+
+            docusign_form = NameEmailForm(request.POST, user=user)
+
+            if docusign_form.is_valid():
+                recipient = docusign_form.cleaned_data["recipient"]
+                ds_template = docusign_form.cleaned_data["template_id"]
+                template = docusign_form.cleaned_data["template_name"]
+                template_name = (
+                    template.template_name if template else "Unknown Template"
+                )
+
+                envelope_args = {
+                    "signer_email": recipient.email,
+                    "signer_name": recipient.get_full_name(),
+                    "template_id": ds_template,
+                }
+
+                logger.info(f"Sending DocuSign envelope: {envelope_args}")
+
+                create_docusign_envelope_task.delay(envelope_args)
+
+                messages.success(
+                    request,
+                    f"Thank you. The document '{template_name}' has been sent to {recipient.get_full_name()}.",
+                )
+                return redirect("/comms/?tab=docusign")
+
+            messages.error(request, "Please correct the DocuSign form.")
+
+    return render(
+        request,
+        "msg/master_comms.html",
+        {
+            "email_form": email_form,
+            "sms_form": sms_form,
+            "docusign_form": docusign_form,
+            "active_tab": active_tab,
+            "can_send_email": is_member_of_email_group(user),
+            "can_send_sms": is_member_of_msg_group(user),
+            "can_send_docusign": is_member_of_docusign_group(user),
+        },
+    )
 
 
 @waffle_flag("email_api")

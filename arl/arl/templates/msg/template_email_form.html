@@ -1,288 +1,114 @@
 {% extends "../base/base.html" %}
-{% block title %}Index{% endblock %}
-
+{% block title %}Email{% endblock %}
 {% block template %}
-{% load static %}
+
 {% load crispy_forms_tags %}
 
-<head>
-  <link rel="stylesheet" type="text/css" href="{% static 'css/main.css' %}">
-</head>
+<style>
+  .custom-upload {
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background-color: #f9f9f9;
+  padding: 6px;
+  font-size: 14px;
+}
+</style>
 
-<!-- Main Form Container -->
-<div id="email-form-container">
-  <form id="email-form" method="post" action="{% url 'send_template_email_view' %}">
-    <div class="container">
-      <div class="row justify-content-center">
-        <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
-          {% csrf_token %}
-          <legend class="border-bottom mb-4">Send Email Template</legend>
-          
-          <!-- Display Form Errors -->
-          {% if form.non_field_errors %}
-            <div class="alert alert-danger" role="alert">
-              {% for error in form.non_field_errors %}
-                <p>{{ error }}</p>
-              {% endfor %}
-            </div>
-          {% endif %}
 
-          {% for field in form.visible_fields %}
-            {% if field.errors %}
-              <div class="alert alert-danger" role="alert">
-                {% for error in field.errors %}
-                  <p>{{ field.label }}: {{ error }}</p>
-                {% endfor %}
-              </div>
-            {% endif %}
-          {% endfor %}
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  <input type="hidden" name="form_type" value="email" />
 
-          <!-- Collapsible Template Selection -->
-          <div style="border: 1px solid #ddd; padding: 10px; border-radius: 5px;" class="mb-4">
-            <div class="d-flex align-items-center">
-              <button type="button" id="template-arrow-toggle" class="btn btn-link p-0"
-                      style="text-decoration: none; font-size: 1.2em; margin-right: 8px;">
-                <span id="template-arrow-icon">►</span>
-              </button>
-              <label for="template-list" style="font-weight: bold; margin: 0;">Select Templates:</label>
-            </div>
-            <div id="template-list" style="display: none; max-height: 150px; overflow-y: auto; margin-top: 10px;">
-              {% for template in form.fields.sendgrid_id.queryset %}
-                <div>
-                  <input type="checkbox" class="template-checkbox" name="sendgrid_id" value="{{ template.id }}" id="template-{{ template.id }}" />
-                  <label for="template-{{ template.id }}">{{ template.name }}</label>
-                </div>
-              {% endfor %}
-            </div>
-          </div>
-
-          <!-- Collapsible Groups Section -->
-          <div style="border: 1px solid #ddd; padding: 10px; border-radius: 5px;" class="mb-4">
-            <div class="d-flex align-items-center">
-              <button type="button" id="group-arrow-toggle" class="btn btn-link p-0"
-                      style="text-decoration: none; font-size: 1.2em; margin-right: 8px;">
-                <span id="group-arrow-icon">►</span>
-              </button>
-              <label style="font-weight: bold; margin: 0;">Select Groups:</label>
-            </div>
-            <div id="group-list" style="display: none; max-height: 150px; overflow-y: auto; margin-top: 10px;">
-              {% for group in form.fields.selected_group.queryset %}
-                <div>
-                  <input type="checkbox" class="group-checkbox" name="selected_group" value="{{ group.id }}" id="group-{{ group.id }}" />
-                  <label for="group-{{ group.id }}">{{ group.name }}</label>
-                </div>
-              {% endfor %}
-            </div>
-          </div>
-
-          <!-- Collapsible Individual Users Section -->
-          <div style="border: 1px solid #ddd; padding: 10px; border-radius: 5px;" class="mb-4">
-            <div class="d-flex align-items-center">
-              <button type="button" id="user-arrow-toggle" class="btn btn-link p-0"
-                      style="text-decoration: none; font-size: 1.2em; margin-right: 8px;">
-                <span id="user-arrow-icon">►</span>
-              </button>
-              <label style="font-weight: bold; margin: 0;">Select Individual Users:</label>
-            </div>
-            <div id="user-list" style="display: none; max-height: 150px; overflow-y: auto; margin-top: 10px;">
-              <div class="d-flex align-items-center mt-2">
-                <input type="checkbox" id="select-all-users" />
-                <label for="select-all-users" class="ml-2 mb-0" style="font-weight: bold;">Select All Users</label>
-              </div>
-              {% for user in form.fields.selected_users.queryset %}
-                <div>
-                  <input type="checkbox" class="user-checkbox" name="selected_users" value="{{ user.id }}" id="user-{{ user.id }}" />
-                  <label for="user-{{ user.id }}">{{ user.get_full_name }} ({{ user.email }})</label>
-                </div>
-              {% endfor %}
-            </div>
-          </div>
-
-              <!-- Collapsible Attachments Section -->
-        <div style="border: 1px solid #ddd; padding: 10px; border-radius: 5px;" class="mb-4">
-          <div class="d-flex align-items-center">
-            <button type="button" id="attachments-arrow-toggle" class="btn btn-link p-0"
-                    style="text-decoration: none; font-size: 1.2em; margin-right: 8px;"
-                    aria-expanded="false" aria-controls="attachments-list">
-              <span id="attachments-arrow-icon">►</span>
-            </button>
-            <label style="font-weight: bold; margin: 0;">Upload Attachments:</label>
-          </div>
-
-          <!-- Collapsible Attachments List with Fixed Height -->
-          <div id="attachments-list" style="display: none; max-height: 150px; overflow-y: auto; margin-top: 10px;">
-            <div class="mb-3">
-              <label for="attachment_1" class="form-label">Attachment 1</label>
-              <input type="file" name="attachment_1" id="attachment_1" class="form-control">
-            </div>
-            <div class="mb-3">
-              <label for="attachment_2" class="form-label">Attachment 2</label>
-              <input type="file" name="attachment_2" id="attachment_2" class="form-control">
-            </div>
-            <div class="mb-3">
-              <label for="attachment_3" class="form-label">Attachment 3</label>
-              <input type="file" name="attachment_3" id="attachment_3" class="form-control">
-            </div>
-          </div>
-        </div>
-
-        <!-- Section to Display Emails in the Group -->
-        <div style="border: 1px solid #ddd; padding: 10px; border-radius: 5px; margin-top: 20px;">
-          <h5 style="font-weight: bold; margin-bottom: 10px;">
-            Emails in Selected Group (<span id="email-count">0</span>)
-          </h5>
-          <div id="email-list" style="max-height: 200px; overflow-y: auto; padding: 10px; background-color: #f9f9f9;">
-            <p class="text-muted">Select a group to view emails.</p>
-          </div>
-        </div>
-          <!-- Submit Button -->
-          <button type="submit" class="btn btn-primary mt-3">Send</button>
-        </div>
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
       </div>
-    </div>
-  </form>
-</div>
+    {% endfor %}
+  {% endif %}
 
+  <legend class="border-bottom mb-3">Send Email Template</legend>
+
+  <!-- Template Selection -->
+  <div class="mb-3 border rounded p-3">
+    <div class="d-flex align-items-center">
+      <button type="button" class="btn btn-link p-0 me-2" id="toggle-template">
+        <span id="arrow-template">►</span>
+      </button>
+      <strong>Select Template(s)</strong>
+    </div>
+    <div id="template-section" class="mt-2" style="display: none; max-height: 200px; overflow-y: auto;">
+      {{ email_form.sendgrid_id }}
+    </div>
+  </div>
+
+  <!-- Group Selection -->
+  <div class="mb-3 border rounded p-3">
+    <div class="d-flex align-items-center">
+      <button type="button" class="btn btn-link p-0 me-2" id="toggle-group">
+        <span id="arrow-group">►</span>
+      </button>
+      <strong>Select Group(s)</strong>
+    </div>
+    <div id="group-section" class="mt-2" style="display: none; max-height: 200px; overflow-y: auto;">
+      {{ email_form.selected_group }}
+    </div>
+  </div>
+
+  <!-- User Selection -->
+  <div class="mb-3 border rounded p-3">
+    <div class="d-flex align-items-center">
+      <button type="button" class="btn btn-link p-0 me-2" id="toggle-users">
+        <span id="arrow-users">►</span>
+      </button>
+      <strong>Select Individual Users</strong>
+    </div>
+    <div id="users-section" class="mt-2" style="display: none; max-height: 200px; overflow-y: auto;">
+      {{ email_form.selected_users }}
+    </div>
+  </div>
+
+  <!-- Attachment Uploads -->
+<div class="mb-3 border rounded p-3">
+  <strong class="mb-2 d-block">Upload Attachments (Max 3 files, 10MB each)</strong>
+
+  <div class="row g-2">
+    <div class="col-md-4">
+      {{ email_form.attachment_1|as_crispy_field }}
+    </div>
+    <div class="col-md-4">
+      {{ email_form.attachment_2|as_crispy_field }}
+    </div>
+    <div class="col-md-4">
+      {{ email_form.attachment_3|as_crispy_field }}
+    </div>
+  </div>
+
+  <small class="text-muted mt-2 d-block">Accepted file types: PDF, DOCX, PNG, JPG</small>
+</div>
+  <button type="submit" class="btn btn-outline-primary mobile-btn mt-3">Send</button>
+</form>
 
 <script>
-// Get CSRF token from the form
-function getCSRFToken() {
-  const csrfInput = document.querySelector("input[name='csrfmiddlewaretoken']");
-  return csrfInput ? csrfInput.value : null;
-}
-
-// Setup collapsible toggles
-function setupToggle(buttonId, listId, arrowId) {
-  const button = document.getElementById(buttonId);
-  const list = document.getElementById(listId);
-  const arrow = document.getElementById(arrowId);
-
-  if (button) {
-    button.addEventListener("click", function () {
-      if (list.style.display === "none") {
-        list.style.display = "block";
+  function toggleSection(btnId, arrowId, sectionId) {
+    document.getElementById(btnId).addEventListener("click", () => {
+      const section = document.getElementById(sectionId);
+      const arrow = document.getElementById(arrowId);
+      if (section.style.display === "none") {
+        section.style.display = "block";
         arrow.textContent = "▼";
       } else {
-        list.style.display = "none";
+        section.style.display = "none";
         arrow.textContent = "►";
       }
     });
   }
-}
 
-// Initialize collapsible sections and other functionality
-function initializeCollapsibleSections() {
-  setupToggle("template-arrow-toggle", "template-list", "template-arrow-icon");
-  setupToggle("group-arrow-toggle", "group-list", "group-arrow-icon");
-  setupToggle("user-arrow-toggle", "user-list", "user-arrow-icon");
-  setupToggle("attachments-arrow-toggle", "attachments-list", "attachments-arrow-icon");
-
-  const selectAll = document.getElementById("select-all-users");
-  if (selectAll) {
-    selectAll.addEventListener("change", function () {
-      const checkboxes = document.querySelectorAll(".user-checkbox");
-      checkboxes.forEach(checkbox => (checkbox.checked = this.checked));
-    });
-  }
-}
-
-// AJAX form submission
-document.getElementById("email-form").addEventListener("submit", function (event) {
-  event.preventDefault(); // Prevent default form submission
-  const form = this;
-
-  fetch(form.action, {
-    method: "POST",
-    body: new FormData(form),
-    headers: {
-      "X-Requested-With": "XMLHttpRequest",
-      "X-CSRFToken": getCSRFToken(), // Include the CSRF token in headers
-    },
-  })
-    .then((response) => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.json();
-    })
-    .then((data) => {
-      if (data.success) {
-        alert("Email sent successfully!");
-        // Reload the page to reset the form
-        window.location.reload();
-      } else {
-        // Replace form content with updated form containing errors
-        document.getElementById("email-form-container").innerHTML = data.html;
-
-        // Reinitialize collapsible toggles for dynamically loaded content
-        initializeCollapsibleSections();
-      }
-    })
-    .catch((error) => console.error("Error:", error));
-});
-
-// Fetch and display emails for selected groups
-function setupGroupEmailFetcher() {
-  const groupCheckboxes = document.querySelectorAll(".group-checkbox");
-  const emailListDiv = document.getElementById("email-list");
-  const emailCountSpan = document.getElementById("email-count");
-
-  if (!groupCheckboxes || !emailListDiv || !emailCountSpan) return;
-
-  groupCheckboxes.forEach(checkbox => {
-    checkbox.addEventListener("change", function () {
-      const selectedGroupIds = Array.from(groupCheckboxes)
-        .filter(cb => cb.checked)
-        .map(cb => cb.value);
-
-      if (selectedGroupIds.length > 0) {
-        emailListDiv.innerHTML = '<p class="text-muted">Loading emails...</p>'; // Show loading message
-
-        fetch(`/get-group-emails/?group_ids=${selectedGroupIds.join(",")}`)
-          .then((response) => response.json())
-          .then((data) => {
-            emailListDiv.innerHTML = ""; // Clear the list
-            const totalEmails = data.emails.length;
-
-            // Update the email count
-            emailCountSpan.textContent = totalEmails;
-
-            if (totalEmails > 0) {
-              const list = document.createElement("ul");
-              list.style.listStyleType = "none";
-              list.style.padding = "0";
-
-              data.emails.forEach(email => {
-                const listItem = document.createElement("li");
-                listItem.style.marginBottom = "5px";
-                listItem.innerHTML = `
-                  <strong>${email.email}</strong> 
-                  <span style="color: ${email.status === "Active" ? "green" : "red"};">(${email.status})</span>
-                `;
-                list.appendChild(listItem);
-              });
-
-              emailListDiv.appendChild(list);
-            } else {
-              emailListDiv.innerHTML = '<p class="text-muted">No emails found in the selected groups.</p>';
-            }
-          })
-          .catch((error) => {
-            emailListDiv.innerHTML = '<p class="text-danger">Error loading emails.</p>';
-            console.error("Error:", error);
-          });
-      } else {
-        emailListDiv.innerHTML = '<p class="text-muted">Select a group to view emails.</p>';
-        emailCountSpan.textContent = "0";
-      }
-    });
+  document.addEventListener("DOMContentLoaded", () => {
+    toggleSection("toggle-template", "arrow-template", "template-section");
+    toggleSection("toggle-group", "arrow-group", "group-section");
+    toggleSection("toggle-users", "arrow-users", "users-section");
   });
-}
-
-// Initialize the email fetcher when the page loads
-setupGroupEmailFetcher();
-
-// Initialize toggles on page load
-initializeCollapsibleSections();
 </script>
 {% endblock %}

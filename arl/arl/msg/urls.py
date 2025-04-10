@@ -1,10 +1,10 @@
 from django.urls import path
 
 from arl.msg.views import (EmailEventList, FetchTwilioCallsView,
-                           SendSMSView, SendTemplateEmailView,
                            SendTemplateWhatsAppView,
                            campaign_setup_view, carwash_targets,
-                           click_thank_you, comms, email_event_summary_view,
+                           click_thank_you, communications,
+                           email_event_summary_view,
                            employee_email_report_view, fetch_twilio_data,
                            get_group_emails, get_task_status,
                            message_summary_view, sendgrid_webhook,
@@ -15,13 +15,6 @@ from arl.msg.views import (EmailEventList, FetchTwilioCallsView,
                            fetch_sms_data)
 
 urlpatterns = [
-    path("send-sms/", SendSMSView.as_view(), name="send_sms_view"),
-    path(
-        "send-template-email/",
-        SendTemplateEmailView.as_view(),
-        name="send_template_email_view",
-    ),
-    path("send-one-off-sms/", SendSMSView.as_view(), name="send_one_off_sms_view"),
     path("sendgrid_hook/", sendgrid_webhook, name="sendgrid_webhook"),
     path("sms-success/", sms_success_view, name="sms_success"),
     path(
@@ -44,7 +37,7 @@ urlpatterns = [
     ),
     path("api/data/", EmailEventList, name="data-list"),
     path("thank-you/", click_thank_you, name="thank_you"),
-    path("comms/", comms, name="comms"),
+    path("comms/", communications, name="comms"),
     path('webhook/whatsapp/', whatsapp_webhook, name='whatsapp_webhook'),
     path('carwash/targets/', carwash_targets, name='carwash_targets'),
     # Route for summarizing costs
