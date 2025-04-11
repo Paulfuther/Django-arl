@@ -14,6 +14,23 @@
   .dropdown-menu {
     border-radius: 0.5rem;
   }
+
+  .material-symbols-outlined {
+    font-variation-settings: 
+      'FILL' 0,
+      'wght' 400,
+      'GRAD' 0,
+      'opsz' 48;
+    font-size: 24px; /* change as needed */
+    color: #555; /* or your theme color */
+    vertical-align: middle;
+    margin-right: 4px;
+  }
+
+.nav-link .material-symbols-outlined {
+  font-size: 20px;
+  }
+
 </style>
 
 <nav class="navbar navbar-expand-lg navbar-light bg-white fixed-top shadow-sm">
@@ -32,14 +49,18 @@
         <!-- HR -->
         <li class="nav-item">
           <a class="nav-link" href="{% url 'hr_dashboard' %}">
-            <i class="fas fa-user-shield me-1"></i> HR
+            <i class="material-symbols-outlined">
+              group
+              </i> HR
           </a>
         </li>
 
         <!-- Reports & Forms -->
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" id="formsDropdown" role="button" data-bs-toggle="dropdown">
-            <i class="fas fa-file-alt me-1"></i> Forms & Reports
+            <i class="material-symbols-outlined">
+              description
+            </i> Forms & Reports
           </a>
           <ul class="dropdown-menu">
             <li><a class="dropdown-item" href="{% url 'create_salt_log' %}">Create Salt Log</a></li>
@@ -53,7 +74,7 @@
         {% if user.is_dropbox %}
         <li class="nav-item">
           <a class="nav-link" href="{% url 'list_folders' %}">
-            <i class="fa-solid fa-cloud  me-1"></i> Dropbox
+            <i class="material-symbols-outlined">cloud</i> Dropbox
           </a>
         </li>
         {% endif %}
@@ -62,7 +83,9 @@
         {% if user.is_comms %}
         <li class="nav-item">
             <a class="nav-link" href="{% url 'comms' %}" >
-              <i class="fa-solid fa-message me-1"></i> Communications</a>
+              <i class="material-symbols-outlined">
+                sms
+                </i> Communications</a>
             </li>
         {% endif %}
 
@@ -70,7 +93,9 @@
         {% if user.is_staff %}
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown">
-            <i class="fas fa-tools me-1"></i> Admin Tools
+            <i  class="material-symbols-outlined">
+              admin_panel_settings
+              </i> Admin Tools
           </a>
           <ul class="dropdown-menu">
             <li><a class="dropdown-item" href="{% url 'admin:index' %}">Django Admin</a></li>
@@ -102,14 +127,18 @@
         <!-- Help -->
         <li class="nav-item">
           <a class="nav-link" href="{% url 'help_page' %}">
-            <i class="fas fa-circle-info me-1"></i> Help
+            <i class="material-symbols-outlined">
+              info
+              </i> Help
           </a>
         </li>
 
         <!-- Logout -->
         <li class="nav-item">
           <a class="nav-link" href="{% url 'logout' %}">
-            <i class="fas fa-sign-out-alt me-1"></i> Logout
+            <i  class="material-symbols-outlined">
+              logout
+              </i> Logout
           </a>
         </li>
 
