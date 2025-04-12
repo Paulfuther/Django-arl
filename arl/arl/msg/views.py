@@ -187,7 +187,7 @@ def fetch_twilio_data(request):
 
 
 def fetch_sms_data(request):
-    task = fetch_twilio_sms_task.delay()
+    task = fetch_twilio_sms_task.delay(request.user.id)
     return JsonResponse({"task_id": task.id})
 
 
@@ -215,7 +215,7 @@ def sms_summary_view(request):
 def communications(request):
     user = request.user
     active_tab = request.GET.get("tab", "email")
-
+    print(user, active_tab)
     # Determine what tabs the user has access to
     valid_tabs = []
     if is_member_of_email_group(user):
@@ -247,7 +247,7 @@ def communications(request):
             email_form = TemplateEmailForm(request.POST, request.FILES, user=user)
 
             if email_form.is_valid():
-                sendgrid_template = email_form.cleaned_data.get("sendgrid_id").first()
+                sendgrid_template = email_form.cleaned_data.get("sendgrid_id")
                 if not sendgrid_template:
                     messages.error(request, "No email template selected.")
                     return redirect("comms")
@@ -277,7 +277,7 @@ def communications(request):
                 )
 
                 messages.success(request, "Emails have been queued for delivery.")
-                return redirect("comms")
+                return redirect("/comms/?tab=email")
 
         elif form_type == "sms":
             active_tab = "sms"
@@ -330,7 +330,7 @@ def communications(request):
                 return redirect("/comms/?tab=docusign")
 
             messages.error(request, "Please correct the DocuSign form.")
-
+    
     return render(
         request,
         "msg/master_comms.html",
@@ -464,7 +464,7 @@ def sendgrid_webhook_view(request):
 
 
 def email_event_summary_view(request):
-    form = TemplateFilterForm(request.GET or None)
+    form = TemplateFilterForm(request.GET or None, user=request.user)
     summary_table = ""
 
     # Only proceed with task if form is valid and template_id is provided

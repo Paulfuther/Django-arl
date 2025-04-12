@@ -676,8 +676,9 @@ class EmailTemplateAdmin(admin.ModelAdmin):
     list_filter = ("employers",)
 
     def get_employers(self, obj):
-        """Display multiple employers as a comma-separated string."""
-        return ", ".join([emp.name for emp in obj.employers.all()])
+        """Display employers in alphabetical order as comma-separated string."""
+        sorted_employers = sorted(emp.name for emp in obj.employers.all())
+        return ", ".join(sorted_employers)
 
     get_employers.short_description = "Employers"
 

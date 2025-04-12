@@ -31,9 +31,21 @@
   font-size: 20px;
   }
 
+  .navbar-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 100vw;
+  background-color: rgba(0, 0, 0, 0.4); /* semi-transparent black */
+  z-index: 1040; /* Just below the navbar dropdown (default is 1050) */
+  display: none;
+}
+
 </style>
 
 <nav class="navbar navbar-expand-lg navbar-light bg-white fixed-top shadow-sm">
+  
   <div class="container">
 
     <button class="navbar-toggler order-0" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar"
@@ -69,7 +81,7 @@
 
         <!-- Reports & Forms -->
         <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle" href="#" id="formsDropdown" role="button" data-bs-toggle="dropdown">
+          <a class="nav-link dropdown-toggle" href="javascript:void(0)" id="formsDropdown" role="button" data-bs-toggle="dropdown">
             <i class="material-symbols-outlined">
               description
             </i> Forms & Reports
@@ -95,9 +107,8 @@
         {% if user.is_comms %}
         <li class="nav-item">
             <a class="nav-link" href="{% url 'comms' %}" >
-              <i class="material-symbols-outlined">
-                sms
-                </i> Communications</a>
+              <i class="material-symbols-outlined">sms</i> Communications
+              </a>
             </li>
         {% endif %}
 

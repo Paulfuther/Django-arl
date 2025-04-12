@@ -1,6 +1,4 @@
-{% extends "../base/base.html" %}
-{% block title %}Email{% endblock %}
-{% block template %}
+
 
 {% load crispy_forms_tags %}
 
@@ -12,6 +10,11 @@
   padding: 6px;
   font-size: 14px;
 }
+
+  .checkbox-group label {
+    display: block;
+    margin-bottom: 4px;
+  }
 </style>
 
 
@@ -38,7 +41,7 @@
       </button>
       <strong>Select Template(s)</strong>
     </div>
-    <div id="template-section" class="mt-2" style="display: none; max-height: 200px; overflow-y: auto;">
+    <div id="template-section" class="mt-2 checkbox-group" style="display: none; max-height: 200px; overflow-y: auto;">
       {{ email_form.sendgrid_id }}
     </div>
   </div>
@@ -51,23 +54,37 @@
       </button>
       <strong>Select Group(s)</strong>
     </div>
-    <div id="group-section" class="mt-2" style="display: none; max-height: 200px; overflow-y: auto;">
+    <div id="group-section" class="mt-2 checkbox-group" style="display: none; max-height: 200px; overflow-y: auto;">
       {{ email_form.selected_group }}
     </div>
   </div>
 
-  <!-- User Selection -->
-  <div class="mb-3 border rounded p-3">
-    <div class="d-flex align-items-center">
-      <button type="button" class="btn btn-link p-0 me-2" id="toggle-users">
-        <span id="arrow-users">►</span>
-      </button>
-      <strong>Select Individual Users</strong>
-    </div>
-    <div id="users-section" class="mt-2" style="display: none; max-height: 200px; overflow-y: auto;">
-      {{ email_form.selected_users }}
-    </div>
+ <!-- User Selection -->
+<div class="mb-3 border rounded p-3">
+  <div class="d-flex align-items-center">
+    <button type="button" class="btn btn-link p-0 me-2" id="toggle-users">
+      <span id="arrow-users">►</span>
+    </button>
+    <strong>Select Individual Users</strong>
   </div>
+  <div id="users-section" class="mt-2" style="display: none; max-height: 250px; overflow-y: auto;">
+    <div class="form-check mb-2">
+      <input type="checkbox" class="form-check-input" id="select-all-users">
+      <label class="form-check-label" for="select-all-users">Select All Users</label>
+    </div>
+
+    {% for user in email_form.fields.selected_users.queryset %}
+      <div class="form-check">
+        <input class="form-check-input user-checkbox" type="checkbox" name="selected_users" value="{{ user.id }}" id="user-{{ user.id }}">
+        <label class="form-check-label" for="user-{{ user.id }}">
+          {{ user.get_full_name }} ({{ user.email }})
+        </label>
+      </div>
+    {% empty %}
+      <p class="text-muted">No users found for your employer.</p>
+    {% endfor %}
+  </div>
+</div>
 
   <!-- Attachment Uploads -->
 <div class="mb-3 border rounded p-3">
@@ -91,24 +108,36 @@
 </form>
 
 <script>
-  function toggleSection(btnId, arrowId, sectionId) {
-    document.getElementById(btnId).addEventListener("click", () => {
-      const section = document.getElementById(sectionId);
-      const arrow = document.getElementById(arrowId);
-      if (section.style.display === "none") {
-        section.style.display = "block";
-        arrow.textContent = "▼";
-      } else {
-        section.style.display = "none";
-        arrow.textContent = "►";
-      }
-    });
-  }
-
-  document.addEventListener("DOMContentLoaded", () => {
+  $(document).ready(function () {
     toggleSection("toggle-template", "arrow-template", "template-section");
     toggleSection("toggle-group", "arrow-group", "group-section");
     toggleSection("toggle-users", "arrow-users", "users-section");
   });
+
+  function toggleSection(btnId, arrowId, sectionId) {
+    const button = document.getElementById(btnId);
+    const section = document.getElementById(sectionId);
+    const arrow = document.getElementById(arrowId);
+
+    if (button) {
+      button.addEventListener("click", () => {
+        const isHidden = section.style.display === "none";
+        section.style.display = isHidden ? "block" : "none";
+        arrow.textContent = isHidden ? "▼" : "►";
+      });
+    }
+  }
 </script>
-{% endblock %}
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const selectAll = document.getElementById("select-all-users");
+    const userCheckboxes = document.querySelectorAll(".user-checkbox");
+
+    if (selectAll && userCheckboxes.length > 0) {
+      selectAll.addEventListener("change", function () {
+        userCheckboxes.forEach(cb => cb.checked = this.checked);
+      });
+    }
+  });
+</script>

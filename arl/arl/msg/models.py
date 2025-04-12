@@ -23,6 +23,7 @@ class BulkEmailSendgrid(models.Model):
 
 
 class EmailEvent(models.Model):
+    employer = models.ForeignKey(Employer, null=True, blank=True, on_delete=models.SET_NULL)
     user = models.ForeignKey(
         CustomUser, on_delete=models.CASCADE, null=True, blank=True
     )
