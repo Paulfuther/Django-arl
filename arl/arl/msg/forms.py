@@ -1,7 +1,11 @@
+from collections import defaultdict
+
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.db import models
+from django.db.models import CharField, IntegerField, Value
+from django.forms.widgets import Select
 
 from arl.msg.models import EmailTemplate, WhatsAppTemplate
 from arl.user.models import CustomUser, Store
@@ -48,17 +52,146 @@ class SMSForm(forms.Form):
         return message
 
 
+class TemplateWhatsAppForm(forms.Form):
+    whatsapp_id = forms.ModelChoiceField(
+        queryset=WhatsAppTemplate.objects.all(), label="Select Template"
+    )
+
+    selected_group = forms.ModelChoiceField(
+        queryset=Group.objects.all(),
+        required=True,
+        label="Select Group to Send Whatsapp",
+        widget=forms.Select(attrs={"class": "custom-input"}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field_name, field in self.fields.items():
+            if field_name != "csrfmiddlewaretoken":  # Skip CSRF token field
+                field.widget.attrs.update({"class": "custom-input"})
+
+
+class SendGridFilterForm(forms.Form):
+    date_from = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+        label="From",
+    )
+    date_to = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+        label="To",
+    )
+    template_id = forms.ModelChoiceField(
+        queryset=EmailTemplate.objects.all(),
+        required=True,
+        widget=forms.Select(attrs={"class": "form-control"}),
+        label="Template Name",
+    )
+
+
+class GroupedSelect(Select):
+    def optgroups(self, name, value, attrs=None):
+        groups = defaultdict(list)
+        has_selected = False
+
+        # Loop through EmailTemplate objects
+        for index, template in enumerate(self.choices.queryset):
+            option_value = template.pk
+            option_label = self.choices.field.label_from_instance(template)
+
+            # Group logic
+            group_label = (
+                "Generic Templates"
+                if template.employers.count() == 0
+                else "Employer Templates"
+            )
+
+            selected = str(option_value) in value
+            option = self.create_option(
+                name,
+                option_value,
+                option_label,
+                selected,
+                index,
+                attrs=attrs,
+            )
+            groups[group_label].append(option)
+            has_selected = has_selected or selected
+
+        optgroups = [
+            (label, group, index) for index, (label, group) in enumerate(groups.items())
+        ]
+        return optgroups
+
+
+class GroupedTemplateChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, obj):
+        if obj.employers.exists():
+            return f"{obj.name}"
+        return f"{obj.name} 🌐"  # Add globe emoji for generic
+
+
+class TemplateFilterForm(forms.Form):
+    template_id = forms.ModelChoiceField(
+        queryset=EmailTemplate.objects.none(),
+        required=True,
+        widget=forms.Select(attrs={"class": "form-control"}),
+        label="Template Name",
+        empty_label="— Select a Template —",
+    )
+
+    date_from = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+        label="From",
+    )
+
+    date_to = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+        label="To",
+    )
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop("user", None)
+        super().__init__(*args, **kwargs)
+
+        if user and hasattr(user, "employer"):
+            employer = user.employer
+
+            employer_templates = EmailTemplate.objects.filter(
+                employers=employer
+            ).annotate(
+                sort_order=Value(0, output_field=IntegerField()),
+                employer_name=Value(employer.name, output_field=CharField()),
+            )
+
+            generic_templates = EmailTemplate.objects.filter(
+                employers__isnull=True
+            ).annotate(
+                sort_order=Value(1, output_field=IntegerField()),
+                employer_name=Value("Generic", output_field=CharField()),
+            )
+
+            templates = (employer_templates | generic_templates).order_by(
+                "sort_order", "name"
+            )
+
+            self.fields["template_id"].queryset = templates
+
+
 class TemplateEmailForm(forms.Form):
-    sendgrid_id = forms.ModelMultipleChoiceField(
+    sendgrid_id = forms.ModelChoiceField(
         queryset=EmailTemplate.objects.none(),
         widget=forms.RadioSelect,
         required=True,
         label="Select Template",
     )
 
-    selected_group = forms.ModelMultipleChoiceField(
+    selected_group = forms.ModelChoiceField(
         queryset=Group.objects.none(),
-        widget=forms.CheckboxSelectMultiple,
+        widget=forms.RadioSelect,
         required=False,
         label="Select Groups",
     )
@@ -115,63 +248,6 @@ class TemplateEmailForm(forms.Form):
             )
 
         return cleaned_data
-
-
-class TemplateWhatsAppForm(forms.Form):
-    whatsapp_id = forms.ModelChoiceField(
-        queryset=WhatsAppTemplate.objects.all(), label="Select Template"
-    )
-
-    selected_group = forms.ModelChoiceField(
-        queryset=Group.objects.all(),
-        required=True,
-        label="Select Group to Send Whatsapp",
-        widget=forms.Select(attrs={"class": "custom-input"}),
-    )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for field_name, field in self.fields.items():
-            if field_name != "csrfmiddlewaretoken":  # Skip CSRF token field
-                field.widget.attrs.update({"class": "custom-input"})
-
-
-class SendGridFilterForm(forms.Form):
-    date_from = forms.DateField(
-        required=False,
-        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
-        label="From",
-    )
-    date_to = forms.DateField(
-        required=False,
-        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
-        label="To",
-    )
-    template_id = forms.ModelChoiceField(
-        queryset=EmailTemplate.objects.all(),
-        required=True,
-        widget=forms.Select(attrs={"class": "form-control"}),
-        label="Template Name",
-    )
-
-
-class TemplateFilterForm(forms.Form):
-    template_id = forms.ModelChoiceField(
-        queryset=EmailTemplate.objects.all(),
-        required=True,
-        widget=forms.Select(attrs={"class": "form-control"}),
-        label="Template Name",
-    )
-    start_date = forms.DateField(
-        required=False,
-        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
-        label="Start Date",
-    )
-    end_date = forms.DateField(
-        required=False,
-        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"}),
-        label="End Date",
-    )
 
 
 class CampaignSetupForm(forms.Form):

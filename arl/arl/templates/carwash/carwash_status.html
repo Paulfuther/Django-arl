@@ -6,11 +6,7 @@
 {% load crispy_forms_tags %}
 
 <style>
-    .container {
-        max-width: 80%;
-        overflow-x: hidden;
-        /* Prevent horizontal overflow */
-    }
+    
 
     select,
     input,
@@ -22,10 +18,11 @@
 </style>
 
 
-<div class="container mb-2" style="height: 95vh;">
+<div class="container mt-4">
+    <div class="row justify-content-center pt-5 mt-5"></div>
     <div class="row justify-content-center">
-        <div class="col-12 col-sm-10 col-md-8 col-lg-8 col-xl-8 mt-2">
-            <legend class="border-bottom mb-4">Message Cost Summary</legend>
+        <div class="col-12 col-lg-10">
+            <legend class="border-bottom mb-4">Carwash Status</legend>
 <form method="post">
     {% csrf_token %}
     {{ form|crispy }}

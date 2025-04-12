@@ -6,7 +6,7 @@ import boto
 import boto.s3.connection
 from botocore.exceptions import NoCredentialsError
 from django.conf import settings
-from django.http import HttpResponse, HttpResponseServerError
+from django.http import HttpResponse
 from django.urls import reverse
 from django.utils.http import quote
 
@@ -131,7 +131,7 @@ def list_s3_objects(folder_name):
         filtered_keys = []
         for obj in objects:
             if obj.key != folder_prefix:  # Skip the folder itself
-                file_name = unquote(obj.key[len(folder_prefix):].lstrip('/'))
+                file_name = unquote(obj.key[len(folder_prefix) :].lstrip("/"))
                 encoded_key = quote(obj.key, safe="")  # URL-encode the filename
                 # print("key  :", encoded_key)
                 link = reverse("download_from_s3", kwargs={"key": encoded_key})
@@ -174,4 +174,3 @@ def download_from_s3(request, key):
         # Handle exceptions appropriately (e.g., log the error)
         print(f"Error downloading from S3: {str(e)}")
         return HttpResponse("Error downloading from S3", status=500)
-
