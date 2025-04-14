@@ -221,17 +221,21 @@ class TemplateEmailForm(forms.Form):
             # ✅ Email templates visible to this employer
             self.fields["sendgrid_id"].queryset = EmailTemplate.objects.filter(
                 models.Q(employers=employer) | models.Q(employers__isnull=True)
-            ).distinct()
+            ).distinct().order_by("name")
 
             # ✅ Groups that include users from this employer
             self.fields["selected_group"].queryset = Group.objects.filter(
                 user__employer=employer
-            ).distinct()
+            ).distinct().order_by("name")
 
-            # ✅ Active users from this employer
+            # ✅ Active users from this employer, sorted alphabetically
             self.fields["selected_users"].queryset = User.objects.filter(
-                employer=employer, is_active=True
-            )
+                employer=employer,
+                is_active=True
+            ).order_by("last_name", "first_name")
+
+            # ✅ Show full name with employer
+            self.fields["selected_users"].label_from_instance = lambda u: f"{u.get_full_name()} - {u.email} ({u.employer.name if u.employer else 'No Employer'})"
 
     def clean(self):
         cleaned_data = super().clean()
