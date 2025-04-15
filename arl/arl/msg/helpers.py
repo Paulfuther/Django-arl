@@ -799,23 +799,23 @@ def collect_attachments(request):
     return attachments
 
 
-def prepare_recipient_data(user, selected_groups, selected_users):
+def prepare_recipient_data(user, selected_group, selected_users):
     recipients = []
     employer = user.employer
 
-    if selected_groups:
-        for group in selected_groups:
-            for u in group.user_set.filter(is_active=True, employer=employer):
-                recipients.append(
-                    {
-                        "name": u.get_full_name(),
-                        "email": u.email,
-                        "status": "Active",
-                    }
-                )
+    # ✅ Handle single group (not a loop)
+    if selected_group:
+        for u in selected_group.user_set.filter(is_active=True, employer=employer):
+            recipients.append(
+                {
+                    "name": u.get_full_name(),
+                    "email": u.email,
+                    "status": "Active",
+                }
+            )
 
     if selected_users:
-        for u in selected_users:
+        for u in selected_users.order_by("first_name", "last_name"):
             recipients.append(
                 {
                     "name": u.get_full_name(),

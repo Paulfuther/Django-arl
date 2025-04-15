@@ -250,23 +250,18 @@ def communications(request):
                 sendgrid_template = email_form.cleaned_data.get("sendgrid_id")
                 if not sendgrid_template:
                     messages.error(request, "No email template selected.")
-                    return redirect("comms")
+                    return redirect("/comms/?tab=email")
 
                 sendgrid_id = sendgrid_template.sendgrid_id
-                selected_groups = email_form.cleaned_data.get("selected_group")
+                selected_group = email_form.cleaned_data.get("selected_group")
                 selected_users = email_form.cleaned_data.get("selected_users")
-
-                if not selected_groups and not selected_users:
-                    messages.error(request, "No recipients selected.")
-                    return redirect("comms")
-
                 employer = user.employer
                 attachments = collect_attachments(request)
                 if attachments is None:
-                    return redirect("comms")
+                    attachments = []
 
                 recipients = prepare_recipient_data(
-                    user, selected_groups, selected_users
+                    user, selected_group, selected_users
                 )
 
                 master_email_send_task.delay(
@@ -278,7 +273,9 @@ def communications(request):
 
                 messages.success(request, "Emails have been queued for delivery.")
                 return redirect("/comms/?tab=email")
-
+            else:
+                messages.error(request, "Please correct the errors below.")
+                
         elif form_type == "sms":
             active_tab = "sms"
             if not is_member_of_msg_group(user):
