@@ -110,7 +110,9 @@ INSTALLED_APPS = [
     "arl.carwash",
     "arl.setup",
     "phonenumber_field",
-    "arl.helpdesk"
+    "arl.helpdesk",
+    'django_otp',
+    'django_otp.plugins.otp_totp',
 ]
 
 PHONENUMBER_DEFAULT_REGION = 'CA'
@@ -126,6 +128,7 @@ MIDDLEWARE = [
     "django_htmx.middleware.HtmxMiddleware",
     "arl.user.middleware.ErrorLoggingMiddleware",
     "waffle.middleware.WaffleMiddleware",
+    'django_otp.middleware.OTPMiddleware',
 ]
 
 ROOT_URLCONF = "arl.urls"

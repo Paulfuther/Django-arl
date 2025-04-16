@@ -11,12 +11,14 @@ from .views import (CheckPhoneNumberUniqueView, RegisterView,
                     hr_dashboard, cancel_invite, resend_invite,
                     hr_document_view, download_signed_document,
                     fetch_signed_docs_by_user, search_user_roles,
-                    update_user_roles)
+                    update_user_roles, setup_totp, verify_totp)
 from django.views.generic import TemplateView
 
 
 urlpatterns = [
     path("login", login_view, name="login"),
+    path("mfa/setup-mfa/", setup_totp, name="admin_setup_mfa"),
+    path("mfa/verify-mfa/", verify_totp, name="admin_verify_totp"),
     path("register/<str:token>/", RegisterView.as_view(), name="register"),
     path(
         "check_phone_number_unique/",
