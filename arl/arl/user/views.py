@@ -1,7 +1,11 @@
+import base64
+import io
 import logging
 import os
 import traceback
+from functools import wraps
 
+import qrcode
 from celery import chain
 from django.contrib import messages
 from django.contrib.auth import get_user_model, login, logout
@@ -13,15 +17,21 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.http import (Http404, HttpResponse, HttpResponseBadRequest,
-                         HttpResponseRedirect, JsonResponse)
+from django.http import (
+    Http404,
+    HttpResponse,
+    HttpResponseBadRequest,
+    HttpResponseRedirect,
+    JsonResponse,
+)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
 from django.views.generic import FormView, ListView
 from django_celery_results.models import TaskResult
-from phonenumbers import (PhoneNumberFormat, format_number, is_valid_number,
-                          parse)
+from django_otp import user_has_device
+from django_otp.plugins.otp_totp.models import TOTPDevice
+from phonenumbers import PhoneNumberFormat, format_number, is_valid_number, parse
 from phonenumbers.phonenumberutil import NumberParseException
 from twilio.base.exceptions import TwilioException
 from twilio.rest import Client
@@ -29,19 +39,24 @@ from twilio.rest import Client
 from arl.bucket.helpers import download_from_s3
 from arl.dsign.models import DocuSignTemplate, SignedDocumentFile
 from arl.dsign.tasks import create_docusign_envelope_task
-from arl.msg.helpers import (check_verification_token,
-                             request_verification_token)
+from arl.msg.helpers import check_verification_token, request_verification_token
 from arl.msg.models import EmailTemplate
 from arl.msg.tasks import send_sms_task
 from arl.setup.helpers import employer_hr_required
 
-from .forms import (CustomUserCreationForm, NewHireInviteForm,
-                    TwoFactorAuthenticationForm)
+from .forms import (
+    CustomUserCreationForm,
+    NewHireInviteForm,
+    TwoFactorAuthenticationForm,
+)
 from .models import CustomUser, Employer, EmployerSettings, NewHireInvite
-from .tasks import (create_newhire_data_email, save_user_to_db,
-                    send_newhire_template_email_task,
-                    notify_hr_about_departure,
-                    send_new_hire_invite_task)
+from .tasks import (
+    create_newhire_data_email,
+    notify_hr_about_departure,
+    save_user_to_db,
+    send_new_hire_invite_task,
+    send_newhire_template_email_task,
+)
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -520,30 +535,119 @@ class CustomAdminLoginView(LoginView):
         return super().form_invalid(form)
 
     def form_valid(self, form):
-        # Here, you can perform additional logic after a user successfully logs in.
-        # For example, check if the user has 2FA enabled and redirect accordingly.
         user = form.get_user()
-        print(user.username)
-        # Implement your 2FA logic here
-        if user and user.is_active:
-            print("yah", user.phone_number)
-            if user.phone_number:
-                # Request the verification code from Twilio
-                try:
-                    request_verification_token(user.phone_number)
-                    self.request.session["user_id"] = (
-                        user.id
-                    )  # Store user ID in the session
-                    self.request.session["phone_number"] = user.phone_number
-                    return redirect("admin_verification_page")
 
-                except TwilioException as e:
-                    messages.error(
-                        self.request, f"Failed to send verification code: {e}"
-                    )
-                    # Redirect back to the login page (you may need to specify the correct URL name)
-                    return redirect(reverse("custom_admin_login"))
+        if user and user.is_active:
+            # ✅ Check for confirmed MFA device
+            if user_has_device(user, confirmed=True):
+                # ✅ Check if this session is verified
+                if not hasattr(self.request, "otp_device"):
+                    # User is not yet MFA-verified in this session
+                    self.request.session["pre_2fa_user_id"] = user.id
+                    return redirect("admin_verify_totp")
+            else:
+                # User is not enrolled — redirect to setup
+                self.request.session["pre_2fa_user_id"] = user.id
+                return redirect("admin_setup_mfa")
+
+            # ✅ Passed all checks — log in
+            login(self.request, user)
             return redirect("admin:index")
+
+        messages.error(self.request, "Login failed.")
+        return redirect("custom_admin_login")
+
+
+def verify_totp(request):
+    user_id = request.session.get("pre_2fa_user_id")
+    if not user_id:
+        messages.error(request, "Session expired. Please log in again.")
+        return redirect("custom_admin_login")
+
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        messages.error(request, "Invalid user.")
+        return redirect("custom_admin_login")
+
+    device = TOTPDevice.objects.filter(user=user, confirmed=True).first()
+    if not device:
+        messages.error(request, "No verified MFA device found.")
+        return redirect("admin_setup_mfa")
+
+    if request.method == "POST":
+        token = request.POST.get("token")
+        if device.verify_token(token):
+            login(request, user)
+            request.session.pop("pre_2fa_user_id", None)
+            request.otp_device = device
+            messages.success(request, "MFA verified successfully.")
+            return redirect("admin:index")
+        else:
+            messages.error(request, "Invalid verification code.")
+
+    # ✅ Always return a response on GET or after invalid POST
+    return render(request, "admin/verify_totp.html")
+
+
+def require_pre_2fa(view_func):
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        if "pre_2fa_user_id" not in request.session:
+            return redirect("custom_admin_login")
+        return view_func(request, *args, **kwargs)
+
+    return _wrapped_view
+
+
+@require_pre_2fa
+def setup_totp(request):
+    user_id = request.session.get("pre_2fa_user_id")
+    if not user_id:
+        return redirect("custom_admin_login")
+
+    user = User.objects.get(id=user_id)
+
+    if TOTPDevice.objects.filter(user=user, confirmed=True).exists():
+        messages.info(request, "You already have MFA set up.")
+        return redirect("admin:index")
+
+    # Check for unconfirmed device
+    device = TOTPDevice.objects.filter(user=user, confirmed=False).first()
+    if not device:
+        device = TOTPDevice.objects.create(
+            user=user, name="Admin TOTP", confirmed=False
+        )
+
+    qr = qrcode.make(device.config_url)
+    buffer = io.BytesIO()
+    qr.save(buffer, format="PNG")
+    qr_data_uri = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+    if request.method == "POST":
+        token = request.POST.get("token")
+        if device.verify_token(token):
+            device.confirmed = True
+            device.save()
+
+            # ✅ Now log the user in
+            from django.contrib.auth import login
+
+            login(request, user)
+
+            request.session.pop("pre_2fa_user_id", None)
+            messages.success(request, "MFA setup complete.")
+            return redirect("admin:index")
+        else:
+            messages.error(request, "Invalid token. Please try again.")
+
+    return render(
+        request,
+        "admin/setup_totp.html",
+        {
+            "qr_code": f"data:image/png;base64,{qr_data_uri}",
+        },
+    )
 
 
 def fetch_managers(request):
@@ -728,29 +832,32 @@ def hr_dashboard(request):
 
         else:
             # Save the form in the session to repopulate it after redirect (optional)
-            request.session['form_errors'] = form.errors
-            request.session['form_data'] = request.POST
+            request.session["form_errors"] = form.errors
+            request.session["form_data"] = request.POST
             messages.error(request, "Please correct the errors in the form.")
             return HttpResponseRedirect(reverse("hr_dashboard") + "?tab=employees")
 
     # ✅ Handle GET request
-    if 'form_errors' in request.session:
+    if "form_errors" in request.session:
         form = NewHireInviteForm(
-            data=request.session.get('form_data'),
-            employer=employer
+            data=request.session.get("form_data"), employer=employer
         )
-        form._errors = request.session.pop('form_errors')
-        request.session.pop('form_data', None)
+        form._errors = request.session.pop("form_errors")
+        request.session.pop("form_data", None)
     else:
         form = NewHireInviteForm(employer=employer)
         form = NewHireInviteForm(employer=employer)
-    return render(request, "user/hr_dashboard.html", {
-        "form": form,
-        "templates": templates,
-        "pending_invites": pending_invites,
-        "active_tab": request.GET.get("tab", "docusign"),
-        "employer": employer,
-    })
+    return render(
+        request,
+        "user/hr_dashboard.html",
+        {
+            "form": form,
+            "templates": templates,
+            "pending_invites": pending_invites,
+            "active_tab": request.GET.get("tab", "docusign"),
+            "employer": employer,
+        },
+    )
 
 
 @login_required
