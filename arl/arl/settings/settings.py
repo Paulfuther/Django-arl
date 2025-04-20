@@ -314,14 +314,14 @@ STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
 # STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
 
 # BASE URL DEV
-BASE_URL = "http://localhost:8000"
+BASE_URL = "https://56e2-2607-fea8-2840-b200-870-354c-6aad-1d2f.ngrok-free.app"
 SITE_URL = BASE_URL
 OWNER_EMAIL = os.environ.get("OWNER_EMAIL")
 ADMIN_PHONE_NUMBER = os.environ.get("ADMIN_PHONE_NUMBER")
 MESSAGE_TAGS = {
     messages.ERROR: 'danger',  # ✅ this converts 'error' → 'danger' for Bootstrap styling
 }
-
+print("site url:",SITE_URL)
 try:
     from .local_settings import *
 except ImportError:

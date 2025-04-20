@@ -1,21 +1,117 @@
-
-
 {% load crispy_forms_tags %}
 
-{% if messages %}
-  {% for message in messages %}
-    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-      {{ message }}
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-  {% endfor %}
-{% endif %}
+<style>
+  .dropdown-box {
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 0;
+    overflow: hidden;
+    background-color: #fff;
+    max-height: 0;
+    transition: max-height 0.3s ease;
+  }
+
+  .dropdown-box.open {
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .dropdown-option {
+    padding: 10px 15px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+  }
+
+  .dropdown-option:last-child {
+    border-bottom: none;
+  }
+
+  .dropdown-option input[type="radio"] {
+    margin-right: 8px;
+  }
+
+  .dropdown-toggle-btn {
+    background-color: #f8f9fa;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 10px 12px;
+    width: 100%;
+    text-align: left;
+    font-weight: 500;
+    position: relative;
+  }
+
+  .dropdown-toggle-btn:after {
+    content: "▼";
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    transition: transform 0.3s ease;
+  }
+
+  .dropdown-toggle-btn.open:after {
+    transform: translateY(-50%) rotate(180deg);
+  }
+
+  @media (max-width: 768px) {
+    .dropdown-box.open {
+      max-height: 200px;
+    }
+  }
+</style>
 
 <form method="post">
   {% csrf_token %}
   <input type="hidden" name="form_type" value="docusign">
-  {{ docusign_form|crispy }}
+
+  <!-- Employee Selection -->
+  <label class="form-label">Select Employee</label>
+  <button type="button" id="toggleRecipient" class="dropdown-toggle-btn">Choose Employee</button>
+  <div id="recipientBox" class="dropdown-box">
+    {% for radio in docusign_form.recipient %}
+      <div class="dropdown-option">
+        {{ radio.tag }} {{ radio.choice_label }}
+      </div>
+    {% endfor %}
+  </div>
+
+  <!-- Template Selection -->
+  <label class="form-label mt-3">Select Template</label>
+  <button type="button" id="toggleTemplates" class="dropdown-toggle-btn">Choose Template</button>
+  <div id="templateBox" class="dropdown-box">
+    {% for radio in docusign_form.template_name %}
+      <div class="dropdown-option">
+        {{ radio.tag }} {{ radio.choice_label }}
+      </div>
+    {% endfor %}
+  </div>
+
   <button type="submit" class="btn btn-outline-primary mobile-btn mt-3">Create Envelope</button>
 </form>
 
+<script>
+  function setupDropdown(toggleId, boxId, labelPrefix) {
+    const toggleBtn = document.getElementById(toggleId);
+    const box = document.getElementById(boxId);
 
+    toggleBtn.addEventListener("click", function () {
+      box.classList.toggle("open");
+      toggleBtn.classList.toggle("open");
+    });
+
+    // Close dropdown and update label after selecting an option
+    box.addEventListener("change", function () {
+      const checkedInput = box.querySelector("input:checked");
+      if (checkedInput) {
+        const label = checkedInput.parentElement.innerText.trim();
+        toggleBtn.innerText = label;
+        box.classList.remove("open");
+        toggleBtn.classList.remove("open");
+      }
+    });
+  }
+
+  setupDropdown("toggleTemplates", "templateBox", "Choose Template");
+  setupDropdown("toggleRecipient", "recipientBox", "Choose Employee");
+</script>

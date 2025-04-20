@@ -5,33 +5,37 @@ from arl.user.models import CustomUser, Employer
 from django.db.models.functions import Concat
 from django.db.models import Value, F
 from django.db.models import CharField
+from django.forms.widgets import RadioSelect
 
 
 class NameEmailForm(forms.Form):
     recipient = forms.ModelChoiceField(
         queryset=CustomUser.objects.none(),
-        label="Select Employee"
+        label="Select Employee",
+        widget=RadioSelect,
+        required=True
     )
-    template_name = forms.ModelChoiceField(queryset=DocuSignTemplate.objects.all(), label='Template Name')
+    template_name = forms.ModelChoiceField(
+        queryset=DocuSignTemplate.objects.none(),
+        label='Template Name',
+        widget=RadioSelect,
+        required=True
+    )
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)
-        super(NameEmailForm, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         if user and user.employer:
-            # Limit templates by employer
-            self.fields['template_name'].queryset = DocuSignTemplate.objects.filter(employer=user.employer)
-            # Limit recipients to active users under the same employer
-            self.fields['recipient'].queryset = CustomUser.objects.filter(employer=user.employer, is_active=True)
+            self.fields['template_name'].queryset = DocuSignTemplate.objects.filter(
+                employer=user.employer,
+                is_ready_to_send=True  # ✅ Filter ready ones
+            )
+            self.fields['recipient'].queryset = CustomUser.objects.filter(
+                employer=user.employer,
+                is_active=True
+            )
 
-        # Add custom styling to fields
-        for field_name, field in self.fields.items():
-            field.widget.attrs.update({'class': 'custom-input'})
-
-        # Special style for dropdown
-        self.fields['template_name'].widget.attrs.update({
-            'style': 'appearance: none; -webkit-appearance: none; -moz-appearance: none; text-indent: 1px; text-overflow: ""'
-        })
         self.fields['recipient'].label_from_instance = lambda obj: f"{obj.get_full_name()} ({obj.email})"
 
     def clean(self):

@@ -1,34 +1,44 @@
 from __future__ import absolute_import, unicode_literals
 
+import json
 import logging
+import os
+import uuid
+import zipfile
 from collections import defaultdict
 from datetime import datetime, timedelta
-import json
+from io import BytesIO
+
 from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.db import IntegrityError
 from django.db.models import Q
 from docusign_esign import ApiClient, EnvelopesApi
 from docusign_esign.client.api_exception import ApiException
-from arl.celery import app
-from arl.bucket.helpers import upload_to_linode_object_storage
-from arl.dsign.models import DocuSignTemplate, ProcessedDocsignDocument
-from arl.msg.tasks import send_bulk_sms
-from arl.msg.models import SmsLog
-from arl.user.models import CustomUser, EmployerSMSTask
-from arl.dsign.models import SignedDocumentFile
-from django.db import IntegrityError
-from arl.setup.models import TenantApiKeys, Employer
-from django.contrib.auth import get_user_model
-from .helpers import (create_docusign_envelope,
-                      create_docusign_envelope_new_hire_quiz, get_access_token,
-                      get_docusign_envelope,
-                      get_docusign_template_name_from_template,
-                      get_template_id, get_waiting_for_others_envelopes,
-                      parse_sent_date_time)
-import uuid
-import zipfile
-from io import BytesIO
-import os
 
+from arl.bucket.helpers import upload_to_linode_object_storage
+from arl.celery import app
+from arl.dsign.models import (
+    DocuSignTemplate,
+    ProcessedDocsignDocument,
+    SignedDocumentFile,
+)
+from arl.msg.models import SmsLog
+from arl.msg.tasks import send_bulk_sms
+from arl.setup.models import Employer, TenantApiKeys
+from arl.user.models import CustomUser, EmployerSMSTask
+
+from .helpers import (
+    create_docusign_envelope,
+    create_docusign_envelope_new_hire_quiz,
+    get_access_token,
+    get_docusign_envelope,
+    get_docusign_template_name_from_template,
+    get_template_id,
+    get_waiting_for_others_envelopes,
+    parse_sent_date_time,
+    validate_signature_roles,
+)
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -56,20 +66,15 @@ def list_all_docusign_envelopes_task():
 
     try:
         # List envelopes from the past month
-        one_month_ago = ((datetime.utcnow() -
-                          timedelta(days=60)).strftime("%Y-%m-%d"))
-        results = (
-            envelopes_api.list_status_changes(account_id,
-                                              from_date=one_month_ago)
-        )
+        one_month_ago = (datetime.utcnow() - timedelta(days=60)).strftime("%Y-%m-%d")
+        results = envelopes_api.list_status_changes(account_id, from_date=one_month_ago)
 
         # print("results : ", results)
 
         envelopes = []
         for envelope in results.envelopes:
             envelope_id = envelope.envelope_id
-            email_results = envelopes_api.list_recipients(account_id,
-                                                          envelope_id)
+            email_results = envelopes_api.list_recipients(account_id, envelope_id)
             # print(email_results)
             emails = []
             for email in email_results.signers:
@@ -96,8 +101,7 @@ def list_all_docusign_envelopes_task():
 def check_outstanding_envelopes_task():
     # 🔍 1. Get employers that have this SMS task enabled
     enabled_employers = EmployerSMSTask.objects.filter(
-        task_name="sms for documents behind 48 hrs",
-        is_enabled=True
+        task_name="sms for documents behind 48 hrs", is_enabled=True
     ).values_list("employer_id", flat=True)
 
     if not enabled_employers:
@@ -124,20 +128,44 @@ def check_outstanding_envelopes_task():
                         continue
 
                     # 🧑‍💼 Add store manager to notify
-                    if user.store and user.store.manager and user.store.manager.phone_number:
-                        employer_managers[employer.id].add(user.store.manager.phone_number)
+                    if (
+                        user.store
+                        and user.store.manager
+                        and user.store.manager.phone_number
+                    ):
+                        employer_managers[employer.id].add(
+                            user.store.manager.phone_number
+                        )
 
                     # 🧾 Collect signer details
                     outstanding_signers_info = []
                     for signer in envelope["signers"]:
                         if signer["status"] in ["sent", "delivered"]:
                             try:
-                                signer_user = CustomUser.objects.get(email=signer["email"])
-                                role = signer_user.groups.first().name if signer_user.groups.exists() else "No Role"
-                                store_name = signer_user.store.number if signer_user.store else "No Store"
-                                store_address = signer_user.store.address if signer_user.store else "No Address"
+                                signer_user = CustomUser.objects.get(
+                                    email=signer["email"]
+                                )
+                                role = (
+                                    signer_user.groups.first().name
+                                    if signer_user.groups.exists()
+                                    else "No Role"
+                                )
+                                store_name = (
+                                    signer_user.store.number
+                                    if signer_user.store
+                                    else "No Store"
+                                )
+                                store_address = (
+                                    signer_user.store.address
+                                    if signer_user.store
+                                    else "No Address"
+                                )
                             except CustomUser.DoesNotExist:
-                                role, store_name, store_address = "Unknown", "Unknown", "Unknown"
+                                role, store_name, store_address = (
+                                    "Unknown",
+                                    "Unknown",
+                                    "Unknown",
+                                )
 
                             signer_info = (
                                 f"Name: {signer['name']}\n"
@@ -148,7 +176,11 @@ def check_outstanding_envelopes_task():
                             )
                             outstanding_signers_info.append(signer_info)
 
-                    signer_list = "\n".join(outstanding_signers_info) if outstanding_signers_info else "No outstanding signers"
+                    signer_list = (
+                        "\n".join(outstanding_signers_info)
+                        if outstanding_signers_info
+                        else "No outstanding signers"
+                    )
 
                     # 🗂️ Add to list of behind documents per employer
                     employer_docs[employer.id].append(
@@ -165,31 +197,40 @@ def check_outstanding_envelopes_task():
     for employer_id, documents in employer_docs.items():
         try:
             employer = Employer.objects.get(id=employer_id)
-            message = (
-                f"The following documents are 48+ hours behind:\n\n"
-                + "\n\n".join(documents)
+            message = "The following documents are 48+ hours behind:\n\n" + "\n\n".join(
+                documents
             )
 
-            logger.warning(f"📄 SMS for {employer.name} will include {len(documents)} document(s).")
+            logger.warning(
+                f"📄 SMS for {employer.name} will include {len(documents)} document(s)."
+            )
 
             # 🔔 Get HR users for employer (dsign_sms group)
-            hr_users = CustomUser.objects.filter(
-                is_active=True,
-                employer=employer,
-                groups__name="dsign_sms"
-            ).exclude(phone_number__isnull=True).exclude(phone_number="")
+            hr_users = (
+                CustomUser.objects.filter(
+                    is_active=True, employer=employer, groups__name="dsign_sms"
+                )
+                .exclude(phone_number__isnull=True)
+                .exclude(phone_number="")
+            )
 
             hr_numbers = list(hr_users.values_list("phone_number", flat=True))
             manager_numbers = list(employer_managers[employer_id])
             all_recipients = list(set(hr_numbers + manager_numbers))
-            unique_recipients = [n for n in all_recipients if n not in already_notified_numbers]
+            unique_recipients = [
+                n for n in all_recipients if n not in already_notified_numbers
+            ]
 
             if not all_recipients:
-                logger.warning(f"⚠️ No recipients found for employer {employer.name}. Skipping.")
+                logger.warning(
+                    f"⚠️ No recipients found for employer {employer.name}. Skipping."
+                )
                 continue
 
             # 🔐 Get Twilio API credentials
-            twilio_keys = TenantApiKeys.objects.filter(employer=employer, is_active=True).first()
+            twilio_keys = TenantApiKeys.objects.filter(
+                employer=employer, is_active=True
+            ).first()
             if not twilio_keys:
                 logger.error(f"❌ No Twilio credentials for {employer.name}")
                 continue
@@ -199,13 +240,15 @@ def check_outstanding_envelopes_task():
                 body=message,
                 twilio_account_sid=twilio_keys.account_sid,
                 twilio_auth_token=twilio_keys.auth_token,
-                twilio_notify_sid=twilio_keys.notify_service_sid
+                twilio_notify_sid=twilio_keys.notify_service_sid,
             )
 
-            logger.info(f"📬 Sent 48-hour document reminder SMS to {len(all_recipients)} for {employer.name}")
+            logger.info(
+                f"📬 Sent 48-hour document reminder SMS to {len(all_recipients)} for {employer.name}"
+            )
             SmsLog.objects.create(
                 level="INFO",
-                message=f"📬 Sent 48-hour document reminder SMS to {len(all_recipients)} for {employer.name}"
+                message=f"📬 Sent 48-hour document reminder SMS to {len(all_recipients)} for {employer.name}",
             )
             # Track notified numbers
             already_notified_numbers.update(unique_recipients)
@@ -213,7 +256,7 @@ def check_outstanding_envelopes_task():
             logger.error(f"❌ Error sending SMS for employer {employer_id}: {e}")
             SmsLog.objects.create(
                 level="ERROR",
-                message=f"❌ Error sending 48-hour SMS for employer {employer_id}: {e}"
+                message=f"❌ Error sending 48-hour SMS for employer {employer_id}: {e}",
             )
 
     if not employer_docs:
@@ -239,12 +282,11 @@ def check_outstanding_envelopes_weekly_sms_task():
                 # Retrieve the store manager for the primary recipient
                 try:
                     primary_recipient_email = envelope["signers"][0]["email"]
-                    user = CustomUser.objects.get(
-                        email=primary_recipient_email)
+                    user = CustomUser.objects.get(email=primary_recipient_email)
                     store_manager = (
                         user.store.manager
-                        if user.store and user.store.manager else
-                        "No Manager Assigned"
+                        if user.store and user.store.manager
+                        else "No Manager Assigned"
                     )
                 except CustomUser.DoesNotExist:
                     store_manager = "Manager Not Found"
@@ -257,21 +299,19 @@ def check_outstanding_envelopes_weekly_sms_task():
                         # Query the CustomUser model for store
                         # and role based on the signer's email
                         try:
-                            user = (
-                                CustomUser.objects.get(email=signer["email"])
-                            )
+                            user = CustomUser.objects.get(email=signer["email"])
                             store_name = (
-                                user.store.number
-                                if user.store else "No Store Assigned"
+                                user.store.number if user.store else "No Store Assigned"
                             )
                             store_address = (
-                                user.store.address if
-                                user.store else "No Address Available"
+                                user.store.address
+                                if user.store
+                                else "No Address Available"
                             )
                             role = (
-                                user.groups.first().name if
-                                user.groups.exists() else
-                                "No Role Assigned"
+                                user.groups.first().name
+                                if user.groups.exists()
+                                else "No Role Assigned"
                             )
 
                         except CustomUser.DoesNotExist:
@@ -309,10 +349,7 @@ def check_outstanding_envelopes_weekly_sms_task():
 
     if behind_docs:
         document_list = "\n\n".join(behind_docs)
-        message = (
-            f"The following documents are 48 hours behind: \n\n"
-            f"{document_list}"
-        )
+        message = f"The following documents are 48 hours behind: \n\n{document_list}"
 
         # Log the message that will be sent
         logger.info(f"Sending SMS: {message}")
@@ -353,16 +390,13 @@ def get_outstanding_docs():
                     # Query the CustomUser model for store and role
                     try:
                         user = CustomUser.objects.get(email=signer["email"])
-                        store = (
-                            user.store.number if user.store else
-                            "No Store Assigned"
-                        )
+                        store = user.store.number if user.store else "No Store Assigned"
                         store_address = (
-                            user.store.address if user.store
-                            else "No Address Available"
+                            user.store.address if user.store else "No Address Available"
                         )
                         role = (
-                            user.groups.first().name if user.groups.exists()
+                            user.groups.first().name
+                            if user.groups.exists()
                             else "No Role Assigned"
                         )
                         print(store, role)
@@ -400,9 +434,7 @@ def get_outstanding_docs():
 
         # Log the number of outstanding envelopes found
         if serialized_envelopes:
-            logger.info(
-                f"Found {len(serialized_envelopes)}"
-                f" outstanding envelopes.")
+            logger.info(f"Found {len(serialized_envelopes)} outstanding envelopes.")
         else:
             logger.info("No outstanding envelopes found.")
 
@@ -410,9 +442,7 @@ def get_outstanding_docs():
 
     except Exception as e:
         # Log any errors that occur during the task execution
-        logger.error(
-            f"Error occurred in get_outstanding_docs task: {e}"
-            f", exc_info=True")
+        logger.error(f"Error occurred in get_outstanding_docs task: {e}, exc_info=True")
         return []
 
 
@@ -424,7 +454,7 @@ def extract_recipient_email(payload):
         .get("signers", [{}])[0]
         .get("email", "")
     )
-    
+
     # Fallback to sender email if no recipient email is found
     if not recipient_email:
         recipient_email = payload.get("data", {}).get("sender", {}).get("email", "")
@@ -450,14 +480,16 @@ def process_docusign_webhook(payload):
             return {"error": "No signers found"}
 
         recipient_email = signers[0].get("email", "")
-        
+
         print("recipeitn email :", recipient_email)
         # ✅ Fallback to sender email if recipient is empty
         if not recipient_email:
             recipient_email = payload.get("data", {}).get("sender", {}).get("email", "")
 
         if not envelope_id or not recipient_email:
-            logger.error(f"❌ Missing envelope ID or recipient email: {envelope_id}, {recipient_email}")
+            logger.error(
+                f"❌ Missing envelope ID or recipient email: {envelope_id}, {recipient_email}"
+            )
             return {"error": "Invalid payload"}
 
         # ✅ Handle "templateSaved" event
@@ -469,12 +501,16 @@ def process_docusign_webhook(payload):
                 return {"status": "template saved task triggered"}
 
         if event_type == "envelope-sent":
-            handle_envelope_sent(recipient_email, template_name)  # 🚀 Pass extracted template_name
+            handle_envelope_sent(
+                recipient_email, template_name
+            )  # 🚀 Pass extracted template_name
             return {"status": "envelope-sent task triggered"}
 
         # ✅ Handle "recipient-completed" event
         if event_type == "recipient-completed":
-            return handle_recipient_completed(envelope_id, recipient_email, template_id, template_name)
+            return handle_recipient_completed(
+                envelope_id, recipient_email, template_id, template_name
+            )
 
         logger.info(f"ℹ️ Unhandled DocuSign event type: {event_type}")
         return {"status": "ignored"}
@@ -485,7 +521,7 @@ def process_docusign_webhook(payload):
     except Exception as e:
         logger.error(f"❌ Error processing DocuSign webhook: {str(e)}")
         return {"error": str(e)}
-    
+
 
 # ✅ Handles the "templateSaved" event
 def handle_template_saved(template_id, user_email):
@@ -497,16 +533,22 @@ def handle_template_saved(template_id, user_email):
         user = User.objects.get(email=user_email)
         if user and user.employer:
             # Prevent duplicate template entries
-            if not DocuSignTemplate.objects.filter(template_id=template_id, employer=user.employer).exists():
+            if not DocuSignTemplate.objects.filter(
+                template_id=template_id, employer=user.employer
+            ).exists():
                 DocuSignTemplate.objects.create(
                     employer=user.employer,
                     template_id=template_id,
                     name=f"Template {template_id}",
-                    created_by=user
+                    created_by=user,
                 )
-                logger.info(f"✅ Template {template_id} saved for employer {user.employer}")
+                logger.info(
+                    f"✅ Template {template_id} saved for employer {user.employer}"
+                )
             else:
-                logger.info(f"ℹ️ Template {template_id} already exists for employer {user.employer}")
+                logger.info(
+                    f"ℹ️ Template {template_id} already exists for employer {user.employer}"
+                )
         return {"status": "success"}
     except User.DoesNotExist:
         logger.error(f"❌ User with email {user_email} not found")
@@ -517,11 +559,17 @@ def handle_envelope_sent(recipient_email, template_name):
     """Handles document sent events and notifies HR via SMS."""
     try:
         if not recipient_email or not template_name:
-            logger.error(f"❌ Missing recipient_email or template_name: {recipient_email}, {template_name}")
+            logger.error(
+                f"❌ Missing recipient_email or template_name: {recipient_email}, {template_name}"
+            )
             return {"error": "Missing recipient email or template name"}
 
         # ✅ Fetch user to determine employer
-        user = CustomUser.objects.filter(email=recipient_email).select_related("employer").first()
+        user = (
+            CustomUser.objects.filter(email=recipient_email)
+            .select_related("employer")
+            .first()
+        )
         if not user:
             logger.error(f"❌ User with email {recipient_email} not found.")
             return {"error": "User not found"}
@@ -532,9 +580,17 @@ def handle_envelope_sent(recipient_email, template_name):
             return {"error": "Employer not found"}
 
         # ✅ Notify HR
-        notify_hr.delay(template_name, user.get_full_name(), recipient_email, employer.id, event_type="sent")
+        notify_hr.delay(
+            template_name,
+            user.get_full_name(),
+            recipient_email,
+            employer.id,
+            event_type="sent",
+        )
 
-        logger.info(f"📨 Sent HR notification for envelope sent: {template_name} to {recipient_email}")
+        logger.info(
+            f"📨 Sent HR notification for envelope sent: {template_name} to {recipient_email}"
+        )
         return {"status": "HR notified"}
 
     except Exception as e:
@@ -543,12 +599,17 @@ def handle_envelope_sent(recipient_email, template_name):
 
 
 # ✅ Handles "recipient-completed" event
-def handle_recipient_completed(envelope_id, recipient_email,
-                               template_id, template_name):
+def handle_recipient_completed(
+    envelope_id, recipient_email, template_id, template_name
+):
     """Handles recipient completion events by saving the signed document."""
     try:
         # ✅ Fetch user
-        user = CustomUser.objects.filter(email=recipient_email).select_related("employer").first()
+        user = (
+            CustomUser.objects.filter(email=recipient_email)
+            .select_related("employer")
+            .first()
+        )
         print("user :", user)
         if not user:
             logger.error(f"❌ User with email {recipient_email} not found.")
@@ -566,21 +627,27 @@ def handle_recipient_completed(envelope_id, recipient_email,
                 envelope_id=envelope_id,
                 template_name=template_name,
                 user=user,
-                employer=employer
+                employer=employer,
             )
             logger.info(f"✅ Saved signed document: {processed_doc}")
         except IntegrityError as e:
             logger.error(f"❌ Error saving signed document: {str(e)}")
             return {"error": "Database integrity error"}
-        
+
         user_id = user.id
         employer_id = employer.id
 
-        fetch_and_upload_signed_documents.delay(envelope_id, user_id,
-                                                employer_id, template_name)
+        fetch_and_upload_signed_documents.delay(
+            envelope_id, user_id, employer_id, template_name
+        )
         # ✅ Notify HR via SMS (uses the correct Twilio API keys)
-        notify_hr.delay(template_name, user.get_full_name(), recipient_email,
-                        employer.id, event_type="completed")
+        notify_hr.delay(
+            template_name,
+            user.get_full_name(),
+            recipient_email,
+            employer.id,
+            event_type="completed",
+        )
 
         return {"status": "success", "document_id": processed_doc.id}
 
@@ -591,8 +658,7 @@ def handle_recipient_completed(envelope_id, recipient_email,
 
 # ✅ Sends SMS notifications to HR using the correct Twilio API keys
 @app.task(name="notify_hr_task")
-def notify_hr(template_name, full_name, recipient_email,
-              employer_id, event_type):
+def notify_hr(template_name, full_name, recipient_email, employer_id, event_type):
     try:
         employer = Employer.objects.get(id=employer_id)
         logger.info(f"🔹 Employer found: {employer.name}")
@@ -606,13 +672,14 @@ def notify_hr(template_name, full_name, recipient_email,
             logger.info(f"✅ Retrieved Twilio keys for employer {employer.name}")
 
         except TenantApiKeys.DoesNotExist:
-            logger.error(f"❌ No Twilio API keys found for employer {employer}. Skipping SMS.")
+            logger.error(
+                f"❌ No Twilio API keys found for employer {employer}. Skipping SMS."
+            )
             return
 
         # ✅ Fetch HR users for this employer
         hr_users = User.objects.filter(
-            Q(is_active=True) & Q(groups__name="dsign_sms"),
-            employer=employer
+            Q(is_active=True) & Q(groups__name="dsign_sms"), employer=employer
         ).values_list("phone_number", flat=True)
 
         if not hr_users:
@@ -621,17 +688,31 @@ def notify_hr(template_name, full_name, recipient_email,
 
         # ✅ Determine message based on event type
         if event_type == "sent":
-            message_body = f"DocuSign document '{template_name}' was sent to {recipient_email}"
+            message_body = (
+                f"DocuSign document '{template_name}' was sent to {recipient_email}"
+            )
         else:
-            message_body = f"{template_name} completed by: {full_name} at {recipient_email}"
+            message_body = (
+                f"{template_name} completed by: {full_name} at {recipient_email}"
+            )
 
         # ✅ Send SMS
-        success = send_bulk_sms(hr_users, message_body, twilio_account_sid, twilio_auth_token, twilio_notify_sid)
+        success = send_bulk_sms(
+            hr_users,
+            message_body,
+            twilio_account_sid,
+            twilio_auth_token,
+            twilio_notify_sid,
+        )
 
         if success:
-            logger.info(f"📨 SMS sent successfully for 'completed' status: {message_body}")
+            logger.info(
+                f"📨 SMS sent successfully for 'completed' status: {message_body}"
+            )
         else:
-            logger.error(f"❌ Failed to send SMS for 'completed' status: {message_body}")
+            logger.error(
+                f"❌ Failed to send SMS for 'completed' status: {message_body}"
+            )
 
     except Employer.DoesNotExist:
         logger.error(f"❌ Employer with ID {employer_id} not found.")
@@ -654,17 +735,23 @@ def handle_template_saved_task(template_id, user_email):
             employer = user.employer
 
             # ✅ Prevent duplicate template entries
-            if not DocuSignTemplate.objects.filter(template_id=template_id, employer=employer).exists():
+            if not DocuSignTemplate.objects.filter(
+                template_id=template_id, employer=employer
+            ).exists():
                 DocuSignTemplate.objects.create(
                     employer=employer,
                     template_id=template_id,
                     name=f"Template {template_id}",
-                    created_by=user
+                    created_by=user,
                 )
-                logger.info(f"✅ Template {template_id} saved for employer {employer.name}")
+                logger.info(
+                    f"✅ Template {template_id} saved for employer {employer.name}"
+                )
             else:
-                logger.info(f"ℹ️ Template {template_id} already exists for employer {employer.name}")
-        
+                logger.info(
+                    f"ℹ️ Template {template_id} already exists for employer {employer.name}"
+                )
+
         return {"status": "success"}
 
     except User.DoesNotExist:
@@ -673,7 +760,7 @@ def handle_template_saved_task(template_id, user_email):
     except Exception as e:
         logger.error(f"❌ Error processing templateSaved event: {str(e)}")
         return {"error": str(e)}
-    
+
 
 @app.task(name="upload_signed_document_to_linode")
 def upload_signed_document_to_linode(document_id):
@@ -692,13 +779,15 @@ def upload_signed_document_to_linode(document_id):
             document_bytes = BytesIO(response.content)
             upload_to_linode_object_storage(document_bytes, object_key)
         else:
-            logger.error(f"Failed to fetch document from DocuSign for envelope {document.envelope_id}. Status: {response.status_code}")
+            logger.error(
+                f"Failed to fetch document from DocuSign for envelope {document.envelope_id}. Status: {response.status_code}"
+            )
 
     except ProcessedDocsignDocument.DoesNotExist:
         logger.error(f"❌ Document {document_id} not found.")
 
 
-# ======================================================== 
+# ========================================================
 # end of webhook functions
 
 
@@ -711,13 +800,9 @@ def create_docusign_envelope_task(envelope_args):
         create_docusign_envelope(envelope_args)
 
         logger.info(
-            f"Docusign envelope New Hire File for {signer_name} "
-            "created successfully"
+            f"Docusign envelope New Hire File for {signer_name} created successfully"
         )
-        return (
-            f"Docusign envelope New Hire File for {signer_name} "
-            "created successfully"
-        )
+        return f"Docusign envelope New Hire File for {signer_name} created successfully"
 
     except Exception as e:
         logger.error(
@@ -736,22 +821,17 @@ def send_new_hire_quiz(envelope_args):
         create_docusign_envelope_new_hire_quiz(envelope_args)
         signer_name = envelope_args.get("signer_name")
         logger.info(
-            f"Docusign envelope New Hire Quiz for {signer_name} "
-            f"created successfully"
+            f"Docusign envelope New Hire Quiz for {signer_name} created successfully"
         )
 
-        return (
-            f"Docusign envelope New Hire Quiz for {signer_name} "
-            f"created successfully"
-        )
+        return f"Docusign envelope New Hire Quiz for {signer_name} created successfully"
     except Exception as e:
         logger.error(
             f"Error creating Docusign New Hire Quiz for {signer_name} "
             f"envelope: {str(e)}"
         )
         return (
-            f"Error creating Docusign New Hire Quiz for {signer_name}"
-            f"envelope: {str(e)}"
+            f"Error creating Docusign New Hire Quiz for {signer_name}envelope: {str(e)}"
         )
 
 
@@ -775,9 +855,7 @@ def fetch_and_upload_signed_documents(envelope_id, user_id, employer_id, templat
 
         # ✅ Get the path to the zip file
         zip_path = envelopes_api.get_document(
-            settings.DOCUSIGN_ACCOUNT_ID,
-            "archive",
-            envelope_id
+            settings.DOCUSIGN_ACCOUNT_ID, "archive", envelope_id
         )
 
         logger.warning(f"📦 Zip file obtained at: {zip_path}")
@@ -792,7 +870,9 @@ def fetch_and_upload_signed_documents(envelope_id, user_id, employer_id, templat
 
         zip_buffer = BytesIO(zip_bytes)
         folder_name = f"{uuid.uuid4().hex[:8]}"
-        upload_path_prefix = f"DOCUMENTS/{employer.name.replace(' ', '_')}/{folder_name}/"
+        upload_path_prefix = (
+            f"DOCUMENTS/{employer.name.replace(' ', '_')}/{folder_name}/"
+        )
 
         with zipfile.ZipFile(zip_buffer, "r") as zip_ref:
             for file_name in zip_ref.namelist():
@@ -815,3 +895,20 @@ def fetch_and_upload_signed_documents(envelope_id, user_id, employer_id, templat
 
     except Exception as e:
         logger.error(f"❌ Failed to fetch/upload signed DocuSign docs: {str(e)}")
+
+
+@app.task(name="validate_signature_tabs")
+def validate_template_signature_tabs_task(template_id):
+    template = DocuSignTemplate.objects.filter(template_id=template_id).first()
+    if not template:
+        return
+
+    is_valid, issues = validate_signature_roles(template_id)
+    template.is_ready_to_send = is_valid
+    template.save(update_fields=["is_ready_to_send"])
+
+    return {
+        "template_id": template_id,
+        "is_valid": is_valid,
+        "issues": issues,
+    }

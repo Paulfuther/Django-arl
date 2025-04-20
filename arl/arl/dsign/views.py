@@ -11,22 +11,26 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
-from docusign_esign import TemplatesApi
+from docusign_esign import ApiClient, ApiException, TemplatesApi
 
 from arl.bucket.helpers import upload_to_linode_object_storage
 from arl.dsign.helpers import (
-    create_api_client,
     create_docusign_document,
     get_access_token,
     get_docusign_envelope,
     get_docusign_template_name_from_template,
 )
-from arl.dsign.tasks import get_outstanding_docs, list_all_docusign_envelopes_task
+from arl.dsign.tasks import (get_outstanding_docs,
+                             list_all_docusign_envelopes_task)
 
 from .forms import MultiSignedDocUploadForm, NameEmailForm
 from .helpers import get_docusign_edit_url
 from .models import DocuSignTemplate, SignedDocumentFile
-from .tasks import create_docusign_envelope_task, process_docusign_webhook
+from .tasks import (
+    create_docusign_envelope_task,
+    process_docusign_webhook,
+    validate_template_signature_tabs_task,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -214,71 +218,128 @@ def edit_document_page(request, template_id):
         and "chrome" not in user_agent
         and "chromium" not in user_agent
     )
+    template = DocuSignTemplate.objects.filter(template_id=template_id).first()
 
     if is_safari:
-        return redirect(edit_url)  # Open DocuSign editor in a new tab for Safari
+        # ✅ Show UI first, then redirect to DocuSign editor
+        return render(
+            request,
+            "dsign/dsign_redirect.html",
+            {
+                "edit_url": edit_url,
+                "template": template,
+            },
+        )
 
-    return render(request, "dsign/dsign_embed.html", {"edit_url": edit_url})
+    return render(
+        request,
+        "dsign/dsign_embed.html",
+        {
+            "edit_url": edit_url,
+            "template": template,
+        },
+    )
 
 
 def check_docusign_template_ready(template_id):
     access_token = get_access_token().access_token
     base_path = settings.DOCUSIGN_BASE_PATH
     account_id = settings.DOCUSIGN_ACCOUNT_ID
-    api_client = create_api_client(base_path, access_token)
+    api_client = ApiClient()
+    api_client.host = base_path
+    api_client.set_default_header("Authorization", f"Bearer {access_token}")
+
     templates_api = TemplatesApi(api_client)
 
-    template = templates_api.get(account_id, template_id)
+    try:
+        template = templates_api.get(account_id, template_id)
 
-    has_docs = len(template.documents) > 0
-    has_recipients = bool(template.recipients and template.recipients.signers)
-    has_subject = bool(template.email_subject and template.email_subject.strip())
+        # ✅ Basic checks
+        has_docs = bool(template.documents)
+        has_subject = bool(template.email_subject and template.email_subject.strip())
+        has_signers = bool(template.recipients and template.recipients.signers)
 
-    print(
-        f"📄 Docs: {has_docs}, 👤 Recipients: {has_recipients}, ✉️ Subject: {has_subject}"
-    )
+        if not (has_docs and has_subject and has_signers):
+            print("❌ Missing docs, subject, or signers.")
+            return False
 
-    return has_docs and has_recipients and has_subject
+        gsa_signed = False
+
+        for signer in template.recipients.signers:
+            role = signer.role_name
+            # We don’t call .list_tabs anymore because that API doesn't work for templates
+            has_tabs = (
+                hasattr(signer, "tabs")
+                and signer.tabs
+                and (
+                    getattr(signer.tabs, "sign_here_tabs", None)
+                    or getattr(signer.tabs, "signHereTabs", None)
+                )
+            )
+
+            print(f"🔍 {role} tabs: {signer.tabs}")
+
+            if has_tabs:
+                print(f"✅ {role} appears to have SignHere tabs.")
+                if role == "GSA":
+                    gsa_signed = True
+            else:
+                print(f"❌ {role} has no apparent tabs assigned.")
+
+        if not gsa_signed:
+            print("❌ GSA role is missing required signature tab.")
+            return False
+
+        return True
+
+    except ApiException as e:
+        print(f"❌ Error retrieving template: {e}")
+        return False
 
 
-def update_template_readiness(template):
-    is_ready = all(
+def update_template_readiness(template, validation_passed: bool):
+    """
+    Updates the template readiness flag based on validation outcome.
+
+    Args:
+        template (DocuSignTemplate): the template to update
+        validation_passed (bool): result from validate_signature_roles
+    """
+    # Ensure required fields are present
+    required_fields_present = all(
         [
-            template.document_file,  # Must be uploaded
-            template.signer_role,  # Must be set
-            template.subject,  # Must be set
-            template.has_tabs_set,  # Optional: if you track that tabs were added
+            template.template_name,
+            template.template_id,
+            template.signer_role,  # This should be 'GSA'
         ]
     )
-    template.is_ready_to_send = is_ready
+
+    template.is_ready_to_send = required_fields_present and validation_passed
     template.save(update_fields=["is_ready_to_send"])
 
 
 def docusign_close(request):
     template_id = request.GET.get("template_id")
+    template = None
+    status = "validating"
+
     if template_id:
-        # ✅ Mark the template as ready to send
-        try:
-            template = DocuSignTemplate.objects.get(template_id=template_id)
+        template = DocuSignTemplate.objects.filter(template_id=template_id).first()
 
-            if check_docusign_template_ready(template_id):
-                template.is_ready_to_send = True
-                template.save(update_fields=["is_ready_to_send"])
-                messages.success(
-                    request, f"✅ '{template.template_name}' is ready to send!"
-                )
-            else:
-                template.is_ready_to_send = False
-                template.save(update_fields=["is_ready_to_send"])
-                messages.warning(
-                    request,
-                    f"⚠️ '{template.template_name}' is still incomplete. Please finish setup.",
-                )
+        if template:
+            # Kick off validation in background
+            validate_template_signature_tabs_task.delay(template_id)
+        else:
+            status = "notfound"
 
-        except DocuSignTemplate.DoesNotExist:
-            messages.warning(request, "Template not found to update.")
-
-    return redirect("hr_dashboard")
+    return render(
+        request,
+        "dsign/template_edit_success.html",
+        {
+            "template": template,
+            "status": status,
+        },
+    )
 
 
 @login_required

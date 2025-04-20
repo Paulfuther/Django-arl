@@ -1,0 +1,49 @@
+{% extends "../base/base.html" %}
+{% load static %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+
+<style>
+    .container-fluid {
+    padding-top: 100px; /* keeps content below fixed navbar */
+  }
+</style>
+
+
+<div class="container text-center mt-5">
+    {% if status == "validating" %}
+      <h3>✅ Template Saved — Validating…</h3>
+      <div class="spinner-border text-primary mt-3" role="status"></div>
+      <p class="text-muted mt-3">Hang tight — this will update automatically.</p>
+  
+      <script>
+        // Auto-redirect if not in iframe
+        if (window.top === window.self) {
+          setTimeout(() => {
+            window.location.href = "{% url 'hr_dashboard' %}?tab=docusign";
+          }, 5000);
+        } else {
+          // Show a manual exit button
+          document.write(`
+            <div class="alert alert-info mt-4">
+              <strong>✅ Saved!</strong> You may now close this tab or return to your dashboard.
+            </div>
+          `);
+        }
+      </script>
+  
+    {% elif status == "ready" %}
+      <div class="alert alert-success">✅ Template is ready to send!</div>
+      <a href="{% url 'hr_dashboard' %}?tab=docusign" class="btn btn-primary mt-3">Back to Dashboard</a>
+  
+    {% elif status == "incomplete" %}
+      <div class="alert alert-warning">⚠️ Some required fields are missing.</div>
+      <a href="{% url 'hr_dashboard' %}?tab=docusign" class="btn btn-warning mt-3">Back to Dashboard</a>
+  
+    {% else %}
+      <div class="alert alert-danger">❌ Something went wrong.</div>
+      <a href="{% url 'hr_dashboard' %}?tab=docusign" class="btn btn-danger mt-3">Back to Dashboard</a>
+    {% endif %}
+  </div>
+  {% endblock %}
