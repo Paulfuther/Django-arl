@@ -1,5 +1,5 @@
 from collections import defaultdict
-
+from django.forms import RadioSelect
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
@@ -30,7 +30,7 @@ class SMSForm(forms.Form):
         queryset=Group.objects.none(),  # Set dynamically in __init__
         required=True,
         label="Select Group to Send SMS",
-        widget=forms.Select(attrs={"class": "custom-input"}),
+        widget=RadioSelect,
     )
 
     def __init__(self, *args, **kwargs):
@@ -42,8 +42,6 @@ class SMSForm(forms.Form):
             self.fields["selected_group"].queryset = Group.objects.filter(
                 user__employer=employer
             ).distinct()
-
-        self.fields["selected_group"].empty_label = "Select a group..."
 
     def clean_message(self):
         message = self.cleaned_data.get("message", "").strip()

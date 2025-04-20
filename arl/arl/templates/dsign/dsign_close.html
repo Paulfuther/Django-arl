@@ -1,0 +1,15 @@
+{% extends "../base/base.html" %}
+{% block content %}
+<script>
+  // Force redirect out of iframe
+  if (window.top !== window.self) {
+    window.top.location.href = "{{ redirect_url }}";
+  } else {
+    window.location.href = "{{ redirect_url }}";
+  }
+</script>
+
+<div class="container text-center mt-5">
+  <p class="text-muted">Redirecting you back to the dashboard…</p>
+</div>
+{% endblock %}

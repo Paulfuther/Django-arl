@@ -1,90 +1,96 @@
 {% extends "../base/base.html" %}
-{% block template %}
 {% load static %}
-{% include "../base/navbar.html" %}
+
 {% load crispy_forms_tags %}
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit DocuSign Template</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #f8f9fa;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
+{% block template %}
+{% include "../base/navbar.html" %}
+<style>
+  .container-fluid {
+    padding-top: 100px; /* keeps content below fixed navbar */
+  }
 
-        .editor-container {
-            width: 85vw;
-            height: 85vh;
-            background: white;
-            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
-            padding: 20px;
-            border-radius: 8px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            margin-top: 20px;
-        }
+  .embed-responsive {
+    height: 85vh;
+  }
 
-        iframe {
-            width: 100%;
-            height: 100%;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-        }
+  iframe {
+    border-radius: 8px;
+    border: 1px solid #ccc;
+  }
 
-        .header {
-            font-size: 20px;
-            font-weight: bold;
-            text-align: center;
-            margin-bottom: 10px;
-            color: #343a40;
-        }
+  .col-md-3, .col-md-9 {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
 
-        .fallback-message {
-            text-align: center;
-            color: red;
-            margin-top: 15px;
-        }
+  @media (max-width: 768px) {
+    .container-fluid {
+      padding-top: 80px;
+    }
 
-        @media screen and (max-width: 768px) {
-            .editor-container { width: 90vw; height: 75vh; padding: 10px; margin-top: 10px; }
-            .header { font-size: 18px; margin-bottom: 5px; }
-        }
+    .embed-responsive {
+      height: 70vh;
+    }
+  }
+</style>
 
-        @media screen and (max-width: 480px) {
-            .editor-container { width: 95vw; height: 70vh; padding: 5px; }
-            .header { font-size: 16px; margin-bottom: 5px; }
-        }
+<div class="container-fluid">
+  <div class="row">
+    <!-- Sidebar -->
+    <div class="col-md-3 border-end">
+        <h5 class="mb-2">{{ template.template_name|default:"DocuSign Template" }}</h5>
+      
+        {% if template.is_new_hire_template %}
+          <span class="badge bg-success mb-2">Auto-sends to New Hires</span>
+        {% else %}
+          <span class="badge bg-secondary mb-2">Manual Use Only</span>
+        {% endif %}
+      
+        <p class="small text-muted mb-3">You're editing a reusable template used for document signing workflows.</p>
+      
+        {% if template.is_ready_to_send %}
+          <div class="alert alert-success small py-2 px-3">
+            ✅ This template is ready to send.
+          </div>
+          <div class="alert alert-info small mt-3">
+            <strong>Quick Setup Guide:</strong>
+            <ol class="mb-0 ps-3 small">
+              <li>Click <strong>+ Fields</strong> in the top menu.</li>
+              <li>Drag fields like <em>Sign Here</em>, <em>Date Signed</em>, etc.</li>
+              <li>Assign each field to a <strong>role</strong> (e.g. Manager, GSA).</li>
+              <li>Click <strong>Save and Close</strong> to return to your dashboard.</li>
+            </ol>
+          </div>
+        {% else %}
+          <div class="alert alert-warning small py-2 px-3">
+            ⚠️ This template is incomplete — add required fields before sending.
+          </div>
+        {% endif %}
+      
+        <div class="alert alert-warning small mt-3">
+          <strong>Note:</strong> Safari users or local environments may open the editor in a new tab.
+        </div>
+      
+        <a href="{% url 'hr_dashboard' %}" class="btn btn-outline-secondary btn-sm w-100 mt-3">← Back to Dashboard</a>
+      </div>
 
-        @media screen and (max-width: 360px) {
-            .editor-container { width: 98vw; height: 65vh; padding: 4px; }
-            .header { font-size: 14px; margin-bottom: 3px; }
-        }
-    </style>
-</head>
-<body>
-    <div class="editor-container">
-        <div class="header">DocuSign Editor</div>
+    <!-- Main Editor -->
+    <div class="col-md-9">
+      <div class="alert alert-info mb-3">
+        <strong>Reminder:</strong> Add fields like "sign here", then click <em>Save and Close</em> inside DocuSign when done.
+      </div>
 
-        {% if edit_url %}
-        <iframe 
-            src="{{ edit_url }}" 
-            allow="fullscreen; camera; microphone; geolocation" 
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
-        ></iframe>
-    {% else %}
-        <h3>Error: {{ error }}</h3>
-    {% endif %}
+      <div class="embed-responsive">
+        <iframe
+          src="{{ edit_url }}"
+          width="100%"
+          height="100%"
+          allowfullscreen>
+        </iframe>
+      </div>
     </div>
-</body>
-</html>
+  </div>
+</div>
+
 {% endblock %}

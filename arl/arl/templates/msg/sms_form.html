@@ -1,18 +1,102 @@
 
 {% load crispy_forms_tags %}
+<style>
+  .dropdown-box {
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 0;
+    overflow: hidden;
+    background-color: #fff;
+    max-height: 0;
+    transition: max-height 0.3s ease;
+  }
 
-{% if messages %}
-  {% for message in messages %}
-    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-      {{ message }}
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-  {% endfor %}
-{% endif %}
+  .dropdown-box.open {
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .dropdown-option {
+    padding: 10px 15px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    align-items: center;
+  }
+
+  .dropdown-option:last-child {
+    border-bottom: none;
+  }
+
+  .dropdown-option input[type="radio"] {
+    margin-right: 10px;
+  }
+
+  .dropdown-toggle-btn {
+    background-color: #f8f9fa;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 10px 12px;
+    width: 100%;
+    text-align: left;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .dropdown-toggle-btn:after {
+    content: "▼";
+    float: right;
+    transition: transform 0.3s ease;
+  }
+
+  .dropdown-toggle-btn.open:after {
+    transform: rotate(180deg);
+  }
+
+  @media (max-width: 768px) {
+    .dropdown-box.open {
+      max-height: 200px;
+    }
+  }
+</style>
+
 <form method="post">
   {% csrf_token %}
   <input type="hidden" name="form_type" value="sms">
-  {{ sms_form|crispy }}
-  <button type="submit" class="btn btn-outline-primary mobile-btn mt-3">Send</button>
+
+  {{ sms_form.message|as_crispy_field }}
+
+  <label class="form-label">Select Group</label>
+  <button type="button" id="toggleGroups" class="dropdown-toggle-btn">Choose Group</button>
+
+  <div id="groupBox" class="dropdown-box">
+    {% for radio in sms_form.selected_group %}
+      <div class="dropdown-option">
+        {{ radio.tag }} {{ radio.choice_label }}
+      </div>
+    {% endfor %}
+  </div>
+
+  <button type="submit" class="btn btn-outline-primary mobile-btn mt-3">Send SMS</button>
 </form>
 
+<script>
+  const toggleGroupBtn = document.getElementById("toggleGroups");
+  const groupBox = document.getElementById("groupBox");
+
+  toggleGroupBtn.addEventListener("click", function () {
+    groupBox.classList.toggle("open");
+    toggleGroupBtn.classList.toggle("open");
+  });
+
+  // Update toggle button with selected group label
+  document.querySelectorAll("#groupBox input[type=radio]").forEach(radio => {
+    radio.addEventListener("change", () => {
+      const label = radio.closest(".dropdown-option").textContent.trim();
+      if (label) {
+        toggleGroupBtn.textContent = label;
+      }
+      groupBox.classList.remove("open");
+      toggleGroupBtn.classList.remove("open");
+    });
+  });
+</script>

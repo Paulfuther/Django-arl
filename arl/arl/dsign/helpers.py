@@ -20,6 +20,7 @@ from docusign_esign import (
     TemplatesApi,
 )
 from docusign_esign.client.api_exception import ApiException
+from docusign_esign.models.envelope import Envelope
 
 from arl.bucket.helpers import upload_to_linode_object_storage
 from arl.dbox.helpers import upload_to_dropbox, upload_to_dropbox_quiz
@@ -761,3 +762,76 @@ def check_docusign_template_readiness(template_id, employer):
     except Exception as e:
         print(f"⚠️ Error checking template readiness: {e}")
         return False
+
+
+def validate_signature_roles(template_id):
+    access_token = get_access_token().access_token
+    base_path = settings.DOCUSIGN_BASE_PATH
+    account_id = settings.DOCUSIGN_ACCOUNT_ID
+
+    api_client = ApiClient()
+    api_client.host = base_path
+    api_client.set_default_header("Authorization", f"Bearer {access_token}")
+    templates_api = TemplatesApi(api_client)
+    envelopes_api = EnvelopesApi(api_client)
+
+    try:
+        # ✅ Step 1: Get all signer roles defined in the template
+        template = templates_api.get(account_id, template_id)
+        signer_roles = [r.role_name for r in template.recipients.signers]
+        print("📄 Roles in template:", signer_roles)
+
+        # ✅ Step 2: Create template roles dynamically
+        template_roles = [
+            TemplateRole(
+                role_name=role,
+                name=f"Test {role}",
+                email=f"{role.lower()}@example.com",
+                client_user_id=f"{role.lower()}-123",
+            )
+            for role in signer_roles
+        ]
+
+        # ✅ Step 3: Create envelope for validation
+        envelope_definition = EnvelopeDefinition(
+            status="created",
+            template_id=template_id,
+            template_roles=template_roles,
+            email_subject="Template Validation",
+        )
+
+        envelope_summary = envelopes_api.create_envelope(
+            account_id, envelope_definition=envelope_definition
+        )
+        envelope_id = envelope_summary.envelope_id
+        print(f"✅ Created Envelope: {envelope_id}")
+
+        recipients = envelopes_api.list_recipients(account_id, envelope_id)
+        recipient_roles = [r.role_name for r in recipients.signers]
+        print("📬 Recipients returned:", recipient_roles)
+
+        # ✅ Step 4: Check for tabs
+        missing_roles = []
+        for signer in recipients.signers:
+            tabs = envelopes_api.list_tabs(account_id, envelope_id, signer.recipient_id)
+            if not tabs.sign_here_tabs:
+                print(f"❌ Role {signer.role_name} has no Sign Here tabs.")
+                missing_roles.append(signer.role_name)
+            else:
+                print(
+                    f"✅ Role {signer.role_name} has {len(tabs.sign_here_tabs)} Sign Here tab(s)."
+                )
+
+        # 🧹 Cleanup
+        envelopes_api.update(
+            account_id,
+            envelope_id,
+            envelope=Envelope(status="voided", voided_reason="Validation test"),
+        )
+        print("🧹 Envelope voided after validation.")
+
+        return len(missing_roles) == 0, missing_roles
+
+    except ApiException as e:
+        print(f"❌ Error during validation: {e}")
+        return False, ["error"]

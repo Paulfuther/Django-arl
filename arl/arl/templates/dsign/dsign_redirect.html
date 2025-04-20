@@ -1,0 +1,117 @@
+{% extends "../base/base.html" %}
+{% load static %}
+{% block template %}
+{% include "../base/navbar.html" %}
+
+<style>
+  .container-fluid {
+    padding-top: 100px;
+  }
+
+  .col-sidebar {
+    padding: 32px 24px;
+    background-color: #fff;
+    border-right: 1px solid #ddd;
+    min-height: 100%;
+  }
+
+  .col-content {
+    padding: 32px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f9f9f9;
+    min-height: 400px;
+  }
+
+  .launch-box {
+    max-width: 500px;
+    width: 100%;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    padding: 24px;
+    text-align: center;
+  }
+
+  .launch-box h5 {
+    font-size: 1.1rem;
+    margin-bottom: 16px;
+  }
+
+  .role-list {
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+  }
+
+  @media (max-width: 768px) {
+    .container-fluid {
+      padding-top: 80px;
+    }
+
+    .col-sidebar {
+      border-right: none;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .col-content {
+      padding-top: 20px;
+    }
+  }
+</style>
+
+<div class="container-fluid">
+  <div class="row">
+    <!-- Sidebar -->
+    <div class="col-md-4 col-sidebar">
+      <h5 class="mb-2">{{ template.template_name|default:"DocuSign Template" }}</h5>
+
+      {% if template.is_new_hire_template %}
+        <span class="badge bg-success mb-2">Auto-sends to New Hires</span>
+      {% else %}
+        <span class="badge bg-secondary mb-2">Manual Use Only</span>
+      {% endif %}
+
+      <div class="small text-muted mt-2">
+        <strong>Template ID:</strong> {{ template.template_id }}
+      </div>
+
+      <div class="alert alert-info small mt-3">
+        <strong>Instructions:</strong>
+        <ol class="ps-3 mb-0">
+          <li>Click <strong>+ Fields</strong></li>
+          <li>Drag in sign/date/initial blocks</li>
+          <li>Assign each field to a role</li>
+          <li>Click <strong>Save and Close</strong></li>
+        </ol>
+      </div>
+
+      <div class="mt-3 small">
+        <strong>Roles used in this template:</strong>
+        <ul class="role-list ps-3">
+          <li>Manager</li>
+          <li>GSA</li>
+        </ul>
+      </div>
+
+      <a href="{% url 'hr_dashboard' %}" class="btn btn-outline-secondary btn-sm mt-4 w-100">
+        ← Back to Dashboard
+      </a>
+    </div>
+
+    <!-- Launch editor column -->
+    <div class="col-md-8 col-content">
+      <div class="launch-box">
+        <h5>Launch the DocuSign Editor</h5>
+        <p class="mb-3">This will open in a new tab so you can edit fields, assign roles, and save changes.</p>
+
+        <a href="{{ edit_url }}" target="_blank" class="btn btn-primary w-100">
+          🚀 Open Editor
+        </a>
+
+        <p class="text-muted small mt-3 mb-0">Having trouble? Make sure pop-ups are allowed.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
