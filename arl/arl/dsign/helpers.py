@@ -813,14 +813,19 @@ def validate_signature_roles(template_id):
         # ✅ Step 4: Check for tabs
         missing_roles = []
         for signer in recipients.signers:
-            tabs = envelopes_api.list_tabs(account_id, envelope_id, signer.recipient_id)
-            if not tabs.sign_here_tabs:
-                print(f"❌ Role {signer.role_name} has no Sign Here tabs.")
+            try:
+                tabs = envelopes_api.list_tabs(account_id, envelope_id, signer.recipient_id)
+
+                sign_here_tabs = getattr(tabs, "sign_here_tabs", [])
+                if not sign_here_tabs:
+                    print(f"❌ Role {signer.role_name} has no Sign Here tabs.")
+                    missing_roles.append(signer.role_name)
+                else:
+                    print(f"✅ Role {signer.role_name} has {len(sign_here_tabs)} Sign Here tab(s).")
+
+            except Exception as e:
+                print(f"❌ Error checking tabs for role {signer.role_name}: {e}")
                 missing_roles.append(signer.role_name)
-            else:
-                print(
-                    f"✅ Role {signer.role_name} has {len(tabs.sign_here_tabs)} Sign Here tab(s)."
-                )
 
         # 🧹 Cleanup
         envelopes_api.update(
