@@ -4,7 +4,7 @@ import uuid
 import zipfile
 from datetime import datetime, timedelta
 from io import BytesIO
-
+import time
 import requests
 from django.conf import settings
 from django.db.models import Q
@@ -809,19 +809,35 @@ def validate_signature_roles(template_id):
         recipients = envelopes_api.list_recipients(account_id, envelope_id)
         recipient_roles = [r.role_name for r in recipients.signers]
         print("📬 Recipients returned:", recipient_roles)
-
+        print("New Block :")
         # ✅ Step 4: Check for tabs
         missing_roles = []
+
         for signer in recipients.signers:
             try:
-                tabs = envelopes_api.list_tabs(account_id, envelope_id, signer.recipient_id)
+                # Use raw request to bypass SDK deserialization issues
+                tab_path = f"/v2.1/accounts/{account_id}/envelopes/{envelope_id}/recipients/{signer.recipient_id}/tabs"
+                full_url = f"{base_path}{tab_path}"
+                headers = {
+                    "Authorization": f"Bearer {access_token}",
+                    "Accept": "application/json"
+                }
 
-                sign_here_tabs = getattr(tabs, "sign_here_tabs", [])
-                if not sign_here_tabs:
+                response = api_client.rest_client.GET(full_url, headers=headers)
+
+                # ✅ Parse raw HTTP response body
+                response_data = json.loads(response.data.decode("utf-8"))
+                print("📦 Raw tabs for", signer.role_name, ":", response_data)
+
+                sign_tabs = response_data.get("signHereTabs", [])
+
+                if not sign_tabs:
                     print(f"❌ Role {signer.role_name} has no Sign Here tabs.")
                     missing_roles.append(signer.role_name)
                 else:
-                    print(f"✅ Role {signer.role_name} has {len(sign_here_tabs)} Sign Here tab(s).")
+                    print(f"✅ Role {signer.role_name} has {len(sign_tabs)} Sign Here tab(s).")
+
+                print(f"🔍 Tab types for {signer.role_name}: {list(response_data.keys())}")
 
             except Exception as e:
                 print(f"❌ Error checking tabs for role {signer.role_name}: {e}")
