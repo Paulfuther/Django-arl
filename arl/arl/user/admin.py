@@ -1,6 +1,5 @@
 import uuid
 from datetime import datetime
-
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.admin import SimpleListFilter
@@ -12,7 +11,7 @@ from django.utils.html import format_html, strip_tags
 from import_export import fields, resources
 from import_export import fields as export_fields
 from import_export.admin import ExportActionMixin
-
+from django_celery_results.admin import TaskResultAdmin as DefaultTaskResultAdmin
 from arl.bucket.helpers import upload_to_linode_object_storage
 from arl.carwash.models import CarwashStatus
 from arl.dsign.models import (
@@ -29,7 +28,6 @@ from arl.msg.models import (
     WhatsAppTemplate,
 )
 from arl.msg.tasks import EmployerSMSTask
-
 # from arl.payroll.models import CalendarEvent, PayPeriod, StatutoryHoliday
 from arl.quiz.models import Answer, Question, Quiz, SaltLog
 from arl.setup.models import StripePayment, StripePlan, TenantApiKeys
@@ -398,75 +396,27 @@ class QuestionAdmin(admin.ModelAdmin):
     display_answers.short_description = "Answers"
 
 
-class TaskResultAdmin(admin.ModelAdmin):
+class CustomTaskResultAdmin(DefaultTaskResultAdmin):
     list_display = (
         "task_id",
         "task_name",
+        "periodic_task_name",
         "status",
+        "short_result",
         "date_done",
         "worker",
-        "short_result",
-        "created_datetime",
-        "completed_datetime",
     )
-    readonly_fields = (
-        "task_id",
-        "task_name",
-        "status",
-        "worker",
-        "result_content_type",
-        "result_encoding",
-        "result",
-        "parameters",
-        "traceback",
-        "meta",
-        "created_datetime",
-        "completed_datetime",
-    )
-    list_filter = ("status", "date_done")
-    search_fields = ("task_id", "task_name")
+
+    search_fields = ("task_id", "task_name", "periodic_task_name")
+    list_filter = ("status", "task_name", "periodic_task_name")  # ✅ Add filtering
 
     def short_result(self, obj):
-        """Shorten the result for list view."""
         if obj.result:
-            return (
-                str(obj.result)[:75] + "..."
-                if len(str(obj.result)) > 75
-                else obj.result
-            )
+            return str(obj.result)[:75] + "..." if len(str(obj.result)) > 75 else obj.result
         return "No result"
-
     short_result.short_description = "Result (short)"
 
-    def created_datetime(self, obj):
-        """Convert created datetime to local timezone for better readability."""
-        return self._format_datetime(obj.date_created)
 
-    created_datetime.short_description = "Created DateTime"
-
-    def completed_datetime(self, obj):
-        """Convert completed datetime to local timezone for better readability."""
-        return self._format_datetime(obj.date_done)
-
-    completed_datetime.short_description = "Completed DateTime"
-
-    def _format_datetime(self, value):
-        if value:
-            # Customize this to match your timezone setup
-            return datetime.strftime(value, "%b. %d, %Y, %I:%M %p")
-        return "N/A"
-
-    def parameters(self, obj):
-        """Display formatted parameters for better readability."""
-        args = obj.task_args or "-"
-        kwargs = obj.task_kwargs or "-"
-        return format_html(
-            "<strong>Positional Arguments:</strong> {}<br><strong>Named Arguments:</strong> {}",
-            args,
-            kwargs,
-        )
-
-    parameters.short_description = "Task Parameters"
 
 
 @admin.register(DocumentType)
@@ -892,3 +842,4 @@ admin.site.register(Answer)
 admin.site.register(Question, QuestionAdmin)
 admin.site.register(ExternalRecipient, ExternalRecipientAdmin)
 admin.site.register(SMSOptOut, SMSOptOutAdmin)
+
