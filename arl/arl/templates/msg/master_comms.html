@@ -29,6 +29,11 @@
       <a class="nav-link {% if active_tab == 'docusign' %}active{% endif %}" data-bs-toggle="tab" href="#docusign">DSign</a>
     </li>
     {% endif %}
+    <li class="nav-item">
+      <a class="nav-link {% if active_tab == 'docusign' %}active{% endif %}" data-bs-toggle="tab" href="#whatsapp">DSign</a>
+    </li>
+    
+   
   </ul>
 
   <!-- Tab Content -->
@@ -43,6 +48,10 @@
 
     <div id="docusign" class="tab-pane fade {% if active_tab == 'docusign' %}show active{% endif %}">
       {% include "dsign/name_email_form.html" %}
+    </div>
+
+    <div id="whatsapp" class="tab-pane fade {% if active_tab == 'docusign' %}show active{% endif %}">
+      {% include "msg/whatsapp_form.html" %}
     </div>
   </div>
 </div>

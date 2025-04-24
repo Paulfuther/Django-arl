@@ -3,7 +3,7 @@ from __future__ import absolute_import, unicode_literals
 import csv
 import os
 from datetime import datetime, timedelta
-
+from django_celery_results.models import TaskResult
 import pandas as pd
 from celery.utils.log import get_task_logger
 from django.conf import settings
@@ -13,7 +13,7 @@ from django.db import connection
 from django.db.models import F, Func, IntegerField, OuterRef, Subquery
 from django.utils import timezone
 from twilio.rest import Client
-
+from celery import Task
 from arl.celery import app
 from arl.msg.models import EmailEvent, EmailLog, EmailTemplate, Message, SmsLog
 from arl.setup.models import TenantApiKeys
@@ -128,8 +128,20 @@ def master_email_send_task(recipients, sendgrid_id, attachments=None, employer_i
 # This task takes employers who want the tobacco sms and
 # logs them and their users when sent.
 # The logs are in the SmsLogs model
-@app.task(name="tobacco_compliance_sms_with_download_link")
-def send_bulk_tobacco_sms_link():
+class TrackPeriodicNameTask(Task):
+    def on_success(self, retval, task_id, args, kwargs):
+        TaskResult.objects.filter(task_id=task_id).update(
+            periodic_task_name="Tobacco Compliance SMS"
+        )
+        super().on_success(retval, task_id, args, kwargs)
+
+
+@app.task(name="tobacco_compliance_sms_with_download_link",
+          bind=True,
+          base=TrackPeriodicNameTask,
+          track_started=True,
+          ignore_result=False,)
+def send_bulk_tobacco_sms_link(self, *args, **kwargs):
     try:
         # Get Employers who have this SMS enabled
         enabled_employers = EmployerSMSTask.objects.filter(
@@ -166,6 +178,9 @@ def send_bulk_tobacco_sms_link():
             "Please review: "
             f"{pdf_url}. "
         )
+
+        # Added
+        results_summary = []
 
         # ✅ Process each employer separately to ensure correct Twilio credentials
         for employer_id in enabled_employers:
@@ -211,19 +226,37 @@ def send_bulk_tobacco_sms_link():
                 log_message = f"📢 Bulk Tobacco SMS sent successfully to {len(phone_numbers)} users for employer: {employer.name}"
                 logger.info(log_message)
                 SmsLog.objects.create(level="INFO", message=log_message)
+                results_summary.append(f"✅ {log_message}")
+
+                if not results_summary:
+                    results_summary.append("ℹ️ Task ran successfully but no per-employer messages were recorded.")
 
             except Exception as e:
                 # ✅ Log error per employer
                 error_message = f"🚨 SMS Task Failed for {employer.name}: {str(e)}"
                 logger.error(error_message)
                 SmsLog.objects.create(level="ERROR", message=error_message)
+                results_summary.append(error_message)
+
+            # ✅ Set `periodic_task_name` in the results DB
+        TaskResult.objects.filter(task_id=self.request.id).update(
+            periodic_task_name="Tobacco Compliance SMS"
+        )
+
+        # ✅ Return clean result summary
+        return {
+            "summary": results_summary,
+            "total_employers": len(enabled_employers),
+            "successful": [msg for msg in results_summary if msg.startswith("✅")],
+            "errors": [msg for msg in results_summary if msg.startswith("🚨")],
+        }
 
     except Exception as e:
-        # ✅ Log critical failure
-        logger.error(f"🚨 Critical error in SMS task: {str(e)}")
-        SmsLog.objects.create(
-            level="ERROR", message=f"Critical SMS Task Failure: {str(e)}"
-        )
+        critical_msg = f"🔥 CRITICAL error in task: {str(e)}"
+        logger.critical(critical_msg)
+        SmsLog.objects.create(level="CRITICAL", message=critical_msg)
+        return {"error": critical_msg}
+
 
 
 # This is the old tobacco SMS. It has NOT been approved

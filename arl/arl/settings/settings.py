@@ -224,7 +224,8 @@ AUTH_USER_MODEL = "user.CustomUser"
 CRISPY_TEMPLATE_PACK = "bootstrap4"
 
 CELERY_RESULT_BACKEND = "django-db"
-
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_SERIALIZER = 'json'
 
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
@@ -314,7 +315,7 @@ STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
 # STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
 
 # BASE URL DEV
-BASE_URL = "https://56e2-2607-fea8-2840-b200-870-354c-6aad-1d2f.ngrok-free.app"
+BASE_URL = "https://5f0a-2607-fea8-2840-b200-9cda-d156-dea0-5d5a.ngrok-free.app"
 SITE_URL = BASE_URL
 OWNER_EMAIL = os.environ.get("OWNER_EMAIL")
 ADMIN_PHONE_NUMBER = os.environ.get("ADMIN_PHONE_NUMBER")
