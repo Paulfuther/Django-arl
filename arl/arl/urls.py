@@ -20,6 +20,7 @@ urlpatterns = [
     path("", include("arl.carwash.urls")),
     path("", include("arl.setup.urls")),
     path("", include("arl.helpdesk.urls"))
+    
 ]
 
 

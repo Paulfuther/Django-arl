@@ -599,62 +599,94 @@ def handle_envelope_sent(recipient_email, template_name):
 
 
 # ✅ Handles "recipient-completed" event
-def handle_recipient_completed(
-    envelope_id, recipient_email, template_id, template_name
-):
+def handle_recipient_completed(envelope_id, recipient_email, template_id, template_name):
     """Handles recipient completion events by saving the signed document."""
     try:
-        # ✅ Fetch user
+        # ✅ Fetch the template first
+        template = DocuSignTemplate.objects.filter(template_id=template_id).first()
+        if not template:
+            logger.error(f"❌ DocuSignTemplate with ID {template_id} not found.")
+            return {"error": "Template not found"}
+
+        employer = template.employer
         user = (
             CustomUser.objects.filter(email=recipient_email)
             .select_related("employer")
             .first()
         )
-        print("user :", user)
-        if not user:
-            logger.error(f"❌ User with email {recipient_email} not found.")
-            return {"error": "User not found"}
 
-        # ✅ Ensure employer exists
-        employer = user.employer
-        if not employer:
-            logger.error(f"❌ Employer not found for user {user.email}.")
-            return {"error": "Employer not found"}
+        if template.is_company_document:
+            # 🏢 This is a COMPANY DOCUMENT
+            try:
+                processed_doc = ProcessedDocsignDocument.objects.create(
+                    envelope_id=envelope_id,
+                    template_name=template_name,
+                    user=user,
+                    employer=employer,
+                    is_company_document=True,  # ✅ (if you add this field later)
+                )
+                logger.info(f"✅ Saved company signed document: {processed_doc}")
+            except IntegrityError as e:
+                logger.error(f"❌ Error saving company document: {str(e)}")
+                return {"error": "Database integrity error"}
 
-        # ✅ Save the processed document
-        try:
-            processed_doc = ProcessedDocsignDocument.objects.create(
-                envelope_id=envelope_id,
-                template_name=template_name,
-                user=user,
-                employer=employer,
+            fetch_and_upload_signed_documents.delay(
+                envelope_id,
+                user.id if user else None,
+                employer.id, template_name,
+                is_company_document=True
             )
-            logger.info(f"✅ Saved signed document: {processed_doc}")
-        except IntegrityError as e:
-            logger.error(f"❌ Error saving signed document: {str(e)}")
-            return {"error": "Database integrity error"}
 
-        user_id = user.id
-        employer_id = employer.id
+            return {"status": "success", "document_id": processed_doc.id}
 
-        fetch_and_upload_signed_documents.delay(
-            envelope_id, user_id, employer_id, template_name
-        )
-        # ✅ Notify HR via SMS (uses the correct Twilio API keys)
-        notify_hr.delay(
-            template_name,
-            user.get_full_name(),
-            recipient_email,
-            employer.id,
-            event_type="completed",
-        )
+        else:
+            # 👤 This is an EMPLOYEE DOCUMENT
+            user = (
+                CustomUser.objects.filter(email=recipient_email)
+                .select_related("employer")
+                .first()
+            )
+            print("user :", user)
+            if not user:
+                logger.error(f"❌ User with email {recipient_email} not found.")
+                return {"error": "User not found"}
 
-        return {"status": "success", "document_id": processed_doc.id}
+            employer = user.employer
+            if not employer:
+                logger.error(f"❌ Employer not found for user {user.email}.")
+                return {"error": "Employer not found"}
+
+            try:
+                processed_doc = ProcessedDocsignDocument.objects.create(
+                    envelope_id=envelope_id,
+                    template_name=template_name,
+                    user=user,
+                    employer=employer,
+                )
+                logger.info(f"✅ Saved signed document: {processed_doc}")
+            except IntegrityError as e:
+                logger.error(f"❌ Error saving signed document: {str(e)}")
+                return {"error": "Database integrity error"}
+
+            fetch_and_upload_signed_documents.delay(
+                envelope_id, user.id, employer.id, template_name
+            )
+
+            # ✅ Notify HR (only for employee docs)
+            notify_hr.delay(
+                template_name,
+                user.get_full_name(),
+                recipient_email,
+                employer.id,
+                event_type="completed",
+            )
+
+            return {"status": "success", "document_id": processed_doc.id}
 
     except Exception as e:
         logger.error(f"❌ Error in handle_recipient_completed: {str(e)}")
         return {"error": str(e)}
-
+    
 
 # ✅ Sends SMS notifications to HR using the correct Twilio API keys
 @app.task(name="notify_hr_task")
@@ -837,10 +869,20 @@ def send_new_hire_quiz(envelope_args):
 
 # This is the FINAL version of the task to upload to linode.
 @app.task(name="fetch_and_upload_signed_documents")
-def fetch_and_upload_signed_documents(envelope_id, user_id, employer_id, template_name):
+def fetch_and_upload_signed_documents(
+    envelope_id,
+    user_id,
+    employer_id,
+    template_name,
+        is_company_document=False):
+
     try:
-        user = CustomUser.objects.get(id=user_id)
         employer = Employer.objects.get(id=employer_id)
+        user = None
+
+        if user_id is not None:
+            user = CustomUser.objects.get(id=user_id)
+
     except Exception as e:
         logger.error(f"❌ User or employer not found: {e}")
         return
@@ -870,9 +912,14 @@ def fetch_and_upload_signed_documents(envelope_id, user_id, employer_id, templat
 
         zip_buffer = BytesIO(zip_bytes)
         folder_name = f"{uuid.uuid4().hex[:8]}"
-        upload_path_prefix = (
-            f"DOCUMENTS/{employer.name.replace(' ', '_')}/{folder_name}/"
-        )
+        
+
+        # ✅ Determine the upload path based on document type
+        if is_company_document:
+            upload_path_prefix = f"DOCUMENTS/{employer.name.replace(' ', '_')}/company/{folder_name}/"
+        else:
+            upload_path_prefix = f"DOCUMENTS/{employer.name.replace(' ', '_')}/{folder_name}/"
+
 
         with zipfile.ZipFile(zip_buffer, "r") as zip_ref:
             for file_name in zip_ref.namelist():
@@ -891,6 +938,7 @@ def fetch_and_upload_signed_documents(envelope_id, user_id, employer_id, templat
                         file_name=file_name,
                         file_path=linode_path,
                         template_name=template_name,
+                        is_company_document=is_company_document,
                     )
 
     except Exception as e:

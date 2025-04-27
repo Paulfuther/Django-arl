@@ -252,6 +252,68 @@ class TemplateEmailForm(forms.Form):
         return cleaned_data
 
 
+class QuickEmailForm(forms.Form):
+    subject = forms.CharField(
+        max_length=255,
+        required=True,
+        label="Subject",
+        widget=forms.TextInput(attrs={"placeholder": "Enter the email subject"})
+    )
+    message = forms.CharField(
+        required=True,
+        label="Message",
+        widget=forms.Textarea(attrs={"placeholder": "Write your message here...", "rows": 6})
+    )
+    selected_group = forms.ModelChoiceField(
+        queryset=Group.objects.none(),
+        widget=RadioSelect,
+        required=False,
+        label="Select Groups",
+    )
+    selected_users = forms.ModelMultipleChoiceField(
+        queryset=User.objects.none(),
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Select Individual Users",
+    )
+    attachment_1 = forms.FileField(required=False, label="Attachment 1")
+    attachment_2 = forms.FileField(required=False, label="Attachment 2")
+    attachment_3 = forms.FileField(required=False, label="Attachment 3")
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop("user", None)
+        super().__init__(*args, **kwargs)
+
+        if user and hasattr(user, "employer"):
+            employer = user.employer
+
+            self.fields["selected_group"].queryset = Group.objects.filter(
+                user__employer=employer
+            ).distinct().order_by("name")
+
+            self.fields["selected_users"].queryset = User.objects.filter(
+                employer=employer, is_active=True
+            ).order_by("last_name", "first_name")
+
+            self.fields["selected_users"].label_from_instance = (
+                lambda u: f"{u.get_full_name()} - {u.email} ({u.employer.name if u.employer else 'No Employer'})"
+            )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        selected_group = cleaned_data.get("selected_group")
+        selected_users = cleaned_data.get("selected_users")
+
+        if not selected_group and not selected_users:
+            raise forms.ValidationError(
+                "You must select either a group or at least one user."
+            )
+        if selected_group and selected_users:
+            raise forms.ValidationError(
+                "You cannot select both a group and individual users."
+            )
+        return cleaned_data
+
 class CampaignSetupForm(forms.Form):
     contact_list = forms.ChoiceField(
         label="Select Contact List",

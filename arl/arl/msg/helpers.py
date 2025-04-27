@@ -20,10 +20,11 @@ from sendgrid.helpers.mail import (
     FileName,
     FileType,
     Mail,
+    Personalization,
+    To
 )
 from twilio.base.exceptions import TwilioException
 from twilio.rest import Client
-
 from arl.setup.models import TenantApiKeys
 from arl.user.models import CustomUser, Store
 
@@ -122,16 +123,26 @@ def create_master_email(
         # Initialize the email message
         message = Mail(
             from_email=sender_email,
-            to_emails=to_email,
         )
 
         print(f"📜 Email Template Data: {template_data}")
-        message.dynamic_template_data = template_data
         message.template_id = sendgrid_id
         asm = Asm(
             group_id=unsubscribe_group_id,
         )
         message.asm = asm
+
+        # ✅ Create Personalization
+        personalization = Personalization()
+        for email in to_email:
+            personalization.add_to(To(email))
+        personalization.dynamic_template_data = template_data
+
+        if "subject" in template_data:
+            personalization.subject = template_data["subject"]
+
+        message.add_personalization(personalization)
+      
         # Handle attachments if provided
         if attachments:
             for attachment in attachments:
@@ -225,60 +236,6 @@ def create_hr_newhire_email(**kwargs):
     except Exception as e:
         print("Error sending email:", e)
         return False
-
-
-def create_single_email(to_email, name, template_id=None, attachments=None):
-    """
-    Create and send a single email using the SendGrid API.
-
-    Args:
-        to_email: The recipient's email address.
-        name: The recipient's name for personalization.
-        template_id: The SendGrid template ID (optional).
-        attachments: List of attachments (optional).
-            Each attachment is a dictionary with:
-            {
-                "file_content": file bytes content,
-                "file_name": "example.pdf",
-                "file_type": "application/pdf"
-            }
-    """
-    unsubscribe_group_id = 24753
-    message = Mail(
-        from_email=settings.MAIL_DEFAULT_SENDER,
-        to_emails=to_email,
-    )
-    message.dynamic_template_data = {
-        "name": name,
-    }
-    message.template_id = template_id
-
-    # Add ASM (Advanced Suppression Manager) for unsubscribe
-    asm = Asm(
-        group_id=unsubscribe_group_id,
-    )
-    message.asm = asm
-    print(message)
-    # Add attachments if provided
-    if attachments:
-        for attachment in attachments:
-            encoded_file = base64.b64encode(attachment["file_content"]).decode()
-
-            attached_file = Attachment(
-                FileContent(encoded_file),
-                FileName(attachment["file_name"]),
-                FileType(attachment["file_type"]),
-                Disposition("attachment"),
-            )
-            message.add_attachment(attached_file)
-
-    try:
-        response = sg.send(message)
-        print(response.status_code)
-        print(response.body)
-        print(response.headers)
-    except Exception as e:
-        print(e.message)
 
 
 def send_sms_model(phone_number, message):
@@ -546,7 +503,14 @@ def create_incident_file_email_by_rule(
         # Handle general errors in the function
         logger.error(f"An error occurred while processing emails: {str(e)}")
 
-    # Return a summary of the operation
+    # 🛑 FINAL CHECK
+    if results["failed"]:
+        failed_list = ", ".join(results["failed"])
+        error_message = f"Emails failed to send to: {failed_list}"
+        logger.error(error_message)
+        raise Exception(error_message)  # 🚨 Raise so Celery knows to fail the task
+
+    # ✅ If no failures, return success normally
     return results
 
 

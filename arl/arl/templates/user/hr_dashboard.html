@@ -162,10 +162,12 @@
           <a class="nav-link {% if active_tab == 'employees' %}active{% endif %}" data-bs-toggle="tab" href="#employees">Invite New Employee</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link {% if active_tab == 'signed-documents' %}active{% endif %}" data-bs-toggle="tab" href="#signed-documents">Signed Documents</a>
+          <a class="nav-link {% if active_tab == 'user-roles' %}active{% endif %}" data-bs-toggle="tab" href="#user-roles">User Roles</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link {% if active_tab == 'user-roles' %}active{% endif %}" data-bs-toggle="tab" href="#user-roles">User Roles</a>
+          <a class="nav-link {% if active_tab == 'document_center' %}active{% endif %}" data-bs-toggle="tab" href="#document-center">
+            Document Center
+          </a>
         </li>
       </ul>
 
@@ -173,8 +175,16 @@
 
           <div class="tab-content mt-3">
             <div id="docusign" class="tab-pane fade {% if active_tab == 'docusign' %}show active{% endif %}">
+              {% if active_tab == 'docusign' and messages %}
+              {% for message in messages %}
+              <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+              {% endfor %}
+            {% endif %}
               <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
-                <a href="{% url 'create_new_document_page' %}" class="btn btn-outline-primary mobile-btn">
+                <a href="{% url 'create_new_document_page' %}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary mobile-btn">
                   <i class="fas fa-plus"></i> Create New Document
                 </a>
               </div>
@@ -196,14 +206,36 @@
                   {% endif %}
                   </p>
                   <div class="template-actions">
-                    <a href="{% url 'edit_document_page' template.template_id %}" class="btn btn-outline-primary mobile-btn">Edit</a>
+                    <a href="{% url 'edit_document_page' template.template_id %}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary mobile-btn">Edit</a>
                   </div>
+
                   <form method="post" action="{% url 'set_new_hire_template' template.id %}" class="mt-2">
                     {% csrf_token %}
-                    <label>
-                      <input type="radio" name="new_hire_template" onchange="this.form.submit()" {% if template.is_new_hire_template %}checked{% endif %}> Mark as New Hire File
-                    </label>
+                  
+                    <div class="form-check mb-2">
+                      <input class="form-check-input" type="checkbox" name="is_new_hire_template" id="newHireCheckbox" onchange="this.form.submit()" {% if template.is_new_hire_template %}checked{% endif %}>
+                      <label class="form-check-label" for="newHireCheckbox">
+                        Mark as New Hire File
+                      </label>
+                    </div>
+                  
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" name="is_in_app_signing_template" id="inAppCheckbox" onchange="this.form.submit()" {% if template.is_in_app_signing_template %}checked{% endif %}>
+                      <label class="form-check-label" for="inAppCheckbox">
+                        In-App Signing Template
+                      </label>
+                    </div>
+
+                    <!-- Mark as Company Document -->
+                    <div class="form-check mb-2">
+                      <input class="form-check-input" type="checkbox" name="is_company_document" id="companyDocCheckbox" onchange="this.form.submit()" {% if template.is_company_document %}checked{% endif %}>
+                      <label class="form-check-label" for="companyDocCheckbox">
+                        Mark as Company Document
+                      </label>
+                  </div>
+                  
                   </form>
+
                 </div>
                 {% empty %}<p>No templates found.</p>{% endfor %}
               </div>
@@ -214,7 +246,7 @@
 
           <div id="employees" class="tab-pane fade {% if active_tab == 'employees' %}show active{% endif %}">
             <h4 class="mb-3">Invite a New Hire</h4>
-            {% if messages %}
+            {% if active_tab == 'employees' and messages %}
             {% for message in messages %}
               <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
                 {{ message }}
@@ -253,21 +285,7 @@
             {% else %}<p class="text-muted">No pending invitations.</p>{% endif %}
           </div>
 
-        <!-- Get all documents for an employee  -->
-
-          <div id="signed-documents" class="tab-pane fade">
-            <legend class="mb-3">Search Signed Documents</legend>
-                <form method="get" class="mb-3" 
-                      hx-get="{% url 'hr_document_view' %}" 
-                      hx-target="#employee-table" 
-                      hx-trigger="submit">
-                  <input type="text" name="q" placeholder="Search by name or email" class="form-control mb-2" />
-                  <button type="submit" class="btn btn-outline-primary mobile-btn">Search</button>
-                </form>
-            <div id="employee-table">
-              {% include "dsign/partials/employee_document_table.html" %}
-            </div>
-          </div>
+        
 
         <!-- Getr and update roles for all employees  -->
 
@@ -282,9 +300,70 @@
               {% include "user/hr/partials/user_role_list.html" %}
             </div>
         </div>
+        
+        <!-- 🚀 Document Center -->
 
+        <div id="document-center" class="tab-pane fade {% if active_tab == 'document_center' %}show active{% endif %}">
+          <h4 class="mb-3">Document Center</h4>
+
+          <!-- 🧠 Sub-tabs: Employee vs Company -->
+          <ul class="nav nav-tabs mt-3" id="documentCenterTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link {% if document_tab == 'employee' %}active{% endif %}" id="employee-documents-tab" data-bs-toggle="tab" data-bs-target="#employee-documents" type="button" role="tab">
+                Employee Documents
+              </button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link {% if document_tab == 'company' %}active{% endif %}" id="company-documents-tab" data-bs-toggle="tab" data-bs-target="#company-documents" type="button" role="tab">
+                Company Documents
+              </button>
+            </li>
+          </ul>
+
+          <div class="tab-content p-3 border border-top-0 rounded-bottom">
+
+           
+            <!-- 📄 Employee Documents (inside Document Center) -->
+            <div class="tab-pane fade {% if document_tab == 'employee' %}show active{% endif %}" id="employee-documents" role="tabpanel">
+
+              <legend class="mb-3">Search Signed Documents</legend>
+
+              <form method="get" class="mb-3"
+                    hx-get="{% url 'hr_document_view' %}"
+                    hx-target="#employee-table"
+                    hx-trigger="submit">
+                <input type="text" name="q" placeholder="Search by name or email" class="form-control mb-2" />
+                <input type="hidden" name="tab" value="document_center">
+                <button type="submit" class="btn btn-outline-primary mobile-btn">Search</button>
+              </form>
+
+              <div id="employee-table">
+                {% include "dsign/partials/employee_document_table.html" %}
+              </div>
+
+            </div>
+
+            <!-- 📄 Company Documents -->
+            <div class="tab-pane fade {% if document_tab == 'company' %}show active{% endif %}" id="company-documents" role="tabpanel">
+              {% if company_documents %}
+                <ul class="list-group">
+                  {% for doc in company_documents %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                      {{ doc.file_name }}
+                      <a href="{% url 'download_signed_document' doc.id %}" target="_blank" class="btn btn-outline-primary btn-sm">View</a>
+                   </li>
+                  {% endfor %}
+                </ul>
+              {% else %}
+                <p>No company documents available.</p>
+              {% endif %}
+            </div>
 
         </div>
+
+      </div>
+
+    </div>
 
         <div>
         <a href="{% url 'home' %}" class="btn btn-outline-secondary mt-3">Back</a>

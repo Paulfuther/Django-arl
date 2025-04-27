@@ -15,10 +15,16 @@
   <!-- Nav Tabs -->
   <ul class="nav nav-tabs" id="commsTabs">
     {% if can_send_email %}
+    {% if can_send_email %}
     <li class="nav-item">
       <a class="nav-link {% if active_tab == 'email' %}active{% endif %}" data-bs-toggle="tab" href="#email">Email</a>
     </li>
+    <li class="nav-item">
+      <a class="nav-link {% if active_tab == 'quick_email' %}active{% endif %}" data-bs-toggle="tab" href="#quick_email">Quick Email</a>
+    </li>
+  {% endif %}
     {% endif %}
+
     {% if can_send_sms %}
     <li class="nav-item">
       <a class="nav-link {% if active_tab == 'sms' %}active{% endif %}" data-bs-toggle="tab" href="#sms">SMS</a>
@@ -40,6 +46,10 @@
   <div class="tab-content mt-3">
     <div id="email" class="tab-pane fade {% if active_tab == 'email' %}show active{% endif %}">
       {% include "msg/template_email_form.html" %}
+    </div>
+
+    <div id="quick_email" class="tab-pane fade {% if active_tab == 'quick_email' %}show active{% endif %}">
+      {% include "msg/quick_email_form.html" %}
     </div>
 
     <div id="sms" class="tab-pane fade {% if active_tab == 'sms' %}show active{% endif %}">

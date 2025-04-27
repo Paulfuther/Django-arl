@@ -856,3 +856,81 @@ def validate_signature_roles(template_id):
     except ApiException as e:
         print(f"❌ Error during validation: {e}")
         return False, ["error"]
+
+
+def create_envelope_for_in_app_signing(user, template_id, employer):
+    access_token = get_access_token().access_token
+    base_path = settings.DOCUSIGN_BASE_PATH
+    api_client = create_api_client(base_path, access_token)
+
+    envelopes_api = EnvelopesApi(api_client)
+
+    envelope_definition = EnvelopeDefinition(
+        template_id=template_id,
+        template_roles=[
+            TemplateRole(
+                email=user.email,
+                name=f"{user.first_name} {user.last_name}",
+                role_name="GSA",
+                client_user_id=str(user.id),  # Match the role you defined in your DocuSign template
+            )
+        ],
+        status="sent",
+    )
+
+    envelope_summary = envelopes_api.create_envelope(
+        account_id=settings.DOCUSIGN_ACCOUNT_ID,
+        envelope_definition=envelope_definition,
+    )
+
+    return envelope_summary.envelope_id
+
+
+def get_recipient_view_url(user, envelope_id, return_url):
+    access_token = get_access_token().access_token
+    base_path = settings.DOCUSIGN_BASE_PATH
+    api_client = create_api_client(base_path, access_token)
+    
+    envelopes_api = EnvelopesApi(api_client)
+
+    recipient_view_request = RecipientViewRequest(
+        authentication_method="none",
+        client_user_id=str(user.id),  # Important for embedded signing
+        recipient_id="1",  # DocuSign assigns 1 to the first recipient by default
+        return_url=return_url,
+        user_name=f"{user.first_name} {user.last_name}",
+        email=user.email,
+    )
+
+    results = envelopes_api.create_recipient_view(
+        account_id=settings.DOCUSIGN_ACCOUNT_ID,
+        envelope_id=envelope_id,
+        recipient_view_request=recipient_view_request,
+    )
+
+    return results.url
+
+
+def get_template_signature_validation(template_id):
+    try:
+        access_token = get_access_token().access_token
+        api_client = create_api_client(settings.DOCUSIGN_BASE_PATH, access_token)
+        templates_api = TemplatesApi(api_client)
+
+        tabs = templates_api.list_tabs(
+            account_id=settings.DOCUSIGN_ACCOUNT_ID,
+            template_id=template_id,
+            recipient_id="1"  # assuming recipient 1 = GSA
+        )
+        #print("tabs :", tabs)
+        has_sign_here = bool(tabs.sign_here_tabs)
+        print(f"Has Sign Here Tabs? {has_sign_here}")
+        return {
+            "has_sign_here": has_sign_here,
+        }
+
+    except Exception as e:
+        print(f"Error validating template {template_id}: {e}")
+        return {
+            "has_sign_here": False,
+        }

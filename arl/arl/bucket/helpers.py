@@ -1,14 +1,17 @@
 import re
 from datetime import date, datetime
 from urllib.parse import quote, unquote
-from django.shortcuts import get_object_or_404
 import boto
 import boto.s3.connection
 from botocore.exceptions import NoCredentialsError
-from arl.dsign.models import SignedDocumentFile
 from django.conf import settings
 from django.http import HttpResponse
 from django.urls import reverse
+from django.shortcuts import redirect
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 LINODE_ACCESS_KEY = settings.LINODE_ACCESS_KEY
 LINODE_SECRET_KEY = settings.LINODE_SECRET_KEY
@@ -134,7 +137,7 @@ def list_s3_objects(folder_name):
         return []
 
 
-def download_from_s3(request, file_path):
+def download_from_s3(request, file_path, custom_filename=None):
     try:
         # 🔒 Connect to the bucket
         bucket = conn.get_bucket(settings.LINODE_BUCKET_NAME)
@@ -144,21 +147,24 @@ def download_from_s3(request, file_path):
         if not key:
             return HttpResponse("File not found in storage.", status=404)
 
+        # 🧼 Use passed custom filename if available
+        if not custom_filename:
+            filename = key.name.split("/")[-1]
+            custom_filename = filename
+
+        filename_encoded = quote(custom_filename, safe="")
+        
         # ⏳ Generate a pre-signed URL for 1 hour
         url = key.generate_url(
             expires_in=3600,
             query_auth=True,
-            force_http=False  # or False if you want HTTPS
+            force_http=False,
+            response_headers={
+                "response-content-disposition": f'attachment; filename="{filename_encoded}"'
+            }
         )
-
-        # 🧼 Sanitize filename
-        filename_encoded = quote(key.name.split("/")[-1], safe="")
-
-        # 🔁 Redirect to pre-signed S3 URL
-        response = HttpResponse(status=302)
-        response["Location"] = url
-        response["Content-Disposition"] = f'attachment; filename="{filename_encoded}"'
-        return response
+        # 🔁 Redirect user directly to the signed S3 URL
+        return redirect(url)
 
     except Exception as e:
         print(f"Error downloading from S3: {str(e)}")

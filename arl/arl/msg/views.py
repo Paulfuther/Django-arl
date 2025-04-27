@@ -47,6 +47,7 @@ from .forms import (
     TemplateEmailForm,
     TemplateFilterForm,
     TemplateWhatsAppForm,
+    QuickEmailForm,
 )
 from .tasks import (
     fetch_twilio_sms_task,
@@ -220,6 +221,7 @@ def communications(request):
     valid_tabs = []
     if is_member_of_email_group(user):
         valid_tabs.append("email")
+        valid_tabs.append("quick_email")
     if is_member_of_msg_group(user):
         valid_tabs.append("sms")
     if is_member_of_docusign_group(user):
@@ -232,12 +234,47 @@ def communications(request):
     # Default forms
     sms_form = SMSForm(user=user)
     email_form = TemplateEmailForm(user=user)
+    quick_email_form = QuickEmailForm(user=user)
     docusign_form = NameEmailForm(user=user)
 
     if request.method == "POST":
         form_type = request.POST.get("form_type")
 
-        if form_type == "email":
+        if form_type == "quick_email":
+            active_tab = "quick_email"
+            quick_email_form = QuickEmailForm(request.POST, request.FILES, user=user)
+
+            if quick_email_form.is_valid():
+                subject = quick_email_form.cleaned_data["subject"]
+                message = quick_email_form.cleaned_data["message"]
+                selected_group = quick_email_form.cleaned_data["selected_group"]
+                selected_users = quick_email_form.cleaned_data["selected_users"]
+
+                employer = user.employer
+                attachments = collect_attachments(request)
+                if attachments is None:
+                    attachments = []
+
+                recipients = prepare_recipient_data(
+                    user, selected_group, selected_users
+                )
+
+                # ✅ Now send using your new master helper (we'll have to create a basic helper)
+                master_email_send_task.delay(
+                    recipients=recipients,
+                    sendgrid_id="d-4ac0497efd864e29b4471754a9c836eb",
+                    attachments=attachments,
+                    employer_id=request.user.employer.id,
+                    body=message,
+                    subject=subject
+                )
+
+                messages.success(request, "Quick email has been queued for delivery.")
+                return redirect("/comms/?tab=quick_email")
+            else:
+                messages.error(request, "Please correct the errors below.")
+
+        elif form_type == "email":
             active_tab = "email"
             if not is_member_of_email_group(user):
                 return custom_permission_denied(
@@ -333,6 +370,7 @@ def communications(request):
         "msg/master_comms.html",
         {
             "email_form": email_form,
+            "quick_email_form": quick_email_form,
             "sms_form": sms_form,
             "docusign_form": docusign_form,
             "active_tab": active_tab,

@@ -19,6 +19,9 @@ from arl.dsign.helpers import (
     get_access_token,
     get_docusign_envelope,
     get_docusign_template_name_from_template,
+    create_envelope_for_in_app_signing,
+    get_recipient_view_url,
+    get_template_signature_validation
 )
 from arl.dsign.tasks import (get_outstanding_docs,
                              list_all_docusign_envelopes_task)
@@ -209,34 +212,21 @@ def create_new_document_page(request):
 
 @login_required
 def edit_document_page(request, template_id):
-    """Loads an HTML page with an iframe for the DocuSign template editor."""
+    """Shows helper info, then lets user continue to DocuSign editor."""
     edit_url = get_docusign_edit_url(template_id)
-    user_agent = request.META.get("HTTP_USER_AGENT", "").lower()
-
-    is_safari = (
-        "safari" in user_agent
-        and "chrome" not in user_agent
-        and "chromium" not in user_agent
-    )
     template = DocuSignTemplate.objects.filter(template_id=template_id).first()
 
-    if is_safari:
-        # ✅ Show UI first, then redirect to DocuSign editor
-        return render(
-            request,
-            "dsign/dsign_redirect.html",
-            {
-                "edit_url": edit_url,
-                "template": template,
-            },
-        )
+    # ✅ Run the helper directly (sync)
+    validation_result = get_template_signature_validation(template_id)
+    has_sign_here_tab = validation_result.get('has_sign_here', False)
 
     return render(
         request,
-        "dsign/dsign_embed.html",
+        "dsign/dsign_redirect.html",
         {
             "edit_url": edit_url,
             "template": template,
+            "has_sign_here_tab": has_sign_here_tab,
         },
     )
 
@@ -345,17 +335,33 @@ def docusign_close(request):
 @login_required
 def set_new_hire_template(request, template_id):
     template = get_object_or_404(
-        DocuSignTemplate, id=template_id, employer=request.user.employer
+        DocuSignTemplate,
+        id=template_id,
+        employer=request.user.employer,
     )
 
-    # Unset previous
-    DocuSignTemplate.objects.filter(employer=request.user.employer).update(
-        is_new_hire_template=False
-    )
+    if request.method == "POST":
+        # ✅ If New Hire checkbox is checked, unset others first
+        if 'is_new_hire_template' in request.POST:
+            # Unset all other templates first
+            DocuSignTemplate.objects.filter(
+                employer=request.user.employer,
+                is_new_hire_template=True
+            ).update(is_new_hire_template=False)
+            template.is_new_hire_template = True
+        else:
+            template.is_new_hire_template = False
 
-    # Set selected
-    template.is_new_hire_template = True
-    template.save()
+        # ✅ In-App Signing is independent
+        template.is_in_app_signing_template = 'is_in_app_signing_template' in request.POST
+        # Handle company document toggle
+        if request.POST.get("is_company_document"):
+            template.is_company_document = True
+        else:
+            template.is_company_document = False
+
+        template.save()
+        messages.success(request, "Template updated successfully.")
 
     return redirect("hr_dashboard")
 
@@ -393,3 +399,48 @@ def bulk_upload_signed_documents_view(request):
         form = MultiSignedDocUploadForm()
 
     return render(request, "dsign/bulk_upload.html", {"form": form})
+
+
+@login_required
+def in_app_signing_dashboard(request):
+    employer = request.user.employer
+
+    # Get all templates marked for in-app signing
+    templates = DocuSignTemplate.objects.filter(
+        employer=employer,
+        is_in_app_signing_template=True,
+        is_ready_to_send=True,  # Assuming you want only finalized forms
+    ).order_by("template_name")
+
+    context = {
+        "templates": templates,
+    }
+    return render(request, "dsign/in_app_signing_dashboard.html", context)
+
+
+@login_required
+def start_in_app_signing(request, template_id):
+    template = get_object_or_404(
+        DocuSignTemplate,
+        id=template_id,
+        employer=request.user.employer,
+        is_in_app_signing_template=True, 
+    )
+
+    envelope_id = create_envelope_for_in_app_signing(
+        user=request.user,
+        template_id=template.template_id,
+        employer=request.user.employer,
+    )
+
+    # Build Return URL dynamically
+    return_url = f"{settings.SITE_URL}/hr/dashboard/"
+
+    # Get the Signing URL
+    signing_url = get_recipient_view_url(
+        user=request.user,
+        envelope_id=envelope_id,
+        return_url=return_url,
+    )
+
+    return redirect(signing_url)
