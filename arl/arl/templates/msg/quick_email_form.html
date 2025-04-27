@@ -1,0 +1,192 @@
+{% load crispy_forms_tags %}
+
+<style>
+  .dropdown-box {
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 0;
+    overflow: hidden;
+    background-color: #fff;
+    max-height: 0;
+    transition: max-height 0.3s ease;
+  }
+
+  .dropdown-box.open {
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .dropdown-option {
+    padding: 10px 15px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    align-items: center;
+  }
+
+  .dropdown-option:last-child {
+    border-bottom: none;
+  }
+
+  .dropdown-option input[type="radio"],
+  .dropdown-option input[type="checkbox"] {
+    margin-right: 10px;
+  }
+
+  .dropdown-toggle-btn {
+    background-color: #f8f9fa;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 10px 12px;
+    width: 100%;
+    text-align: left;
+    font-weight: 500;
+    cursor: pointer;
+    margin-bottom: 10px;
+  }
+
+  .dropdown-toggle-btn:after {
+    content: "▼";
+    float: right;
+    transition: transform 0.3s ease;
+  }
+
+  .dropdown-toggle-btn.open:after {
+    transform: rotate(180deg);
+  }
+
+  @media (max-width: 768px) {
+    .dropdown-box.open {
+      max-height: 200px;
+    }
+  }
+</style>
+
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  <input type="hidden" name="form_type" value="quick_email" />
+
+  {% if messages %}
+    <div class="mt-3">
+      {% for message in messages %}
+        <div class="alert {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if quick_email_form.non_field_errors %}
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      {{ quick_email_form.non_field_errors }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  {% endif %}
+
+  <legend class="border-bottom mb-4">Send a Quick Email</legend>
+
+  <div class="mb-3">
+    {{ quick_email_form.subject|as_crispy_field }}
+  </div>
+
+  <div class="mb-3">
+    {{ quick_email_form.message|as_crispy_field }}
+  </div>
+
+  <!-- ✅ Group Dropdown -->
+  <button type="button" id="toggleGroups" class="dropdown-toggle-btn">Select Group</button>
+
+  <div id="groupBox" class="dropdown-box mb-3">
+    {% for radio in quick_email_form.selected_group %}
+      <div class="dropdown-option">
+        {{ radio.tag }} {{ radio.choice_label }}
+      </div>
+    {% endfor %}
+  </div>
+
+  <!-- ✅ Users Dropdown -->
+  <button type="button" id="toggleUsers" class="dropdown-toggle-btn">Select Users</button>
+
+  <div id="userBox" class="dropdown-box mb-3">
+    {% for checkbox in quick_email_form.selected_users %}
+      <div class="dropdown-option">
+        {{ checkbox.tag }} {{ checkbox.choice_label }}
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="row g-2">
+    <div class="col-md-4">
+      {{ quick_email_form.attachment_1|as_crispy_field }}
+    </div>
+    <div class="col-md-4">
+      {{ quick_email_form.attachment_2|as_crispy_field }}
+    </div>
+    <div class="col-md-4">
+      {{ quick_email_form.attachment_3|as_crispy_field }}
+    </div>
+  </div>
+
+  <button type="submit" class="btn btn-outline-primary mt-3">Send Email</button>
+</form>
+
+<script>
+  // Group Dropdown
+  const toggleGroupBtn = document.getElementById("toggleGroups");
+  const groupBox = document.getElementById("groupBox");
+
+  toggleGroupBtn.addEventListener("click", function () {
+    groupBox.classList.toggle("open");
+    toggleGroupBtn.classList.toggle("open");
+  });
+
+  document.querySelectorAll("#groupBox input[type=radio]").forEach(radio => {
+    radio.addEventListener("change", () => {
+      const label = radio.closest(".dropdown-option").textContent.trim();
+      if (label) {
+        toggleGroupBtn.textContent = label;
+      }
+      groupBox.classList.remove("open");
+      toggleGroupBtn.classList.remove("open");
+    });
+  });
+
+  // Users Dropdown
+  const toggleUserBtn = document.getElementById("toggleUsers");
+  const userBox = document.getElementById("userBox");
+
+  toggleUserBtn.addEventListener("click", function () {
+    userBox.classList.toggle("open");
+    toggleUserBtn.classList.toggle("open");
+  });
+
+  document.querySelectorAll("#userBox input[type=checkbox]").forEach(checkbox => {
+    checkbox.addEventListener("change", () => {
+      const selected = Array.from(document.querySelectorAll("#userBox input[type=checkbox]:checked"))
+        .map(cb => cb.closest(".dropdown-option").textContent.trim())
+        .join(", ");
+      toggleUserBtn.textContent = selected || "Select Users";
+    });
+  });
+</script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const subjectInput = document.getElementById('id_subject');
+      const bodyInput = document.getElementById('id_message');
+    
+      const defaultCompanyName = "{{ employer_name|escapejs }}" || "Our Company";  // <-- You pass employer_name from Django
+    
+      function fillDefaultSubject() {
+        if (subjectInput && bodyInput && !subjectInput.value.trim()) {
+          subjectInput.value = `New Message from ${defaultCompanyName}`;
+        }
+      }
+    
+      // When the user starts typing in the message, set the subject if empty
+      if (bodyInput) {
+        bodyInput.addEventListener('focus', fillDefaultSubject);
+        bodyInput.addEventListener('input', fillDefaultSubject);
+      }
+    });
+    </script>

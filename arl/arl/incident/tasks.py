@@ -2,7 +2,7 @@ from __future__ import absolute_import, unicode_literals
 from django.conf import settings
 import logging
 from io import BytesIO
-
+import base64
 import pdfkit
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
@@ -17,7 +17,7 @@ from arl.helpers import (get_s3_images_for_incident,
                          upload_to_linode_object_storage)
 from arl.msg.helpers import (create_incident_file_email,
                              create_incident_file_email_by_rule,
-                             send_incident_email)
+                             send_incident_email, create_master_email)
 from arl.user.models import CustomUser, Employer, Store, ExternalRecipient
 
 from .helpers import create_pdf, create_restricted_pdf
@@ -269,7 +269,6 @@ def save_incident_file(**kwargs):
 # There are four tasks to be called.
 # generate_pdf_task_upload_to_linode_task, upload_to_dropbox_task
 # and send_email_to_group_task
-
 @app.task(name="create_incident_pdf")
 def generate_pdf_task(incident_id):
     '''
@@ -358,8 +357,9 @@ def upload_file_to_dropbox_task(data):
         raise Exception(error_message)
 
 
+# APPROVED for muluti tenant
 @app.task(name="email_incident_pdf_to_group")
-def send_email_to_group_task(data, group_name, subject, employer_id):
+def send_email_to_group_task(data, group_name, employer_id):
     try:
         # Fetch the emails of active users in the specified group
         to_emails = CustomUser.objects.filter(
@@ -370,42 +370,58 @@ def send_email_to_group_task(data, group_name, subject, employer_id):
 
         if not to_emails:
             raise ValueError(f"No active users found in group: {group_name}")
-        sender_email = get_employer_sender_email(employer_id)
-        if not sender_email:
-            raise ValueError(f"No sender email configured for employer ID {employer_id}")
+        # ✅ Fetch tenant sender email
+        tenant_api_key = TenantApiKeys.objects.filter(employer_id=employer_id).first()
+        sender_email = tenant_api_key.verified_sender_email if tenant_api_key else settings.MAIL_DEFAULT_SENDER
 
-        # Convert the PDF bytes back to BytesIO for attachment
+        # ✅ Prepare PDF as attachment
         pdf_buffer = BytesIO(data["pdf_buffer"])
         pdf_filename = data["pdf_filename"]
+        attachments = [{
+            "file_content": base64.b64encode(pdf_buffer.getvalue()).decode(),
+            "file_name": pdf_filename,
+            "file_type": "application/pdf",
+        }]
 
-        # Send the email with the PDF attachment
-        create_incident_file_email_by_rule(
-            to_emails=to_emails,
-            subject=subject,
-            body=(
-                "Thank you for using our services. "
-                "Attached is your incident report."
-            ),
-            attachment_buffer=pdf_buffer,
-            attachment_filename=pdf_filename,
-            sender_email=sender_email,
+        # ✅ Prepare dynamic template data
+        first_email = to_emails[0]
+        try:
+            user = CustomUser.objects.get(email=first_email)
+            full_name = user.get_full_name()
+            company_name = user.employer.name if user.employer else "Unknown Company"
+        except CustomUser.DoesNotExist:
+            full_name = "Valued User"
+            company_name = "Unknown Company"
+
+        template_data = {
+            "name": full_name,
+            "company_name": company_name,
+        }
+
+        # ✅ Now call your master helper
+        create_master_email(
+            to_email=list(to_emails),
+            sendgrid_id="d-d24563b3a2c14e9ebb1ebae50b6097f1",
+            template_data=template_data,
+            attachments=attachments,
+            verified_sender=sender_email,
         )
 
         return {
             "status": "success",
-            "message": f"Emails sent to group '{group_name}' successfully.",
+            "message": f"Incident email sent to group '{group_name}'",
         }
+
     except Exception as e:
-        logger.error(f"Error sending email to group '{group_name}': {e}")
+        logger.error(f"Error sending incident email to group '{group_name}': {e}")
         return {"status": "error", "message": str(e)}
 
 
+# APPROVED for multi tenant.
 # This task creates a pdf of the select Incident Form
 # Then emails the form to the user.
 # This is called from the list of incidents
 # when you click the pdf button
-
-
 @app.task(name="email_updated_incident_pdf")
 def generate_pdf_email_to_user_task(incident_id, user_email):
     try:
@@ -446,28 +462,51 @@ def generate_pdf_email_to_user_task(incident_id, user_email):
             f"_report.pdf"
         )
 
-        # Close the BytesIO buffer to free up resources
-        # Then email to the current user
+        # ✅ Prepare the attachment for SendGrid
+        attachments = [{
+            "file_content": base64.b64encode(pdf_buffer.getvalue()).decode(),
+            "file_name": pdf_filename,
+            "file_type": "application/pdf",
+        }]
 
-        subject = f"Your Incident Report {pdf_filename}"
-        body = "Thank you for using our services. "
-        "Attached is your incident report."
-        # attachment_data = pdf_buffer.getvalue()
+        # ✅ Fetch user and dynamic template data
+        try:
+            user = CustomUser.objects.get(email=user_email)
+            full_name = user.get_full_name()
+            company_name = user.employer.name if user.employer else "Unknown Company"
+        except CustomUser.DoesNotExist:
+            full_name = "Valued User"
+            company_name = "Unknown Company"
 
-        # Call the create_single_email function with
-        # user_email and other details
-        create_incident_file_email(user_email, subject, body,
-                                   pdf_buffer, pdf_filename)
-        # create_single_email(user_email, subject, body, pdf_buffer)
+        template_data = {
+            "name": full_name,
+            "company_name": company_name,
+        }
+
+        # ✅ Get verified sender if needed
+        try:
+            tenant_api_key = TenantApiKeys.objects.get(employer=user.employer)
+            sender_email = tenant_api_key.verified_sender_email
+        except TenantApiKeys.DoesNotExist:
+            sender_email = settings.MAIL_DEFAULT_SENDER
+
+        # ✅ Call master email helper
+        create_master_email(
+            to_email=[user_email],
+            sendgrid_id="d-f76eb0684e444e29b0a3cfc621cefd6a", 
+            template_data=template_data,
+            attachments=attachments,
+            verified_sender=sender_email,
+        )
 
         return {
             "status": "success",
             "message": f"Incident {pdf_filename} emailed to {user_email}",
         }
-    except Exception as e:
-        logger.error("Error in generate_pdf_task: {}".format(e))
-        return {"status": "error", "message": str(e)}
 
+    except Exception as e:
+        logger.error(f"Error in generate_pdf_email_to_user_task: {str(e)}")
+        return {"status": "error", "message": str(e)}
 
 # this task emails a restricted pdf to a user as long as
 # the belong to the correct group

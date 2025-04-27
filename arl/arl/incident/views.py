@@ -46,6 +46,7 @@ def is_abm_incident_pdf(user):
     return user.groups.filter(name="abm_incident_pdf").exists()
 
 
+# APPROVED for multi tenant
 class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView):
     model = Incident
     login_url = "/login/"
@@ -210,13 +211,15 @@ def handle_new_incident_form_creation(sender, instance, created, **kwargs):
             # ✅ Mark the instance as queued for sending
             instance.queued_for_sending = True
             instance.save(update_fields=["queued_for_sending"])
-            print("empoloyer id :", employer_id)
+            logger.warning(
+                f"instance: {instance.user_employer} | Employer ID: {instance.user_employer.id}"
+            )
+
             # Step 1: Generate PDF and email the group
             chain(
                 generate_pdf_task.s(instance.id),
                 send_email_to_group_task.s(
                     group_name="incident_form_email",
-                    subject="A New Incident Report Has Been Created",
                     employer_id=employer_id,
                 ),
             ).apply_async()
@@ -303,6 +306,7 @@ def mark_do_not_send(request, pk):
         return HttpResponse(status=500)  # Generic error response
 
 
+# APPROVED for multi tenant
 class IncidentUpdateView(PermissionRequiredMixin, LoginRequiredMixin, UpdateView):
     model = Incident
     login_url = "/login/"
@@ -354,10 +358,10 @@ class IncidentUpdateView(PermissionRequiredMixin, LoginRequiredMixin, UpdateView
 
             # Trigger the tasks for PDF generation and email
             chain(
-                generate_pdf_task.s(self.object.id),  # Generate PDF
-                send_email_to_group_task.s(  # Email the PDF
+                generate_pdf_task.si(self.object.id),  # Generate PDF
+                send_email_to_group_task.s(
                     group_name="incident_update_email",
-                    subject="An Incident Report Has Been Updated",
+                    employer_id=self.object.employer.id,
                 ),
             ).apply_async()
 

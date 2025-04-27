@@ -10,7 +10,9 @@ from arl.dsign.views import (
     edit_document_page, docusign_close,
     create_new_document_page,
     set_new_hire_template,
-    bulk_upload_signed_documents_view
+    bulk_upload_signed_documents_view,
+    in_app_signing_dashboard,
+    start_in_app_signing
 )
 
 urlpatterns = [
@@ -34,4 +36,6 @@ urlpatterns = [
     path("docusign/edit-document/<str:template_id>/", edit_document_page, name="edit_document_page"),
     path("set-new-hire-template/<int:template_id>/", set_new_hire_template, name="set_new_hire_template"),
     path("bulk-upload-documents/", bulk_upload_signed_documents_view, name="bulk_upload_signed_documents"),
+    path('in-app-signing/', in_app_signing_dashboard, name='in_app_signing_dashboard'),
+    path('start-in-app-signing/<int:template_id>/', start_in_app_signing, name='start_in_app_signing'),
 ]

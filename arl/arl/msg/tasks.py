@@ -40,7 +40,14 @@ logger = get_task_logger(__name__)
 # This task is APPROVED for multi tenant.
 # It is also the master email task.
 @app.task(name="master_email_send")
-def master_email_send_task(recipients, sendgrid_id, attachments=None, employer_id=None):
+def master_email_send_task(
+        recipients,
+        sendgrid_id,
+        attachments=None,
+        employer_id=None,
+        body=None,
+        subject=None
+        ):
     """
     Master task to send emails using the provided template and recipient data.
 
@@ -54,72 +61,59 @@ def master_email_send_task(recipients, sendgrid_id, attachments=None, employer_i
         str: Success or error message.
     """
     try:
-        # Default sender (fallback)
+        # Default sender
         verified_sender = settings.MAIL_DEFAULT_SENDER
+        employer = None
 
-        # ✅ Retrieve employer-specific sender
+        # Retrieve employer-specific verified sender
         if employer_id:
             employer = Employer.objects.filter(id=employer_id).first()
-            print("Employer :", employer)
             if employer:
                 tenant_api_key = TenantApiKeys.objects.filter(employer=employer).first()
                 if tenant_api_key and tenant_api_key.verified_sender_email:
-                    verified_sender = (
-                        tenant_api_key.verified_sender_email
-                    )  # ✅ Set verified sender
+                    verified_sender = tenant_api_key.verified_sender_email
 
         print(f"📧 Using verified sender: {verified_sender}")
 
-        # Track errors and successes
         failed_emails = []
+
         for recipient in recipients:
-            try:
-                email = recipient.get("email")
-                name = recipient.get("name")
-                senior_contact_name = employer.senior_contact_name
-                company_name = employer.name
+            email = recipient.get("email")
+            name = recipient.get("name")
 
-                if not email:
-                    print(f"Skipping recipient with no email: {recipient}")
-                    continue  # Skip if no email is provided
+            if not email:
+                print(f"Skipping recipient with no email: {recipient}")
+                continue
 
-                # ✅ Ensure name is part of `template_data`
-                template_data = {
-                    "name": name,
-                    "senior_contact_name": senior_contact_name,
-                    "company_name": company_name,
-                }  # Add more dynamic values if needed
+            template_data = {
+                "name": name,
+                "body": body,
+                "company_name": employer.name if employer else "Company",
+                "subject": subject if subject else f"New Message from {employer.name if employer else 'Our Company'}",
+            }
 
-                # ✅ Pass `verified_sender` directly to `create_master_email`
-                success = create_master_email(
-                    to_email=email,
-                    sendgrid_id=sendgrid_id,
-                    template_data=template_data,
-                    attachments=attachments,
-                    verified_sender=verified_sender,  # ✅ Explicitly passing verified sender
-                )
+            success = create_master_email(
+                to_email=email,
+                sendgrid_id=sendgrid_id,
+                template_data=template_data,
+                attachments=attachments,
+                verified_sender=verified_sender,
+            )
 
-                if not success:
-                    failed_emails.append(email)
-                    print(f"Failed to send email to {email}.")
-            except Exception as e:
-                email_address = email or "Unknown"
-                failed_emails.append(email_address)
-                print(f"Error sending email to {email_address}: {e}")
+            if not success:
+                failed_emails.append(email)
+                print(f"❌ Failed to send email to {email}")
 
-        # Final status message
         if failed_emails:
-            print(f"Emails sent with some failures. Failed emails: {failed_emails}")
             return f"Emails sent with some failures. Failed emails: {', '.join(failed_emails)}"
         else:
-            print(f"All emails sent successfully using template '{sendgrid_id}'.")
-            return f"All emails sent successfully using template '{sendgrid_id}'."
+            return f"✅ All emails sent successfully using template '{sendgrid_id}'"
 
     except Exception as e:
-        error_message = f"Critical error in master_email_send_task: {str(e)}"
+        error_message = f"🔥 Critical error in master_email_send_task: {str(e)}"
         print(error_message)
         return error_message
-
+    
 
 #
 # APPROVED

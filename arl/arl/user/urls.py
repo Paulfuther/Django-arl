@@ -77,4 +77,5 @@ urlpatterns = [
     path("close-twilio-sub/<str:subaccount_sid>", close_twilio_sub, name = "close_twilio_sub"),
     path("hr/search-user-roles/", search_user_roles, name="search_user_roles"),
     path("hr/update-user-role/<int:user_id>/", update_user_roles, name="update_user_roles"),
+    
 ]

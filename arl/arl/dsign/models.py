@@ -16,6 +16,8 @@ class DocuSignTemplate(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     is_new_hire_template = models.BooleanField(default=False)
     is_ready_to_send = models.BooleanField(default=False)
+    is_in_app_signing_template = models.BooleanField(default=False)
+    is_company_document = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ("employer", "template_id")  # Ensure uniqueness per employer
@@ -31,11 +33,16 @@ class ProcessedDocsignDocument(models.Model):
     )  # Added field
     processed_at = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey(
-        CustomUser, on_delete=models.CASCADE, related_name="processed_documents"
+        CustomUser, 
+        on_delete=models.SET_NULL,  # ✅ Changed from CASCADE to SET_NULL
+        null=True,                  # ✅ Allow NULL in database
+        blank=True,                 # ✅ Allow form/model level blank
+        related_name="processed_documents"
     )
     employer = models.ForeignKey(
         "user.Employer", on_delete=models.CASCADE, related_name="processed_documents"
     )
+    is_company_document = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.envelope_id} - {self.user.username} - {self.template_name}"
@@ -51,6 +58,7 @@ class SignedDocumentFile(models.Model):
     file_path = models.CharField(max_length=512)  # S3/Linode path
     template_name = models.CharField(max_length=255, null=True, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
+    is_company_document = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.file_name} for {self.user.get_full_name()}"

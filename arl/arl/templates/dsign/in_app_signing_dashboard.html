@@ -1,0 +1,26 @@
+{% extends "../base/base.html" %}
+{% block template %}
+{% load static %}
+{% include "../base/navbar.html" %}
+
+<div class="container mb-2" style="height: 95vh;">
+    <div class="row justify-content-center pt-5 mt-5"></div>
+    <div class="row justify-content-center">
+  <legend>Available Forms to Sign</legend>
+
+  {% if templates %}
+    <ul class="list-group mt-3">
+      {% for template in templates %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          {{ template.template_name }}
+          <a href="{% url 'start_in_app_signing' template.id %}" class="btn btn-outline-primary btn-sm">
+            Sign Now
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No forms available for signing right now.</p>
+  {% endif %}
+</div>
+{% endblock %}

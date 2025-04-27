@@ -4,7 +4,7 @@ import logging
 import os
 import traceback
 from functools import wraps
-
+from django.utils import timezone
 import qrcode
 from celery import chain
 from django.contrib import messages
@@ -846,7 +846,36 @@ def hr_dashboard(request):
         request.session.pop("form_data", None)
     else:
         form = NewHireInviteForm(employer=employer)
-        form = NewHireInviteForm(employer=employer)
+
+    # ✅ Check for DocuSign event
+    event = request.GET.get('event')
+    tab = request.GET.get('tab')
+    document_tab = request.GET.get('document_tab', 'employee')
+    if event and not tab:
+        # ✅ If coming back from signing and no tab selected, default to "docusign"
+        active_tab = "docusign"
+    else:
+        active_tab = tab or "docusign"  # Default to docusign if nothing else is provided
+
+    if event == "signing_complete":
+        messages.success(request, "✅ Thanks for signing your document!")
+    elif event == "decline":
+        messages.warning(request, "⚠️ You declined to sign the document.")
+    elif event == "cancel":
+        messages.warning(request, "⚠️ You canceled signing the document.")    
+
+    # ✅ Fetch employee documents (is_company_document = False)
+    employee_documents = SignedDocumentFile.objects.filter(
+        employer=employer,
+        is_company_document=False
+    )
+
+    # ✅ Fetch company documents (is_company_document = True)
+    company_documents = SignedDocumentFile.objects.filter(
+        employer=employer,
+        is_company_document=True
+    )
+
     return render(
         request,
         "user/hr_dashboard.html",
@@ -854,8 +883,11 @@ def hr_dashboard(request):
             "form": form,
             "templates": templates,
             "pending_invites": pending_invites,
-            "active_tab": request.GET.get("tab", "docusign"),
+            "active_tab": active_tab,
+            "document_tab": document_tab,
             "employer": employer,
+            "employee_documents": employee_documents,
+            "company_documents": company_documents,
         },
     )
 
@@ -968,8 +1000,14 @@ def download_signed_document(request, doc_id):
         # 🔍 Get the uploaded document
         doc = get_object_or_404(SignedDocumentFile, id=doc_id)
 
-        # 🔑 Use the file path stored in the model (e.g., "DOCUMENTS/employer/uuid/filename.pdf")
-        return download_from_s3(request, doc.file_path)
+        # 🧼 Build a clean, dynamic filename
+        employee_name = doc.user.get_full_name().replace(" ", "_") if doc.user else "Company"
+        template_clean = doc.template_name.replace(" ", "_")
+        today = timezone.now().strftime("%Y-%m-%d")
+        custom_filename = f"{employee_name}_{template_clean}_{today}.pdf"
+
+        # 🔥 Pass this custom filename into download_from_s3
+        return download_from_s3(request, doc.file_path, custom_filename)
 
     except Exception as e:
         print(f"Error in download_signed_document: {str(e)}")

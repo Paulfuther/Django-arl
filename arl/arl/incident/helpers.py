@@ -49,7 +49,10 @@ def create_pdf(incident_id):
             f"_report.pdf"
         )
         # Return the PDF as a BytesIO buffer
-        return {"status": "success", "pdf_filename": pdf_filename, "pdf_buffer": pdf_buffer}
+        return {
+            "status": "success",
+            "pdf_filename": pdf_filename,
+            "pdf_buffer": pdf_buffer}
 
     except ObjectDoesNotExist:
         error_message = f"Incident with ID {incident_id} does not exist."
