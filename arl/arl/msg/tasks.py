@@ -88,6 +88,7 @@ def master_email_send_task(
             template_data = {
                 "name": name,
                 "body": body,
+                "senior_contact_name": employer.senior_contact_name,
                 "company_name": employer.name if employer else "Company",
                 "subject": subject if subject else f"New Message from {employer.name if employer else 'Our Company'}",
             }
