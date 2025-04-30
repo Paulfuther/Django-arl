@@ -8,7 +8,6 @@ from botocore.exceptions import NoCredentialsError
 from django.conf import settings
 from django.http import HttpResponse
 from django.urls import reverse
-from django.utils.http import quote
 
 logger = logging.getLogger(__name__)
 LINODE_ACCESS_KEY = settings.LINODE_ACCESS_KEY

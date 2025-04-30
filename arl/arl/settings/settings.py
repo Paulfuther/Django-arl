@@ -200,7 +200,7 @@ TIME_ZONE = "America/New_York"
 
 USE_TZ = True
 SITE_URL = os.getenv("SITE_URL", "http://127.0.0.1:8000")
-print("site ure :", SITE_URL)
+# print("site ure :", SITE_URL)
 #if socket.gethostname() == "":
 #    SITE_URL = "https://www.1553690ontarioinc.com"
 #else:
@@ -315,14 +315,28 @@ STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
 # STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
 
 # BASE URL DEV
-BASE_URL = "https://5f0a-2607-fea8-2840-b200-9cda-d156-dea0-5d5a.ngrok-free.app"
+BASE_URL = "https://731d-2607-fea8-2840-b200-a520-f762-b4dc-93b5.ngrok-free.app"
 SITE_URL = BASE_URL
 OWNER_EMAIL = os.environ.get("OWNER_EMAIL")
 ADMIN_PHONE_NUMBER = os.environ.get("ADMIN_PHONE_NUMBER")
 MESSAGE_TAGS = {
     messages.ERROR: 'danger',  # ✅ this converts 'error' → 'danger' for Bootstrap styling
 }
-print("site url:",SITE_URL)
+print("site url:", SITE_URL)
+
+
+# settings.py (only for local dev!)
+# SESSION_COOKIE_SAMESITE = None
+# SESSION_COOKIE_SECURE = False
+# CSRF_COOKIE_SAMESITE = None
+# CSRF_COOKIE_SECURE = False
+# CSRF_TRUSTED_ORIGINS = [
+#    "https://731d-2607-fea8-2840-b200-a520-f762-b4dc-93b5.ngrok-free.app",
+# ]
+# CSRF_TRUSTED_ORIGINS = [
+#    "https://*.ngrok-free.app",
+# ]
+
 try:
     from .local_settings import *
 except ImportError:
