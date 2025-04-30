@@ -120,7 +120,7 @@
         <button type="button" id="toggle-user-dropdown" class="dropdown-toggle-btn">Select Users</button>
 
         <div id="user-dropdownBox" class="dropdown-box mb-3">
-          {% for checkbox in quick_email_form.selected_users %}
+          {% for checkbox in email_form.selected_users %}
           <div class="dropdown-option">
             {{ checkbox.tag }} {{ checkbox.choice_label }}
           </div>
