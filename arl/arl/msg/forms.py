@@ -201,18 +201,10 @@ class TemplateEmailForm(forms.Form):
         label="Select Active Users",
     )
 
-    attachment_1 = forms.FileField(required=False, label="Attachment 1")
-    attachment_2 = forms.FileField(required=False, label="Attachment 2")
-    attachment_3 = forms.FileField(required=False, label="Attachment 3")
-
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
-        # ✅ Style file fields for Bootstrap consistency
-        self.fields["attachment_1"].widget.attrs.update({"class": "form-control form-control-sm custom-upload"})
-        self.fields["attachment_2"].widget.attrs.update({"class": "form-control form-control-sm custom-upload"})
-        self.fields["attachment_3"].widget.attrs.update({"class": "form-control form-control-sm custom-upload"})
-
+        
         if user and hasattr(user, "employer"):
             employer = user.employer
 
@@ -276,9 +268,6 @@ class QuickEmailForm(forms.Form):
         required=False,
         label="Select Individual Users",
     )
-    attachment_1 = forms.FileField(required=False, label="Attachment 1")
-    attachment_2 = forms.FileField(required=False, label="Attachment 2")
-    attachment_3 = forms.FileField(required=False, label="Attachment 3")
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user", None)
@@ -313,6 +302,7 @@ class QuickEmailForm(forms.Form):
                 "You cannot select both a group and individual users."
             )
         return cleaned_data
+
 
 class CampaignSetupForm(forms.Form):
     contact_list = forms.ChoiceField(

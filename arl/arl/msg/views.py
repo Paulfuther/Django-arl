@@ -217,6 +217,7 @@ def communications(request):
     user = request.user
     active_tab = request.GET.get("tab", "email")
     print(user, active_tab)
+
     # Determine what tabs the user has access to
     valid_tabs = []
     if is_member_of_email_group(user):
@@ -251,9 +252,12 @@ def communications(request):
                 selected_users = quick_email_form.cleaned_data["selected_users"]
 
                 employer = user.employer
+                
                 attachments = collect_attachments(request)
-                if attachments is None:
-                    attachments = []
+
+                if request.FILES.getlist("attachments") and attachments is None:
+                    # User tried to upload but failed validation
+                    return redirect("/comms/?tab=quick_email") 
 
                 recipients = prepare_recipient_data(
                     user, selected_group, selected_users
@@ -294,8 +298,10 @@ def communications(request):
                 selected_users = email_form.cleaned_data.get("selected_users")
                 employer = user.employer
                 attachments = collect_attachments(request)
-                if attachments is None:
-                    attachments = []
+              
+                if request.FILES.getlist("attachments") and attachments is None:
+                    # User tried to upload but failed validation
+                    return redirect("/comms/?tab=email")
 
                 recipients = prepare_recipient_data(
                     user, selected_group, selected_users

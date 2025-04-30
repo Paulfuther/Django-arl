@@ -745,21 +745,26 @@ def get_all_contact_lists():
         print("Error retrieving contact lists:", e)
 
 
-def collect_attachments(request):
+def collect_attachments(request, max_files=5):
     attachments = []
-    for field_name in ["attachment_1", "attachment_2", "attachment_3"]:
-        file = request.FILES.get(field_name)
-        if file:
-            if file.size > 10 * 1024 * 1024:
-                messages.error(request, f"{file.name} exceeds 10MB limit.")
-                return None
-            attachments.append(
-                {
-                    "file_name": file.name,
-                    "file_type": file.content_type,
-                    "file_content": base64.b64encode(file.read()).decode("utf-8"),
-                }
-            )
+
+    uploaded_files = request.FILES.getlist("attachments")
+    print("Files :", uploaded_files)
+    if len(uploaded_files) > max_files:
+        messages.error(request, f"You can upload up to {max_files} files only.")
+        return None
+
+    for file in uploaded_files:
+        if file.size > 10 * 1024 * 1024:  # 10MB per file
+            messages.error(request, f"{file.name} exceeds 10MB limit.")
+            return None
+
+        attachments.append({
+            "file_name": file.name,
+            "file_type": file.content_type,
+            "file_content": base64.b64encode(file.read()).decode("utf-8"),
+        })
+
     return attachments
 
 

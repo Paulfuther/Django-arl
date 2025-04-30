@@ -1,6 +1,56 @@
 {% load crispy_forms_tags %}
 
 <style>
+
+.dropdown-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 12px 16px;
+    background-color: #f8f9fa;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    position: relative;
+  }
+
+  .dropdown-toggle-btn:hover {
+    background-color: #e9ecef;
+  }
+
+  .dropdown-toggle-btn::after {
+    content: "▼";
+    font-size: 0.9rem;
+    transition: transform 0.3s ease;
+    margin-left: auto;
+  }
+
+  .dropdown-toggle-btn.open::after {
+    transform: rotate(180deg);
+    content: "▲";
+  }
+
+  .dropdown-box {
+    border: 1px solid #ccc;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    overflow: hidden;
+    max-height: 0;
+    opacity: 0;
+    transition: max-height 0.4s ease, opacity 0.4s ease;
+    background: white;
+    padding: 0;
+  }
+
+  .dropdown-box.open {
+    max-height: 400px; /* adjust if needed */
+    opacity: 1;
+    padding: 8px 0;
+  }
+
   .custom-upload {
   border: 1px solid #ccc;
   border-radius: 6px;
@@ -16,7 +66,7 @@
 </style>
 
 
-<form method="post" enctype="multipart/form-data">
+<form id="template-email-form" method="post" enctype="multipart/form-data">
   {% csrf_token %}
   <input type="hidden" name="form_type" value="email" />
 
@@ -38,113 +88,145 @@
     </div>
   {% endfor %}
 {% endif %}
+<div id="template-email-spinner" class="mt-3 text-center" style="display: none;">
+  <span class="dot-loader"><span></span><span></span><span></span></span>
+  <div class="text-muted small mt-1">Sending your email…</div>
+</div>
   <legend class="border-bottom mb-3">Send Email Template</legend>
 
-  <!-- Template Selection -->
-  <div class="mb-3 border rounded p-3">
-    <div class="d-flex align-items-center">
-      <button type="button" class="btn btn-link p-0 me-2" id="toggle-template">
-        <span id="arrow-template">►</span>
-      </button>
-      <strong>Select Template(s)</strong>
-    </div>
-    <div id="template-section" class="mt-2 checkbox-group" style="display: none; max-height: 200px; overflow-y: auto;">
-      {{ email_form.sendgrid_id }}
-    </div>
-  </div>
+          <!-- Template Selection -->
+        <button type="button" id="toggle-template-dropdown" class="dropdown-toggle-btn">Select Template</button>
 
-  <!-- Group Selection -->
-  <div class="mb-3 border rounded p-3">
-    <div class="d-flex align-items-center">
-      <button type="button" class="btn btn-link p-0 me-2" id="toggle-group">
-        <span id="arrow-group">►</span>
-      </button>
-      <strong>Select Group(s)</strong>
-    </div>
-    <div id="group-section" class="mt-2 checkbox-group" style="display: none; max-height: 200px; overflow-y: auto;">
-      {{ email_form.selected_group }}
-    </div>
-  </div>
+        <div id="template-dropdownBox" class="dropdown-box mb-3">
+          {% for radio in email_form.sendgrid_id %}
+            <div class="dropdown-option">
+              {{ radio.tag }} {{ radio.choice_label }}
+            </div>
+          {% endfor %}
+        </div>
 
- <!-- User Selection -->
-<div class="mb-3 border rounded p-3">
-  <div class="d-flex align-items-center">
-    <button type="button" class="btn btn-link p-0 me-2" id="toggle-users">
-      <span id="arrow-users">►</span>
-    </button>
-    <strong>Select Individual Users</strong>
-  </div>
-  <div id="users-section" class="mt-2" style="display: none; max-height: 250px; overflow-y: auto;">
-    <div class="form-check mb-2">
-      <input type="checkbox" class="form-check-input" id="select-all-users">
-      <label class="form-check-label" for="select-all-users">Select All Users</label>
-    </div>
+        <!-- Group Selection -->
+        <button type="button" id="toggle-template-group" class="dropdown-toggle-btn">Select Group</button>
 
-    {% for user in email_form.fields.selected_users.queryset %}
-      <div class="form-check">
-        <input class="form-check-input user-checkbox" type="checkbox" name="selected_users" value="{{ user.id }}" id="user-{{ user.id }}">
-        <label class="form-check-label" for="user-{{ user.id }}">
-          {{ user.get_full_name }} ({{ user.email }}) ({{user.employer}})
-        </label>
+        <div id="template-groupBox" class="dropdown-box mb-3">
+          {% for radio in email_form.selected_group %}
+            <div class="dropdown-option">
+              {{ radio.tag }} {{ radio.choice_label }}
+            </div>
+          {% endfor %}
+        </div>
+
+        <!-- User Selection -->
+        <button type="button" id="toggle-user-dropdown" class="dropdown-toggle-btn">Select Users</button>
+
+        <div id="user-dropdownBox" class="dropdown-box mb-3">
+          {% for checkbox in quick_email_form.selected_users %}
+          <div class="dropdown-option">
+            {{ checkbox.tag }} {{ checkbox.choice_label }}
+          </div>
+        {% endfor %}
       </div>
-    {% empty %}
-      <p class="text-muted">No users found for your employer.</p>
-    {% endfor %}
-  </div>
-</div>
 
-  <!-- Attachment Uploads -->
-<div class="mb-3 border rounded p-3">
-  <strong class="mb-2 d-block">Upload Attachments (Max 3 files, 10MB each)</strong>
+          <!-- Attachment Uploads -->
+          <div class="form-group">
+            <label for="attachments">Attach Files</label>
+            <input type="file" id="attachments" name="attachments" multiple class="form-control custom-upload">
+            <small class="form-text text-muted">
+              You can upload up to 5 files. Each file should be less than 10MB.
+            </small>
+            </div>
 
-  <div class="row g-2">
-    <div class="col-md-4">
-      {{ email_form.attachment_1|as_crispy_field }}
-    </div>
-    <div class="col-md-4">
-      {{ email_form.attachment_2|as_crispy_field }}
-    </div>
-    <div class="col-md-4">
-      {{ email_form.attachment_3|as_crispy_field }}
-    </div>
-  </div>
-
-  <small class="text-muted mt-2 d-block">Accepted file types: PDF, DOCX, PNG, JPG</small>
-</div>
-  <button type="submit" class="btn btn-outline-primary mobile-btn mt-3">Send</button>
-</form>
-
-<script>
-  $(document).ready(function () {
-    toggleSection("toggle-template", "arrow-template", "template-section");
-    toggleSection("toggle-group", "arrow-group", "group-section");
-    toggleSection("toggle-users", "arrow-users", "users-section");
-  });
-
-  function toggleSection(btnId, arrowId, sectionId) {
-    const button = document.getElementById(btnId);
-    const section = document.getElementById(sectionId);
-    const arrow = document.getElementById(arrowId);
-
-    if (button) {
-      button.addEventListener("click", () => {
-        const isHidden = section.style.display === "none";
-        section.style.display = isHidden ? "block" : "none";
-        arrow.textContent = isHidden ? "▼" : "►";
-      });
-    }
-  }
-</script>
-
-<script>
-  document.addEventListener("DOMContentLoaded", function () {
-    const selectAll = document.getElementById("select-all-users");
-    const userCheckboxes = document.querySelectorAll(".user-checkbox");
-
-    if (selectAll && userCheckboxes.length > 0) {
-      selectAll.addEventListener("change", function () {
-        userCheckboxes.forEach(cb => cb.checked = this.checked);
-      });
-    }
-  });
-</script>
+          <button type="submit" class="btn btn-outline-primary mt-3">Send Email</button>
+        </form>
+        <script>
+          document.addEventListener("DOMContentLoaded", function () {
+          
+            // === 🔽 Dropdown Setup (Template, Group, Users) ===
+            function initDropdown(toggleSelector, boxSelector, inputType = "radio") {
+              const toggleBtn = document.querySelector(toggleSelector);
+              const box = document.querySelector(boxSelector);
+          
+              if (!toggleBtn || !box) return;
+          
+              toggleBtn.addEventListener("click", function () {
+                box.classList.toggle("open");
+                toggleBtn.classList.toggle("open");
+              });
+          
+              box.querySelectorAll(`input[type=${inputType}]`).forEach(input => {
+                input.addEventListener("change", () => {
+                  if (inputType === "radio") {
+                    const label = input.closest(".dropdown-option")?.textContent.trim();
+                    toggleBtn.textContent = label || "Select";
+                    box.classList.remove("open");
+                    toggleBtn.classList.remove("open");
+                  } else if (inputType === "checkbox") {
+                    const selected = Array.from(box.querySelectorAll('input[type=checkbox]:checked'))
+                      .map(cb => cb.closest(".dropdown-option")?.textContent.trim())
+                      .join(", ");
+                    toggleBtn.textContent = selected || "Select Users";
+                  }
+                });
+              });
+            }
+          
+            // ✅ Hook up dropdowns
+            initDropdown("#toggle-template-dropdown", "#template-dropdownBox", "radio");
+            initDropdown("#toggle-template-group", "#template-groupBox", "radio");
+            initDropdown("#toggle-user-dropdown", "#user-dropdownBox", "checkbox");
+          
+            // === ☑️ "Select All" for user checkboxes ===
+            const selectAll = document.getElementById("select-all-users");
+            const userCheckboxes = document.querySelectorAll(".user-checkbox");
+          
+            if (selectAll && userCheckboxes.length > 0) {
+              selectAll.addEventListener("change", function () {
+                userCheckboxes.forEach(cb => cb.checked = this.checked);
+              });
+            }
+          
+            // === 📎 Attachment Validation + Spinner ===
+            const form = document.getElementById("template-email-form");
+            const fileInput = document.querySelector('#template-email-form input[type="file"][name="attachments"]');
+          
+            if (form && fileInput) {
+              form.addEventListener("submit", function (e) {
+                if (form.dataset.submitted) {
+                  e.preventDefault();
+                  return;
+                }
+          
+                const files = fileInput.files;
+                const maxFiles = 5;
+                const maxSize = 10 * 1024 * 1024;
+          
+                if (files.length > maxFiles) {
+                  alert(`❌ You can upload up to ${maxFiles} files.`);
+                  e.preventDefault();
+                  return;
+                }
+          
+                for (let file of files) {
+                  if (file.size > maxSize) {
+                    alert(`❌ ${file.name} exceeds the 10MB size limit.`);
+                    e.preventDefault();
+                    return;
+                  }
+                }
+          
+                // ✅ Valid — Show spinner and block resubmit
+                form.dataset.submitted = true;
+          
+                const spinner = document.getElementById("template-email-spinner");
+                if (spinner) spinner.style.display = "block";
+          
+                const submitBtn = form.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                  submitBtn.disabled = true;
+                  submitBtn.innerHTML = "Sending...";
+                }
+              });
+            }
+          
+          });
+          </script>
