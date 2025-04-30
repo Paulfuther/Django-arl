@@ -43,21 +43,34 @@
 <form method="post">
   {% csrf_token %}
   <input type="hidden" name="form_type" value="sms">
-  <legend class="border-bottom mb-3">Send A Text</legend>
-  {{ sms_form.message}}
   
+  <legend class="border-bottom mb-3">Send A Text</legend>
+
+  <!-- Message Field -->
+  <div class="mb-3">
+    <label for="{{ sms_form.message.id_for_label }}" class="form-label">Message</label>
+    {{ sms_form.message }}
+    {% if sms_form.message.errors %}
+      <div class="text-danger small">{{ sms_form.message.errors.0 }}</div>
+    {% endif %}
+  </div>
+
+  <!-- Group Dropdown -->
   <label class="form-label">Select Group</label>
   <button type="button" id="toggleGroups" class="dropdown-toggle-btn">Choose Group</button>
 
-  <div id="groupBox" class="dropdown-box">
+  <div id="groupBox" class="dropdown-box mb-3">
     {% for radio in sms_form.selected_group %}
       <div class="dropdown-option">
         {{ radio.tag }} {{ radio.choice_label }}
       </div>
+    {% empty %}
+      <p class="text-muted px-3">No groups available for your employer.</p>
     {% endfor %}
   </div>
 
-  <button type="submit" class="btn btn-outline-primary mobile-btn mt-3">Send SMS</button>
+  <!-- Submit Button -->
+  <button type="submit" class="btn btn-outline-primary mt-3">Send SMS</button>
 </form>
 
 <script>

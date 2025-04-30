@@ -25,9 +25,17 @@
  
     {% endif %}
 
-   
+    {% if can_send_sms %}
+    <li class="nav-item">
+      <a class="nav-link {% if active_tab == 'sms' %}active{% endif %}" data-bs-toggle="tab" href="#sms">SMS</a>
+    </li>
+    {% endif %}
 
-    
+    {% if can_send_docusign %}
+    <li class="nav-item">
+      <a class="nav-link {% if active_tab == 'docusign' %}active{% endif %}" data-bs-toggle="tab" href="#docusign">DSign</a>
+    </li>
+    {% endif %}
   </ul>
 
   <!-- Tab Content -->
@@ -40,8 +48,13 @@
       {% include "msg/quick_email_form.html" %}
     </div>
 
-   
-    
+    <div id="sms" class="tab-pane fade {% if active_tab == 'sms' %}show active{% endif %}">
+      {% include "msg/sms_form.html" %}
+    </div>
+
+    <div id="docusign" class="tab-pane fade {% if active_tab == 'docusign' %}show active{% endif %}">
+      {% include "dsign/name_email_form.html" %}
+    </div>
 
     
   </div>

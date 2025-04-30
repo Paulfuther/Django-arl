@@ -233,10 +233,10 @@ def communications(request):
         active_tab = valid_tabs[0] if valid_tabs else None
 
     # Default forms
-    #sms_form = SMSForm(user=user)
+    sms_form = SMSForm(user=user)
     email_form = TemplateEmailForm(user=user)
     quick_email_form = QuickEmailForm(user=user)
-    #docusign_form = NameEmailForm(user=user)
+    docusign_form = NameEmailForm(user=user)
 
     if request.method == "POST":
         form_type = request.POST.get("form_type")
@@ -330,9 +330,9 @@ def communications(request):
 
             if sms_form.is_valid():
                 group = sms_form.cleaned_data["selected_group"]
-                message = sms_form.cleaned_data["message"]
+                sms_message = sms_form.cleaned_data["message"]
 
-                send_one_off_bulk_sms_task.delay(group.id, message, user.id)
+                send_one_off_bulk_sms_task.delay(group.id, sms_message, user.id)
                 messages.success(request, "SMS is being sent.")
                 return redirect("/comms/?tab=sms")
 
@@ -377,12 +377,12 @@ def communications(request):
         {
             "email_form": email_form,
             "quick_email_form": quick_email_form,
-            #"sms_form": sms_form,
-            #"docusign_form": docusign_form,
+            "sms_form": sms_form,
+            "docusign_form": docusign_form,
             "active_tab": active_tab,
             "can_send_email": is_member_of_email_group(user),
-            #"can_send_sms": is_member_of_msg_group(user),
-            #"can_send_docusign": is_member_of_docusign_group(user),
+            "can_send_sms": is_member_of_msg_group(user),
+            "can_send_docusign": is_member_of_docusign_group(user),
         },
     )
 
