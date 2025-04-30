@@ -233,7 +233,7 @@ def communications(request):
         active_tab = valid_tabs[0] if valid_tabs else None
 
     # Default forms
-    sms_form = SMSForm(user=user)
+    #sms_form = SMSForm(user=user)
     email_form = TemplateEmailForm(user=user)
     quick_email_form = QuickEmailForm(user=user)
     #docusign_form = NameEmailForm(user=user)
@@ -377,11 +377,11 @@ def communications(request):
         {
             "email_form": email_form,
             "quick_email_form": quick_email_form,
-            "sms_form": sms_form,
+            #"sms_form": sms_form,
             #"docusign_form": docusign_form,
             "active_tab": active_tab,
             "can_send_email": is_member_of_email_group(user),
-            "can_send_sms": is_member_of_msg_group(user),
+            #"can_send_sms": is_member_of_msg_group(user),
             #"can_send_docusign": is_member_of_docusign_group(user),
         },
     )
