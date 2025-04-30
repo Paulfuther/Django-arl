@@ -1,5 +1,5 @@
 
-{% load crispy_forms_tags %}
+
 <style>
   .dropdown-box {
     border: 1px solid #ccc;
@@ -63,7 +63,7 @@
   {% csrf_token %}
   <input type="hidden" name="form_type" value="sms">
   <legend class="border-bottom mb-3">Send A Text</legend>
-  {{ sms_form.message|as_crispy_field }}
+  {{ sms_form.message}}
   
   <label class="form-label">Select Group</label>
   <button type="button" id="toggleGroups" class="dropdown-toggle-btn">Choose Group</button>
