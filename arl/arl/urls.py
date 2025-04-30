@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.urls import include, path
 
 from arl.user.views import CustomAdminLoginView
-
+from django.views.generic import TemplateView
 
 admin.site.login = CustomAdminLoginView.as_view()
 
@@ -19,9 +19,14 @@ urlpatterns = [
     path("", include("arl.payroll.urls")),
     path("", include("arl.carwash.urls")),
     path("", include("arl.setup.urls")),
-    path("", include("arl.helpdesk.urls"))
-    
+    path("", include("arl.helpdesk.urls")),
+    path(
+        "40ebffa97ba5035264526bdf252ca040.html",
+        TemplateView.as_view(template_name="twilio/40ebffa97ba5035264526bdf252ca040.html"),
+    ),
 ]
+    
+
 
 
 handler403 = "arl.views.error_403"
