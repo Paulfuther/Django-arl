@@ -1,4 +1,4 @@
-
+{% load crispy_forms_tags %}
 
 <style>
 
@@ -145,11 +145,11 @@
   <legend class="border-bottom mb-4">Send a Quick Email</legend>
 
   <div class="mb-3">
-    {{ quick_email_form.subject }}
+    {{ quick_email_form.subject|as_crispy_field }}
   </div>
 
   <div class="mb-3">
-    {{ quick_email_form.message }}
+    {{ quick_email_form.message|as_crispy_field }}
   </div>
 
   <!-- ✅ Group Dropdown -->

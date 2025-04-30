@@ -25,8 +25,6 @@ urlpatterns = [
         TemplateView.as_view(template_name="twilio/40ebffa97ba5035264526bdf252ca040.html"),
     ),
 ]
-    
-
 
 
 handler403 = "arl.views.error_403"
