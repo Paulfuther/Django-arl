@@ -1,14 +1,17 @@
 import json
 import logging
 import urllib.parse
+from django.http import JsonResponse
+from django.contrib.auth import get_user_model
 
+from django.db.models import Q
 from celery.result import AsyncResult
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import Group
 from django.forms import modelformset_factory
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views.decorators.csrf import csrf_exempt
@@ -61,6 +64,7 @@ from .tasks import (
 )
 
 logger = logging.getLogger(__name__)
+User = get_user_model()
 
 
 class SendTemplateWhatsAppView(LoginRequiredMixin, UserPassesTestMixin, FormView):
@@ -610,3 +614,24 @@ def tobacco_vape_policy_view(request):
     Render the Tobacco and Vape Products Required Action Policy.
     """
     return render(request, "msg/tobacco_vape_policy.html")
+
+
+@login_required
+def search_users_view(request):
+    query = request.GET.get("search", "")
+    employer = request.user.employer
+
+    users = User.objects.filter(employer=employer, is_active=True).order_by("last_name", "first_name")
+    if query:
+        users = users.filter(
+            Q(first_name__icontains=query) |
+            Q(last_name__icontains=query) |
+            Q(email__icontains=query)
+        )
+
+    selected_ids = request.GET.getlist("selected_users")
+
+    return render(request, "msg/partials/user_checkboxes.html", {
+        "users": users,
+        "selected_ids": selected_ids
+    })

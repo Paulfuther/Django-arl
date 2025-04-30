@@ -222,10 +222,12 @@ class TemplateEmailForm(forms.Form):
             self.fields["selected_users"].queryset = User.objects.filter(
                 employer=employer,
                 is_active=True
-            ).order_by("last_name", "first_name")
+            ).order_by("last_name")
 
-            # ✅ Show full name with employer
-            self.fields["selected_users"].label_from_instance = lambda u: f"{u.get_full_name()} - {u.email} ({u.employer.name if u.employer else 'No Employer'})"
+            self.fields["selected_users"].label_from_instance = lambda u: (
+                f"{u.last_name}, {u.first_name} – {u.email} "
+                f"({u.employer.name if u.employer else 'No Employer'})"
+            )
 
     def clean(self):
         cleaned_data = super().clean()
@@ -280,12 +282,15 @@ class QuickEmailForm(forms.Form):
                 user__employer=employer
             ).distinct().order_by("name")
 
+            # ✅ Active users from this employer, sorted alphabetically
             self.fields["selected_users"].queryset = User.objects.filter(
-                employer=employer, is_active=True
-            ).order_by("last_name", "first_name")
+                employer=employer,
+                is_active=True
+            ).order_by("last_name")
 
-            self.fields["selected_users"].label_from_instance = (
-                lambda u: f"{u.get_full_name()} - {u.email} ({u.employer.name if u.employer else 'No Employer'})"
+            self.fields["selected_users"].label_from_instance = lambda u: (
+                f"{u.last_name}, {u.first_name} – {u.email} "
+                f"({u.employer.name if u.employer else 'No Employer'})"
             )
 
     def clean(self):

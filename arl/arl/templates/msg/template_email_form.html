@@ -107,17 +107,33 @@
           {% endfor %}
         </div>
 
-        <!-- User Selection -->
-        <button type="button" id="toggle-user-dropdown" class="dropdown-toggle-btn">Select Users</button>
+          <!-- User Selection -->
+          <button type="button" id="toggle-user-dropdown" class="dropdown-toggle-btn">Select Users</button>
 
-        <div id="user-dropdownBox" class="dropdown-box mb-3">
-          {% for checkbox in email_form.selected_users %}
-          <div class="dropdown-option">
-            {{ checkbox.tag }} {{ checkbox.choice_label }}
+          <div id="user-dropdownBox" class="dropdown-box mb-3">
+
+            <!-- 🔍 Search Input -->
+            <div class="px-3 mb-2">
+            <input type="text"
+                  name="search"
+                  class="form-control mb-2"
+                  placeholder="Search users..."
+                  hx-get="{% url 'search_users' %}"
+                  hx-trigger="keyup changed delay:200ms"
+                  hx-target="#user-checkbox-list"
+                  hx-include="[name='csrfmiddlewaretoken'], input[name='selected_users']:checked"
+                  autocomplete="off">
+            </div>
+            <!-- ✅ Selection Summary -->
+            <div id="selected-summary" class="mb-2 text-muted small ps-2">
+              0 users selected
+            </div>
+            <!-- 🔁 Live Result Target -->
+            <div id="user-checkbox-list">
+              {% include "msg/partials/user_checkboxes.html" with users=email_form.fields.selected_users.queryset %}
+            </div>
+
           </div>
-        {% endfor %}
-      </div>
-
           <!-- Attachment Uploads -->
           <div class="form-group">
             <label for="attachments">Attach Files</label>
@@ -155,7 +171,7 @@
                     const selected = Array.from(box.querySelectorAll('input[type=checkbox]:checked'))
                       .map(cb => cb.closest(".dropdown-option")?.textContent.trim())
                       .join(", ");
-                    toggleBtn.textContent = selected || "Select Users";
+                      updateSelectedSummary();;
                   }
                 });
               });
@@ -221,3 +237,39 @@
           
           });
           </script>
+
+
+<script>
+  document.addEventListener("htmx:afterSwap", function (e) {
+    if (e.detail.target.id === "user-checkbox-list") {
+      const selectAll = document.getElementById("select-all-users");
+      const checkboxes = document.querySelectorAll(".user-checkbox");
+
+      if (selectAll && checkboxes.length > 0) {
+        selectAll.addEventListener("change", function () {
+          checkboxes.forEach(cb => cb.checked = this.checked);
+          updateSelectedSummary();
+        });
+      }
+
+      checkboxes.forEach(cb => {
+        cb.addEventListener("change", updateSelectedSummary);
+      });
+
+      updateSelectedSummary();
+    }
+  });
+
+  function updateSelectedSummary() {
+    const checked = document.querySelectorAll(".user-checkbox:checked");
+    const summary = document.getElementById("selected-summary");
+
+    if (summary) {
+      const count = checked.length;
+      summary.textContent = `${count} user${count === 1 ? '' : 's'} selected`;
+    }
+  }
+
+  // Initial run for when page first loads
+  document.addEventListener("DOMContentLoaded", updateSelectedSummary);
+</script>

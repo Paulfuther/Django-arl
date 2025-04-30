@@ -1,0 +1,62 @@
+<!-- Select All Checkbox -->
+<div class="form-check mb-2" style="padding-left: 2rem;">
+  <input type="checkbox" class="form-check-input" id="select-all-users">
+  <label class="form-check-label ps-2" for="select-all-users">Select All Users</label>
+</div>
+
+<!-- User List -->
+{% for user in users %}
+  <div class="dropdown-option">
+    <input type="checkbox"
+           name="selected_users"
+           value="{{ user.id }}"
+           class="form-check-input user-checkbox"
+           id="user-{{ user.id }}"
+           {% if user.id|stringformat:"s" in selected_ids %}checked{% endif %}>
+    <label class="form-check-label" for="user-{{ user.id }}">
+      {{ user.last_name }}, {{ user.first_name }} ({{ user.email }}) ({{ user.employer.name }})
+    </label>
+  </div>
+{% empty %}
+  <p class="text-muted px-2">No users found.</p>
+{% endfor %}
+
+<script>
+  function updateSelectedSummary() {
+    const checked = document.querySelectorAll(".user-checkbox:checked");
+    const summary = document.getElementById("selected-summary");
+
+    if (summary) {
+      const count = checked.length;
+      summary.textContent = `${count} user${count === 1 ? '' : 's'} selected`;
+    }
+  }
+
+  function bindCheckboxHandlers() {
+    const selectAll = document.getElementById("select-all-users");
+    const checkboxes = document.querySelectorAll(".user-checkbox");
+
+    if (selectAll && checkboxes.length > 0) {
+      selectAll.checked = checkboxes.length > 0 && Array.from(checkboxes).every(cb => cb.checked);
+
+      selectAll.addEventListener("change", function () {
+        checkboxes.forEach(cb => cb.checked = this.checked);
+        updateSelectedSummary();
+      });
+    }
+
+    checkboxes.forEach(cb => {
+      cb.addEventListener("change", updateSelectedSummary);
+    });
+
+    updateSelectedSummary();
+  }
+
+  document.addEventListener("DOMContentLoaded", bindCheckboxHandlers);
+
+  document.addEventListener("htmx:afterSwap", function (e) {
+    if (e.detail.target.id === "user-checkbox-list") {
+      bindCheckboxHandlers();
+    }
+  });
+</script>
