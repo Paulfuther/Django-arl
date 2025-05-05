@@ -12,7 +12,8 @@ from arl.msg.views import (EmailEventList, FetchTwilioCallsView,
                            template_email_success_view,
                            template_whats_app_success_view, whatsapp_webhook,
                            tobacco_vape_policy_view, sms_summary_view,
-                           fetch_sms_data, search_users_view)
+                           fetch_sms_data, search_users_view,
+                           latest_compliance_file)
 
 urlpatterns = [
     path("sendgrid_hook/", sendgrid_webhook, name="sendgrid_webhook"),
@@ -53,4 +54,5 @@ urlpatterns = [
     path('get-group-emails/', get_group_emails, name='get_group_emails'),
     path('tobacco-vape-policy/', tobacco_vape_policy_view, name='tobacco_vape_policy'),
     path("search-users/", search_users_view, name="search_users"),
+    path("messages/compliance/", latest_compliance_file, name="latest_compliance"),
 ]

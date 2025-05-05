@@ -18,7 +18,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormView
 from waffle.decorators import waffle_flag
-
+from .models import ComplianceFile
 from arl.dsign.forms import NameEmailForm
 from arl.dsign.tasks import create_docusign_envelope_task
 from arl.msg.helpers import (
@@ -374,7 +374,8 @@ def communications(request):
                 return redirect("/comms/?tab=docusign")
 
             messages.error(request, "Please correct the DocuSign form.")
-    
+            
+    selected_ids = request.POST.getlist("selected_users") if request.method == "POST" else []
     return render(
         request,
         "msg/master_comms.html",
@@ -387,6 +388,7 @@ def communications(request):
             "can_send_email": is_member_of_email_group(user),
             "can_send_sms": is_member_of_msg_group(user),
             "can_send_docusign": is_member_of_docusign_group(user),
+            "selected_ids": selected_ids,
         },
     )
 
@@ -635,3 +637,11 @@ def search_users_view(request):
         "users": users,
         "selected_ids": selected_ids
     })
+
+
+# View for weekly compliance notes
+def latest_compliance_file(request):
+    file = ComplianceFile.objects.filter(is_active=True).first()
+    if file:
+        return redirect(file.file.url)
+    return redirect("/")  # fallback

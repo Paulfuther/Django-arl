@@ -159,4 +159,14 @@ class EmailList(models.Model):
     is_active = models.BooleanField(default=True)
 
 
+class ComplianceFile(models.Model):
+    title = models.CharField(max_length=255, default="Weekly Compliance Policy")
+    file = models.FileField(upload_to="compliance/")
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)  # Only one active file at a time
 
+    def __str__(self):
+        return f"{self.title} - {self.uploaded_at.strftime('%Y-%m-%d')}"
+
+    class Meta:
+        ordering = ["-uploaded_at"]
