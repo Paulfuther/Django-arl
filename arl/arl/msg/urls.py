@@ -13,7 +13,10 @@ from arl.msg.views import (EmailEventList, FetchTwilioCallsView,
                            template_whats_app_success_view, whatsapp_webhook,
                            tobacco_vape_policy_view, sms_summary_view,
                            fetch_sms_data, search_users_view,
-                           latest_compliance_file)
+                           latest_compliance_file,
+                           compliance_file_view,
+                           upload_attachment, twilio_short_link_webhook)
+
 
 urlpatterns = [
     path("sendgrid_hook/", sendgrid_webhook, name="sendgrid_webhook"),
@@ -55,4 +58,7 @@ urlpatterns = [
     path('tobacco-vape-policy/', tobacco_vape_policy_view, name='tobacco_vape_policy'),
     path("search-users/", search_users_view, name="search_users"),
     path("messages/compliance/", latest_compliance_file, name="latest_compliance"),
+    path("compliance/", compliance_file_view, name="compliance"),
+    path("upload-attachment/", upload_attachment, name="upload_attachment"),
+    path("twilio/webhook/short-link/", twilio_short_link_webhook, name="twilio_short_link_webhook"),
 ]

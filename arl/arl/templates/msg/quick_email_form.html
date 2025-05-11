@@ -48,17 +48,7 @@
     margin-right: 10px;
   }
 
-  .dropdown-toggle-btn {
-    background-color: #f8f9fa;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    padding: 10px 12px;
-    width: 100%;
-    text-align: left;
-    font-weight: 500;
-    cursor: pointer;
-    margin-bottom: 10px;
-  }
+  
 
   .dropdown-toggle-btn.open {
     border-bottom-left-radius: 0;
@@ -141,7 +131,6 @@
     <div class="text-muted small mt-1">Sending your email…</div>
   </div>
 
-
   <legend class="border-bottom mb-4">Send a Quick Email</legend>
 
   <div class="mb-3">
@@ -152,9 +141,8 @@
     {{ quick_email_form.message|as_crispy_field }}
   </div>
 
-  <!-- ✅ Group Dropdown -->
+  <!-- Group Selection -->
   <button type="button" id="toggle-Groups" class="dropdown-toggle-btn">Select Group</button>
-
   <div id="group-Box" class="dropdown-box mb-3">
     {% for radio in quick_email_form.selected_group %}
       <div class="dropdown-option">
@@ -163,103 +151,109 @@
     {% endfor %}
   </div>
 
-  <!-- ✅ Users Dropdown -->
-  <button type="button" id="toggle-Users" class="dropdown-toggle-btn">Select Users</button>
+  <!-- User Selection -->
+  <!-- 👇 Button with label span for summary -->
+<button type="button" id="toggle-quick-dropdown" class="dropdown-toggle-btn">
+  <span id="quick-summary-label">Select Users</span>
+</button>
 
-  <div id="user-Box" class="dropdown-box mb-3">
-    {% for checkbox in quick_email_form.selected_users %}
-      <div class="dropdown-option">
-        {{ checkbox.tag }} {{ checkbox.choice_label }}
-      </div>
-    {% endfor %}
+<!-- 🔽 Dropdown content -->
+<div id="quick-user-box" class="dropdown-box mb-3">
+  <div class="px-3 mb-2">
+    <input type="text"
+           name="search"
+           class="form-control"
+           placeholder="Search users..."
+           hx-get="{% url 'search_users' %}"
+           hx-trigger="keyup changed delay:200ms"
+           hx-target="#quick-user-checkbox-list"
+           hx-include="[name='csrfmiddlewaretoken'], input[name='selected_users']:checked"
+           autocomplete="off">
   </div>
 
-  <!-- File Uploads  -->
-
+  <div id="quick-user-checkbox-list">
+    {% include "msg/partials/user_checkboxes_quick.html" with users=quick_email_form.fields.selected_users.queryset selected_ids=quick_selected_ids %}
+  </div>
+</div>
+    
+  <!-- File Uploads -->
   <div class="form-group">
     <label for="attachments">Attach Files</label>
     <input type="file" id="attachments" name="attachments" multiple class="form-control custom-upload">
     <small class="form-text text-muted">
         You can upload up to 5 files. Each file should be less than 10MB.
     </small>
-</div>
+  </div>
 
   <button type="submit" class="btn btn-outline-primary mt-3">Send Email</button>
-  
 </form>
-
 <script>
   document.addEventListener("DOMContentLoaded", function () {
-  
-    function initDropdown(toggleSelector, boxSelector, inputType = "radio") {
-      const toggleBtn = document.querySelector(toggleSelector);
-      const box = document.querySelector(boxSelector);
-  
-      if (!toggleBtn || !box) return;
-  
+    // ✅ Toggle dropdowns
+    function initDropdown(toggleId, wrapperId, updateCallback = null) {
+      const toggleBtn = document.getElementById(toggleId);
+      const wrapper = document.getElementById(wrapperId);
+
+      if (!toggleBtn || !wrapper) return;
+
       toggleBtn.addEventListener("click", function () {
-        box.classList.toggle("open");
+        wrapper.classList.toggle("open");
         toggleBtn.classList.toggle("open");
-      });
-  
-      box.querySelectorAll(`input[type=${inputType}]`).forEach(input => {
-        input.addEventListener("change", () => {
-          if (inputType === "radio") {
-            const label = input.closest(".dropdown-option")?.textContent.trim();
-            toggleBtn.textContent = label || "Select";
-            box.classList.remove("open");
-            toggleBtn.classList.remove("open");
-          } else if (inputType === "checkbox") {
-            const selected = Array.from(box.querySelectorAll('input[type=checkbox]:checked'))
-              .map(cb => cb.closest(".dropdown-option")?.textContent.trim())
-              .join(", ");
-            toggleBtn.textContent = selected || "Select Users";
-          }
-        });
+        if (updateCallback) updateCallback();
       });
     }
-  
-    // Initialize dropdowns for all tabs
-    initDropdown("#toggle-Groups", "#group-Box", "radio");
-    initDropdown("#toggle-Users", "#user-Box", "checkbox");
-  
-    // Auto-fill subject
+
+    // ✅ Update summary in button
+    function updateQuickUserSummary() {
+      const checked = document.querySelectorAll(".quick-user-checkbox:checked");
+      const label = document.getElementById("quick-summary-label");
+      if (label) {
+        const count = checked.length;
+        label.textContent = count > 0 ? `${count} user${count > 1 ? "s" : ""} selected` : "Select Users";
+      }
+    }
+
+    // ✅ Dropdown init
+    initDropdown("toggle-quick-summary", "quick-summary-wrapper", updateQuickUserSummary);
+    initDropdown("toggle-template-summary", "template-summary-wrapper");
+
+    // ✅ Auto-fill subject
     const subjectInput = document.getElementById('id_subject');
     const bodyInput = document.getElementById('id_message');
     const defaultCompanyName = "{{ employer_name|escapejs }}" || "Our Company";
-  
+
     function fillDefaultSubject() {
       if (subjectInput && bodyInput && !subjectInput.value.trim()) {
         subjectInput.value = `New Message from ${defaultCompanyName}`;
       }
     }
-  
+
     if (bodyInput) {
       bodyInput.addEventListener('focus', fillDefaultSubject);
       bodyInput.addEventListener('input', fillDefaultSubject);
     }
-  
-    // Form submit handling
+
+    // ✅ Form submission and attachment validation
     const form = document.getElementById("quick-email-form");
     const fileInput = document.querySelector('#quick-email-form input[type="file"][name="attachments"]');
-  
+
     if (form && fileInput) {
       form.addEventListener("submit", function (e) {
         if (form.dataset.submitted) {
           e.preventDefault();
           return;
         }
-  
+
         const files = fileInput.files;
         const maxFiles = 5;
-        const maxFileSize = 10 * 1024 * 1024; // 10MB
-  
+        const maxFileSize = 10 * 1024 * 1024;
+
         if (files.length > maxFiles) {
           alert(`❌ You can upload up to ${maxFiles} files.`);
           e.preventDefault();
           return;
         }
-  
+
         for (let file of files) {
           if (file.size > maxFileSize) {
             alert(`❌ ${file.name} exceeds the 10MB size limit.`);
@@ -267,12 +261,12 @@
             return;
           }
         }
-  
-        // ✅ Show spinner and block resubmit
+
         form.dataset.submitted = true;
+
         const spinner = document.getElementById("quick-email-spinner");
         if (spinner) spinner.style.display = "block";
-  
+
         const submitBtn = form.querySelector('button[type="submit"]');
         if (submitBtn) {
           submitBtn.disabled = true;
@@ -280,6 +274,12 @@
         }
       });
     }
-  
+
+    // ✅ Fallback update for HTMX swaps
+    document.addEventListener("htmx:afterSwap", function (e) {
+      if (e.detail.target.id === "quick-user-checkbox-list") {
+        updateQuickUserSummary();
+      }
+    });
   });
-  </script>
+</script>

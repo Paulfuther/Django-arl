@@ -1,62 +1,54 @@
-<!-- Select All Checkbox -->
-<div class="form-check mb-2" style="padding-left: 2rem;">
-  <input type="checkbox" class="form-check-input" id="select-all-users">
-  <label class="form-check-label ps-2" for="select-all-users">Select All Users</label>
+{% with summary_id|default:"selected-summary" as sid %}
+<!-- 🔘 Select All -->
+<div class="form-check mb-2 m-3">
+  <input type="checkbox" class="form-check-input" id="select-all-users-{{ sid }}">
+  <label class="form-check-label ps-2" for="select-all-users-{{ sid }}">Select All Users</label>
 </div>
 
-<!-- User List -->
+<!-- 👤 User Checkboxes -->
 {% for user in users %}
   <div class="dropdown-option">
     <input type="checkbox"
            name="selected_users"
            value="{{ user.id }}"
-           class="form-check-input user-checkbox"
-           id="user-{{ user.id }}"
+           class="form-check-input user-checkbox user-checkbox-{{ sid }}"
+           id="user-{{ sid }}-{{ user.id }}"
            {% if user.id|stringformat:"s" in selected_ids %}checked{% endif %}>
-    <label class="form-check-label" for="user-{{ user.id }}">
+    <label class="form-check-label" for="user-{{ sid }}-{{ user.id }}">
       {{ user.last_name }}, {{ user.first_name }} ({{ user.email }}) ({{ user.employer.name }})
     </label>
   </div>
-{% empty %}
-  <p class="text-muted px-2">No users found.</p>
 {% endfor %}
 
 <script>
-  function updateSelectedSummary() {
-    const checked = document.querySelectorAll(".user-checkbox:checked");
-    const summary = document.getElementById("selected-summary");
+(function() {
+  const sid = "{{ sid }}";
+  const label = document.getElementById(`${sid}-label`);
+  const selectAll = document.getElementById(`select-all-users-${sid}`);
 
-    if (summary) {
-      const count = checked.length;
-      summary.textContent = `${count} user${count === 1 ? '' : 's'} selected`;
-    }
+  function updateSummary() {
+    const checkboxes = document.querySelectorAll(`.user-checkbox-${sid}`);
+    const checked = document.querySelectorAll(`.user-checkbox-${sid}:checked`);
+    const summaryText = checked.length > 0 ? `${checked.length} user${checked.length === 1 ? '' : 's'} selected` : "Select Users";
+
+    if (label) label.textContent = summaryText;
+    if (selectAll) selectAll.checked = checked.length === checkboxes.length;
   }
 
-  function bindCheckboxHandlers() {
-    const selectAll = document.getElementById("select-all-users");
-    const checkboxes = document.querySelectorAll(".user-checkbox");
-
-    if (selectAll && checkboxes.length > 0) {
-      selectAll.checked = checkboxes.length > 0 && Array.from(checkboxes).every(cb => cb.checked);
-
+  function bind() {
+    const checkboxes = document.querySelectorAll(`.user-checkbox-${sid}`);
+    if (selectAll) {
       selectAll.addEventListener("change", function () {
         checkboxes.forEach(cb => cb.checked = this.checked);
-        updateSelectedSummary();
+        updateSummary();
       });
     }
-
-    checkboxes.forEach(cb => {
-      cb.addEventListener("change", updateSelectedSummary);
-    });
-
-    updateSelectedSummary();
+    checkboxes.forEach(cb => cb.addEventListener("change", updateSummary));
+    updateSummary();
   }
 
-  document.addEventListener("DOMContentLoaded", bindCheckboxHandlers);
-
-  document.addEventListener("htmx:afterSwap", function (e) {
-    if (e.detail.target.id === "user-checkbox-list") {
-      bindCheckboxHandlers();
-    }
-  });
+  document.addEventListener("DOMContentLoaded", bind);
+  document.addEventListener("htmx:afterSwap", bind);
+})();
 </script>
+{% endwith %}

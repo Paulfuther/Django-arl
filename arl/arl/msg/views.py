@@ -1,9 +1,11 @@
 import json
 import logging
+import uuid
+from django.conf import settings
 import urllib.parse
 from django.http import JsonResponse
 from django.contrib.auth import get_user_model
-
+from django.http import HttpResponseNotFound
 from django.db.models import Q
 from celery.result import AsyncResult
 from django.contrib import messages
@@ -11,14 +13,18 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import Group
 from django.forms import modelformset_factory
-from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormView
 from waffle.decorators import waffle_flag
-from .models import ComplianceFile
+from django.views.decorators.http import require_POST
+from django.utils import timezone
+from django.utils.timezone import now
+from django.http import (HttpResponse,
+                         HttpResponseBadRequest, HttpResponseServerError)
+from .models import ComplianceFile, ShortenedSMSLog
 from arl.dsign.forms import NameEmailForm
 from arl.dsign.tasks import create_docusign_envelope_task
 from arl.msg.helpers import (
@@ -33,6 +39,7 @@ from arl.msg.helpers import (
     prepare_recipient_data,
     send_whats_app_carwash_sites_template,
 )
+from arl.bucket.helpers import upload_to_linode_object_storage, conn
 from arl.msg.tasks import (
     process_whatsapp_webhook,
     send_template_whatsapp_task,
@@ -254,7 +261,15 @@ def communications(request):
                 message = quick_email_form.cleaned_data["message"]
                 selected_group = quick_email_form.cleaned_data["selected_group"]
                 selected_users = quick_email_form.cleaned_data["selected_users"]
-
+                uploaded_file_urls = request.POST.get("uploaded_file_urls")
+                if uploaded_file_urls:
+                    try:
+                        file_urls = json.loads(uploaded_file_urls)
+                    except json.JSONDecodeError:
+                        file_urls = []
+                else:
+                    file_urls = []
+                    
                 employer = user.employer
                 
                 attachments = collect_attachments(request)
@@ -274,7 +289,8 @@ def communications(request):
                     attachments=attachments,
                     employer_id=request.user.employer.id,
                     body=message,
-                    subject=subject
+                    subject=subject,
+                    attachment_urls=file_urls
                 )
 
                 messages.success(request, "Quick email has been queued for delivery.")
@@ -300,12 +316,31 @@ def communications(request):
                 sendgrid_id = sendgrid_template.sendgrid_id
                 selected_group = email_form.cleaned_data.get("selected_group")
                 selected_users = email_form.cleaned_data.get("selected_users")
+                uploaded_file_urls = request.POST.get("uploaded_file_urls")
+                print("uplaoded file urls :", uploaded_file_urls)
+                if uploaded_file_urls:
+                    try:
+                        file_urls = json.loads(uploaded_file_urls)
+                    except json.JSONDecodeError:
+                        file_urls = []
+                else:
+                    file_urls = []
+                # Print to console
+                print("Selected group:", selected_group)
+                print("Selected users:", selected_users)
+
+                # Optionally: inspect each user
+                for user in selected_users:
+                    print(f"User: {user.first_name} {user.last_name} ({user.email})")
+
+                # Exit early for testing
+                # return HttpResponse("Debug: printed selected group and users. Execution stopped.")
                 employer = user.employer
-                attachments = collect_attachments(request)
+                #attachments = collect_attachments(request)
               
-                if request.FILES.getlist("attachments") and attachments is None:
+                #if request.FILES.getlist("attachments") and attachments is None:
                     # User tried to upload but failed validation
-                    return redirect("/comms/?tab=email")
+                #    return redirect("/comms/?tab=email")
 
                 recipients = prepare_recipient_data(
                     user, selected_group, selected_users
@@ -314,8 +349,8 @@ def communications(request):
                 master_email_send_task.delay(
                     recipients=recipients,
                     sendgrid_id=sendgrid_id,
-                    attachments=attachments,
                     employer_id=employer.id if employer else None,
+                    attachment_urls=file_urls
                 )
 
                 messages.success(request, "Emails have been queued for delivery.")
@@ -645,3 +680,85 @@ def latest_compliance_file(request):
     if file:
         return redirect(file.file.url)
     return redirect("/")  # fallback
+
+
+def compliance_file_view(request):
+    file = ComplianceFile.objects.filter(is_active=True).first()
+    if not file:
+        return HttpResponseNotFound("No file available.")
+    return redirect(file.presigned_url or file.file.url)
+
+
+@csrf_exempt  # Only if you're not using the CSRF token — use caution
+def upload_attachment(request):
+    if request.method == "POST" and request.FILES.get("file"):
+        uploaded_file = request.FILES["file"]
+        unique_name = f"email_attachments/{uuid.uuid4()}_{uploaded_file.name}"
+
+        try:
+            upload_to_linode_object_storage(uploaded_file, unique_name)
+            # ✅ Set public-read permission AFTER upload
+            bucket = conn.get_bucket(settings.LINODE_BUCKET_NAME)
+            key = bucket.get_key(unique_name)
+            key.set_acl("public-read")
+
+            url = f"https://{settings.LINODE_BUCKET_NAME}.{settings.LINODE_REGION}/{unique_name}"
+            return JsonResponse({"success": True, "url": url})
+
+        except Exception as e:
+            return JsonResponse({"success": False, "error": str(e)}, status=500)
+
+    return JsonResponse({"success": False, "error": "Invalid request"}, status=400)
+
+
+@csrf_exempt
+@require_POST
+def twilio_short_link_webhook(request):
+    try:
+        logger.info("📩 Webhook Content-Type: %s", request.content_type)
+
+        if request.content_type == "application/json":
+            data = json.loads(request.body)
+        elif request.content_type == "application/x-www-form-urlencoded":
+            data = request.POST.dict()
+        else:
+            return HttpResponseBadRequest("Unsupported content type")
+
+        logger.info("✅ Parsed Webhook Data: %s", data)
+
+        sms_sid = data.get("SmsSid") or data.get("sms_sid")
+        to = data.get("To") or data.get("to")
+        from_number = data.get("From") or data.get("from")
+        message_status = data.get("MessageStatus", "").lower()
+        messaging_sid = data.get("MessagingServiceSid") or data.get("messaging_service_sid")
+        account_sid = data.get("AccountSid") or data.get("account_sid")
+        event_type = data.get("event_type", message_status)
+        link = data.get("link")
+        click_time = data.get("click_time")
+        user_agent = data.get("user_agent")
+
+        if not sms_sid:
+            logger.warning("❌ No SmsSid found in webhook data")
+            return HttpResponseBadRequest("Missing SmsSid")
+
+        user = CustomUser.objects.filter(phone_number__icontains=to).first() if to else None
+
+        ShortenedSMSLog.objects.create(
+            sms_sid=sms_sid,
+            to=to or "",
+            from_number=from_number or "",
+            messaging_service_sid=messaging_sid or "",
+            account_sid=account_sid or "",
+            event_type=event_type,
+            link=link,
+            click_time=click_time or None,
+            user_agent=user_agent or "",
+            user=user,
+            created_at=now()
+        )
+
+        return JsonResponse({"status": "success"})
+
+    except Exception as e:
+        logger.exception("❌ Webhook processing failed.")
+        return HttpResponseBadRequest("Internal Error")

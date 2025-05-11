@@ -2,8 +2,9 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from django.utils.timezone import now
-
+from uuid import uuid4
 from arl.user.models import CustomUser, Employer
+from arl.bucket.helpers import upload_to_linode_object_storage, conn
 
 
 class Twimlmessages(models.Model):
@@ -162,11 +163,65 @@ class EmailList(models.Model):
 class ComplianceFile(models.Model):
     title = models.CharField(max_length=255, default="Weekly Compliance Policy")
     file = models.FileField(upload_to="compliance/")
+    s3_key = models.CharField(max_length=512, blank=True, null=True)
+    presigned_url = models.URLField(max_length=1024, blank=True, null=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
-    is_active = models.BooleanField(default=True)  # Only one active file at a time
+    is_active = models.BooleanField(default=True)
+
+    def save(self, *args, **kwargs):
+        if self.is_active:
+            ComplianceFile.objects.exclude(pk=self.pk).update(is_active=False)
+
+        super().save(*args, **kwargs)
+
+        # Upload and generate URL
+        if self.file and not self.s3_key:
+            unique_key = f"compliance/{uuid4()}_{self.file.name}"
+
+            # Upload to Linode (your unchanged helper)
+            upload_to_linode_object_storage(self.file.file, unique_key)
+            self.s3_key = unique_key
+
+            # ✅ Make it public
+            bucket = conn.get_bucket(settings.LINODE_BUCKET_NAME)
+            key = bucket.get_key(unique_key)
+            if key:
+                key.set_acl('public-read')
+
+            # ✅ Public URL (not presigned)
+            from urllib.parse import quote
+            self.presigned_url = f"https://{settings.LINODE_BUCKET_NAME}.{settings.LINODE_REGION}/{quote(unique_key)}"
+
+            super().save(update_fields=["s3_key", "presigned_url"])
 
     def __str__(self):
         return f"{self.title} - {self.uploaded_at.strftime('%Y-%m-%d')}"
 
     class Meta:
         ordering = ["-uploaded_at"]
+
+
+class ShortenedSMSLog(models.Model):
+    EVENT_TYPES = [
+        ("sent", "Sent"),
+        ("delivered", "Delivered"),
+        ("click", "Clicked"),
+        ("failed", "Failed"),
+    ]
+
+    sms_sid = models.CharField(max_length=64)
+    to = models.CharField(max_length=20)
+    from_number = models.CharField(max_length=20)
+    messaging_service_sid = models.CharField(max_length=64)
+    account_sid = models.CharField(max_length=64)
+    link = models.URLField(max_length=1000, blank=True, null=True)
+    click_time = models.DateTimeField(blank=True, null=True)
+    event_type = models.CharField(max_length=20, choices=EVENT_TYPES)
+    user_agent = models.TextField(blank=True, null=True)
+    user = models.ForeignKey(
+        CustomUser, null=True, blank=True, on_delete=models.SET_NULL
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"{self.event_type.upper()} - {self.to}"

@@ -2,6 +2,8 @@ from __future__ import absolute_import, unicode_literals
 
 import csv
 import os
+import requests
+import base64
 from datetime import datetime, timedelta
 from django_celery_results.models import TaskResult
 import pandas as pd
@@ -29,6 +31,7 @@ from .helpers import (
     send_whats_app_template,
     send_whats_app_template_autoreply,
     sync_contacts_with_sendgrid,
+    send_linkshortened_sms
 )
 
 logger = get_task_logger(__name__)
@@ -46,7 +49,8 @@ def master_email_send_task(
         attachments=None,
         employer_id=None,
         body=None,
-        subject=None
+        subject=None,
+        attachment_urls=None
         ):
     """
     Master task to send emails using the provided template and recipient data.
@@ -60,6 +64,32 @@ def master_email_send_task(
     Returns:
         str: Success or error message.
     """
+    attachment_urls = attachment_urls or []
+    print("attachment urls :", attachment_urls)
+    attachments = []
+    for url in attachment_urls:
+        try:
+            response = requests.get(url)
+            print(f"📡 Fetching: {url} → Status: {response.status_code}")
+            if response.status_code == 200:
+                content_type = response.headers.get("Content-Type", "application/octet-stream")
+                filename = url.split("/")[-1]
+                encoded = base64.b64encode(response.content).decode("utf-8")
+                attachments.append({
+                    "filename": filename,
+                    "type": content_type,
+                    "content": encoded,
+                    "disposition": "attachment"
+                })
+            else:
+                print(f"❌ Failed to fetch {url} → {response.status_code}")
+        except Exception as e:
+            print(f"🚨 Error fetching {url}: {e}")
+
+    print("✅ Final attachments summary:")
+    for a in attachments:
+        print(f"• {a['filename']} ({a['type']}) - {len(a['content']) // 1024} KB")
+
     try:
         # Default sender
         verified_sender = settings.MAIL_DEFAULT_SENDER
@@ -253,56 +283,92 @@ def send_bulk_tobacco_sms_link(self, *args, **kwargs):
         return {"error": critical_msg}
 
 
-
-# This is the old tobacco SMS. It has NOT been approved
-# for multi tenant models.
-@app.task(name="bulk_sms")
-def send_bulk_sms_task():
+@app.task(name="tobacoo_sms_with_shortened_link",
+          bind=True,)
+def send_bulk_shortened_sms_link_task(self):
     try:
-        active_users = CustomUser.objects.filter(is_active=True)
-        gsat = [user.phone_number for user in active_users]
-        message = (
-            "Required Action Policy for Tobacco and Vape Products WHAT IS "
-            "REQUIRED? You must request ID from anyone purchasing tobacco "
-            "or vape products, who looks to be younger than 40. WHY? It is "
-            "against the law to sell tobacco or vape products to minors. "
-            "A person who distributes tobacco or vape products to a minor "
-            "is guilty of an offence, and could be punished with: Loss of "
-            "employment. Face personal fines of $4,000 to $100,000. Loss of "
-            "license to sell tobacco and vape products, as well as face "
-            "additional fines of $10,000 to $150,000. (for the Associate) "
-            "WHO? Each and every Guest that wants to buy tobacco products. "
-            "REQUIRED Guests that look under the age of 40 are asked for "
-            "(picture) I.D. when purchasing tobacco products. Ask for "
-            "(picture) I.D. if they look under 40 before quoting the price "
-            "of tobacco products. Ask for (picture) I.D. if they look under "
-            "40 before placing tobacco products on the counter. Dont let an "
-            "angry Guest stop you from asking for (picture) I.D. "
-            "ITs THE LAW! I.D. Drivers license Passport Certificate of "
-            "Canadian Citizenship Canadian permanent resident card "
-            "Canadian Armed Forces I.D. card Any documents issued by a "
-            "federal or provincial authority or a foreign government that"
-            "contain a photo, date of birth and signature are also "
-            "acceptable. IMPORTANT - School I.D. cannot be accepted as "
-            "proof of age. EXPECTED RESULTS. No employee is charged with "
-            "selling tobacco products to a minor. Employees always remember "
-            "to ask for I.D. No Employee receives a warning letter about "
-            "selling to a minor.",
+        enabled_employers = EmployerSMSTask.objects.filter(
+            task_name="tobacco_compliance_sms_with_shortened_link",
+            is_enabled=True
+        ).values_list("employer_id", flat=True)
+
+        if not enabled_employers:
+            logger.warning("No employers enabled for this SMS task.")
+            return
+
+        opted_out_users = SMSOptOut.objects.values_list("user_id", flat=True)
+
+        active_users = CustomUser.objects.filter(
+            is_active=True,
+            employer_id__in=enabled_employers
+        ).exclude(id__in=opted_out_users)\
+         .exclude(phone_number__isnull=True)\
+         .exclude(phone_number="")
+        print("Active Users :", active_users)
+        results_summary = []
+
+        for employer_id in enabled_employers:
+            employer = Employer.objects.get(id=employer_id)
+            employer_users = active_users.filter(employer=employer)
+
+            phone_numbers = [str(user.phone_number) for user in employer_users]
+            if not phone_numbers:
+                logger.warning(f"⚠️ No active users for employer: {employer.name}")
+                continue
+
+            # Get Twilio credentials
+            twilio_keys = TenantApiKeys.objects.filter(
+                employer=employer,
+                is_active=True
+            ).first()
+
+            if not twilio_keys:
+                logger.error(f"🚨 No Twilio keys for {employer.name}")
+                continue
+
+            sid = settings.TWILIO_ACCOUNT_SID
+            token = settings.TWILIO_AUTH_TOKEN
+            msg_sid = settings.MESSAGE_SERVICE_SID
+            if not sid or not token or not msg_sid:
+                logger.error(f"🚨 Incomplete Twilio credentials for {employer.name}")
+                continue
+
+            # Define message
+            body = (
+                "Here is our weekly message on the rules for regulated product. Please click to read. https://eu-central-1.linodeobjects.com:443/paulfuther/compliance/5ba9f54f-13b6-4c88-9025-da3c83706704_compliance/Required_Action_Policy_for_Tobacco_and_Vape_Products_fHro8Cy.pdf?Signature=NEpmg80AlAy1Lfq%2FCTCYIHVBCMA%3D&Expires=1747138225&AWSAccessKeyId=ULY9TR4YXH6RPFWEHYFR"
+            )
+            # Send individually to each user so link gets shortened per-message
+            for phone in phone_numbers:
+                result = send_linkshortened_sms(
+                    to_number=phone,
+                    body=body,
+                    twilio_account_sid=sid,
+                    twilio_auth_token=token,
+                    twilio_message_service_sid=msg_sid,
+                )
+                logger.info(f"{employer.name}: {result}")
+
+            results_summary.append(f"✅ Sent SMS to {len(phone_numbers)} for {employer.name}")
+
+        TaskResult.objects.filter(task_id=self.request.id).update(
+            periodic_task_name="Tobacco Compliance Shortened SMS"
         )
-        send_bulk_sms(gsat, message)
-        # Log the result
-        logger.info("Bulk SMS task completed successfully")
-        log_message = f"Bulk SMS sent successfully to {', '.join(gsat)}"
-        log_entry = SmsLog(level="INFO", message=log_message)
-        log_entry.save()
+
+        return {
+            "summary": results_summary,
+            "total_employers": len(enabled_employers),
+            "successful": [msg for msg in results_summary if msg.startswith("✅")],
+        }
+
     except Exception as e:
-        # Log or handle other exceptions
-        logger.error(f"An error occurred: {str(e)}")
+        msg = f"🔥 CRITICAL error in task: {str(e)}"
+        logger.critical(msg)
+        SmsLog.objects.create(level="CRITICAL", message=msg)
+        return {"error": msg}
 
 
-#
+
 # APPROVED
-#
 # This task is APPROVED for multi tenant.
 # Tenatn api keys are geneated here and passed to the helper.
 @app.task(name="one_off_bulk_sms")
