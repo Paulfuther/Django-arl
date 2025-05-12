@@ -6,7 +6,7 @@ import urllib.parse
 from django.http import JsonResponse
 from django.contrib.auth import get_user_model
 from django.http import HttpResponseNotFound
-from django.db.models import Q
+from django.db.models import Count, Q, Subquery, OuterRef, Max
 from celery.result import AsyncResult
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -20,10 +20,9 @@ from django.views.generic import TemplateView
 from django.views.generic.edit import FormView
 from waffle.decorators import waffle_flag
 from django.views.decorators.http import require_POST
-from django.utils import timezone
 from django.utils.timezone import now
 from django.http import (HttpResponse,
-                         HttpResponseBadRequest, HttpResponseServerError)
+                         HttpResponseBadRequest)
 from .models import ComplianceFile, ShortenedSMSLog
 from arl.dsign.forms import NameEmailForm
 from arl.dsign.tasks import create_docusign_envelope_task
@@ -207,7 +206,7 @@ def fetch_sms_data(request):
 def fetch_shortlink_sms_data(request):
     form = SMSLogFilterForm(request.GET or None)
 
-    logs = ShortenedSMSLog.objects.select_related("user").order_by("-created_at")
+    logs = ShortenedSMSLog.objects.select_related("user")
 
     if form.is_valid():
         start_date = form.cleaned_data.get("start_date")
@@ -218,9 +217,30 @@ def fetch_shortlink_sms_data(request):
         if end_date:
             logs = logs.filter(created_at__date__lte=end_date)
 
+    # ✅ Pivot by sms_sid, user, etc.
+    summary = (
+        logs.values(
+            "sms_sid",  # ✅ group key
+            "user__first_name",
+            "user__last_name",
+            "to",
+            "from_number",
+            "body",
+            "error_code",
+        )
+        .annotate(
+            queued=Count("id", filter=Q(event_type="queued")),
+            sent=Count("id", filter=Q(event_type="sent")),
+            delivered=Count("id", filter=Q(event_type="delivered")),
+            clicked=Count("id", filter=Q(event_type="click")),
+            last_time=Max("created_at")
+        )
+        .order_by("-last_time")
+    )
+
     context = {
-        "logs": logs,
-        "form": form
+        "summary": summary,
+        "form": form,
     }
     return render(request, "msg/shortlink_sms_data.html", context)
 

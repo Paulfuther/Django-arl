@@ -223,6 +223,7 @@ class ShortenedSMSLog(models.Model):
     )
     error_code = models.CharField(max_length=10, blank=True, null=True)
     created_at = models.DateTimeField(default=timezone.now)
+    body = models.TextField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.event_type.upper()} - {self.to}"
