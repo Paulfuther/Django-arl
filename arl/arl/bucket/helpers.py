@@ -19,6 +19,7 @@ LINODE_REGION = settings.LINODE_REGION
 LINODE_BUCKET_NAME = settings.LINODE_BUCKET_NAME
 LINODE_URL = settings.LINODE_URL
 
+conn = None
 try:
     conn = boto.connect_s3(
         aws_access_key_id=LINODE_ACCESS_KEY,
