@@ -143,20 +143,23 @@ def create_master_email(
 
         message.add_personalization(personalization)
       
+        print("✅ Final Email attachments summary:")
+        for a in attachments:
+            print(f"• {a['filename']} ({a['type']}) - {len(a['content']) // 1024} KB")
+
         # Handle attachments if provided
         if attachments:
-            for attachment in attachments:
-                encoded_content = attachment.get("file_content")
-                if encoded_content:
+            for att in attachments:
+                try:
                     attachment_instance = Attachment(
-                        FileContent(encoded_content),
-                        FileName(attachment.get("file_name", "file")),
-                        FileType(
-                            attachment.get("file_type", "application/octet-stream")
-                        ),
-                        Disposition("attachment"),
+                        FileContent(att["content"]),
+                        FileName(att.get("filename", "file")),
+                        FileType(att.get("type", "application/octet-stream")),
+                        Disposition(att.get("disposition", "attachment")),
                     )
-                    message.attachment = attachment_instance
+                    message.add_attachment(attachment_instance)
+                except Exception as e:
+                    print(f"❌ Error adding attachment {att.get('filename', '')}: {e}")
 
         # Send the email via SendGrid
         sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
@@ -262,6 +265,28 @@ def send_sms(phone_number, body):
     except Exception as e:
         print("Failed to send SMS:", str(e))
     return None
+
+
+def send_linkshortened_sms(to_number, body, twilio_account_sid,
+                           twilio_auth_token, twilio_message_service_sid):
+    try:
+        if not twilio_account_sid or not twilio_auth_token or not twilio_message_service_sid:
+            logger.error("🚨 Missing Twilio credentials. Cannot send SMS.")
+            return False
+
+        # ✅ Use the employer's Twilio Account SID & Auth Token
+        client = Client(twilio_account_sid, twilio_auth_token)
+
+        message = client.messages.create(
+            to=to_number,
+            body=body,
+            messaging_service_sid=(twilio_message_service_sid
+                                   or settings.TWILIO_MESSAGE_SERVICE_SID),
+            shorten_urls=True
+        )
+        return f"✅ Message sent. SID: {message.sid}"
+    except Exception as e:
+        return f"❌ Error sending SMS: {str(e)}"
 
 
 # This function function is APPROVED for multip tenant.

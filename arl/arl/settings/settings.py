@@ -286,6 +286,9 @@ TWILIO_AUTH_TOKEN = os.environ.get("TWILIO_AUTH_TOKEN")
 TWILIO_FROM = os.environ.get("TWILIO_FROM")
 TWILIO_VERIFY_SID = os.environ.get("TWILIO_VERIFY_SID")
 TWILIO_NOTIFY_SERVICE_SID = os.environ.get("TWILIO_NOTIFY_SERVICE_SID")
+
+MESSAGE_SERVICE_SID = os.environ.get("MESSAGE_SERVICE_SID")
+
 SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY")
 MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER")
 SENDGRID_NEWHIRE_ID = os.environ.get("SENDGRID_NEWHIRE_ID")
@@ -323,7 +326,7 @@ MESSAGE_TAGS = {
     messages.ERROR: 'danger',  # ✅ this converts 'error' → 'danger' for Bootstrap styling
 }
 print("site url:", SITE_URL)
-
+print("Twilio Message Service Sid :", MESSAGE_SERVICE_SID)
 
 # settings.py (only for local dev!)
 # SESSION_COOKIE_SAMESITE = None
