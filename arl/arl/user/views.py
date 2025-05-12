@@ -1002,7 +1002,7 @@ def download_signed_document(request, doc_id):
 
         # 🧼 Build a clean, dynamic filename
         employee_name = doc.user.get_full_name().replace(" ", "_") if doc.user else "Company"
-        template_clean = doc.template_name.replace(" ", "_")
+        template_clean = doc.template_name.replace(" ", "_") if doc.template_name else "Untitled"
         today = timezone.now().strftime("%Y-%m-%d")
         custom_filename = f"{employee_name}_{template_clean}_{today}.pdf"
 
