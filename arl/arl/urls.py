@@ -7,7 +7,8 @@ from django.views.generic import TemplateView
 admin.site.login = CustomAdminLoginView.as_view()
 
 urlpatterns = [
-    path("custom-admin-login/", CustomAdminLoginView.as_view(), name="custom_admin_login"),
+    path("custom-admin-login/", CustomAdminLoginView.as_view(),
+         name="custom_admin_login"),
     path("admin/", admin.site.urls),
     path("", include("arl.user.urls")),
     path("", include("arl.dbox.urls")),
@@ -22,7 +23,8 @@ urlpatterns = [
     path("", include("arl.helpdesk.urls")),
     path(
         "40ebffa97ba5035264526bdf252ca040.html",
-        TemplateView.as_view(template_name="twilio/40ebffa97ba5035264526bdf252ca040.html"),
+        TemplateView.as_view(
+            template_name="twilio/40ebffa97ba5035264526bdf252ca040.html"),
     ),
 ]
 
