@@ -58,6 +58,7 @@ from .forms import (
     TemplateFilterForm,
     TemplateWhatsAppForm,
     QuickEmailForm,
+    SMSLogFilterForm
 )
 from .tasks import (
     fetch_twilio_sms_task,
@@ -201,6 +202,27 @@ def fetch_twilio_data(request):
 def fetch_sms_data(request):
     task = fetch_twilio_sms_task.delay(request.user.id)
     return JsonResponse({"task_id": task.id})
+
+
+def fetch_shortlink_sms_data(request):
+    form = SMSLogFilterForm(request.GET or None)
+
+    logs = ShortenedSMSLog.objects.select_related("user").order_by("-created_at")
+
+    if form.is_valid():
+        start_date = form.cleaned_data.get("start_date")
+        end_date = form.cleaned_data.get("end_date")
+
+        if start_date:
+            logs = logs.filter(created_at__date__gte=start_date)
+        if end_date:
+            logs = logs.filter(created_at__date__lte=end_date)
+
+    context = {
+        "logs": logs,
+        "form": form
+    }
+    return render(request, "msg/shortlink_sms_data.html", context)
 
 
 def get_task_status(request, task_id):
