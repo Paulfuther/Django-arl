@@ -15,7 +15,8 @@ from arl.msg.views import (EmailEventList, FetchTwilioCallsView,
                            fetch_sms_data, search_users_view,
                            latest_compliance_file,
                            compliance_file_view,
-                           upload_attachment, twilio_short_link_webhook)
+                           upload_attachment, twilio_short_link_webhook,
+                           fetch_shortlink_sms_data,)
 
 
 urlpatterns = [
@@ -48,6 +49,7 @@ urlpatterns = [
     path('message-summary/', message_summary_view, name='summarize_costs'),
     path('fetch-twilio-data/', fetch_twilio_data, name='fetch_twilio_data'),
     path('fetch-sms-data/', fetch_sms_data, name='fetch_sms_data'),
+    path('fetch-shortlink_sms-data/', fetch_shortlink_sms_data, name='fetch_sms_data'),
     path('sms-summary-view/', sms_summary_view, name='sms_summary_view'),
     path("get-task-status/<str:task_id>/", get_task_status, name="get_task_status"),
     path('sendgrid-webhook/', sendgrid_webhook_view, name='sendgrid_webhook_view'),
@@ -61,4 +63,5 @@ urlpatterns = [
     path("compliance/", compliance_file_view, name="compliance"),
     path("upload-attachment/", upload_attachment, name="upload_attachment"),
     path("twilio/webhook/short-link/", twilio_short_link_webhook, name="twilio_short_link_webhook"),
+    path("short-link-sms/report/", fetch_shortlink_sms_data, name="shortened_sms_report"),
 ]

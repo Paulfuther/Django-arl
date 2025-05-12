@@ -179,6 +179,19 @@ class TemplateFilterForm(forms.Form):
             self.fields["template_id"].queryset = templates
 
 
+class SMSLogFilterForm(forms.Form):
+    start_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label="Start Date"
+    )
+    end_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label="End Date"
+    )
+
+
 class TemplateEmailForm(forms.Form):
     sendgrid_id = forms.ModelChoiceField(
         queryset=EmailTemplate.objects.none(),

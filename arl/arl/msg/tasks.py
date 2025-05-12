@@ -326,16 +326,19 @@ def send_bulk_shortened_sms_link_task(self):
                 logger.error(f"🚨 No Twilio keys for {employer.name}")
                 continue
 
-            sid = settings.TWILIO_ACCOUNT_SID
-            token = settings.TWILIO_AUTH_TOKEN
-            msg_sid = settings.MESSAGE_SERVICE_SID
+            sid = twilio_keys.account_sid
+            token = twilio_keys.auth_token
+            msg_sid = twilio_keys.messaging_service_sid
             if not sid or not token or not msg_sid:
                 logger.error(f"🚨 Incomplete Twilio credentials for {employer.name}")
                 continue
 
             # Define message
             body = (
-                "Here is our weekly message on the rules for regulated product. Please click to read. https://eu-central-1.linodeobjects.com:443/paulfuther/compliance/5ba9f54f-13b6-4c88-9025-da3c83706704_compliance/Required_Action_Policy_for_Tobacco_and_Vape_Products_fHro8Cy.pdf?Signature=NEpmg80AlAy1Lfq%2FCTCYIHVBCMA%3D&Expires=1747138225&AWSAccessKeyId=ULY9TR4YXH6RPFWEHYFR"
+                "Hello, this is Terry from Petro Canada. Each week, we share reminders for employees "
+                "about regulated products. Please review this week’s message: "
+                "https://paulfuther.eu-central-1.linodeobjects.com/compliance/4dcc0432-05f8-4e5e-b462-7c31bd7c59bd_compliance/rules.pdf "
+                "Reply STOP to opt out."
             )
             # Send individually to each user so link gets shortened per-message
             for phone in phone_numbers:
