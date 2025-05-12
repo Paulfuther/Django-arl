@@ -45,7 +45,7 @@ from arl.msg.tasks import (
     send_template_whatsapp_task,
     start_campaign_task,
 )
-from arl.user.models import CustomUser, Store
+from arl.user.models import CustomUser, Store, SMSOptOut
 
 from .forms import (
     CampaignSetupForm,
@@ -736,12 +736,23 @@ def twilio_short_link_webhook(request):
         link = data.get("link")
         click_time = data.get("click_time")
         user_agent = data.get("user_agent")
+        error_code = data.get("ErrorCode") or data.get("error_code")
 
         if not sms_sid:
             logger.warning("❌ No SmsSid found in webhook data")
             return HttpResponseBadRequest("Missing SmsSid")
 
         user = CustomUser.objects.filter(phone_number__icontains=to).first() if to else None
+        # 🛑 Handle 30007 (Carrier Filtered)
+        if error_code == "30007" and user:
+            if not hasattr(user, "sms_opt_out"):
+                SMSOptOut.objects.create(
+                    user=user,
+                    reason="Carrier filtered message (30007)"
+                )
+                logger.info(f"User {user.username} automatically opted out due to 30007 error.")
+            else:
+                logger.info(f"User {user.username} already opted out. 30007 received again.")
 
         ShortenedSMSLog.objects.create(
             sms_sid=sms_sid,
@@ -754,6 +765,7 @@ def twilio_short_link_webhook(request):
             click_time=click_time or None,
             user_agent=user_agent or "",
             user=user,
+            error_code=error_code,
             created_at=now()
         )
 

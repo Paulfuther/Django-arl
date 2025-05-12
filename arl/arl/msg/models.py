@@ -221,6 +221,7 @@ class ShortenedSMSLog(models.Model):
     user = models.ForeignKey(
         CustomUser, null=True, blank=True, on_delete=models.SET_NULL
     )
+    error_code = models.CharField(max_length=10, blank=True, null=True)
     created_at = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
