@@ -69,13 +69,13 @@
   <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.36/vfs_fonts.js"></script>
 
   <!-- Dropzone JS -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/dropzone/5.9.3/min/dropzone.min.js"></script>
+ 
 
   <!-- Initialize Dropzone -->
   <script>
-    // Disable auto-discovery before initialization
-    Dropzone.autoDiscover = false;
-  </script>
+  window.Dropzone = window.Dropzone || {};
+  Dropzone.autoDiscover = false;
+</script>
   
 </body>
 

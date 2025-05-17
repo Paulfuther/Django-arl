@@ -18,7 +18,10 @@
       {{ user.last_name }}, {{ user.first_name }} ({{ user.email }}) ({{ user.employer.name }})
     </label>
   </div>
+  {% empty %}
+  <p class="text-muted px-2">No users found.</p>
 {% endfor %}
+
 
 <script>
 (function() {
