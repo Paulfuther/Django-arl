@@ -192,136 +192,6 @@ class SMSLogFilterForm(forms.Form):
     )
 
 
-class TemplateEmailForm(forms.Form):
-    sendgrid_id = forms.ModelChoiceField(
-        queryset=EmailTemplate.objects.none(),
-        widget=forms.RadioSelect,
-        required=True,
-        label="Select Template",
-    )
-
-    selected_group = forms.ModelChoiceField(
-        queryset=Group.objects.none(),
-        widget=forms.RadioSelect,
-        required=False,
-        label="Select Groups",
-    )
-
-    selected_users = forms.ModelMultipleChoiceField(
-        queryset=User.objects.none(),
-        widget=forms.CheckboxSelectMultiple,
-        required=False,
-        label="Select Active Users",
-    )
-
-    def __init__(self, *args, **kwargs):
-        user = kwargs.pop("user", None)
-        super().__init__(*args, **kwargs)
-        
-        if user and hasattr(user, "employer"):
-            employer = user.employer
-
-            # ✅ Email templates visible to this employer
-            self.fields["sendgrid_id"].queryset = EmailTemplate.objects.filter(
-                models.Q(employers=employer) | models.Q(employers__isnull=True)
-            ).distinct().order_by("name")
-
-            # ✅ Groups that include users from this employer
-            self.fields["selected_group"].queryset = Group.objects.filter(
-                user__employer=employer
-            ).distinct().order_by("name")
-
-            # ✅ Active users from this employer, sorted alphabetically
-            self.fields["selected_users"].queryset = User.objects.filter(
-                employer=employer,
-                is_active=True
-            ).order_by("last_name")
-
-            self.fields["selected_users"].label_from_instance = lambda u: (
-                f"{u.last_name}, {u.first_name} – {u.email} "
-                f"({u.employer.name if u.employer else 'No Employer'})"
-            )
-
-    def clean(self):
-        cleaned_data = super().clean()
-        selected_group = cleaned_data.get("selected_group")
-        selected_users = cleaned_data.get("selected_users")
-
-        if not selected_group and not selected_users:
-            raise forms.ValidationError(
-                "You must select either a group or at least one user."
-            )
-        if selected_group and selected_users:
-            raise forms.ValidationError(
-                "You cannot select both a group and individual users."
-            )
-
-        return cleaned_data
-
-
-class QuickEmailForm(forms.Form):
-    subject = forms.CharField(
-        max_length=255,
-        required=True,
-        label="Subject",
-        widget=forms.TextInput(attrs={"placeholder": "Enter the email subject"})
-    )
-    message = forms.CharField(
-        required=True,
-        label="Message",
-        widget=forms.Textarea(attrs={"placeholder": "Write your message here...", "rows": 6})
-    )
-    selected_group = forms.ModelChoiceField(
-        queryset=Group.objects.none(),
-        widget=RadioSelect,
-        required=False,
-        label="Select Groups",
-    )
-    selected_users = forms.ModelMultipleChoiceField(
-        queryset=User.objects.none(),
-        widget=forms.CheckboxSelectMultiple,
-        required=False,
-        label="Select Individual Users",
-    )
-
-    def __init__(self, *args, **kwargs):
-        user = kwargs.pop("user", None)
-        super().__init__(*args, **kwargs)
-
-        if user and hasattr(user, "employer"):
-            employer = user.employer
-
-            self.fields["selected_group"].queryset = Group.objects.filter(
-                user__employer=employer
-            ).distinct().order_by("name")
-
-            # ✅ Active users from this employer, sorted alphabetically
-            self.fields["selected_users"].queryset = User.objects.filter(
-                employer=employer,
-                is_active=True
-            ).order_by("last_name")
-
-            self.fields["selected_users"].label_from_instance = lambda u: (
-                f"{u.last_name}, {u.first_name} – {u.email} "
-                f"({u.employer.name if u.employer else 'No Employer'})"
-            )
-
-    def clean(self):
-        cleaned_data = super().clean()
-        selected_group = cleaned_data.get("selected_group")
-        selected_users = cleaned_data.get("selected_users")
-
-        if not selected_group and not selected_users:
-            raise forms.ValidationError(
-                "You must select either a group or at least one user."
-            )
-        if selected_group and selected_users:
-            raise forms.ValidationError(
-                "You cannot select both a group and individual users."
-            )
-        return cleaned_data
-
-
 class CampaignSetupForm(forms.Form):
     contact_list = forms.ChoiceField(
         label="Select Contact List",
@@ -361,3 +231,130 @@ class StoreTargetForm(forms.ModelForm):
         super(StoreTargetForm, self).__init__(*args, **kwargs)
         self.fields["number"].disabled = True
         self.fields["number"].label = "Store Number"
+
+
+class EmailForm(forms.Form):
+    MODE_CHOICES = [
+        ("text", "Write Custom Message"),
+        ("template", "Use Template"),
+    ]
+
+    email_mode = forms.ChoiceField(
+        choices=MODE_CHOICES,
+        widget=forms.RadioSelect,
+        initial="text",
+        required=True,
+        label="Choose Email Mode",
+    )
+
+    subject = forms.CharField(
+        max_length=255,
+        required=False,
+        label="Email Subject",
+        widget=forms.TextInput(attrs={"placeholder": "Enter a subject..."})
+    )
+
+    message = forms.CharField(
+        widget=forms.Textarea(attrs={"rows": 5, "placeholder": "Write your message here..."}),
+        required=False,
+        label="Message Body"
+    )
+
+    sendgrid_id = forms.ModelChoiceField(
+        queryset=EmailTemplate.objects.none(),
+        widget=forms.RadioSelect,
+        required=False,
+        label="Select Template",
+    )
+
+    selected_group = forms.ModelChoiceField(
+        queryset=Group.objects.none(),
+        widget=forms.RadioSelect,
+        required=False,
+        label="Select Group",
+    )
+
+    selected_users = forms.ModelMultipleChoiceField(
+        queryset=User.objects.none(),
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Select Users",
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.is_draft = kwargs.pop("is_draft", False)
+        user = kwargs.pop("user", None)
+        super().__init__(*args, **kwargs)
+
+        if self.is_draft:
+            self.fields["email_mode"].required = False
+            self.fields["subject"].required = False
+            self.fields["message"].required = False
+            self.fields["sendgrid_id"].required = False
+            self.fields["selected_group"].required = False
+            self.fields["selected_users"].required = False
+
+        if user and hasattr(user, "employer"):
+            employer = user.employer
+
+            self.fields["sendgrid_id"].queryset = EmailTemplate.objects.filter(
+                models.Q(employers=employer) | models.Q(employers__isnull=True)
+            ).distinct().order_by("name")
+
+            self.fields["selected_group"].queryset = Group.objects.filter(
+                user__employer=employer
+            ).distinct().order_by("name")
+
+            self.fields["selected_users"].queryset = User.objects.filter(
+                employer=employer,
+                is_active=True
+            ).order_by("last_name")
+
+            self.fields["selected_users"].label_from_instance = lambda u: (
+                f"{u.last_name}, {u.first_name} – {u.email} "
+                f"({u.employer.name if u.employer else 'No Employer'})"
+            )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        # Skip full validation if draft, BUT do minimum sanity check
+        if self.is_draft:
+            mode = cleaned_data.get("email_mode")
+
+            # Optional: default to "text" if user didn’t select anything
+            if not mode:
+                mode = "text"
+                cleaned_data["email_mode"] = "text"
+
+            if mode == "template":
+                raise forms.ValidationError("Drafts can only be saved when composing a custom message.")
+
+            return cleaned_data
+
+        mode = cleaned_data.get("email_mode")
+        subject = cleaned_data.get("subject")
+        message = cleaned_data.get("message")
+        sendgrid_id = cleaned_data.get("sendgrid_id")
+
+        selected_group = cleaned_data.get("selected_group")
+        selected_users = cleaned_data.get("selected_users")
+
+        # Validate group/user selection
+        if not selected_group and not selected_users:
+            raise forms.ValidationError("You must select either a group or at least one user.")
+        if selected_group and selected_users:
+            raise forms.ValidationError("You cannot select both a group and individual users.")
+
+        # Validate mode-based inputs
+        if mode == "text":
+            if not subject or not message:
+                raise forms.ValidationError("Subject and message are required for text mode.")
+        elif mode == "template":
+            if not sendgrid_id:
+                raise forms.ValidationError("You must select a template.")
+
+        print("Cleaned data:", cleaned_data)
+        print("Mode:", mode)
+        print("Sendgrid ID:", sendgrid_id)
+
+        return cleaned_data

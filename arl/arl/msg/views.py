@@ -1,71 +1,77 @@
 import json
 import logging
-import uuid
-from django.conf import settings
 import urllib.parse
-from django.http import JsonResponse
-from django.contrib.auth import get_user_model
-from django.http import HttpResponseNotFound
-from django.db.models import Count, Q, Subquery, OuterRef, Max
+import uuid
+from io import BytesIO
+
 from celery.result import AsyncResult
+from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import Group
+from django.db.models import Count, Max, Q
 from django.forms import modelformset_factory
+from django.http import (
+    HttpResponse,
+    HttpResponseBadRequest,
+    HttpResponseNotFound,
+    JsonResponse,
+)
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
+from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormView
+from PIL import Image
 from waffle.decorators import waffle_flag
-from django.views.decorators.http import require_POST
-from django.utils.timezone import now
-from django.http import (HttpResponse,
-                         HttpResponseBadRequest)
-from .models import ComplianceFile, ShortenedSMSLog
+
+from arl.bucket.helpers import conn, upload_to_linode_object_storage
 from arl.dsign.forms import NameEmailForm
 from arl.dsign.tasks import create_docusign_envelope_task
 from arl.msg.helpers import (
     client,
-    collect_attachments,
-    custom_permission_denied,
     get_all_contact_lists,
+    get_uploaded_urls_from_request,
     is_member_of_comms_group,
     is_member_of_docusign_group,
     is_member_of_email_group,
     is_member_of_msg_group,
     prepare_recipient_data,
+    save_email_draft,
+    send_quick_email,
+    send_template_email,
     send_whats_app_carwash_sites_template,
 )
-from arl.bucket.helpers import upload_to_linode_object_storage, conn
 from arl.msg.tasks import (
     process_whatsapp_webhook,
     send_template_whatsapp_task,
     start_campaign_task,
 )
-from arl.user.models import CustomUser, Store, SMSOptOut
+from arl.user.models import CustomUser, SMSOptOut, Store
 
 from .forms import (
     CampaignSetupForm,
+    EmailForm,
     EmployeeSearchForm,
     GroupSelectForm,
     SendGridFilterForm,
     SMSForm,
+    SMSLogFilterForm,
     StoreTargetForm,
-    TemplateEmailForm,
     TemplateFilterForm,
     TemplateWhatsAppForm,
-    QuickEmailForm,
-    SMSLogFilterForm
 )
+from .models import ComplianceFile, DraftEmail, ShortenedSMSLog
 from .tasks import (
     fetch_twilio_sms_task,
     fetch_twilio_summary,
     filter_sendgrid_events,
     generate_email_event_summary,
     generate_employee_email_report_task,
-    master_email_send_task,
     process_sendgrid_webhook,
     send_one_off_bulk_sms_task,
 )
@@ -233,7 +239,7 @@ def fetch_shortlink_sms_data(request):
             sent=Count("id", filter=Q(event_type="sent")),
             delivered=Count("id", filter=Q(event_type="delivered")),
             clicked=Count("id", filter=Q(event_type="click")),
-            last_time=Max("created_at")
+            last_time=Max("created_at"),
         )
         .order_by("-last_time")
     )
@@ -267,172 +273,112 @@ def sms_summary_view(request):
 @login_required
 @user_passes_test(is_member_of_comms_group)
 def communications(request):
+    draft_id = request.GET.get("draft_id") or request.POST.get("draft_id")
     user = request.user
     active_tab = request.GET.get("tab", "email")
-    print(user, active_tab)
+    action = request.POST.get("action", "send")
 
-    # Determine what tabs the user has access to
+    # Determine allowed tabs
     valid_tabs = []
     if is_member_of_email_group(user):
         valid_tabs.append("email")
-        valid_tabs.append("quick_email")
     if is_member_of_msg_group(user):
         valid_tabs.append("sms")
     if is_member_of_docusign_group(user):
         valid_tabs.append("docusign")
 
-    # If they try to access a tab they don't have permission for, redirect to the first valid tab
     if active_tab not in valid_tabs:
         active_tab = valid_tabs[0] if valid_tabs else None
 
-    # Default forms
+    initial_data = None
+    if draft_id:
+        try:
+            draft = DraftEmail.objects.get(id=draft_id, user=user)
+            initial_data = {
+                "email_mode": draft.mode,
+                "subject": draft.subject,
+                "message": draft.message,
+                "sendgrid_id": draft.sendgrid_template,
+                "selected_group": draft.selected_group,
+                "selected_users": draft.selected_users.all(),
+            }
+        except DraftEmail.DoesNotExist:
+            messages.error(request, "Draft not found.")
+            return redirect("/comms/?tab=email")
+
+    # Forms
     sms_form = SMSForm(user=user)
-    email_form = TemplateEmailForm(user=user)
-    quick_email_form = QuickEmailForm(user=user)
+    email_form = EmailForm(user=user)
     docusign_form = NameEmailForm(user=user)
 
     if request.method == "POST":
         form_type = request.POST.get("form_type")
+        print(form_type)
 
-        if form_type == "quick_email":
-            active_tab = "quick_email"
-            quick_email_form = QuickEmailForm(request.POST, request.FILES, user=user)
-
-            if quick_email_form.is_valid():
-                subject = quick_email_form.cleaned_data["subject"]
-                message = quick_email_form.cleaned_data["message"]
-                selected_group = quick_email_form.cleaned_data["selected_group"]
-                selected_users = quick_email_form.cleaned_data["selected_users"]
-                uploaded_file_urls = request.POST.get("uploaded_file_urls")
-                if uploaded_file_urls:
-                    try:
-                        file_urls = json.loads(uploaded_file_urls)
-                    except json.JSONDecodeError:
-                        file_urls = []
-                else:
-                    file_urls = []
-                    
-                employer = user.employer
-                
-                attachments = collect_attachments(request)
-
-                if request.FILES.getlist("attachments") and attachments is None:
-                    # User tried to upload but failed validation
-                    return redirect("/comms/?tab=quick_email") 
-
-                recipients = prepare_recipient_data(
-                    user, selected_group, selected_users
-                )
-
-                # ✅ Now send using your new master helper (we'll have to create a basic helper)
-                master_email_send_task.delay(
-                    recipients=recipients,
-                    sendgrid_id="d-4ac0497efd864e29b4471754a9c836eb",
-                    attachments=attachments,
-                    employer_id=request.user.employer.id,
-                    body=message,
-                    subject=subject,
-                    attachment_urls=file_urls
-                )
-
-                messages.success(request, "Quick email has been queued for delivery.")
-                return redirect("/comms/?tab=quick_email")
-            else:
-                messages.error(request, "Please correct the errors below.")
-
-        elif form_type == "email":
+        if form_type == "email":
             active_tab = "email"
-            if not is_member_of_email_group(user):
-                return custom_permission_denied(
-                    request, "You do not have permission to send email."
-                )
-
-            email_form = TemplateEmailForm(request.POST, request.FILES, user=user)
+            print("📬 Processing email form...")
+            email_form = EmailForm(request.POST, request.FILES, user=user)
 
             if email_form.is_valid():
-                sendgrid_template = email_form.cleaned_data.get("sendgrid_id")
-                if not sendgrid_template:
-                    messages.error(request, "No email template selected.")
-                    return redirect("/comms/?tab=email")
-
-                sendgrid_id = sendgrid_template.sendgrid_id
-                selected_group = email_form.cleaned_data.get("selected_group")
-                selected_users = email_form.cleaned_data.get("selected_users")
-                uploaded_file_urls = request.POST.get("uploaded_file_urls")
-                print("uplaoded file urls :", uploaded_file_urls)
-                if uploaded_file_urls:
-                    try:
-                        file_urls = json.loads(uploaded_file_urls)
-                    except json.JSONDecodeError:
-                        file_urls = []
-                else:
-                    file_urls = []
-                # Print to console
-                print("Selected group:", selected_group)
-                print("Selected users:", selected_users)
-
-                # Optionally: inspect each user
-                for user in selected_users:
-                    print(f"User: {user.first_name} {user.last_name} ({user.email})")
-
-                # Exit early for testing
-                # return HttpResponse("Debug: printed selected group and users. Execution stopped.")
-                employer = user.employer
-                #attachments = collect_attachments(request)
-              
-                #if request.FILES.getlist("attachments") and attachments is None:
-                    # User tried to upload but failed validation
-                #    return redirect("/comms/?tab=email")
+                mode = email_form.cleaned_data["email_mode"]
+                selected_group = email_form.cleaned_data["selected_group"]
+                selected_users = email_form.cleaned_data["selected_users"]
+                attachment_urls = get_uploaded_urls_from_request(request)
 
                 recipients = prepare_recipient_data(
                     user, selected_group, selected_users
                 )
 
-                master_email_send_task.delay(
-                    recipients=recipients,
-                    sendgrid_id=sendgrid_id,
-                    employer_id=employer.id if employer else None,
-                    attachment_urls=file_urls
-                )
+                if action == "save":
+                    draft_id = request.POST.get("draft_id")
+                    save_email_draft(
+                        user,
+                        email_form.cleaned_data,
+                        attachment_urls,
+                        draft_id=draft_id,
+                    )
+                    messages.success(request, "Draft saved.")
+                    return redirect("/comms/?tab=email")
 
-                messages.success(request, "Emails have been queued for delivery.")
+                if mode == "text":
+                    subject = email_form.cleaned_data["subject"]
+                    message = email_form.cleaned_data["message"]
+                    send_quick_email(
+                        user, recipients, subject, message, attachment_urls
+                    )
+                else:
+                    sendgrid_template = email_form.cleaned_data["sendgrid_id"]
+                    send_template_email(
+                        user, recipients, sendgrid_template, attachment_urls
+                    )
+
+                messages.success(request, "Email has been queued for delivery.")
                 return redirect("/comms/?tab=email")
+
             else:
                 messages.error(request, "Please correct the errors below.")
-                
+
         elif form_type == "sms":
             active_tab = "sms"
-            if not is_member_of_msg_group(user):
-                return custom_permission_denied(
-                    request, "You do not have permission to send text messages."
-                )
-
             sms_form = SMSForm(request.POST, user=user)
 
             if sms_form.is_valid():
                 group = sms_form.cleaned_data["selected_group"]
                 sms_message = sms_form.cleaned_data["message"]
-
                 send_one_off_bulk_sms_task.delay(group.id, sms_message, user.id)
                 messages.success(request, "SMS is being sent.")
                 return redirect("/comms/?tab=sms")
 
         elif form_type == "docusign":
             active_tab = "docusign"
-            if not is_member_of_docusign_group(user):
-                return custom_permission_denied(
-                    request, "You do not have permission to send DocuSign documents."
-                )
-
             docusign_form = NameEmailForm(request.POST, user=user)
 
             if docusign_form.is_valid():
                 recipient = docusign_form.cleaned_data["recipient"]
                 ds_template = docusign_form.cleaned_data["template_id"]
                 template = docusign_form.cleaned_data["template_name"]
-                template_name = (
-                    template.template_name if template else "Unknown Template"
-                )
+                template_name = template.template_name if template else "Unknown"
 
                 envelope_args = {
                     "signer_email": recipient.email,
@@ -440,25 +386,25 @@ def communications(request):
                     "template_id": ds_template,
                 }
 
-                logger.info(f"Sending DocuSign envelope: {envelope_args}")
-
                 create_docusign_envelope_task.delay(envelope_args)
 
                 messages.success(
                     request,
-                    f"Thank you. The document '{template_name}' has been sent to {recipient.get_full_name()}.",
+                    f"The document '{template_name}' has been sent to {recipient.get_full_name()}.",
                 )
                 return redirect("/comms/?tab=docusign")
 
             messages.error(request, "Please correct the DocuSign form.")
-            
-    selected_ids = request.POST.getlist("selected_users") if request.method == "POST" else []
+
+    selected_ids = (
+        request.POST.getlist("selected_users") if request.method == "POST" else []
+    )
+
     return render(
         request,
         "msg/master_comms.html",
         {
             "email_form": email_form,
-            "quick_email_form": quick_email_form,
             "sms_form": sms_form,
             "docusign_form": docusign_form,
             "active_tab": active_tab,
@@ -466,8 +412,103 @@ def communications(request):
             "can_send_sms": is_member_of_msg_group(user),
             "can_send_docusign": is_member_of_docusign_group(user),
             "selected_ids": selected_ids,
+            "draft_id": draft_id,
         },
     )
+
+
+@login_required
+@require_POST
+def save_draft_ajax(request):
+    form = EmailForm(request.POST, user=request.user, is_draft=True)
+
+    if not form.is_valid():
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Form validation failed.",
+                "errors": form.errors.as_json(),
+            }
+        )
+
+    draft_id = request.POST.get("draft_id")
+    print("draft id :", draft_id)
+    if draft_id:
+        try:
+            draft = DraftEmail.objects.get(id=draft_id, user=request.user)
+        except DraftEmail.DoesNotExist:
+            return JsonResponse({"success": False, "error": "Draft not found."})
+    else:
+        draft = DraftEmail(user=request.user)
+    print("draft :", draft, draft.subject)
+    draft.mode = form.cleaned_data.get("email_mode")
+    draft.subject = form.cleaned_data.get("subject", "")
+    print("draft subject :", draft.subject)
+    draft.message = form.cleaned_data.get("message", "")
+    draft.sendgrid_template = form.cleaned_data.get("sendgrid_id")
+    draft.selected_group = form.cleaned_data.get("selected_group")
+    uploaded_urls_raw = request.POST.get("uploaded_file_urls")
+    try:
+        attachment_urls = json.loads(uploaded_urls_raw) if uploaded_urls_raw else []
+    except json.JSONDecodeError:
+        attachment_urls = []
+
+    draft.attachment_urls = attachment_urls
+    draft.save()
+
+    draft.selected_users.set(form.cleaned_data.get("selected_users"))
+    draft.save()
+
+    return JsonResponse({"success": True, "draft_id": draft.id})
+
+
+@login_required
+@user_passes_test(is_member_of_comms_group)
+def edit_draft_email(request, draft_id):
+    try:
+        draft = DraftEmail.objects.get(id=draft_id, user=request.user)
+    except DraftEmail.DoesNotExist:
+        messages.error(request, "Draft not found.")
+        return redirect("/comms/?tab=email")
+
+    form = EmailForm(
+        initial={
+            "email_mode": draft.mode,
+            "subject": draft.subject,
+            "message": draft.message,
+            "sendgrid_id": draft.sendgrid_template,
+            "selected_group": draft.selected_group,
+            "selected_users": draft.selected_users.all(),
+        },
+        user=request.user,
+    )
+
+    return render(
+        request,
+        "msg/master_comms.html",
+        {
+            "email_form": form,
+            "sms_form": SMSForm(user=request.user),
+            "docusign_form": NameEmailForm(user=request.user),
+            "active_tab": "email",
+            "can_send_email": is_member_of_email_group(request.user),
+            "can_send_sms": is_member_of_msg_group(request.user),
+            "can_send_docusign": is_member_of_docusign_group(request.user),
+            "selected_ids": [u.id for u in draft.selected_users.all()],
+            "draft_id": draft.id,
+            "draft": draft,
+            "attachment_urls": json.dumps(draft.attachment_urls or []),
+        },
+    )
+
+
+@login_required
+@require_POST
+def delete_draft_email(request, draft_id):
+    draft = get_object_or_404(DraftEmail, id=draft_id, user=request.user)
+    draft.delete()
+    messages.success(request, "Draft deleted.")
+    return redirect("/comms/?tab=email")
 
 
 @waffle_flag("email_api")
@@ -700,20 +741,23 @@ def search_users_view(request):
     query = request.GET.get("search", "")
     employer = request.user.employer
 
-    users = User.objects.filter(employer=employer, is_active=True).order_by("last_name", "first_name")
+    users = User.objects.filter(employer=employer, is_active=True).order_by(
+        "last_name", "first_name"
+    )
     if query:
         users = users.filter(
-            Q(first_name__icontains=query) |
-            Q(last_name__icontains=query) |
-            Q(email__icontains=query)
+            Q(first_name__icontains=query)
+            | Q(last_name__icontains=query)
+            | Q(email__icontains=query)
         )
 
     selected_ids = request.GET.getlist("selected_users")
 
-    return render(request, "msg/partials/user_checkboxes.html", {
-        "users": users,
-        "selected_ids": selected_ids
-    })
+    return render(
+        request,
+        "msg/partials/user_checkboxes.html",
+        {"users": users, "selected_ids": selected_ids},
+    )
 
 
 # View for weekly compliance notes
@@ -731,15 +775,48 @@ def compliance_file_view(request):
     return redirect(file.presigned_url or file.file.url)
 
 
-@csrf_exempt  # Only if you're not using the CSRF token — use caution
+@csrf_exempt
 def upload_attachment(request):
     if request.method == "POST" and request.FILES.get("file"):
         uploaded_file = request.FILES["file"]
         unique_name = f"email_attachments/{uuid.uuid4()}_{uploaded_file.name}"
 
         try:
-            upload_to_linode_object_storage(uploaded_file, unique_name)
-            # ✅ Set public-read permission AFTER upload
+            # ✅ Resize if it's an image
+            if uploaded_file.content_type.startswith("image/"):
+                try:
+                    image = Image.open(uploaded_file)
+
+                    # Choose resampling method safely
+                    try:
+                        resample_filter = Image.Resampling.LANCZOS  # Pillow ≥ 10
+                    except AttributeError:
+                        resample_filter = Image.LANCZOS  # Older versions
+
+                    thumbnail_size = (1500, 1500)
+                    image.thumbnail(thumbnail_size, resample=resample_filter)
+
+                    buffer = BytesIO()
+                    image_format = image.format or "JPEG"
+                    image.save(buffer, format=image_format)
+                    buffer.seek(0)
+
+                    # Upload resized image
+                    upload_to_linode_object_storage(buffer, unique_name)
+
+                except Exception as e:
+                    return JsonResponse(
+                        {
+                            "success": False,
+                            "error": f"Image processing failed: {str(e)}",
+                        },
+                        status=500,
+                    )
+
+            else:
+                # Upload non-image file as-is
+                upload_to_linode_object_storage(uploaded_file, unique_name)
+
             bucket = conn.get_bucket(settings.LINODE_BUCKET_NAME)
             key = bucket.get_key(unique_name)
             key.set_acl("public-read")
@@ -772,7 +849,9 @@ def twilio_short_link_webhook(request):
         to = data.get("To") or data.get("to")
         from_number = data.get("From") or data.get("from")
         message_status = data.get("MessageStatus", "").lower()
-        messaging_sid = data.get("MessagingServiceSid") or data.get("messaging_service_sid")
+        messaging_sid = data.get("MessagingServiceSid") or data.get(
+            "messaging_service_sid"
+        )
         account_sid = data.get("AccountSid") or data.get("account_sid")
         event_type = data.get("event_type", message_status)
         link = data.get("link")
@@ -784,17 +863,24 @@ def twilio_short_link_webhook(request):
             logger.warning("❌ No SmsSid found in webhook data")
             return HttpResponseBadRequest("Missing SmsSid")
 
-        user = CustomUser.objects.filter(phone_number__icontains=to).first() if to else None
+        user = (
+            CustomUser.objects.filter(phone_number__icontains=to).first()
+            if to
+            else None
+        )
         # 🛑 Handle 30007 (Carrier Filtered)
         if error_code == "30007" and user:
             if not hasattr(user, "sms_opt_out"):
                 SMSOptOut.objects.create(
-                    user=user,
-                    reason="Carrier filtered message (30007)"
+                    user=user, reason="Carrier filtered message (30007)"
                 )
-                logger.info(f"User {user.username} automatically opted out due to 30007 error.")
+                logger.info(
+                    f"User {user.username} automatically opted out due to 30007 error."
+                )
             else:
-                logger.info(f"User {user.username} already opted out. 30007 received again.")
+                logger.info(
+                    f"User {user.username} already opted out. 30007 received again."
+                )
 
         ShortenedSMSLog.objects.create(
             sms_sid=sms_sid,
@@ -808,11 +894,11 @@ def twilio_short_link_webhook(request):
             user_agent=user_agent or "",
             user=user,
             error_code=error_code,
-            created_at=now()
+            created_at=now(),
         )
 
         return JsonResponse({"status": "success"})
 
-    except Exception as e:
+    except Exception:
         logger.exception("❌ Webhook processing failed.")
         return HttpResponseBadRequest("Internal Error")

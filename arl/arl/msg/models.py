@@ -5,6 +5,7 @@ from django.utils.timezone import now
 from uuid import uuid4
 from arl.user.models import CustomUser, Employer
 from arl.bucket.helpers import upload_to_linode_object_storage, conn
+from django.contrib.auth.models import Group
 
 
 class Twimlmessages(models.Model):
@@ -227,3 +228,16 @@ class ShortenedSMSLog(models.Model):
 
     def __str__(self):
         return f"{self.event_type.upper()} - {self.to}"
+
+
+class DraftEmail(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    mode = models.CharField(max_length=20, choices=[("text", "Text"), ("template", "Template")])
+    subject = models.CharField(max_length=255, blank=True)
+    message = models.TextField(blank=True)
+    sendgrid_template = models.ForeignKey(EmailTemplate, null=True, blank=True, on_delete=models.SET_NULL)
+    selected_group = models.ForeignKey(Group, null=True, blank=True, on_delete=models.SET_NULL)
+    selected_users = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="draft_recipients", blank=True)
+    attachment_urls = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)

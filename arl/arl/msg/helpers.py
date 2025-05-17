@@ -27,6 +27,7 @@ from twilio.base.exceptions import TwilioException
 from twilio.rest import Client
 from arl.setup.models import TenantApiKeys
 from arl.user.models import CustomUser, Store
+from .models import DraftEmail
 
 logger = get_task_logger(__name__)
 
@@ -142,7 +143,7 @@ def create_master_email(
             personalization.subject = template_data["subject"]
 
         message.add_personalization(personalization)
-      
+
         print("✅ Final Email attachments summary:")
         for a in attachments:
             print(f"• {a['filename']} ({a['type']}) - {len(a['content']) // 1024} KB")
@@ -860,3 +861,52 @@ def is_member_of_comms_group(user):
 
 def custom_permission_denied(request, message=None):
     return render(request, "incident/403.html", {"message": message}, status=403)
+
+
+def get_uploaded_urls_from_request(request):
+    uploaded_file_urls = request.POST.get("uploaded_file_urls")
+    try:
+        return json.loads(uploaded_file_urls) if uploaded_file_urls else []
+    except json.JSONDecodeError:
+        return []
+
+
+def save_email_draft(user, cleaned_data, attachment_urls, draft_id=None):
+    from django.shortcuts import get_object_or_404
+    if draft_id:
+        draft = get_object_or_404(DraftEmail, id=draft_id, user=user)
+    else:
+        draft = DraftEmail(user=user)
+
+    draft.mode = cleaned_data.get("email_mode")
+    draft.subject = cleaned_data.get("subject", "")
+    draft.message = cleaned_data.get("message", "")
+    draft.sendgrid_template = cleaned_data.get("sendgrid_id")
+    draft.selected_group = cleaned_data.get("selected_group")
+    draft.attachment_urls = attachment_urls
+    draft.save()
+
+    draft.selected_users.set(cleaned_data.get("selected_users", []))
+    draft.save()
+
+
+def send_quick_email(user, recipients, subject, message, attachment_urls):
+    from .tasks import master_email_send_task
+    master_email_send_task.delay(
+        recipients=recipients,
+        sendgrid_id="d-4ac0497efd864e29b4471754a9c836eb",  # Fallback SendGrid ID
+        employer_id=user.employer.id,
+        body=message,
+        subject=subject,
+        attachment_urls=attachment_urls,
+    )
+
+
+def send_template_email(user, recipients, sendgrid_template, attachment_urls):
+    from .tasks import master_email_send_task
+    master_email_send_task.delay(
+        recipients=recipients,
+        sendgrid_id=sendgrid_template.sendgrid_id,
+        employer_id=user.employer.id,
+        attachment_urls=attachment_urls,
+    )
