@@ -232,6 +232,7 @@ class ShortenedSMSLog(models.Model):
 
 class DraftEmail(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    employer = models.ForeignKey("user.Employer", on_delete=models.CASCADE)
     mode = models.CharField(max_length=20, choices=[("text", "Text"), ("template", "Template")])
     subject = models.CharField(max_length=255, blank=True)
     message = models.TextField(blank=True)

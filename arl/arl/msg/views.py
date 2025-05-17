@@ -293,7 +293,7 @@ def communications(request):
     initial_data = None
     if draft_id:
         try:
-            draft = DraftEmail.objects.get(id=draft_id, user=user)
+            draft = DraftEmail.objects.get(id=draft_id, user=request.user, employer=request.user.employer)
             initial_data = {
                 "email_mode": draft.mode,
                 "subject": draft.subject,
@@ -302,13 +302,16 @@ def communications(request):
                 "selected_group": draft.selected_group,
                 "selected_users": draft.selected_users.all(),
             }
+            attachment_urls = draft.attachment_urls or []
         except DraftEmail.DoesNotExist:
             messages.error(request, "Draft not found.")
             return redirect("/comms/?tab=email")
+    else:
+        attachment_urls = []
 
     # Forms
     sms_form = SMSForm(user=user)
-    email_form = EmailForm(user=user)
+    email_form = EmailForm(user=user, initial=initial_data)
     docusign_form = NameEmailForm(user=user)
 
     if request.method == "POST":
@@ -318,7 +321,7 @@ def communications(request):
         if form_type == "email":
             active_tab = "email"
             print("📬 Processing email form...")
-            email_form = EmailForm(request.POST, request.FILES, user=user)
+            email_form = EmailForm(request.POST, request.FILES, user=user, initial=initial_data)
 
             if email_form.is_valid():
                 mode = email_form.cleaned_data["email_mode"]
@@ -413,6 +416,9 @@ def communications(request):
             "can_send_docusign": is_member_of_docusign_group(user),
             "selected_ids": selected_ids,
             "draft_id": draft_id,
+            "attachment_urls": attachment_urls,
+            "drafts": DraftEmail.objects.filter(user=user,
+                                                employer=user.employer).order_by("-created_at"),
         },
     )
 
@@ -448,6 +454,7 @@ def save_draft_ajax(request):
     draft.sendgrid_template = form.cleaned_data.get("sendgrid_id")
     draft.selected_group = form.cleaned_data.get("selected_group")
     uploaded_urls_raw = request.POST.get("uploaded_file_urls")
+    draft.employer = request.user.employer
     try:
         attachment_urls = json.loads(uploaded_urls_raw) if uploaded_urls_raw else []
     except json.JSONDecodeError:

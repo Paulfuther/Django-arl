@@ -72,7 +72,7 @@
     <div class="mb-3">
         <h6 class="text-muted mb-2">📝 Saved Drafts</h6>
         <ul class="list-group">
-          {% for draft in user.draftemail_set.all %}
+          {% for draft in drafts %}
             <li class="list-group-item d-flex justify-content-between align-items-center px-2 py-2">
               <div class="d-flex align-items-center">
                 {% if draft.id != email_form.initial.draft_id %}
@@ -397,40 +397,50 @@
         const fileListEl = document.getElementById("upload-file-list");
         const hiddenInput = document.getElementById("uploaded_file_urls");
         let uploadedUrls = [];
+        let existingFiles = [];
 
-          // Load existing files from hidden input if editing a draft
-            const existingFiles = hiddenInput.value ? JSON.parse(hiddenInput.value) : [];
+        try {
+          const raw = hiddenInput.value;
+          if (raw && raw.trim() !== "") {
+            existingFiles = JSON.parse(raw);
             uploadedUrls = [...existingFiles];
+          } else {
+            existingFiles = [];
+            uploadedUrls = [];
+          }
+        } catch (e) {
+          console.warn("⚠️ Failed to parse uploaded_file_urls:", e);
+          existingFiles = [];
+          uploadedUrls = [];
+        }
 
-            existingFiles.forEach(url => {
-  const filename = url.split("/").pop();
-  const mockFile = {
-    name: filename,
-    size: 12345, // or a real size if known
-    accepted: true
-  };
+        existingFiles.forEach(url => {
+          const filename = url.split("/").pop();
+          const mockFile = {
+            name: filename,
+            size: 12345,
+            accepted: true
+          };
 
-  this.emit("addedfile", mockFile);
-  if (/\.(jpe?g|png|gif)$/i.test(filename)) {
-    this.emit("thumbnail", mockFile, url);
-  }
-  this.emit("complete", mockFile);
-  this.files.push(mockFile);
+          this.emit("addedfile", mockFile);
+          if (/\.(jpe?g|png|gif)$/i.test(filename)) {
+            this.emit("thumbnail", mockFile, url);
+          }
+          this.emit("complete", mockFile);
+          this.files.push(mockFile);
 
-  const icon = /\.(jpe?g|png|gif)$/i.test(filename)
-    ? "🖼️"
-    : filename.includes("pdf")
-    ? "📄"
-    : "📎";
+          const icon = /\.(jpe?g|png|gif)$/i.test(filename)
+            ? "🖼️"
+            : filename.includes("pdf")
+            ? "📄"
+            : "📎";
 
-  const li = document.createElement("li");
-  li.textContent = `${icon} ${filename}`;
-  fileListEl.appendChild(li);
-});
-
-        this.on("sending", function () {
-          if (submitBtn) submitBtn.disabled = true;
+          const li = document.createElement("li");
+          li.textContent = `${icon} ${filename}`;
+          fileListEl.appendChild(li);
         });
+
+        this.on("sending", () => { if (submitBtn) submitBtn.disabled = true; });
 
         this.on("success", function (file, response) {
           if (response.url) {
@@ -443,7 +453,7 @@
 
             const li = document.createElement("li");
             li.textContent = `${icon} ${file.name}`;
-            if (fileListEl) fileListEl.appendChild(li);
+            fileListEl.appendChild(li);
           }
 
           if (this.getUploadingFiles().length === 0 && this.getQueuedFiles().length === 0) {
@@ -453,7 +463,7 @@
 
         this.on("removedfile", function (file) {
           uploadedUrls = uploadedUrls.filter(url => !url.includes(file.name));
-          if (hiddenInput) hiddenInput.value = JSON.stringify(uploadedUrls);
+          hiddenInput.value = JSON.stringify(uploadedUrls);
 
           [...fileListEl.children].forEach(child => {
             if (child.textContent.includes(file.name)) child.remove();
@@ -464,16 +474,13 @@
           }
         });
 
-        this.on("error", function () {
-          if (submitBtn) submitBtn.disabled = false;
-        });
+        this.on("error", () => { if (submitBtn) submitBtn.disabled = false; });
       }
     });
 
     dropzoneEl.classList.add("dz-initialized");
-        // Prevent form submit while uploading files
-    const form = document.getElementById("template-email-form");
 
+    const form = document.getElementById("template-email-form");
     form.addEventListener("submit", function (e) {
       if (dz.getUploadingFiles().length > 0 || dz.getQueuedFiles().length > 0) {
         e.preventDefault();
@@ -481,7 +488,6 @@
       }
     });
 
-    // Also disable Save Draft button during uploads
     const saveBtn = document.getElementById("save-draft-btn");
     if (saveBtn) {
       dz.on("sending", () => saveBtn.disabled = true);
@@ -588,7 +594,7 @@
           console.log("📥 Response from backend:", data);
           if (data.success) {
             alert("✅ Draft saved!");
-            location.reload();
+            window.location.href = `/comms/?tab=email&draft_id=${data.draft_id}`;
           } else {
             alert("❌ Error saving draft: " + (data.error || "Unknown error"));
 
