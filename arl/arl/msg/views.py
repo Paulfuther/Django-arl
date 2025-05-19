@@ -1,9 +1,9 @@
 import json
 import logging
+import os
 import urllib.parse
 import uuid
 from io import BytesIO
-
 from celery.result import AsyncResult
 from django.conf import settings
 from django.contrib import messages
@@ -23,9 +23,10 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormView
+from arl.msg.helpers import send_linkshortened_sms
 from PIL import Image
 from waffle.decorators import waffle_flag
 
@@ -51,7 +52,8 @@ from arl.msg.tasks import (
     send_template_whatsapp_task,
     start_campaign_task,
 )
-from arl.user.models import CustomUser, SMSOptOut, Store
+from arl.user.models import (CustomUser,
+                             SMSOptOut, Store, Employer)
 
 from .forms import (
     CampaignSetupForm,
@@ -66,6 +68,7 @@ from .forms import (
     TemplateWhatsAppForm,
 )
 from .models import ComplianceFile, DraftEmail, ShortenedSMSLog
+from arl.setup.models import TenantApiKeys
 from .tasks import (
     fetch_twilio_sms_task,
     fetch_twilio_summary,
@@ -293,7 +296,9 @@ def communications(request):
     initial_data = None
     if draft_id:
         try:
-            draft = DraftEmail.objects.get(id=draft_id, user=request.user, employer=request.user.employer)
+            draft = DraftEmail.objects.get(
+                id=draft_id, user=request.user, employer=request.user.employer
+            )
             initial_data = {
                 "email_mode": draft.mode,
                 "subject": draft.subject,
@@ -321,7 +326,9 @@ def communications(request):
         if form_type == "email":
             active_tab = "email"
             print("📬 Processing email form...")
-            email_form = EmailForm(request.POST, request.FILES, user=user, initial=initial_data)
+            email_form = EmailForm(
+                request.POST, request.FILES, user=user, initial=initial_data
+            )
 
             if email_form.is_valid():
                 mode = email_form.cleaned_data["email_mode"]
@@ -417,8 +424,9 @@ def communications(request):
             "selected_ids": selected_ids,
             "draft_id": draft_id,
             "attachment_urls": attachment_urls,
-            "drafts": DraftEmail.objects.filter(user=user,
-                                                employer=user.employer).order_by("-created_at"),
+            "drafts": DraftEmail.objects.filter(
+                user=user, employer=user.employer
+            ).order_by("-created_at"),
         },
     )
 
@@ -909,3 +917,48 @@ def twilio_short_link_webhook(request):
     except Exception:
         logger.exception("❌ Webhook processing failed.")
         return HttpResponseBadRequest("Internal Error")
+
+
+@require_GET
+@login_required
+def test_sms_with_short_link(request):
+    test_number = settings.MY_TEST_PHONE_NUMBER  # e.g., +12225551234
+
+    if not test_number:
+        return JsonResponse({"error": "Test number not found in .env"}, status=400)
+
+    try:
+        employer = Employer.objects.get(id=1)
+    except Employer.DoesNotExist:
+        return JsonResponse({"error": "Employer with ID 1 not found"}, status=404)
+
+    twilio_keys = TenantApiKeys.objects.filter(employer=employer, is_active=True).first()
+    if not twilio_keys:
+        logger.error(f"🚨 No Twilio keys for {employer.name}")
+        return JsonResponse({"error": "Twilio keys not configured"}, status=500)
+
+    sid = twilio_keys.account_sid
+    token = twilio_keys.auth_token
+    msg_sid = twilio_keys.messaging_service_sid
+
+    if not sid or not token or not msg_sid:
+        logger.error(f"🚨 Incomplete Twilio credentials for {employer.name}")
+        return JsonResponse({"error": "Incomplete Twilio credentials"}, status=500)
+
+    body = (
+        "Hello, this is Terry from Petro Canada. Each week, we share reminders for employees "
+        "about regulated products. Please review this week’s message: "
+        "https://paulfuther.eu-central-1.linodeobjects.com/compliance/4dcc0432-05f8-4e5e-b462-7c31bd7c59bd_compliance/rules.pdf "
+        "Reply STOP to opt out."
+    )
+
+    result = send_linkshortened_sms(
+        to_number=test_number,
+        body=body,
+        twilio_account_sid=sid,
+        twilio_auth_token=token,
+        twilio_message_service_sid=msg_sid,
+    )
+
+    logger.info(f"📤 Test SMS sent to {test_number}: {result}")
+    return JsonResponse({"message": "SMS sent", "result": result})
