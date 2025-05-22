@@ -1,0 +1,363 @@
+/* General Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.6;
+  color: #f7f4f4;
+  background-color: #fff;
+}
+
+.container {
+  width: 90%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Hero Section */
+.hero {
+  position: relative;
+  background: url('/static/images/hero.jpg') center/cover no-repeat;
+  color: #ffffff;  /* Bright white text */
+  text-align: center;
+  padding: 100px 20px;
+  z-index: 1;
+}
+
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: url('/static/images/hero.jpg') center/cover no-repeat;
+  filter: blur(3px) brightness(60%);
+  z-index: 0;
+}
+
+.hero .container {
+  position: relative;
+  z-index: 1;
+}
+
+.hero h1 {
+  font-family: 'Open Sans', sans-serif;
+  font-weight: 300; /* Light */
+  font-size: 3rem;
+  letter-spacing: -0.5px;
+}
+
+.hero p {
+  font-family: 'Open Sans', sans-serif;
+  font-weight: 300;
+  font-size: 1.2rem;
+  color: #f4f4f4;
+  margin-bottom: 2rem;
+}
+
+.btn {
+  display: inline-block;
+  padding: 12px 24px;
+  background-color: #0f62fe;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  transition: background 0.3s ease;
+}
+
+.btn:hover {
+  background-color: #0043ce;
+}
+
+/* Features */
+.features {
+  padding: 60px 20px;
+  background-color: #f8f9fa;
+  text-align: center;
+  color: #2c2c2c;  /* dark gray for high contrast */
+}
+
+.features h2 {
+  font-size: 2rem;
+  margin-bottom: 40px;
+  color: #1a1a1a;
+}
+
+.feature-card h3 {
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.feature-card p {
+  text-align: left;
+  line-height: 1.6;
+  color: #333;
+}
+
+.feature-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+}
+
+.feature-card {
+  display: block;
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.05);
+  width: 300px;
+  text-decoration: none;     /* Remove underline */
+  color: inherit;            /* Use parent text color */
+  transition: box-shadow 0.3s ease, transform 0.2s ease;
+}
+
+.feature-card h3,
+.feature-card p {
+  color: #2c2c2c;            /* Neutral text color */
+  margin: 0;
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+/* Showcase */
+.showcase {
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.showcase h2 {
+  font-family: 'Open Sans', sans-serif;
+  font-weight: 300; /* Light */
+  font-size: 2rem;
+  color: #f4f4f4; /* or adjust based on your section background */
+  margin-bottom: 1.5rem;
+}
+
+.showcase .image-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: center;
+  margin-top: 30px;
+}
+
+.showcase img {
+  width: 300px;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+/* CTA */
+.cta {
+  background-color: #2b2b2b;  /* matches your darker hero/footer theme */
+  color: #f4f4f4;
+  padding: 80px 20px;
+  text-align: center;
+  font-family: 'Open Sans', sans-serif;
+  font-weight: 300; /* light */
+}
+
+.cta h2 {
+  font-size: 2rem;
+  margin-bottom: 20px;
+  font-weight: 300; /* light for calm tone */
+}
+
+.cta p {
+  font-size: 1.1rem;
+  font-weight: 300;
+  margin-bottom: 1.5rem;
+}
+
+.btn-accent {
+  background-color: #ffffff;
+  color: #474646;
+  font-weight: bold;
+  border-radius: 4px;
+  padding: 12px 24px;
+  text-decoration: none;
+  transition: background-color 0.3s ease;
+}
+
+.btn-accent:hover {
+  background-color: #e2e2e2;
+  color: #000;
+}
+
+/* Footer */
+footer {
+  padding: 40px 20px;
+  background-color: #2b2b2b;  /* Same as CTA */
+  color: #f4f4f4;
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+footer a {
+  color: #ffffff;
+  text-decoration: none;
+}
+
+footer a:hover {
+  color: #dddddd;
+  text-decoration: underline;
+}
+
+.top-nav {
+  position: absolute;
+  top: 20px;
+  right: 40px;
+  font-family: 'Open Sans', sans-serif;
+  z-index: 100;
+}
+
+.top-nav a {
+  color: #ffffff;
+  text-decoration: none;
+  margin-left: 20px;
+  font-size: 0.95rem;
+  font-weight: 400;
+  padding: 8px 12px;
+  border-radius: 4px;
+  transition: background 0.3s ease;
+}
+
+.top-nav a:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.top-nav a.highlight {
+  font-weight: 600;
+  border: 1px solid white;
+}
+
+.feature-card {
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.2s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* Staggered Section */
+.staggered-section {
+  background-color: white;
+  padding: 80px 20px;
+  color: #1a1a1a; /* default dark text */
+  font-family: 'Open Sans', sans-serif;
+}
+
+/* Individual row layout */
+.staggered-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  margin-bottom: 60px;
+  flex-wrap: wrap;
+  padding: 0 20px;
+}
+
+.staggered-row.reverse {
+  flex-direction: row-reverse;
+}
+
+/* Card and text blocks */
+.staggered-card,
+.staggered-text {
+  flex: 1 1 45%;
+  max-width: 500px;
+  padding: 20px;
+  color: #1a1a1a;
+}
+
+/* Card styling */
+.staggered-card {
+  background-color: #fdfdfd;
+  border: 1px solid #eaeaea;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  text-align: left;
+}
+
+.staggered-text {
+  padding: 10px 20px;
+}
+
+/* Headings and text inside blocks */
+.staggered-card h3,
+.staggered-text h2 {
+  font-size: 1.75rem;
+  margin-bottom: 1rem;
+  font-weight: 300;
+  color: #1a1a1a;
+}
+
+.staggered-text p,
+.staggered-card p {
+  font-weight: 300;
+  line-height: 1.7;
+  color: #2c2c2c;
+}
+
+.staggered-image img {
+  width: 100%;
+  max-width: 500px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  object-fit: cover;
+}
+
+.staggered-image img {
+  height: 300px;
+  width: 100%;
+  max-width: 300px;
+  object-fit: cover;  /* fills container while cropping */
+}
+
+/* Responsive behavior */
+@media (max-width: 768px) {
+  .staggered-row,
+  .staggered-row.reverse {
+    flex-direction: column;
+    gap: 40px;
+  }
+
+  .staggered-card,
+  .staggered-text {
+    max-width: 100%;
+    padding: 10px;
+  }
+
+  .staggered-card h3,
+  .staggered-text h2 {
+    font-size: 1.5rem;
+  }
+}
+
+
+/* Responsive */
+@media (max-width: 768px) {
+  .hero h1 {
+    font-size: 2rem;
+  }
+
+  .feature-grid, .showcase .image-grid {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .feature-card, .showcase img {
+    width: 100%;
+  }
+}
