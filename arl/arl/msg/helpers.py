@@ -145,8 +145,13 @@ def create_master_email(
         message.add_personalization(personalization)
 
         print("✅ Final Email attachments summary:")
-        for a in attachments:
-            print(f"• {a['filename']} ({a['type']}) - {len(a['content']) // 1024} KB")
+        for a in attachments or []:
+            filename = a.get("filename", "Unnamed file")
+            content = a.get("content", b"")
+            filetype = a.get("type", "unknown")
+
+            size_kb = len(content) // 1024 if isinstance(content, (bytes, str)) else "N/A"
+            print(f"• {filename} ({filetype}) - {size_kb} KB")
 
         # Handle attachments if provided
         if attachments:

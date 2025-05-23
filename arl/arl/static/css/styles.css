@@ -349,7 +349,19 @@ footer a:hover {
 /* Responsive */
 @media (max-width: 768px) {
   .hero h1 {
-    font-size: 2rem;
+    font-size: 1.75rem;     /* Smaller font for mobile */
+    line-height: 1.2;       /* Tighter line spacing */
+    margin-bottom: 0.75rem;
+  }
+
+  .hero p {
+    font-size: 1rem;        /* Slightly smaller paragraph */
+    line-height: 1.4;
+    margin-bottom: 1.5rem;
+  }
+
+  .hero {
+    padding: 60px 20px;     /* Less vertical padding on small screens */
   }
 
   .feature-grid, .showcase .image-grid {
