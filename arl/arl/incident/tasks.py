@@ -377,9 +377,10 @@ def send_email_to_group_task(data, group_name, employer_id):
         # ✅ Prepare PDF as attachment
         pdf_buffer = BytesIO(data["pdf_buffer"])
         pdf_filename = data["pdf_filename"]
+        print("pdf_file_name :", pdf_filename)
         attachments = [{
-            "file_content": base64.b64encode(pdf_buffer.getvalue()).decode(),
-            "file_name": pdf_filename,
+            "content": base64.b64encode(pdf_buffer.getvalue()).decode(),
+            "filename": pdf_filename,
             "file_type": "application/pdf",
         }]
 
@@ -464,8 +465,8 @@ def generate_pdf_email_to_user_task(incident_id, user_email):
 
         # ✅ Prepare the attachment for SendGrid
         attachments = [{
-            "file_content": base64.b64encode(pdf_buffer.getvalue()).decode(),
-            "file_name": pdf_filename,
+            "content": base64.b64encode(pdf_buffer.getvalue()).decode(),
+            "filename": pdf_filename,
             "file_type": "application/pdf",
         }]
 
