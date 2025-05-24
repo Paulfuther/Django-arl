@@ -4,7 +4,6 @@ import urllib.parse
 import uuid
 from io import BytesIO
 
-from openai import OpenAI
 from celery.result import AsyncResult
 from django.conf import settings
 from django.contrib import messages
@@ -22,11 +21,13 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
+from django.utils.html import escape
 from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormView
+from openai import OpenAI
 from PIL import Image
 from waffle.decorators import waffle_flag
 
@@ -273,6 +274,10 @@ def sms_summary_view(request):
     return render(request, "msg/sms_data.html")
 
 
+def render_message_to_sendgrid(message):
+    return escape(message).replace("\n", "<br>")
+
+
 @login_required
 @user_passes_test(is_member_of_comms_group)
 def communications(request):
@@ -353,7 +358,8 @@ def communications(request):
 
                 if mode == "text":
                     subject = email_form.cleaned_data["subject"]
-                    message = email_form.cleaned_data["message"]
+                    raw_message = email_form.cleaned_data["message"]
+                    message = render_message_to_sendgrid(raw_message)
                     send_quick_email(
                         user, recipients, subject, message, attachment_urls
                     )
@@ -985,10 +991,10 @@ def generate_ai_content(request):
                 model="gpt-4o",
                 messages=[
                     {"role": "system", "content": system_message},
-                    {"role": "user", "content": prompt}
+                    {"role": "user", "content": prompt},
                 ],
                 max_tokens=300 if mode == "email" else 100,
-                temperature=0.7
+                temperature=0.7,
             )
             message = response.choices[0].message.content.strip()
             return JsonResponse({"message": message})
