@@ -14,7 +14,7 @@ User = get_user_model()
 
 
 class SMSForm(forms.Form):
-    message = forms.CharField(
+    sms_message = forms.CharField(
         max_length=1000,
         widget=forms.Textarea(
             attrs={

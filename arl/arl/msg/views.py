@@ -381,7 +381,7 @@ def communications(request):
 
             if sms_form.is_valid():
                 group = sms_form.cleaned_data["selected_group"]
-                sms_message = sms_form.cleaned_data["message"]
+                sms_message = sms_form.cleaned_data["sms_message"]
                 send_one_off_bulk_sms_task.delay(group.id, sms_message, user.id)
                 messages.success(request, "SMS is being sent.")
                 return redirect("/comms/?tab=sms")
