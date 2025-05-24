@@ -90,6 +90,9 @@
                   <span class="me-2 text-muted">📝</span>
                 {% endif %}
 
+
+
+
                 <a href="{% url 'edit_draft_email' draft.id %}" class="text-decoration-none text-dark">
                   {{ draft.subject|default:"(No Subject)" }}
                 </a>
@@ -157,6 +160,19 @@
             </label>
           </div>
         </fieldset>
+
+        <div class="mb-3">
+            <label for="ai-prompt" class="form-label">Need help from AI to write your message?</label>
+            <textarea id="ai-prompt" class="form-control mb-2" rows="2" placeholder="Describe what you want to say..."></textarea>
+            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="generateEmailAI()">Generate with AI</button>
+          </div>
+
+          <div id="ai-generated-result" style="display: none;" class="mb-3">
+            <label class="form-label">Suggested Message:</label>
+            <textarea id="ai-body" class="form-control" rows="6"></textarea>
+            <button type="button" class="btn btn-link btn-sm mt-1" onclick="insertGeneratedEmail()">⬇️ Insert into form</button>
+      </div>
+
 
           <div id="quick-email-section">
               <div class="mb-3">
@@ -619,4 +635,38 @@
       return "";
     }
   });
+</script>
+
+<script>
+  function generateEmailAI() {
+    const prompt = document.getElementById("ai-prompt").value.trim();
+    if (!prompt) return alert("Please enter a prompt for the email.");
+
+    fetch("{% url 'generate_ai_content' %}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCSRFToken()
+      },
+      body: JSON.stringify({ prompt: prompt, mode: "email" })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.message) {
+        document.getElementById("ai-body").value = data.message;
+        document.getElementById("ai-generated-result").style.display = "block";
+      } else {
+        alert("❌ AI failed: " + (data.error || "Unknown error"));
+      }
+    })
+    .catch(err => {
+      console.error("Email AI error:", err);
+      alert("Network error while generating email.");
+    });
+  }
+
+  function insertGeneratedEmail() {
+    const aiText = document.getElementById("ai-body").value;
+    document.getElementById("id_message").value = aiText;  // or whatever the field ID is
+  }
 </script>

@@ -1,9 +1,10 @@
 import json
 import logging
-import os
 import urllib.parse
 import uuid
 from io import BytesIO
+
+from openai import OpenAI
 from celery.result import AsyncResult
 from django.conf import settings
 from django.contrib import messages
@@ -26,7 +27,6 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormView
-from arl.msg.helpers import send_linkshortened_sms
 from PIL import Image
 from waffle.decorators import waffle_flag
 
@@ -43,6 +43,7 @@ from arl.msg.helpers import (
     is_member_of_msg_group,
     prepare_recipient_data,
     save_email_draft,
+    send_linkshortened_sms,
     send_quick_email,
     send_template_email,
     send_whats_app_carwash_sites_template,
@@ -52,8 +53,8 @@ from arl.msg.tasks import (
     send_template_whatsapp_task,
     start_campaign_task,
 )
-from arl.user.models import (CustomUser,
-                             SMSOptOut, Store, Employer)
+from arl.setup.models import TenantApiKeys
+from arl.user.models import CustomUser, Employer, SMSOptOut, Store
 
 from .forms import (
     CampaignSetupForm,
@@ -68,7 +69,6 @@ from .forms import (
     TemplateWhatsAppForm,
 )
 from .models import ComplianceFile, DraftEmail, ShortenedSMSLog
-from arl.setup.models import TenantApiKeys
 from .tasks import (
     fetch_twilio_sms_task,
     fetch_twilio_summary,
@@ -932,7 +932,9 @@ def test_sms_with_short_link(request):
     except Employer.DoesNotExist:
         return JsonResponse({"error": "Employer with ID 1 not found"}, status=404)
 
-    twilio_keys = TenantApiKeys.objects.filter(employer=employer, is_active=True).first()
+    twilio_keys = TenantApiKeys.objects.filter(
+        employer=employer, is_active=True
+    ).first()
     if not twilio_keys:
         logger.error(f"🚨 No Twilio keys for {employer.name}")
         return JsonResponse({"error": "Twilio keys not configured"}, status=500)
@@ -962,3 +964,33 @@ def test_sms_with_short_link(request):
 
     logger.info(f"📤 Test SMS sent to {test_number}: {result}")
     return JsonResponse({"message": "SMS sent", "result": result})
+
+
+@csrf_exempt
+def generate_ai_content(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        prompt = data.get("prompt", "")
+        mode = data.get("mode", "email")  # default to email
+
+        client = OpenAI(api_key=settings.OPENAI_API_KEY)
+
+        system_message = {
+            "email": "You write professional business emails.",
+            "sms": "You write short, professional SMS messages under 250 characters.",
+        }.get(mode, "You write clear professional messages.")
+
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_message},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=300 if mode == "email" else 100,
+                temperature=0.7
+            )
+            message = response.choices[0].message.content.strip()
+            return JsonResponse({"message": message})
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)

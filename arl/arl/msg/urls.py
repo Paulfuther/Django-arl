@@ -18,7 +18,7 @@ from arl.msg.views import (EmailEventList, FetchTwilioCallsView,
                            upload_attachment, twilio_short_link_webhook,
                            fetch_shortlink_sms_data, edit_draft_email,
                            delete_draft_email, save_draft_ajax,
-                           test_sms_with_short_link)
+                           test_sms_with_short_link, generate_ai_content)
 
 
 urlpatterns = [
@@ -70,4 +70,5 @@ urlpatterns = [
     path("comms/draft/<int:draft_id>/delete/", delete_draft_email, name="delete_draft_email"),
     path("comms/save-draft/", save_draft_ajax, name="save_draft_ajax"),
     path("test-sms/", test_sms_with_short_link, name="test_sms_with_short_link"),
+    path("comms/generate-ai/", generate_ai_content, name="generate_ai_content"),
 ]
