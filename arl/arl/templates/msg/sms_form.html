@@ -1,6 +1,49 @@
 {% load crispy_forms_tags %}
 
 <style>
+  /* Loader Animation */
+    .loading-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100px;
+    }
+
+    .loading-bounce {
+      display: flex;
+      justify-content: space-between;
+      width: 50px;
+    }
+
+    .loading-bounce div {
+      width: 12px;
+      height: 12px;
+      background-color: #007bff;
+      border-radius: 50%;
+      animation: loadingBounce 1.5s infinite ease-in-out;
+    }
+
+    .loading-bounce div:nth-child(1) {
+      animation-delay: 0s;
+    }
+    .loading-bounce div:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+    .loading-bounce div:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes loadingBounce {
+      0%,
+      80%,
+      100% {
+        transform: scale(0);
+      }
+      40% {
+        transform: scale(1);
+      }
+    }
+
   .dropdown-box {
     border: 1px solid #ccc;
     border-radius: 8px;
@@ -62,6 +105,15 @@
         <button type="button" class="btn btn-outline-secondary btn-sm" onclick="generateSmsAi()">Generate with AI</button>
       </div>
 
+       <!-- Spinner for SMS AI -->
+      <div id="sms-ai-spinner" class="loading-container" style="display: none;">
+        <div class="loading-bounce">
+          <div></div>
+          <div></div>
+          <div></div>
+        </div>
+      </div>
+
       <!-- Generated Result -->
       <div id="sms-ai-result" style="display: none;" class="mb-3">
         <label class="form-label">Suggested Message:</label>
@@ -93,10 +145,39 @@
     {% endfor %}
   </div>
 
+          <!-- User Selection -->
+           <label class="form-label">Or Select Individuals</label>
+              <button type="button" id="toggle-sms-user-dropdown" class="dropdown-toggle-btn">
+                <span id="sms-selected-summary-label" class="d-inline">Select Users</span>
+              </button>
+
+          <div id="sms-user-dropdownBox" class="dropdown-box mb-3">
+
+            <!-- 🔍 Search Input -->
+            <div class="px-3 mb-2">
+              <input type="text"
+                    name="search"
+                    class="form-control mb-2"
+                    placeholder="Search users..."
+                    hx-get="{% url 'search_users' %}"
+                    hx-trigger="keyup changed delay:200ms"
+                    hx-target="#sms-user-checkbox-list"
+                    hx-include="[name='csrfmiddlewaretoken'], input[name='selected_users']:checked"
+                    autocomplete="off">
+            </div>
+            
+            <!-- 🔁 Live Result Target -->
+            <div id="sms-user-checkbox-list">
+             <!-- Template Email -->
+             {% include "msg/partials/user_checkboxes.html" with users=email_form.fields.selected_users.queryset selected_ids=selected_ids summary_id="sms-selected-summary" %}
+            </div>
+            </div>
   <!-- Submit Button -->
   <button type="submit" class="btn btn-outline-primary mt-3">Send SMS</button>
 </form>
 
+
+<!-- Set up groups -->
 <script>
   const toggleGroupBtn = document.getElementById("toggleGroups");
   const groupBox = document.getElementById("groupBox");
@@ -119,11 +200,31 @@
   });
 </script>
 
+<!-- Set up Users -->
+<script>
+  // Toggle SMS User Box
+  const toggleSmsUserBtn = document.getElementById("toggle-sms-user-dropdown");
+  const smsUserBox = document.getElementById("sms-user-dropdownBox");
+
+  if (toggleSmsUserBtn && smsUserBox) {
+    toggleSmsUserBtn.addEventListener("click", function () {
+      smsUserBox.classList.toggle("open");
+      toggleSmsUserBtn.classList.toggle("open");
+    });
+  }
+</script>
+
+
+<!-- Generate AI -->
 <script>
   function generateSmsAi() {
     const prompt = document.getElementById("sms-ai-prompt").value.trim();
     if (!prompt) return alert("Please enter a short SMS description.");
+    const spinner = document.getElementById("sms-ai-spinner");
+  const resultBox = document.getElementById("sms-ai-result");
 
+  spinner.style.display = "flex"; // 👈 show spinner
+  resultBox.style.display = "none"; // hide result while generating
     fetch("{% url 'generate_ai_content' %}", {
       method: "POST",
       headers: {
@@ -144,8 +245,11 @@
     .catch(err => {
       console.error("SMS AI error:", err);
       alert("Network error while generating SMS.");
-    });
-  }
+    })
+  .finally(() => {
+    spinner.style.display = "none";
+  });
+}
 
   function insertSmsAi() {
   console.log("Insert button clicked");

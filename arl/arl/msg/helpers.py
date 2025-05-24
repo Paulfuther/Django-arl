@@ -828,6 +828,23 @@ def prepare_recipient_data(user, selected_group, selected_users):
     return list(unique_recipients.values())
 
 
+def prepare_sms_recipient_data(user, selected_group, selected_users):
+    recipients = []
+    employer = user.employer
+
+    if selected_group:
+        for u in selected_group.user_set.filter(is_active=True, employer=employer):
+            recipients.append({"id": u.id, "phone": u.phone_number})
+
+    if selected_users:
+        for u in selected_users.order_by("first_name", "last_name"):
+            recipients.append({"id": u.id, "phone": u.phone_number})
+
+    # ✅ Remove duplicates by phone number
+    unique_recipients = {r["phone"]: r for r in recipients}
+    return list(unique_recipients.values())
+
+
 def is_member_of_msg_group(user):
     is_member = user.groups.filter(name="SendSMS").exists()
     if is_member:

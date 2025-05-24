@@ -28,20 +28,34 @@ class SMSForm(forms.Form):
 
     selected_group = forms.ModelChoiceField(
         queryset=Group.objects.none(),  # Set dynamically in __init__
-        required=True,
+        required=False,
         label="Select Group to Send SMS",
         widget=RadioSelect,
     )
 
+    selected_users = forms.ModelMultipleChoiceField(
+        queryset=CustomUser.objects.none(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple
+    )
+
     def __init__(self, *args, **kwargs):
-        user = kwargs.pop("user", None)  # Get the logged-in user
+        user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
 
         if user and user.employer:
             employer = user.employer
+
+            # ✅ Populate groups for this employer
             self.fields["selected_group"].queryset = Group.objects.filter(
                 user__employer=employer
             ).distinct()
+
+            # ✅ Populate users for this employer
+            self.fields["selected_users"].queryset = CustomUser.objects.filter(
+                employer=employer,
+                is_active=True
+            ).order_by("first_name", "last_name")
 
     def clean_message(self):
         message = self.cleaned_data.get("message", "").strip()

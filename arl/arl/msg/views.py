@@ -43,6 +43,7 @@ from arl.msg.helpers import (
     is_member_of_email_group,
     is_member_of_msg_group,
     prepare_recipient_data,
+    prepare_sms_recipient_data,
     save_email_draft,
     send_linkshortened_sms,
     send_quick_email,
@@ -78,6 +79,7 @@ from .tasks import (
     generate_employee_email_report_task,
     process_sendgrid_webhook,
     send_one_off_bulk_sms_task,
+    send_sms_to_selected_users_task,
 )
 
 logger = logging.getLogger(__name__)
@@ -380,9 +382,20 @@ def communications(request):
             sms_form = SMSForm(request.POST, user=user)
 
             if sms_form.is_valid():
-                group = sms_form.cleaned_data["selected_group"]
+                selected_group = sms_form.cleaned_data["selected_group"]
+                selected_users = sms_form.cleaned_data["selected_users"]
                 sms_message = sms_form.cleaned_data["sms_message"]
-                send_one_off_bulk_sms_task.delay(group.id, sms_message, user.id)
+
+                recipients = prepare_sms_recipient_data(user, selected_group, selected_users)
+
+                if not recipients:
+                    messages.error(request, "No recipients found. Please select a group or users.")
+                    return redirect("/comms/?tab=sms")
+
+                # Pass list of user IDs to the task
+                recipient_ids = [r["id"] for r in recipients]
+                send_sms_to_selected_users_task.delay(recipient_ids, sms_message, user.id)
+
                 messages.success(request, "SMS is being sent.")
                 return redirect("/comms/?tab=sms")
 

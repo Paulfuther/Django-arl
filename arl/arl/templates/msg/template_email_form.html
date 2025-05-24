@@ -6,6 +6,50 @@
 
 <style>
 
+  /* Loader Animation */
+    .loading-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100px;
+    }
+
+    .loading-bounce {
+      display: flex;
+      justify-content: space-between;
+      width: 50px;
+    }
+
+    .loading-bounce div {
+      width: 12px;
+      height: 12px;
+      background-color: #007bff;
+      border-radius: 50%;
+      animation: loadingBounce 1.5s infinite ease-in-out;
+    }
+
+    .loading-bounce div:nth-child(1) {
+      animation-delay: 0s;
+    }
+    .loading-bounce div:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+    .loading-bounce div:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes loadingBounce {
+      0%,
+      80%,
+      100% {
+        transform: scale(0);
+      }
+      40% {
+        transform: scale(1);
+      }
+    }
+
+
   .dz-preview .dz-image img {
   width: auto !important;
   height: auto !important;
@@ -161,7 +205,8 @@
           </div>
         </fieldset>
 
-        <div class="mb-3">
+        <!--  AI prompt -->
+        <div id="ai-prompt-wrapper" class="mb-3">
             <label for="ai-prompt" class="form-label">Need help from AI to write your message?</label>
             <textarea id="ai-prompt" class="form-control mb-2" rows="2" placeholder="Describe what you want to say..."></textarea>
             <button type="button" class="btn btn-outline-secondary btn-sm" onclick="generateEmailAI()">Generate with AI</button>
@@ -171,6 +216,15 @@
             <label class="form-label">Suggested Message:</label>
             <textarea id="ai-body" class="form-control" rows="6"></textarea>
             <button type="button" class="btn btn-link btn-sm mt-1" onclick="insertGeneratedEmail()">⬇️ Insert into form</button>
+      </div>
+
+         <!-- Spinner for SMS AI -->
+      <div id="email-ai-spinner" class="loading-container" style="display: none;">
+        <div class="loading-bounce">
+          <div></div>
+          <div></div>
+          <div></div>
+        </div>
       </div>
 
 
@@ -560,14 +614,22 @@
     const templateRadio = document.getElementById("email_mode_template");
 
     function toggleSections() {
+    const aiWrapper = document.getElementById("ai-prompt-wrapper");
+
     if (quickRadio.checked) {
       quickSection.style.display = "block";
       templateSection.style.display = "none";
       if (saveButton) saveButton.style.display = "inline-block";
+      if (aiWrapper) aiWrapper.style.display = "block";  // ✅ Show AI tools
     } else {
       quickSection.style.display = "none";
       templateSection.style.display = "block";
       if (saveButton) saveButton.style.display = "none";
+      if (aiWrapper) aiWrapper.style.display = "none";  // ✅ Hide AI tools
+      // ✅ Clear any previous prompt or results
+      document.getElementById("ai-prompt").value = "";
+      document.getElementById("ai-body").value = "";
+      document.getElementById("ai-generated-result").style.display = "none";
     }
   }
 
@@ -637,10 +699,17 @@
   });
 </script>
 
+<!-- Generate Email AI -->
 <script>
   function generateEmailAI() {
     const prompt = document.getElementById("ai-prompt").value.trim();
     if (!prompt) return alert("Please enter a prompt for the email.");
+
+    const spinner = document.getElementById("email-ai-spinner");
+    const resultBox = document.getElementById("ai-generated-result");
+
+    spinner.style.display = "flex"; // 👈 show spinner
+    resultBox.style.display = "none"; // hide previous result
 
     fetch("{% url 'generate_ai_content' %}", {
       method: "POST",
@@ -662,6 +731,9 @@
     .catch(err => {
       console.error("Email AI error:", err);
       alert("Network error while generating email.");
+     })
+    .finally(() => {
+      spinner.style.display = "none";
     });
   }
 
