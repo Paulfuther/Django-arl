@@ -73,7 +73,7 @@
   <!-- Message Field -->
   <div class="mb-3">
    
-    {{ sms_form.message|as_crispy_field }}
+    {{ sms_form.sms_message|as_crispy_field }}
     {% if sms_form.message.errors %}
       <div class="text-danger small">{{ sms_form.message.errors.0 }}</div>
     {% endif %}
@@ -148,7 +148,10 @@
   }
 
   function insertSmsAi() {
-    const aiText = document.getElementById("sms-ai-body").value;
-    document.getElementById("id_message").value = aiText;
-  }
+  console.log("Insert button clicked");
+  const aiText = document.getElementById("sms-ai-body").value;
+  document.getElementById("id_sms_message").value = aiText;
+}
+
+ 
 </script>
