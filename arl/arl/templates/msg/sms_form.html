@@ -53,7 +53,22 @@
       {% endfor %}
     </div>
   {% endif %}
-  <legend class="border-bottom mb-3">Send A Text</legend>
+  
+
+    <!-- AI Prompt Section -->
+      <div class="mb-3">
+        <label for="sms-ai-prompt" class="form-label">Need help from AI to craft your message?</label>
+        <textarea id="sms-ai-prompt" class="form-control mb-2" rows="2" placeholder="Describe what you want to say..."></textarea>
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="generateSmsAi()">Generate with AI</button>
+      </div>
+
+      <!-- Generated Result -->
+      <div id="sms-ai-result" style="display: none;" class="mb-3">
+        <label class="form-label">Suggested Message:</label>
+        <textarea id="sms-ai-body" class="form-control" rows="3"></textarea>
+        <button type="button" class="btn btn-link btn-sm mt-1" onclick="insertSmsAi()">⬇️ Insert into SMS Field</button>
+      </div>
+
 
   <!-- Message Field -->
   <div class="mb-3">
@@ -102,4 +117,38 @@
       toggleGroupBtn.classList.remove("open");
     });
   });
+</script>
+
+<script>
+  function generateSmsAi() {
+    const prompt = document.getElementById("sms-ai-prompt").value.trim();
+    if (!prompt) return alert("Please enter a short SMS description.");
+
+    fetch("{% url 'generate_ai_content' %}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": getCSRFToken()
+      },
+      body: JSON.stringify({ prompt: prompt, mode: "sms" })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.message) {
+        document.getElementById("sms-ai-body").value = data.message;
+        document.getElementById("sms-ai-result").style.display = "block";
+      } else {
+        alert("❌ AI failed: " + (data.error || "Unknown error"));
+      }
+    })
+    .catch(err => {
+      console.error("SMS AI error:", err);
+      alert("Network error while generating SMS.");
+    });
+  }
+
+  function insertSmsAi() {
+    const aiText = document.getElementById("sms-ai-body").value;
+    document.getElementById("id_message").value = aiText;
+  }
 </script>
