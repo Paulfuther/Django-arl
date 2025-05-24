@@ -442,6 +442,54 @@ def send_one_off_bulk_sms_task(group_id, message, user_id):
         logger.error(f"🚨 An error occurred while sending SMS: {str(e)}")
 
 
+# NEW: Send SMS to selected individual users (not group)
+@app.task(name="one_off_user_sms")
+def send_sms_to_selected_users_task(user_ids, message, sender_id):
+    User = get_user_model()
+    try:
+        sender = User.objects.get(id=sender_id)
+        employer = sender.employer
+    except User.DoesNotExist:
+        logger.error(f"🚨 Sender user {sender_id} not found.")
+        return
+
+    # ✅ Fetch active target users
+    users = User.objects.filter(id__in=user_ids, is_active=True, employer=employer)
+    phone_numbers = [u.phone_number for u in users if u.phone_number]
+
+    if not phone_numbers:
+        logger.warning("⚠️ No valid phone numbers found among selected users.")
+        return
+
+    # ✅ Get Twilio keys for this employer
+    twilio_keys = (
+        TenantApiKeys.objects.filter(employer=employer, is_active=True)
+        .values("account_sid", "auth_token", "notify_service_sid")
+        .first()
+    )
+    if not twilio_keys:
+        logger.error(f"🚨 No Twilio credentials for employer {employer.name}")
+        return
+
+    try:
+        send_bulk_sms(
+            phone_numbers,
+            message,
+            twilio_keys["account_sid"],
+            twilio_keys["auth_token"],
+            twilio_keys["notify_service_sid"],
+        )
+
+        logger.info(f"📢 SMS sent to {len(phone_numbers)} selected users by {sender.email}")
+        SmsLog.objects.create(
+            level="INFO",
+            message=f"SMS sent to {len(phone_numbers)} users by {sender.email}",
+        )
+
+    except Exception as e:
+        logger.error(f"🚨 Error while sending SMS to selected users: {str(e)}")
+
+
 #
 # APPROVED
 #
