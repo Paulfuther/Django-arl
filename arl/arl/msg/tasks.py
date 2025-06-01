@@ -1,12 +1,13 @@
 from __future__ import absolute_import, unicode_literals
 
+import base64
 import csv
 import os
-import requests
-import base64
 from datetime import datetime, timedelta
-from django_celery_results.models import TaskResult
+
 import pandas as pd
+import requests
+from celery import Task
 from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -14,24 +15,35 @@ from django.contrib.auth.models import Group
 from django.db import connection
 from django.db.models import F, Func, IntegerField, OuterRef, Subquery
 from django.utils import timezone
+from django.utils.timezone import now
+from django_celery_results.models import TaskResult
 from twilio.rest import Client
-from celery import Task
+
 from arl.celery import app
-from arl.msg.models import EmailEvent, EmailLog, EmailTemplate, Message, SmsLog
+from arl.msg.models import (
+    CustomUser,
+    EmailEvent,
+    EmailLog,
+    EmailTemplate,
+    Message,
+    ShortenedSMSLog,
+    SmsLog,
+    Employer,
+)
 from arl.setup.models import TenantApiKeys
-from arl.user.models import CustomUser, Employer, EmployerSMSTask, SMSOptOut
+from arl.user.models import SMSOptOut, EmployerSMSTask
 
 from .helpers import (
     client,
     create_master_email,
     create_single_csv_email,
     send_bulk_sms,
+    send_linkshortened_sms,
     send_monthly_store_phonecall,
     send_sms_model,
     send_whats_app_template,
     send_whats_app_template_autoreply,
     sync_contacts_with_sendgrid,
-    send_linkshortened_sms
 )
 
 logger = get_task_logger(__name__)
@@ -44,14 +56,14 @@ logger = get_task_logger(__name__)
 # It is also the master email task.
 @app.task(name="master_email_send")
 def master_email_send_task(
-        recipients,
-        sendgrid_id,
-        attachments=None,
-        employer_id=None,
-        body=None,
-        subject=None,
-        attachment_urls=None
-        ):
+    recipients,
+    sendgrid_id,
+    attachments=None,
+    employer_id=None,
+    body=None,
+    subject=None,
+    attachment_urls=None,
+):
     """
     Master task to send emails using the provided template and recipient data.
 
@@ -72,15 +84,19 @@ def master_email_send_task(
             response = requests.get(url)
             print(f"📡 Fetching: {url} → Status: {response.status_code}")
             if response.status_code == 200:
-                content_type = response.headers.get("Content-Type", "application/octet-stream")
+                content_type = response.headers.get(
+                    "Content-Type", "application/octet-stream"
+                )
                 filename = url.split("/")[-1]
                 encoded = base64.b64encode(response.content).decode("utf-8")
-                attachments.append({
-                    "filename": filename,
-                    "type": content_type,
-                    "content": encoded,
-                    "disposition": "attachment"
-                })
+                attachments.append(
+                    {
+                        "filename": filename,
+                        "type": content_type,
+                        "content": encoded,
+                        "disposition": "attachment",
+                    }
+                )
             else:
                 print(f"❌ Failed to fetch {url} → {response.status_code}")
         except Exception as e:
@@ -120,7 +136,9 @@ def master_email_send_task(
                 "body": body,
                 "senior_contact_name": employer.senior_contact_name,
                 "company_name": employer.name if employer else "Company",
-                "subject": subject if subject else f"New Message from {employer.name if employer else 'Our Company'}",
+                "subject": subject
+                if subject
+                else f"New Message from {employer.name if employer else 'Our Company'}",
             }
 
             success = create_master_email(
@@ -144,7 +162,7 @@ def master_email_send_task(
         error_message = f"🔥 Critical error in master_email_send_task: {str(e)}"
         print(error_message)
         return error_message
-    
+
 
 #
 # APPROVED
@@ -161,11 +179,13 @@ class TrackPeriodicNameTask(Task):
         super().on_success(retval, task_id, args, kwargs)
 
 
-@app.task(name="tobacco_compliance_sms_with_download_link",
-          bind=True,
-          base=TrackPeriodicNameTask,
-          track_started=True,
-          ignore_result=False,)
+@app.task(
+    name="tobacco_compliance_sms_with_download_link",
+    bind=True,
+    base=TrackPeriodicNameTask,
+    track_started=True,
+    ignore_result=False,
+)
 def send_bulk_tobacco_sms_link(self, *args, **kwargs):
     try:
         # Get Employers who have this SMS enabled
@@ -254,7 +274,9 @@ def send_bulk_tobacco_sms_link(self, *args, **kwargs):
                 results_summary.append(f"✅ {log_message}")
 
                 if not results_summary:
-                    results_summary.append("ℹ️ Task ran successfully but no per-employer messages were recorded.")
+                    results_summary.append(
+                        "ℹ️ Task ran successfully but no per-employer messages were recorded."
+                    )
 
             except Exception as e:
                 # ✅ Log error per employer
@@ -283,13 +305,14 @@ def send_bulk_tobacco_sms_link(self, *args, **kwargs):
         return {"error": critical_msg}
 
 
-@app.task(name="tobacoo_sms_with_shortened_link",
-          bind=True,)
+@app.task(
+    name="tobacoo_sms_with_shortened_link",
+    bind=True,
+)
 def send_bulk_shortened_sms_link_task(self):
     try:
         enabled_employers = EmployerSMSTask.objects.filter(
-            task_name="tobacco_compliance_sms_with_shortened_link",
-            is_enabled=True
+            task_name="tobacco_compliance_sms_with_shortened_link", is_enabled=True
         ).values_list("employer_id", flat=True)
 
         if not enabled_employers:
@@ -298,12 +321,12 @@ def send_bulk_shortened_sms_link_task(self):
 
         opted_out_users = SMSOptOut.objects.values_list("user_id", flat=True)
 
-        active_users = CustomUser.objects.filter(
-            is_active=True,
-            employer_id__in=enabled_employers
-        ).exclude(id__in=opted_out_users)\
-         .exclude(phone_number__isnull=True)\
-         .exclude(phone_number="")
+        active_users = (
+            CustomUser.objects.filter(is_active=True, employer_id__in=enabled_employers)
+            .exclude(id__in=opted_out_users)
+            .exclude(phone_number__isnull=True)
+            .exclude(phone_number="")
+        )
         print("Active Users :", active_users)
         results_summary = []
 
@@ -318,8 +341,7 @@ def send_bulk_shortened_sms_link_task(self):
 
             # Get Twilio credentials
             twilio_keys = TenantApiKeys.objects.filter(
-                employer=employer,
-                is_active=True
+                employer=employer, is_active=True
             ).first()
 
             if not twilio_keys:
@@ -351,7 +373,9 @@ def send_bulk_shortened_sms_link_task(self):
                 )
                 logger.info(f"{employer.name}: {result}")
 
-            results_summary.append(f"✅ Sent SMS to {len(phone_numbers)} for {employer.name}")
+            results_summary.append(
+                f"✅ Sent SMS to {len(phone_numbers)} for {employer.name}"
+            )
 
         TaskResult.objects.filter(task_id=self.request.id).update(
             periodic_task_name="Tobacco Compliance Shortened SMS"
@@ -368,7 +392,6 @@ def send_bulk_shortened_sms_link_task(self):
         logger.critical(msg)
         SmsLog.objects.create(level="CRITICAL", message=msg)
         return {"error": msg}
-
 
 
 # APPROVED
@@ -480,7 +503,9 @@ def send_sms_to_selected_users_task(user_ids, message, sender_id):
             twilio_keys["notify_service_sid"],
         )
 
-        logger.info(f"📢 SMS sent to {len(phone_numbers)} selected users by {sender.email}")
+        logger.info(
+            f"📢 SMS sent to {len(phone_numbers)} selected users by {sender.email}"
+        )
         SmsLog.objects.create(
             level="INFO",
             message=f"SMS sent to {len(phone_numbers)} users by {sender.email}",
@@ -798,7 +823,7 @@ def process_sendgrid_webhook(payload):
                 user=user,
                 username=user.username if user else "unknown",
                 useragent=useragent,
-                employer=employer
+                employer=employer,
             )
             logger.info(f"Processed SendGrid event: {event} for {email}")
 
@@ -1120,3 +1145,53 @@ def fetch_twilio_sms_task(user_id):
         )
 
     return sms_data
+
+
+@app.task(name="twilio_shortened_link_webhook")
+def process_twilio_short_link_event(data):
+    try:
+        sms_sid = data.get("SmsSid") or data.get("sms_sid")
+        to = data.get("To") or data.get("to")
+        from_number = data.get("From") or data.get("from")
+        message_status = data.get("MessageStatus", "").lower()
+        messaging_sid = data.get("MessagingServiceSid") or data.get(
+            "messaging_service_sid"
+        )
+        account_sid = data.get("AccountSid") or data.get("account_sid")
+        event_type = data.get("event_type", message_status)
+        link = data.get("link")
+        click_time = data.get("click_time")
+        user_agent = data.get("user_agent")
+        error_code = data.get("ErrorCode") or data.get("error_code")
+
+        user = (
+            CustomUser.objects.filter(phone_number__icontains=to).first()
+            if to
+            else None
+        )
+
+        if error_code == "30007" and user:
+            if not hasattr(user, "sms_opt_out"):
+                SMSOptOut.objects.create(
+                    user=user, reason="Carrier filtered message (30007)"
+                )
+
+        ShortenedSMSLog.objects.create(
+            sms_sid=sms_sid,
+            to=to or "",
+            from_number=from_number or "",
+            messaging_service_sid=messaging_sid or "",
+            account_sid=account_sid or "",
+            event_type=event_type,
+            link=link,
+            click_time=click_time or None,
+            user_agent=user_agent or "",
+            user=user,
+            error_code=error_code,
+            created_at=now(),
+        )
+
+    except Exception:
+        import logging
+
+        logging.getLogger("django").exception("❌ Error processing Twilio event")

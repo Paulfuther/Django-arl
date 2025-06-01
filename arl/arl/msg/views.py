@@ -22,7 +22,6 @@ from django.http import (
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils.html import escape
-from django.utils.timezone import now
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 from django.views.generic import TemplateView
@@ -51,12 +50,13 @@ from arl.msg.helpers import (
     send_whats_app_carwash_sites_template,
 )
 from arl.msg.tasks import (
+    process_twilio_short_link_event,
     process_whatsapp_webhook,
     send_template_whatsapp_task,
     start_campaign_task,
 )
 from arl.setup.models import TenantApiKeys
-from arl.user.models import CustomUser, Employer, SMSOptOut, Store
+from arl.user.models import CustomUser, Employer, Store
 
 from .forms import (
     CampaignSetupForm,
@@ -78,7 +78,6 @@ from .tasks import (
     generate_email_event_summary,
     generate_employee_email_report_task,
     process_sendgrid_webhook,
-    send_one_off_bulk_sms_task,
     send_sms_to_selected_users_task,
 )
 
@@ -386,15 +385,21 @@ def communications(request):
                 selected_users = sms_form.cleaned_data["selected_users"]
                 sms_message = sms_form.cleaned_data["sms_message"]
 
-                recipients = prepare_sms_recipient_data(user, selected_group, selected_users)
+                recipients = prepare_sms_recipient_data(
+                    user, selected_group, selected_users
+                )
 
                 if not recipients:
-                    messages.error(request, "No recipients found. Please select a group or users.")
+                    messages.error(
+                        request, "No recipients found. Please select a group or users."
+                    )
                     return redirect("/comms/?tab=sms")
 
                 # Pass list of user IDs to the task
                 recipient_ids = [r["id"] for r in recipients]
-                send_sms_to_selected_users_task.delay(recipient_ids, sms_message, user.id)
+                send_sms_to_selected_users_task.delay(
+                    recipient_ids, sms_message, user.id
+                )
 
                 messages.success(request, "SMS is being sent.")
                 return redirect("/comms/?tab=sms")
@@ -868,8 +873,6 @@ def upload_attachment(request):
 @require_POST
 def twilio_short_link_webhook(request):
     try:
-        logger.info("📩 Webhook Content-Type: %s", request.content_type)
-
         if request.content_type == "application/json":
             data = json.loads(request.body)
         elif request.content_type == "application/x-www-form-urlencoded":
@@ -877,61 +880,10 @@ def twilio_short_link_webhook(request):
         else:
             return HttpResponseBadRequest("Unsupported content type")
 
-        logger.info("✅ Parsed Webhook Data: %s", data)
+        logger.info("✅ Queuing webhook data: %s", data)
+        process_twilio_short_link_event.delay(data)
 
-        sms_sid = data.get("SmsSid") or data.get("sms_sid")
-        to = data.get("To") or data.get("to")
-        from_number = data.get("From") or data.get("from")
-        message_status = data.get("MessageStatus", "").lower()
-        messaging_sid = data.get("MessagingServiceSid") or data.get(
-            "messaging_service_sid"
-        )
-        account_sid = data.get("AccountSid") or data.get("account_sid")
-        event_type = data.get("event_type", message_status)
-        link = data.get("link")
-        click_time = data.get("click_time")
-        user_agent = data.get("user_agent")
-        error_code = data.get("ErrorCode") or data.get("error_code")
-
-        if not sms_sid:
-            logger.warning("❌ No SmsSid found in webhook data")
-            return HttpResponseBadRequest("Missing SmsSid")
-
-        user = (
-            CustomUser.objects.filter(phone_number__icontains=to).first()
-            if to
-            else None
-        )
-        # 🛑 Handle 30007 (Carrier Filtered)
-        if error_code == "30007" and user:
-            if not hasattr(user, "sms_opt_out"):
-                SMSOptOut.objects.create(
-                    user=user, reason="Carrier filtered message (30007)"
-                )
-                logger.info(
-                    f"User {user.username} automatically opted out due to 30007 error."
-                )
-            else:
-                logger.info(
-                    f"User {user.username} already opted out. 30007 received again."
-                )
-
-        ShortenedSMSLog.objects.create(
-            sms_sid=sms_sid,
-            to=to or "",
-            from_number=from_number or "",
-            messaging_service_sid=messaging_sid or "",
-            account_sid=account_sid or "",
-            event_type=event_type,
-            link=link,
-            click_time=click_time or None,
-            user_agent=user_agent or "",
-            user=user,
-            error_code=error_code,
-            created_at=now(),
-        )
-
-        return JsonResponse({"status": "success"})
+        return JsonResponse({"status": "queued"})
 
     except Exception:
         logger.exception("❌ Webhook processing failed.")
