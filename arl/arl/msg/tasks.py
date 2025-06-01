@@ -1160,7 +1160,7 @@ def process_twilio_short_link_event(data):
         account_sid = data.get("AccountSid") or data.get("account_sid")
         event_type = data.get("event_type", message_status)
         link = data.get("link")
-        click_time = data.get("click_time")
+        click_time = data.get("click_time") or now()
         user_agent = data.get("user_agent")
         error_code = data.get("ErrorCode") or data.get("error_code")
 
@@ -1184,7 +1184,7 @@ def process_twilio_short_link_event(data):
             account_sid=account_sid or "",
             event_type=event_type,
             link=link,
-            click_time=click_time or None,
+            click_time=click_time,
             user_agent=user_agent or "",
             user=user,
             error_code=error_code,
