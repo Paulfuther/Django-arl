@@ -879,9 +879,12 @@ def filter_sendgrid_events(date_from=None, date_to=None, template_id=None):
 
 
 @app.task(name="email_event_summary")
-def generate_email_event_summary(template_id=None, start_date=None, end_date=None):
+def generate_email_event_summary(template_id=None, start_date=None, end_date=None, employer_id=None):
     # Filter events based on template_id if provided
     events = EmailEvent.objects.all()
+    if employer_id:
+        events = events.filter(employer_id=employer_id)
+
     if template_id:
         events = events.filter(sg_template_id=template_id)
 
@@ -1149,6 +1152,17 @@ def fetch_twilio_sms_task(user_id):
 
 @app.task(name="twilio_shortened_link_webhook")
 def process_twilio_short_link_event(data):
+    employer = None
+    account_sid = data.get("AccountSid") or data.get("account_sid")
+
+    if account_sid:
+        api_key = TenantApiKeys.objects.filter(account_sid=account_sid).select_related("employer").first()
+        if api_key:
+            employer = api_key.employer
+
+    if not employer:
+        logger.warning(f"⚠️ No employer found for Account SID: {account_sid}")
+
     try:
         sms_sid = data.get("SmsSid") or data.get("sms_sid")
         to = data.get("To") or data.get("to")
@@ -1187,6 +1201,7 @@ def process_twilio_short_link_event(data):
             click_time=click_time,
             user_agent=user_agent or "",
             user=user,
+            employer=employer,
             error_code=error_code,
             created_at=now(),
         )
