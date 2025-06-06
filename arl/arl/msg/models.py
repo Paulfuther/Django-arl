@@ -210,6 +210,8 @@ class ShortenedSMSLog(models.Model):
         ("failed", "Failed"),
     ]
 
+    employer = models.ForeignKey(Employer, null=True, blank=True,
+                                 on_delete=models.SET_NULL)
     sms_sid = models.CharField(max_length=64)
     to = models.CharField(max_length=20)
     from_number = models.CharField(max_length=20)
