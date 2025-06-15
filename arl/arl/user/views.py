@@ -43,6 +43,7 @@ from arl.msg.helpers import check_verification_token, request_verification_token
 from arl.msg.models import EmailTemplate
 from arl.msg.tasks import send_sms_task
 from arl.setup.helpers import employer_hr_required
+from arl.setup.models import EmployerRequest
 
 from .forms import (
     CustomUserCreationForm,
@@ -57,6 +58,7 @@ from .tasks import (
     send_new_hire_invite_task,
     send_newhire_template_email_task,
 )
+from .helpers import send_new_hire_invite
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
