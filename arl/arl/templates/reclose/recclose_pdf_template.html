@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Rec & Close Report</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; font-size: 14px; }
+        h2 { margin-bottom: 0; }
+        .section { margin-top: 20px; }
+        .subsection { margin-bottom: 15px; }
+        .label { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h2>Rec & Close Report</h2>
+    <p><span class="label">Store:</span> {{ entry.store_number }}</p>
+    <p><span class="label">Shift #:</span> {{ entry.shift_number }}</p>
+    <p><span class="label">Timestamp:</span> {{ entry.timestamp }}</p>
+
+    <div class="section">
+        <h3>Section 1</h3>
+        <p><span class="label">Total Sales:</span> ${{ entry.total_sales }}</p>
+    </div>
+
+    <div class="section">
+        <h3>Section 2</h3>
+        <p><span class="label">Cat/Post (Host):</span> {{ entry.cat_post_host }}</p>
+        <p><span class="label">Drive Offs:</span> {{ entry.drive_offs }}</p>
+        <p><span class="label">Purchases:</span> {{ entry.purchases }}</p>
+        <p><span class="label">$1 PPTS Redemptions:</span> {{ entry.ppts_redemptions }}</p>
+        <p><span class="label">Lotto Payout:</span> {{ entry.lotto_payout }}</p>
+        <p><span class="label">Uber Eats:</span> {{ entry.uber_eats }}</p>
+        <p><span class="label">Skip:</span> {{ entry.skip }}</p>
+        <p><span class="label">Drive Off Recovery:</span> {{ entry.drive_off_recovery }}</p>
+        <p><span class="label">Cash Safe Drops:</span> {{ entry.cash_safe_drops }}</p>
+        <p><span class="label">Last Safe Drop:</span> {{ entry.last_safe_drop }}</p>
+        <p><span class="label">In Brink:</span> {{ entry.in_brink }}</p>
+        <p><span class="label">Total Section 2:</span> ${{ entry.total_section_2 }}</p>
+    </div>
+
+    <div class="section">
+        <h3>Final</h3>
+        <p><span class="label">Over or Short:</span> ${{ entry.over_or_short }}</p>
+    </div>
+
+    <div class="section">
+        <h3>Tank Info</h3>
+
+        <div class="subsection">
+            <p><strong>Tank 1</strong></p>
+            <p><span class="label">Name:</span> {{ entry.tank1_name }}</p>
+            <p><span class="label">TC Volume:</span> {{ entry.tank1_tc_volume }}</p>
+            <p><span class="label">Height:</span> {{ entry.tank1_height }}</p>
+            <p><span class="label">Water:</span> {{ entry.tank1_water }}</p>
+            <p><span class="label">Water Height:</span> {{ entry.tank1_water_height }}</p>
+            <p><span class="label">Temperature:</span> {{ entry.tank1_temperature }}</p>
+        </div>
+
+        <div class="subsection">
+            <p><strong>Tank 2</strong></p>
+            <p><span class="label">Name:</span> {{ entry.tank2_name }}</p>
+            <p><span class="label">TC Volume:</span> {{ entry.tank2_tc_volume }}</p>
+            <p><span class="label">Height:</span> {{ entry.tank2_height }}</p>
+            <p><span class="label">Water:</span> {{ entry.tank2_water }}</p>
+            <p><span class="label">Water Height:</span> {{ entry.tank2_water_height }}</p>
+            <p><span class="label">Temperature:</span> {{ entry.tank2_temperature }}</p>
+        </div>
+
+        <div class="subsection">
+            <p><strong>Tank 3</strong></p>
+            <p><span class="label">Name:</span> {{ entry.tank3_name }}</p>
+            <p><span class="label">TC Volume:</span> {{ entry.tank3_tc_volume }}</p>
+            <p><span class="label">Height:</span> {{ entry.tank3_height }}</p>
+            <p><span class="label">Water:</span> {{ entry.tank3_water }}</p>
+            <p><span class="label">Water Height:</span> {{ entry.tank3_water_height }}</p>
+            <p><span class="label">Temperature:</span> {{ entry.tank3_temperature }}</p>
+        </div>
+
+        <div class="subsection">
+            <p><strong>Tank 4</strong></p>
+            <p><span class="label">Name:</span> {{ entry.tank4_name }}</p>
+            <p><span class="label">TC Volume:</span> {{ entry.tank4_tc_volume }}</p>
+            <p><span class="label">Height:</span> {{ entry.tank4_height }}</p>
+            <p><span class="label">Water:</span> {{ entry.tank4_water }}</p>
+            <p><span class="label">Water Height:</span> {{ entry.tank4_water_height }}</p>
+            <p><span class="label">Temperature:</span> {{ entry.tank4_temperature }}</p>
+        </div>
+    </div>
+
+    <div class="section">
+        <h3>Meter Discrepancies</h3>
+
+        <div class="subsection">
+            <p><strong>Meter 1</strong></p>
+            <p><span class="label">Sales:</span> {{ entry.meter1_sales }}</p>
+            <p><span class="label">Meter:</span> {{ entry.meter1_meter }}</p>
+            <p><span class="label">Difference:</span> {{ entry.meter1_difference }}</p>
+        </div>
+
+        <div class="subsection">
+            <p><strong>Meter 2</strong></p>
+            <p><span class="label">Sales:</span> {{ entry.meter2_sales }}</p>
+            <p><span class="label">Meter:</span> {{ entry.meter2_meter }}</p>
+            <p><span class="label">Difference:</span> {{ entry.meter2_difference }}</p>
+        </div>
+
+        <div class="subsection">
+            <p><strong>Meter 3</strong></p>
+            <p><span class="label">Sales:</span> {{ entry.meter3_sales }}</p>
+            <p><span class="label">Meter:</span> {{ entry.meter3_meter }}</p>
+            <p><span class="label">Difference:</span> {{ entry.meter3_difference }}</p>
+        </div>
+
+        <div class="subsection">
+            <p><strong>Meter 4</strong></p>
+            <p><span class="label">Sales:</span> {{ entry.meter4_sales }}</p>
+            <p><span class="label">Meter:</span> {{ entry.meter4_meter }}</p>
+            <p><span class="label">Difference:</span> {{ entry.meter4_difference }}</p>
+        </div>
+    </div>
+</body>
+</html>

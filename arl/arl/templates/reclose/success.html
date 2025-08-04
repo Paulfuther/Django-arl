@@ -1,0 +1,46 @@
+{% extends "../base/base.html" %}
+{% block title %}Success{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+
+<style>
+    .alert {
+  transition: opacity 0.5s ease-out;
+}
+</style>
+
+<div class="container mt-5 text-center">
+    <div class="row justify-content-center pt-5 mt-5">
+    <div class="col-12 col-md-10 col-lg-8 col-xl-6">
+  {% if messages %}
+    <div class="mt-3">
+      {% for message in messages %}
+        <div class="alert {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+</div>
+</div>
+</div>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const alert = document.querySelector(".alert-dismissible");
+    if (alert) {
+      setTimeout(() => {
+        // Bootstrap class to fade out
+        alert.classList.remove("show");
+        alert.classList.add("fade");
+
+        // Fully remove after fade
+        setTimeout(() => alert.remove(), 500);
+      }, 3000); // 3 seconds before fading
+    }
+  });
+</script>
+{% endblock %}
