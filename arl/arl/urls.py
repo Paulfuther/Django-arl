@@ -20,13 +20,15 @@ urlpatterns = [
     path("", include("arl.payroll.urls")),
     path("", include("arl.carwash.urls")),
     path("", include("arl.setup.urls")),
+    path("", include("arl.reclose.urls")),
     path("", include("arl.helpdesk.urls")),
     path(
         "40ebffa97ba5035264526bdf252ca040.html",
         TemplateView.as_view(
             template_name="twilio/40ebffa97ba5035264526bdf252ca040.html"),
     ),
-]
+
+] 
 
 
 handler403 = "arl.views.error_403"

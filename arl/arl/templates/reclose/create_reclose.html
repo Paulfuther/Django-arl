@@ -1,0 +1,302 @@
+{% extends "../base/base.html" %}
+{% block title %}Rec and Close{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+
+<div class="container mt-5">
+ <div class="row justify-content-center pt-5 mt-5"></div>
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+      <form method="post">
+        {% csrf_token %}
+
+        <h5 class="mb-3">Rec and Close</h5>
+
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.store_number.label_tag }}</div>
+            <div class="col-7">{{ form.store_number }}</div>
+            </div>
+
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.shift_number.label_tag }}</div>
+            <div class="col-7">{{ form.shift_number }}</div>
+            </div>
+
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.total_sales.label_tag }}</div>
+            <div class="col-7">{{ form.total_sales }}</div>
+            </div>
+
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.cat_post_host.label_tag }}</div>
+            <div class="col-7">{{ form.cat_post_host }}</div>
+            </div>
+
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.drive_offs.label_tag }}</div>
+            <div class="col-7">{{ form.drive_offs }}</div>
+            </div>
+
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.purchases.label_tag }}</div>
+            <div class="col-7">{{ form.purchases }}</div>
+            </div>
+
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.ppts_redemptions.label_tag }}</div>
+            <div class="col-7">{{ form.ppts_redemptions }}</div>
+            </div>
+
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.lotto_payout.label_tag }}</div>
+            <div class="col-7">{{ form.lotto_payout }}</div>
+            </div>
+
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.uber_eats.label_tag }}</div>
+            <div class="col-7">{{ form.uber_eats }}</div>
+            </div>
+
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.skip.label_tag }}</div>
+            <div class="col-7">{{ form.skip }}</div>
+            </div>
+
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.drive_off_recovery.label_tag }}</div>
+            <div class="col-7">{{ form.drive_off_recovery }}</div>
+            </div>
+
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.cash_safe_drops.label_tag }}</div>
+            <div class="col-7">{{ form.cash_safe_drops }}</div>
+            </div>
+
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.last_safe_drop.label_tag }}</div>
+            <div class="col-7">{{ form.last_safe_drop }}</div>
+            </div>
+
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.in_brink.label_tag }}</div>
+            <div class="col-7">{{ form.in_brink }}</div>
+            </div>
+
+            <div class="row mb-2 align-items-center">
+            <div class="col-5"><strong>Over/Short</strong></div>
+            <div class="col-7">
+                <input type="text" class="form-control" id="id_over_or_short" name="over_or_short" readonly>
+            </div>
+            </div>
+
+
+        <h5 class="mt-4">Tank Info</h5>
+
+            <!-- Tank 1 -->
+            <div class="mb-2"><strong>Tank 1</strong></div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank1_name.label_tag }}</div>
+            <div class="col-7">{{ form.tank1_name }}</div>
+            </div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank1_tc_volume.label_tag }}</div>
+            <div class="col-7">{{ form.tank1_tc_volume }}</div>
+            </div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank1_height.label_tag }}</div>
+            <div class="col-7">{{ form.tank1_height }}</div>
+            </div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank1_water.label_tag }}</div>
+            <div class="col-7">{{ form.tank1_water }}</div>
+            </div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank1_water_height.label_tag }}</div>
+            <div class="col-7">{{ form.tank1_water_height }}</div>
+            </div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank1_temperature.label_tag }}</div>
+            <div class="col-7">{{ form.tank1_temperature }}</div>
+            </div>
+
+            <!-- Tank 2 -->
+            <div class="mt-4 mb-2"><strong>Tank 2</strong></div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank2_name.label_tag }}</div>
+            <div class="col-7">{{ form.tank2_name }}</div>
+            </div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank2_tc_volume.label_tag }}</div>
+            <div class="col-7">{{ form.tank2_tc_volume }}</div>
+            </div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank2_height.label_tag }}</div>
+            <div class="col-7">{{ form.tank2_height }}</div>
+            </div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank2_water.label_tag }}</div>
+            <div class="col-7">{{ form.tank2_water }}</div>
+            </div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank2_water_height.label_tag }}</div>
+            <div class="col-7">{{ form.tank2_water_height }}</div>
+            </div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank2_temperature.label_tag }}</div>
+            <div class="col-7">{{ form.tank2_temperature }}</div>
+            </div>
+
+            <!-- Tank 3 -->
+            <div class="mt-4 mb-2"><strong>Tank 3</strong></div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank3_name.label_tag }}</div>
+            <div class="col-7">{{ form.tank3_name }}</div>
+            </div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank3_tc_volume.label_tag }}</div>
+            <div class="col-7">{{ form.tank3_tc_volume }}</div>
+            </div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank3_height.label_tag }}</div>
+            <div class="col-7">{{ form.tank3_height }}</div>
+            </div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank3_water.label_tag }}</div>
+            <div class="col-7">{{ form.tank3_water }}</div>
+            </div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank3_water_height.label_tag }}</div>
+            <div class="col-7">{{ form.tank3_water_height }}</div>
+            </div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank3_temperature.label_tag }}</div>
+            <div class="col-7">{{ form.tank3_temperature }}</div>
+            </div>
+
+            <!-- Tank 4 -->
+            <div class="mt-4 mb-2"><strong>Tank 4</strong></div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank4_name.label_tag }}</div>
+            <div class="col-7">{{ form.tank4_name }}</div>
+            </div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank4_tc_volume.label_tag }}</div>
+            <div class="col-7">{{ form.tank4_tc_volume }}</div>
+            </div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank4_height.label_tag }}</div>
+            <div class="col-7">{{ form.tank4_height }}</div>
+            </div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank4_water.label_tag }}</div>
+            <div class="col-7">{{ form.tank4_water }}</div>
+            </div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank4_water_height.label_tag }}</div>
+            <div class="col-7">{{ form.tank4_water_height }}</div>
+            </div>
+            <div class="row mb-2 align-items-center">
+            <div class="col-5">{{ form.tank4_temperature.label_tag }}</div>
+            <div class="col-7">{{ form.tank4_temperature }}</div>
+            </div>
+
+
+        <h5 class="mt-4">Meter Discrepancies</h5>
+
+<!-- Meter 1 -->
+<div class="mb-2"><strong>Meter 1</strong></div>
+<div class="row mb-2 align-items-center">
+  <div class="col-5">{{ form.meter1_sales.label_tag }}</div>
+  <div class="col-7">{{ form.meter1_sales }}</div>
+</div>
+<div class="row mb-2 align-items-center">
+  <div class="col-5">{{ form.meter1_meter.label_tag }}</div>
+  <div class="col-7">{{ form.meter1_meter }}</div>
+</div>
+<div class="row mb-2 align-items-center">
+  <div class="col-5">{{ form.meter1_difference.label_tag }}</div>
+  <div class="col-7">{{ form.meter1_difference }}</div>
+</div>
+
+<!-- Meter 2 -->
+<div class="mt-4 mb-2"><strong>Meter 2</strong></div>
+<div class="row mb-2 align-items-center">
+  <div class="col-5">{{ form.meter2_sales.label_tag }}</div>
+  <div class="col-7">{{ form.meter2_sales }}</div>
+</div>
+<div class="row mb-2 align-items-center">
+  <div class="col-5">{{ form.meter2_meter.label_tag }}</div>
+  <div class="col-7">{{ form.meter2_meter }}</div>
+</div>
+<div class="row mb-2 align-items-center">
+  <div class="col-5">{{ form.meter2_difference.label_tag }}</div>
+  <div class="col-7">{{ form.meter2_difference }}</div>
+</div>
+
+<!-- Meter 3 -->
+<div class="mt-4 mb-2"><strong>Meter 3</strong></div>
+<div class="row mb-2 align-items-center">
+  <div class="col-5">{{ form.meter3_sales.label_tag }}</div>
+  <div class="col-7">{{ form.meter3_sales }}</div>
+</div>
+<div class="row mb-2 align-items-center">
+  <div class="col-5">{{ form.meter3_meter.label_tag }}</div>
+  <div class="col-7">{{ form.meter3_meter }}</div>
+</div>
+<div class="row mb-2 align-items-center">
+  <div class="col-5">{{ form.meter3_difference.label_tag }}</div>
+  <div class="col-7">{{ form.meter3_difference }}</div>
+</div>
+
+<!-- Meter 4 -->
+<div class="mt-4 mb-2"><strong>Meter 4</strong></div>
+<div class="row mb-2 align-items-center">
+  <div class="col-5">{{ form.meter4_sales.label_tag }}</div>
+  <div class="col-7">{{ form.meter4_sales }}</div>
+</div>
+<div class="row mb-2 align-items-center">
+  <div class="col-5">{{ form.meter4_meter.label_tag }}</div>
+  <div class="col-7">{{ form.meter4_meter }}</div>
+</div>
+<div class="row mb-2 align-items-center">
+  <div class="col-5">{{ form.meter4_difference.label_tag }}</div>
+  <div class="col-7">{{ form.meter4_difference }}</div>
+</div>
+
+        <h5 class="mt-4">Inventory</h5>
+        <div class="mb-3">{{ form.pump_total_inventory.label_tag }} {{ form.pump_total_inventory }}</div>
+
+        <div class="text-end mt-4">
+          <button type="submit" class="btn btn-primary">Submit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+  function calculateOverOrShort() {
+    const totalSales = parseFloat(document.getElementById("id_total_sales").value) || 0;
+    const fields = [
+      "cat_post_host", "drive_offs", "purchases", "ppts_redemptions", "lotto_payout",
+      "uber_eats", "skip", "drive_off_recovery", "cash_safe_drops", "last_safe_drop", "in_brink"
+    ];
+    let section2Total = 0;
+    fields.forEach(field => {
+      section2Total += parseFloat(document.getElementById(`id_${field}`).value) || 0;
+    });
+
+    const overOrShort = section2Total - totalSales;
+    document.getElementById("id_over_or_short").value = overOrShort.toFixed(2);
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll("input").forEach(input => {
+      input.addEventListener("input", calculateOverOrShort);
+    });
+  });
+</script>
+
+{% endblock %}

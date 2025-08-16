@@ -77,8 +77,15 @@ LOGGING = {
             'level': 'INFO', # Or a more specific level for your app
             'propagate': True,
         },
+        'celery': {
+            'handlers': ['file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
+
+
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.admin",
@@ -113,6 +120,7 @@ INSTALLED_APPS = [
     "arl.helpdesk",
     'django_otp',
     'django_otp.plugins.otp_totp',
+    'arl.reclose',
 ]
 
 PHONENUMBER_DEFAULT_REGION = 'CA'
@@ -211,7 +219,7 @@ SITE_URL = os.getenv("SITE_URL", "http://127.0.0.1:8000")
 STATIC_URL = "/static/"
 STATIC_ROOT = "/var/www/static"
 # STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
-
+#STATICFILES_DIRS = [BASE_DIR / "static"]
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
@@ -313,7 +321,7 @@ STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY_DEV")
 STRIPE_WEBHOOK_SECRET = "whsec_MLSUcBWyIC20anxyl7wSWarBqjyMCoSH"
 STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
 
-
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 # STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY")
 # STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET")
 # STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
