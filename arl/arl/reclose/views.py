@@ -8,6 +8,7 @@ from arl.user.models import CustomUser
 from arl.reclose.tasks import generate_recclose_pdf_task
 from django.contrib import messages
 
+
 @login_required
 def rec_close_create_view(request):
     if request.method == "POST":
