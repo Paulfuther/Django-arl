@@ -11,17 +11,34 @@
     <div class="row justify-content-center">
         <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
             {% if messages %}
-            <div class="container">
-                {% for message in messages %}
-                <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    {{ message }}
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
+    <div class="mt-3">
+      {% for message in messages %}
+        <div class="alert {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
 
         </div>
     </div>
     </divdiv>
+
+<!-- Alert auto-dismiss -->
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const alerts = document.querySelectorAll(".alert");
+    alerts.forEach(alert => {
+      setTimeout(() => {
+        alert.classList.add("fade");
+        alert.classList.remove("show");
+        setTimeout(() => {
+          if (alert.parentNode) alert.parentNode.removeChild(alert);
+        }, 500);
+      }, 5000);
+    });
+  });
+</script>
 
     {% endblock %}

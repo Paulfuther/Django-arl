@@ -18,6 +18,7 @@ from arl.helpers import (get_s3_images_for_incident,
 from arl.msg.helpers import (create_incident_file_email,
                              create_incident_file_email_by_rule,
                              send_incident_email, create_master_email)
+from arl.msg.models import EmailTemplate
 from arl.user.models import CustomUser, Employer, Store, ExternalRecipient
 
 from .helpers import create_pdf, create_restricted_pdf
@@ -363,6 +364,15 @@ def upload_file_to_dropbox_task(data):
 def send_email_to_group_task(data, group_name, employer_id):
     logger.info(f"[Incident Email Task] Starting email task for group '{group_name}' and employer ID {employer_id}")
     try:
+
+        # ✅ Pick the SendGrid template ID directly
+        if group_name == "incident_update_email":
+            sendgrid_id = "d-d732a2877dc14881aac8f2f637c0fa71"  # replace with actual update ID
+        else:
+            sendgrid_id = "d-d24563b3a2c14e9ebb1ebae50b6097f1"  # replace with actual create ID
+
+        logger.info(f"[Incident Email Task] Using template ID: {sendgrid_id}")
+
         # Fetch the emails of active users in the specified group
         to_emails = CustomUser.objects.filter(
             Q(is_active=True) & 
@@ -384,7 +394,6 @@ def send_email_to_group_task(data, group_name, employer_id):
         pdf_filename = data["pdf_filename"]
         logger.info(f"[Incident Email Task] Preparing attachment: {pdf_filename}")
 
-        
         attachments = [{
             "content": base64.b64encode(pdf_buffer.getvalue()).decode(),
             "filename": pdf_filename,
@@ -411,7 +420,7 @@ def send_email_to_group_task(data, group_name, employer_id):
         # ✅ Now call your master helper
         create_master_email(
             to_email=list(to_emails),
-            sendgrid_id="d-d24563b3a2c14e9ebb1ebae50b6097f1",
+            sendgrid_id=sendgrid_id,
             template_data=template_data,
             attachments=attachments,
             verified_sender=sender_email,
@@ -518,6 +527,7 @@ def generate_pdf_email_to_user_task(incident_id, user_email):
     except Exception as e:
         logger.error(f"Error in generate_pdf_email_to_user_task: {str(e)}")
         return {"status": "error", "message": str(e)}
+
 
 # this task emails a restricted pdf to a user as long as
 # the belong to the correct group
