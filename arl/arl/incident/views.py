@@ -355,13 +355,13 @@ class IncidentUpdateView(PermissionRequiredMixin, LoginRequiredMixin, UpdateView
         try:
             # Save the updated instance
             response = super().form_valid(form)
-
+            # print("here we go")
             # Trigger the tasks for PDF generation and email
             chain(
                 generate_pdf_task.si(self.object.id),  # Generate PDF
                 send_email_to_group_task.s(
                     group_name="incident_update_email",
-                    employer_id=self.object.employer.id,
+                    employer_id=self.request.user.employer.id,
                 ),
             ).apply_async()
 

@@ -274,6 +274,7 @@ def generate_pdf_task(incident_id):
     '''
     This task is used to create a pdf of a site incident form.
     '''
+    logger.info(f"[PDF Task] Starting PDF generation for Incident ID: {incident_id}")
     try:
         pdf_result = create_pdf(incident_id)
 
@@ -360,6 +361,7 @@ def upload_file_to_dropbox_task(data):
 # APPROVED for muluti tenant
 @app.task(name="email_incident_pdf_to_group")
 def send_email_to_group_task(data, group_name, employer_id):
+    logger.info(f"[Incident Email Task] Starting email task for group '{group_name}' and employer ID {employer_id}")
     try:
         # Fetch the emails of active users in the specified group
         to_emails = CustomUser.objects.filter(
@@ -370,6 +372,9 @@ def send_email_to_group_task(data, group_name, employer_id):
 
         if not to_emails:
             raise ValueError(f"No active users found in group: {group_name}")
+        logger.info(f"[Incident Email Task] Found {len(to_emails)} recipients in group '{group_name}'")
+
+        # Get verified sender
         # ✅ Fetch tenant sender email
         tenant_api_key = TenantApiKeys.objects.filter(employer_id=employer_id).first()
         sender_email = tenant_api_key.verified_sender_email if tenant_api_key else settings.MAIL_DEFAULT_SENDER
@@ -377,7 +382,9 @@ def send_email_to_group_task(data, group_name, employer_id):
         # ✅ Prepare PDF as attachment
         pdf_buffer = BytesIO(data["pdf_buffer"])
         pdf_filename = data["pdf_filename"]
-        print("pdf_file_name :", pdf_filename)
+        logger.info(f"[Incident Email Task] Preparing attachment: {pdf_filename}")
+
+        
         attachments = [{
             "content": base64.b64encode(pdf_buffer.getvalue()).decode(),
             "filename": pdf_filename,
@@ -398,7 +405,9 @@ def send_email_to_group_task(data, group_name, employer_id):
             "name": full_name,
             "company_name": company_name,
         }
+        logger.info(f"[Incident Email Task] Sending email to {len(to_emails)} users with template data: {template_data}")
 
+        # Send the email via your helper
         # ✅ Now call your master helper
         create_master_email(
             to_email=list(to_emails),
@@ -407,6 +416,7 @@ def send_email_to_group_task(data, group_name, employer_id):
             attachments=attachments,
             verified_sender=sender_email,
         )
+        logger.info(f"[Incident Email Task] Email successfully sent to group '{group_name}'")
 
         return {
             "status": "success",
