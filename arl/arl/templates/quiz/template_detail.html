@@ -1,0 +1,124 @@
+{% extends "../base/base.html" %}
+{% block title %}Index{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+{{ form|as_crispy_errors }}
+
+
+<div class="container">
+    <div class="row justify-content-center pt-5 mt-5"></div>
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+
+
+
+
+  <title>{{ template.name }} – Template</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+
+<body class="bg-light">
+<div class="container py-4">
+
+  <div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+      <h2 class="mb-1">{{ template.name }}</h2>
+      <div class="text-muted">
+        Created {{ template.created_at|date:"Y-m-d H:i" }}
+        {% if template.created_by %} • by {{ template.created_by.get_full_name|default:template.created_by }}{% endif %}
+      </div>
+      <span class="badge {{ template.is_active|yesno:'bg-success,bg-secondary' }}">
+        {{ template.is_active|yesno:'Active,Inactive' }}
+      </span>
+    </div>
+
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary"
+         href="{% url 'template_edit' pk=template.pk %}">
+        Edit Template
+      </a>
+
+      <form method="post" action="{% url 'checklist_from_template' template_id=template.pk %}">
+        {% csrf_token %}
+        <button class="btn btn-primary" type="submit">
+          Start Checklist
+        </button>
+      </form>
+    </div>
+  </div>
+
+  {% if template.description %}
+    <div class="card mb-3">
+      <div class="card-body">
+        <h6 class="text-muted mb-2">Description</h6>
+        <p class="mb-0">{{ template.description }}</p>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <strong>Items</strong>
+      <span class="badge text-bg-light">{{ template.items.count }} total</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width: 80px;">Order</th>
+            <th>Text</th>
+            <th style="width: 140px;">Requires Photo</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for it in template.items.all %}
+          <tr>
+            <td><code>{{ it.order }}</code></td>
+            <td>{{ it.text }}</td>
+            <td>
+              {% if it.requires_photo %}
+                <span class="badge bg-info">Yes</span>
+              {% else %}
+                <span class="badge bg-secondary">No</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="3" class="text-muted">No items yet. Click <em>Edit Template</em> to add items.</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Optional: quick-start with a custom title -->
+  <div class="card mt-3">
+    <div class="card-body">
+      <form method="post" action="{% url 'checklist_from_template' template_id=template.pk %}" class="row g-2">
+        {% csrf_token %}
+        <div class="col-md-8">
+          <label class="form-label">Checklist Title (optional)</label>
+          <input class="form-control" name="title" placeholder="{{ template.name }}">
+        </div>
+        <div class="col-md-4 d-flex align-items-end">
+          <button class="btn btn-primary w-100" type="submit">Start Checklist</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Optional back link if you have a list view named 'template_list' -->
+  {# <a href="{% url 'template_list' %}" class="btn btn-link mt-3">&larr; Back to templates</a> #}
+
+</div>
+</div>
+</div>
+</div>
+</body>
+
+
+{% endblock %}

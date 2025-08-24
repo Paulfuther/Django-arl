@@ -1,0 +1,123 @@
+{% extends "../base/base.html" %}
+{% block title %}Index{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+{{ form|as_crispy_errors }}
+
+
+<div class="container">
+    <div class="row justify-content-center pt-5 mt-5"></div>
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Checklists</h2>
+    <div>
+      <a class="btn btn-outline-secondary" href="{% url 'template_detail' pk=1 %}" style="display:none">New</a>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <form class="row gy-2 gx-2 align-items-end mb-3" method="get">
+    <div class="col-12 col-md-5">
+      <label class="form-label mb-1">Search</label>
+      <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Title or notes…">
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label mb-1">Status</label>
+      <select name="status" class="form-select">
+        <option value="">Any</option>
+        <option value="draft" {% if status == 'draft' %}selected{% endif %}>Draft</option>
+        <option value="submitted" {% if status == 'submitted' %}selected{% endif %}>Submitted</option>
+        <option value="completed" {% if status == 'completed' %}selected{% endif %}>Completed</option>
+      </select>
+    </div>
+    <div class="col-6 col-md-2 form-check mt-4 ms-2">
+      <input class="form-check-input" type="checkbox" value="1" name="mine" id="mine" {% if mine == '1' %}checked{% endif %}>
+      <label class="form-check-label" for="mine">Mine only</label>
+    </div>
+    <div class="col-12 col-md-2 d-grid">
+      <button class="btn btn-primary">Apply</button>
+    </div>
+  </form>
+
+  <!-- Results -->
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Title</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>By</th>
+            <th style="width: 160px;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for c in page_obj.object_list %}
+          <tr>
+            <td class="fw-semibold">{{ c.title }}</td>
+            <td>
+              {% if c.status == 'draft' %}
+                <span class="badge bg-secondary">Draft</span>
+              {% elif c.status == 'submitted' %}
+                <span class="badge bg-info">Submitted</span>
+              {% else %}
+                <span class="badge bg-success">Completed</span>
+              {% endif %}
+            </td>
+            <td>{{ c.created_at|date:"Y-m-d H:i" }}</td>
+            <td>
+              {% if c.created_by %}
+                {{ c.created_by.get_full_name|default:c.created_by }}
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td>
+              <div class="btn-group">
+                <a class="btn btn-sm btn-outline-primary"
+                   href="{% url 'checklist_edit' slug=c.slug %}">
+                  {% if c.status == 'completed' %}View{% else %}Resume{% endif %}
+                </a>
+                {% if c.pdf_file %}
+                  <a class="btn btn-sm btn-outline-success" target="_blank" href="{{ c.pdf_file.url }}">PDF</a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="5" class="text-muted">No checklists found.</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.paginator.num_pages > 1 %}
+      <div class="card-footer d-flex justify-content-between align-items-center">
+        <div>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</div>
+        <div class="btn-group">
+          {% if page_obj.has_previous %}
+            <a class="btn btn-sm btn-outline-secondary" href="?page={{ page_obj.previous_page_number }}&q={{ q }}&status={{ status }}&mine={{ mine }}">Prev</a>
+          {% endif %}
+          {% if page_obj.has_next %}
+            <a class="btn btn-sm btn-outline-secondary" href="?page={{ page_obj.next_page_number }}&q={{ q }}&status={{ status }}&mine={{ mine }}">Next</a>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+</div>
+</div>
+
+
+{% endblock %}
