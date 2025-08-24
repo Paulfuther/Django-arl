@@ -1,5 +1,6 @@
 import logging
 from datetime import date, datetime
+from typing import Optional
 from urllib.parse import quote, unquote
 
 import boto
@@ -76,6 +77,52 @@ def get_s3_images_for_salt_log(image_folder, employer):
     except Exception as e:
         print("An error occurred:", e)
     return images
+
+
+IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".gif", ".webp")
+
+
+def get_signed_url_for_key(key: str, expires_in: int = 3600) -> Optional[str]:
+    """
+    Return a time-limited public URL for a specific object key.
+    """
+    if not key:
+        return None
+    try:
+        return conn.generate_url(
+            expires_in=expires_in,
+            method="GET",
+            bucket=LINODE_BUCKET_NAME,
+            key=key,
+        )
+    except Exception as e:
+        print("Signed URL error:", e)
+        return None
+
+
+def get_s3_image_for_checklist_item(
+    checklist_slug: str, item_uuid: str, employer, expires_in: int = 3600
+) -> Optional[str]:
+    """
+    Look inside CHECKLISTS/<employer>/<checklist_slug>/<item_uuid>/ and
+    return a signed URL for the first image we find, or None.
+    """
+    bucket_name = LINODE_BUCKET_NAME
+    folder_path = f"CHECKLISTS/{employer}/{checklist_slug}/{item_uuid}/"
+    try:
+        bucket = conn.get_bucket(bucket_name)
+        for obj in bucket.list(prefix=folder_path):
+            key = getattr(obj, "key", "")
+            if key.lower().endswith(IMAGE_EXTS):
+                return conn.generate_url(
+                    expires_in=expires_in,
+                    method="GET",
+                    bucket=bucket_name,
+                    key=key,
+                )
+    except Exception as e:
+        print("Checklist image lookup error:", e)
+    return None
 
 
 def remove_old_backups():

@@ -1,0 +1,66 @@
+{% extends "../base/base.html" %}
+{% block title %}Checklist{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+
+
+<div class="container">
+    <div class="row justify-content-center pt-5 mt-5"></div>
+    <div class="row justify-content-center">
+        <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+
+
+<h3>{{ template|default_if_none:"New Checklist Template" }}</h3>
+<form method="post" hx-boost="true">
+  {% csrf_token %}
+  {{ form|crispy }}
+
+  <hr>
+  <h5>Items</h5>
+  {{ formset.management_form }}
+  <div id="template-items">
+    {% for f in formset %}
+      <div class="card mb-2 p-2">
+        {{ f.id }}
+        <div class="row g-2">
+          <div class="col-md-7">{{ f.text|as_crispy_field }}</div>
+          <div class="col-md-2">{{ f.requires_photo|as_crispy_field }}</div>
+          <div class="col-md-2">{{ f.order|as_crispy_field }}</div>
+          <div class="col-md-1">{{ f.DELETE|as_crispy_field }}</div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <button class="btn btn-outline-secondary" type="button"
+          onclick="addFormsetRow('template-items', '{{ formset.prefix }}');">
+    + Add Item
+  </button>
+
+  <div class="mt-3">
+    <button class="btn btn-primary" type="submit">Save Template</button>
+  </div>
+</div>
+</div>
+</div>
+</form>
+
+<script>
+function addFormsetRow(containerId, prefix) {
+  const container = document.getElementById(containerId);
+  const total = document.getElementById('id_' + prefix + '-TOTAL_FORMS');
+  const idx = parseInt(total.value, 10);
+  const empty = `{{ formset.empty_form.as_p|escapejs }}`;
+  const html = empty.replaceAll('__prefix__', idx);
+  const wrapper = document.createElement('div');
+  wrapper.className = 'card mb-2 p-2';
+  wrapper.innerHTML = html;
+  container.appendChild(wrapper);
+  total.value = idx + 1;
+}
+</script>
+
+
+{% endblock %}

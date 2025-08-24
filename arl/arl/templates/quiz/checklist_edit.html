@@ -1,0 +1,199 @@
+{% extends "../base/base.html" %}
+{% block title %}Index{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+{{ form|as_crispy_errors }}
+
+
+<style>
+  .thumb-120 { width:120px; height:120px; border:1px solid #ddd; border-radius:6px; overflow:hidden; background:#f8f9fa }
+  .thumb-120 img { width:100%; height:100%; object-fit:cover; display:block }
+  .dz-check-photo { border:2px dashed #ccc; border-radius:6px; padding:12px; min-height:90px; background:#f9f9f9; text-align:center; color:#777; font-size:.9rem }
+</style>
+
+<div class="container">
+  <div class="row justify-content-center pt-5 mt-5"></div>
+  <div class="row justify-content-center">
+    <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+
+        {% if messages %}
+    <div class="mt-3">
+      {% for message in messages %}
+        <div class="alert {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %} alert-dismissible fade show" role="alert">
+          {{ message }}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+
+{% if form.errors or form.non_field_errors or formset.non_form_errors or formset.errors %}
+  <div class="alert alert-danger">
+    <strong>Please fix the errors below.</strong>
+    {% if form.non_field_errors %}<div>{{ form.non_field_errors }}</div>{% endif %}
+    {% if formset.non_form_errors %}<div>{{ formset.non_form_errors }}</div>{% endif %}
+  </div>
+{% endif %}
+
+<h3 class="mb-3">Edit: {{ checklist.title }}</h3>
+
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  {{ form|crispy }}
+
+  <h5 class="mt-4">Items</h5>
+  {{ formset.management_form }}
+
+  {% for f in formset %}
+    <div class="card mb-3">
+      <div class="card-body">
+        {{ f.id }}
+        {{ f.order }} {# hidden input - keep it here #}
+
+        {% if f.non_field_errors or f.errors %}
+          <div class="alert alert-warning py-2">
+            {{ f.non_field_errors }}
+            <pre class="small mb-0">{{ f.errors }}</pre>
+          </div>
+        {% endif %}
+
+        <!-- Row 1: text + result -->
+        <div class="row g-2">
+          <div class="col-md-8">{{ f.text|as_crispy_field }}</div>
+          <div class="col-md-4">{{ f.result|as_crispy_field }}</div>
+        </div>
+
+        <!-- Row 2: comments -->
+        <div class="row g-2">
+          <div class="col-12">{{ f.comment|as_crispy_field }}</div>
+        </div>
+
+        <!-- Hide the built-in file input; uploads are separate -->
+        <div class="d-none">{{ f.photo }}</div>
+
+        <!-- Row 3: Image area -->
+        <div class="row g-2 align-items-center mt-2">
+          {% if f.instance.signed_url %}
+            <!-- Show thumbnail ONLY (no editing) -->
+            <div class="col-auto">
+              <a href="{{ f.instance.signed_url }}" target="_blank" class="thumb-120 d-inline-block">
+                <img src="{{ f.instance.signed_url }}" alt="photo">
+              </a>
+            </div>
+          {% else %}
+            <!-- No image yet: show Dropzone upload -->
+            <div class="col-auto">
+              <div class="dropzone dz-check-photo"
+                   data-upload-url="{% url 'upload_checklist_item_photo' slug=checklist.slug item_uuid=f.instance.uuid %}">
+                <div class="dz-message">Upload Photo</div>
+              </div>
+            </div>
+          {% endif %}
+
+          <div class="col-12 mt-2">
+            {{ f.DELETE|as_crispy_field }}
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+
+  <div class="d-flex gap-2">
+    <button class="btn btn-sm btn-secondary rounded-0 py-1 px-3" name="action" value="save">Save Draft</button>
+    <button class="btn btn-sm btn-primary rounded-0 py-1 px-3" name="action" value="submit">Submit & Generate PDF</button>
+  </div>
+</form>
+
+</div>
+</div>
+
+<!-- Dropzone -->
+<script src="https://unpkg.com/dropzone@5/dist/min/dropzone.min.js"></script>
+<script>
+  if (window.Dropzone) Dropzone.autoDiscover = false;
+
+  document.addEventListener('DOMContentLoaded', function(){
+    const CSRF = getCookie('csrftoken');
+
+    // Initialize Dropzone only on elements that are visible (i.e., items with no photo yet)
+    document.querySelectorAll('.dz-check-photo').forEach(function(el){
+      const url = el.getAttribute('data-upload-url');
+      const dz = new Dropzone(el, {
+        url: url,
+        paramName: "file",
+        maxFiles: 1,
+        maxFilesize: 10,            // MB
+        acceptedFiles: "image/*",
+        headers: { "X-CSRFToken": CSRF },
+        previewsContainer: null,
+        init: function(){
+          this.on('success', function(file, resp){
+            // Build the thumbnail element
+            if (resp && resp.url) {
+              // Insert a thumbnail col BEFORE the dropzone col
+              const dropzoneCol = el.closest('.col-auto');
+              const row = el.closest('.row');
+              const thumbCol = document.createElement('div');
+              thumbCol.className = 'col-auto';
+              thumbCol.innerHTML = `
+                <a href="${resp.url}" target="_blank" class="thumb-120 d-inline-block">
+                  <img src="${resp.url}" alt="photo">
+                </a>
+              `;
+              row.insertBefore(thumbCol, dropzoneCol);
+
+              // Remove the dropzone UI (no editing after upload)
+              dropzoneCol.remove();
+            } else {
+              el.innerHTML = '<small class="text-danger">Upload finished but no URL returned.</small>';
+            }
+          });
+
+          this.on('error', function(file, message){
+            alert(typeof message === 'string' ? message : 'Upload failed');
+            this.removeFile(file);
+          });
+
+          this.on('maxfilesexceeded', function(file){
+            this.removeAllFiles();
+            this.addFile(file);
+          });
+        }
+      });
+    });
+
+    function getCookie(name){
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+  });
+</script>
+<!-- Alert auto-dismiss -->
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const alerts = document.querySelectorAll(".alert");
+    alerts.forEach(alert => {
+      setTimeout(() => {
+        alert.classList.add("fade");
+        alert.classList.remove("show");
+        setTimeout(() => {
+          if (alert.parentNode) alert.parentNode.removeChild(alert);
+        }, 500);
+      }, 5000);
+    });
+  });
+</script>
+{% endblock %}
