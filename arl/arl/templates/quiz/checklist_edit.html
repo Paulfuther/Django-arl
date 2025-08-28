@@ -29,6 +29,13 @@
           </div>
       {% endif %}
 
+<legend class="mb-3">Edit: {{ checklist.title }}</legend>
+
+<div class="d-flex gap-2 mb-2">
+  <a href="{% url 'checklist_dashboard' %}" class="btn btn-sm btn-outline-primary">
+    Back to Dashboard
+  </a>
+</div>
 
 {% if form.errors or form.non_field_errors or formset.non_form_errors or formset.errors %}
   <div class="alert alert-danger">
@@ -38,7 +45,7 @@
   </div>
 {% endif %}
 
-<h3 class="mb-3">Edit: {{ checklist.title }}</h3>
+
 
 <form method="post" enctype="multipart/form-data">
   {% csrf_token %}
@@ -93,9 +100,7 @@
             </div>
           {% endif %}
 
-          <div class="col-12 mt-2">
-            {{ f.DELETE|as_crispy_field }}
-          </div>
+         
         </div>
       </div>
     </div>
@@ -112,60 +117,77 @@
 
 <!-- Dropzone -->
 <script src="https://unpkg.com/dropzone@5/dist/min/dropzone.min.js"></script>
+
 <script>
   if (window.Dropzone) Dropzone.autoDiscover = false;
 
-  document.addEventListener('DOMContentLoaded', function(){
+  document.addEventListener('DOMContentLoaded', function () {
     const CSRF = getCookie('csrftoken');
 
-    // Initialize Dropzone only on elements that are visible (i.e., items with no photo yet)
-    document.querySelectorAll('.dz-check-photo').forEach(function(el){
+    document.querySelectorAll('.dz-check-photo').forEach(function (el) {
       const url = el.getAttribute('data-upload-url');
+
       const dz = new Dropzone(el, {
         url: url,
         paramName: "file",
         maxFiles: 1,
-        maxFilesize: 10,            // MB
-        acceptedFiles: "image/*",
+        maxFilesize: 10,                       // MB
+        acceptedFiles: "image/*,.heic,.heif",
         headers: { "X-CSRFToken": CSRF },
         previewsContainer: null,
-        init: function(){
-          this.on('success', function(file, resp){
-            // Build the thumbnail element
+        createImageThumbnails: false,          // ✅ save mobile CPU/RAM
+        clickable: true,                       // ✅ tap anywhere to open picker
+        timeout: 60 * 1000,                    // ✅ 60s network timeout
+        init: function () {
+          const ensureCameraHints = () => {
+            if (this.hiddenFileInput) {
+              this.hiddenFileInput.setAttribute("accept", "image/*,.heic,.heif");
+              this.hiddenFileInput.setAttribute("capture", "environment"); // back camera
+            }
+          };
+
+          // Apply hints at several lifecycle moments
+          ensureCameraHints();
+          this.on("addedfile", ensureCameraHints);
+          this.on("processing", ensureCameraHints);
+
+          this.on("maxfilesexceeded", function (file) {
+            this.removeAllFiles();
+            this.addFile(file);
+          });
+
+          this.on("success", function (file, resp) {
             if (resp && resp.url) {
-              // Insert a thumbnail col BEFORE the dropzone col
               const dropzoneCol = el.closest('.col-auto');
               const row = el.closest('.row');
+
               const thumbCol = document.createElement('div');
               thumbCol.className = 'col-auto';
               thumbCol.innerHTML = `
-                <a href="${resp.url}" target="_blank" class="thumb-120 d-inline-block">
+                <a href="${resp.url}" target="_blank" class="thumb-120 d-inline-block" rel="noopener">
                   <img src="${resp.url}" alt="photo">
                 </a>
               `;
-              row.insertBefore(thumbCol, dropzoneCol);
 
-              // Remove the dropzone UI (no editing after upload)
-              dropzoneCol.remove();
+              // Slight delay avoids layout twitch on some mobiles
+              setTimeout(() => {
+                row.insertBefore(thumbCol, dropzoneCol);
+                dropzoneCol.remove(); // no editing after upload
+              }, 0);
             } else {
               el.innerHTML = '<small class="text-danger">Upload finished but no URL returned.</small>';
             }
           });
 
-          this.on('error', function(file, message){
+          this.on("error", function (file, message) {
             alert(typeof message === 'string' ? message : 'Upload failed');
             this.removeFile(file);
-          });
-
-          this.on('maxfilesexceeded', function(file){
-            this.removeAllFiles();
-            this.addFile(file);
           });
         }
       });
     });
 
-    function getCookie(name){
+    function getCookie(name) {
       let cookieValue = null;
       if (document.cookie && document.cookie !== '') {
         const cookies = document.cookie.split(';');
@@ -181,6 +203,7 @@
     }
   });
 </script>
+
 <!-- Alert auto-dismiss -->
 <script>
   document.addEventListener("DOMContentLoaded", function () {

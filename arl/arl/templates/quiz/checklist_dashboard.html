@@ -44,13 +44,7 @@
 <div class="tab-pane fade show active" id="available" role="tabpanel" aria-labelledby="available-tab">
   <div class="table-responsive">
     <table class="table table-sm align-middle">
-      <thead class="table-light">
-        <tr>
-          <th>Template</th>
-          <th class="d-none d-md-table-cell">Description</th>
-          <th>Action</th>
-        </tr>
-      </thead>
+      
       <tbody>
         {% for t in templates %}
           <tr>
@@ -70,7 +64,7 @@
             </td>
 
             <td class="d-flex gap-2">
-              <a class="btn btn-sm btn-outline-primary"
+              <a class="btn btn-sm btn-outline-primary py-1"
                  href="{% url 'checklist_from_template' template_id=t.pk %}">
                 Start
               </a>
@@ -88,106 +82,130 @@
 <div class="tab-pane fade" id="inprogress" role="tabpanel">
   <div class="table-responsive">
     <table class="table table-sm align-middle">
-      <thead class="table-light">
+      <!-- Show headers on md+; hide on mobile -->
+      <thead class="table-light d-none d-md-table-header-group">
         <tr>
           <th>Title</th>
-          <th class="d-none d-sm-table-cell">Created</th>
-          <th class="d-none d-lg-table-cell">By</th>
-          <th style="width: 140px;">Action</th>
+          <th>Created</th>
+          <th>Store</th>
+          <th>By</th>
+          <th style="width:140px;">Action</th>
         </tr>
       </thead>
       <tbody>
-        {% for c in drafts %}
-          <tr>
-            <td class="fw-semibold">
-              {{ c.title }}
-              <!-- Compact meta on small screens -->
-              <div class="small text-muted d-sm-none mt-1">
-                {{ c.created_at|date:"Y-m-d H:i" }}
-                {% if c.created_by %}
-                  · by {{ c.created_by.get_full_name|default:c.created_by }}
-                {% endif %}
+      {% for c in drafts %}
+        <tr>
+          <!-- Desktop cells -->
+          <td class="d-none d-md-table-cell fw-semibold">{{ c.title }}</td>
+          <td class="d-none d-md-table-cell">{{ c.created_at|date:"Y-m-d H:i" }}</td>
+          <td class="d-none d-md-table-cell">
+            {% if c.store %}
+              {% if c.store.number %}Store {{ c.store.number }}{% else %}{{ c.store }}{% endif %}
+              {% if c.store.city %}<span class="text-muted"> · {{ c.store.city }}</span>{% endif %}
+            {% else %}—{% endif %}
+          </td>
+          <td class="d-none d-md-table-cell">
+            {% if c.created_by %}{{ c.created_by.get_full_name|default:c.created_by }}{% else %}—{% endif %}
+          </td>
+          <td class="d-none d-md-table-cell">
+            <a class="btn btn-sm btn-outline-primary""
+               href="{% url 'checklist_edit' slug=c.slug %}">Resume</a>
+          </td>
+
+          <!-- Mobile stacked cell -->
+          <td class="d-table-cell d-md-none" colspan="5">
+            <div class="d-flex justify-content-between align-items-start">
+              <div class="me-2">
+                <div class="fw-semibold">{{ c.title }}</div>
+                <div class="text-muted small">
+                  {% if c.store %}
+                    {% if c.store.number %}Store {{ c.store.number }}{% else %}{{ c.store }}{% endif %}
+                    {% if c.store.city %} · {{ c.store.city }}{% endif %}
+                  {% else %}—{% endif %}
+                </div>
+                <div class="text-muted small">
+                  {% if c.created_by %}by {{ c.created_by.get_full_name|default:c.created_by }}{% else %}by —{% endif %}
+                </div>
+                <div class="text-muted small">Created: {{ c.created_at|date:"Y-m-d H:i" }}</div>
               </div>
-            </td>
-
-            <!-- Hidden on < sm -->
-            <td class="d-none d-sm-table-cell">
-              {{ c.created_at|date:"Y-m-d H:i" }}
-            </td>
-
-            <!-- Hidden on < lg -->
-            <td class="d-none d-lg-table-cell">
-              {% if c.created_by %}{{ c.created_by.get_full_name|default:c.created_by }}{% else %}—{% endif %}
-            </td>
-
-            <td>
-              <a class="btn btn-sm btn-outline-primary" href="{% url 'checklist_edit' slug=c.slug %}">Resume</a>
-            </td>
-          </tr>
-        {% empty %}
-          <tr><td colspan="4" class="text-muted">No drafts.</td></tr>
-        {% endfor %}
+              <div>
+                <a class="btn btn-sm btn-outline-primary"
+                   href="{% url 'checklist_edit' slug=c.slug %}">Resume</a>
+              </div>
+            </div>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="text-muted">No drafts.</td></tr>
+      {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
         <!-- Submitted -->
-        <div class="tab-pane fade" id="submitted" role="tabpanel">
-          <div class="table-responsive">
-            <table class="table table-sm align-middle">
-              <thead class="table-light">
-                <tr>
-                  <th>Title</th>
-                  <th class="d-none d-md-table-cell">Store</th>
-                  <th class="d-none d-sm-table-cell">Submitted</th>
-                  <th class="d-none d-lg-table-cell">By</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for c in submitted %}
-                  <tr>
-                    <td class="fw-semibold">
-                      {{ c.title }}
-                      <!-- Compact meta shown only on small screens -->
-                      <div class="small text-muted d-md-none mt-1">
-                        {% if c.store %}Store {{ c.store.number|default:c.store }}{% endif %}
-                        · {{ c.submitted_at|date:"Y-m-d H:i" }}<br>
-                        {% if c.submitted_by %}
-                          by {{ c.submitted_by.get_full_name|default:c.submitted_by }}
-                        {% endif %}
-                      </div>
-                    </td>
+<div class="tab-pane fade" id="submitted" role="tabpanel">
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead class="table-light d-none d-md-table-header-group">
+        <tr>
+          <th>Title</th>
+          <th>Submitted</th>
+          <th>Store</th>
+          <th>By</th>
+          <th style="width:140px;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for c in submitted %}
+        <tr>
+          <!-- Desktop cells -->
+          <td class="d-none d-md-table-cell fw-semibold">{{ c.title }}</td>
+          <td class="d-none d-md-table-cell">{{ c.submitted_at|date:"Y-m-d H:i" }}</td>
+          <td class="d-none d-md-table-cell">
+            {% if c.store %}
+              {% if c.store.number %}Store {{ c.store.number }}{% else %}{{ c.store }}{% endif %}
+              {% if c.store.city %}<span class="text-muted"> · {{ c.store.city }}</span>{% endif %}
+            {% else %}—{% endif %}
+          </td>
+          <td class="d-none d-md-table-cell">
+            {% if c.submitted_by %}{{ c.submitted_by.get_full_name|default:c.submitted_by }}{% else %}—{% endif %}
+          </td>
+          <td class="d-none d-md-table-cell">
+            <a class="btn btn-sm btn-outline-primary""
+               href="{% url 'checklist_detail' slug=c.slug %}">View</a>
+          </td>
 
-                    <!-- Hidden on < md -->
-                    <td class="d-none d-md-table-cell">
-                      {% if c.store %}{{ c.store }}{% else %}—{% endif %}
-                    </td>
-
-                    <!-- Hidden on < sm -->
-                    <td class="d-none d-sm-table-cell">
-                      {{ c.submitted_at|date:"Y-m-d H:i" }}
-                    </td>
-
-                    <!-- Hidden on < lg -->
-                    <td class="d-none d-lg-table-cell">
-                      {% if c.submitted_by %}{{ c.submitted_by.get_full_name|default:c.submitted_by }}{% else %}—{% endif %}
-                    </td>
-
-                    <td class="d-flex gap-2">
-                      <a class="btn btn-sm btn-outline-primary" href="{% url 'checklist_detail' slug=c.slug %}">View</a>
-                      {% if c.pdf_url %}
-                        <a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ c.pdf_url }}">PDF</a>
-                      {% endif %}
-                    </td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
+          <!-- Mobile stacked cell -->
+          <td class="d-table-cell d-md-none" colspan="5">
+            <div class="d-flex justify-content-between align-items-start">
+              <div class="me-2">
+                <div class="fw-semibold">{{ c.title }}</div>
+                <div class="text-muted small">
+                  {% if c.store %}
+                    {% if c.store.number %}Store {{ c.store.number }}{% else %}{{ c.store }}{% endif %}
+                    {% if c.store.city %} · {{ c.store.city }}{% endif %}
+                  {% else %}—{% endif %}
+                </div>
+                <div class="text-muted small">
+                  {% if c.submitted_by %}by {{ c.submitted_by.get_full_name|default:c.submitted_by }}{% else %}by —{% endif %}
+                </div>
+                <div class="text-muted small">Submitted: {{ c.submitted_at|date:"Y-m-d H:i" }}</div>
+              </div>
+              <div>
+                <a class="btn btn-sm btn-outline-primary""
+                   href="{% url 'checklist_detail' slug=c.slug %}">View</a>
+              </div>
+            </div>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="text-muted">No submitted checklists.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
   </div>
 
 </div>

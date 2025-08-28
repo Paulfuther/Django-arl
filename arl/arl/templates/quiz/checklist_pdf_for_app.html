@@ -58,7 +58,12 @@
   <div class="row justify-content-center">
     <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
 
-      <h1>{{ checklist.title }}</h1>
+      <legend>{{ checklist.title }}</legend>
+      <div class="d-flex gap-2 mb-2">
+  <a href="{% url 'checklist_dashboard' %}" class="btn btn-sm btn-outline-primary">
+    Back to Dashboard
+  </a>
+</div>
       <div class="meta">
         {% if store_number %}<div>Store #: {{ store_number }}</div>{% endif %}
         {% if store_name %}<div>Store Name: {{ store_name }}</div>{% endif %}
