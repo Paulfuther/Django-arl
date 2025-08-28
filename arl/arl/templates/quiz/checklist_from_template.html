@@ -1,26 +1,103 @@
 {% extends "../base/base.html" %}
-{% block title %}Index{% endblock %}
+{% block title %}Start Checklist{% endblock %}
 
 {% block template %}
 {% include "../base/navbar.html" %}
 {% load crispy_forms_tags %}
 {{ form|as_crispy_errors }}
 
+<style>
+  .meta-line { font-size:.925rem; color:#6c757d; }
+  .badge-soft { background:#eef2ff; color:#3730a3; }
+</style>
 
 <div class="container">
-    <div class="row justify-content-center pt-5 mt-5"></div>
-    <div class="row justify-content-center">
-        <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+  <div class="row justify-content-center pt-5 mt-5"></div>
+  <div class="row justify-content-center">
+    <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
 
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <h5 class="mb-0">Start Checklist</h5>
+        <a class="btn btn-sm btn-outline-secondary" href="{% url 'checklist_dashboard' %}">Back</a>
+      </div>
 
-<h3>Start Checklist from: {{ template.name }}</h3>
-<form method="post">
-  {% csrf_token %}
-  <div class="mb-3">
-    <label class="form-label">Checklist Title (optional)</label>
-    <input class="form-control" name="title" placeholder="{{ template.name }}">
+      <div class="card mb-3">
+        <div class="card-body">
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+            <div>
+              <div class="fw-semibold">{{ template.name }}</div>
+              {% if template.description %}
+                <div class="meta-line mt-1">{{ template.description }}</div>
+              {% endif %}
+            </div>
+            <div>
+              <span class="badge badge-soft">Items: {{ template.items.count }}</span>
+              {% if template.is_active %}
+                <span class="badge text-bg-success">Active</span>
+              {% else %}
+                <span class="badge text-bg-secondary">Inactive</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {% if messages %}
+        <div class="mt-2">
+          {% for message in messages %}
+            <div class="alert {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %} alert-dismissible fade show text-break" role="alert">
+              <div class="mb-0 text-break">{{ message }}</div>
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <form method="post" novalidate>
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div class="card">
+          <div class="card-body">
+            {# Keep fields inline/compact like the rest of the app #}
+            <div class="row g-2">
+              <div class="col-12">
+                {{ form.title|as_crispy_field }}
+              </div>
+              {# Include store if your ChecklistForm exposes it #}
+              {% if form.store %}
+              <div class="col-12">
+                {{ form.store|as_crispy_field }}
+              </div>
+              {% endif %}
+              <div class="col-12">
+                {{ form.notes|as_crispy_field }}
+              </div>
+            </div>
+          </div>
+          <div class="card-footer d-flex gap-2">
+            <button type="submit" class="btn btn-sm btn-outline-primary">Create Checklist</button>
+            <a href="{% url 'checklist_dashboard' %}" class="btn btn-sm btn-outline-primary">Cancel</a>
+          </div>
+        </div>
+      </form>
+
+    </div>
   </div>
-  <button class="btn btn-primary">Start</button>
-</form>
+</div>
 
+<!-- Alert auto-dismiss -->
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const alerts = document.querySelectorAll(".alert");
+    alerts.forEach(alert => {
+      setTimeout(() => {
+        alert.classList.add("fade");
+        alert.classList.remove("show");
+        setTimeout(() => {
+          if (alert.parentNode) alert.parentNode.removeChild(alert);
+        }, 500);
+      }, 5000);
+    });
+  });
+</script>
 {% endblock %}

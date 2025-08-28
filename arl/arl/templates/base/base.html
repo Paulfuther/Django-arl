@@ -3,6 +3,31 @@
 <!doctype html>
 <html lang="en">
 
+
+<style>
+  /* Stop any horizontal scrolling */
+  html, body { overflow-x: hidden; }
+
+  /* Make sure nothing can exceed viewport width */
+  .container, .row, .col-12, .card { max-width: 100%; }
+
+  /* PRE/long text should wrap instead of forcing overflow */
+  pre, code { 
+    white-space: pre-wrap;    /* wrap lines */
+    word-break: break-word;
+  }
+
+  /* Alerts and messages: allow breaking long tokens/URLs */
+  .alert, .alert * { 
+    word-wrap: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  /* Constrain Dropzone and thumb blocks to viewport */
+  .dz-check-photo { max-width: 100%; }
+  .thumb-120 { max-width: 100%; }
+</style>
+
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">

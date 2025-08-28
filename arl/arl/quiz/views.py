@@ -2,6 +2,7 @@ import os
 import uuid
 from io import BytesIO
 
+from celery.result import AsyncResult
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -9,9 +10,9 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.http import HttpResponseBadRequest, JsonResponse
+from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.text import slugify
 from django.views.generic import CreateView, UpdateView, View
@@ -37,7 +38,12 @@ from .forms import (
     TemplateItemFormSet,
 )
 from .models import Checklist, ChecklistItem, ChecklistTemplate, Quiz, SaltLog
-from .tasks import generate_salt_log_pdf_task, save_salt_log, generate_checklist_pdf_task
+from .tasks import (
+    generate_checklist_pdf_task,
+    generate_fresh_checklist_pdf,
+    generate_salt_log_pdf_task,
+    save_salt_log,
+)
 
 
 @login_required
@@ -388,28 +394,46 @@ def template_detail(request, pk):
 
 @login_required
 def checklist_from_template(request, template_id):
-    template = get_object_or_404(ChecklistTemplate, pk=template_id, is_active=True)
+    template = get_object_or_404(
+        ChecklistTemplate.objects.prefetch_related("items"),
+        pk=template_id, is_active=True
+    )
+
     if request.method == "POST":
-        # create Checklist + its items from the template
-        title = request.POST.get("title") or template.name
-        checklist = Checklist.objects.create(
-            template=template, title=title, created_by=request.user
-        )
-        bulk_items = []
-        for order, ti in enumerate(template.items.all(), start=1):
-            bulk_items.append(
+        form = ChecklistForm(request.POST, user=request.user)  # pass user for store queryset
+        if form.is_valid():
+            checklist = form.save(commit=False)
+            checklist.template = template
+            checklist.created_by = request.user
+            checklist.status = "draft"
+            if not checklist.title:
+                checklist.title = template.name
+            checklist.save()
+
+            # clone items in order
+            t_items = template.items.all().order_by("order", "id")
+            ChecklistItem.objects.bulk_create([
                 ChecklistItem(
                     checklist=checklist,
                     template_item=ti,
                     text=ti.text,
-                    order=order,
+                    order=(ti.order or idx),
                 )
-            )
-        ChecklistItem.objects.bulk_create(bulk_items)
-        messages.success(request, "Checklist started.")
-        return redirect("checklist_edit", slug=checklist.slug)
+                for idx, ti in enumerate(t_items, start=1)
+            ])
 
-    return render(request, "quiz/checklist_from_template.html", {"template": template})
+            messages.success(request, "Checklist created.")
+            return redirect("checklist_edit", slug=checklist.slug)
+        else:
+            messages.error(request, "Please fix the errors below.")
+    else:
+        form = ChecklistForm(initial={"title": template.name}, user=request.user)
+
+    return render(
+        request,
+        "quiz/checklist_from_template.html",   # your template above
+        {"template": template, "form": form},
+    )
 
 
 @login_required
@@ -448,9 +472,14 @@ def checklist_edit(request, slug):
                 # 🔔 Kick off async PDF generation
                 try:
                     generate_checklist_pdf_task.delay(checklist.id)
-                    messages.success(request, "Checklist submitted. PDF generation started.")
+                    messages.success(
+                        request, "Checklist submitted. PDF generation started."
+                    )
                 except Exception as e:
-                    messages.error(request, f"Checklist submitted, but PDF task failed to queue: {e}")
+                    messages.error(
+                        request,
+                        f"Checklist submitted, but PDF task failed to queue: {e}",
+                    )
 
                 return redirect("checklist_dashboard")
             else:
@@ -478,13 +507,10 @@ def checklist_edit(request, slug):
     employer = getattr(request.user, "employer", "noemployer")
     for fr in formset.forms:
         item = fr.instance
-        if getattr(item, "pk", None):
-            if item.photo and item.photo.name:
-                item.signed_url = get_signed_url_for_key(item.photo.name)
-            else:
-                item.signed_url = get_s3_image_for_checklist_item(
-                    checklist.slug, str(item.uuid), employer
-                )
+        item.signed_url = None  # default
+        if getattr(item, "pk", None) and getattr(item, "photo", None) and item.photo.name:
+            # short-lived is fine for the edit page
+            item.signed_url = get_signed_url_for_key(item.photo.name, expires_in=900)
 
     return render(
         request,
@@ -495,8 +521,47 @@ def checklist_edit(request, slug):
 
 @login_required
 def checklist_detail(request, slug):
-    checklist = get_object_or_404(Checklist, slug=slug)
-    return render(request, "quiz/checklist_detail.html", {"checklist": checklist})
+    checklist = get_object_or_404(
+        Checklist.objects.select_related("created_by", "submitted_by", "store"),
+        slug=slug,
+    )
+
+    qs = (
+        ChecklistItem.objects.filter(checklist=checklist)
+        .only("text", "result", "comment", "photo", "uuid", "order")
+        .order_by("order", "id")
+    )
+
+    items = []
+    for it in qs:
+        signed = None
+        if it.photo and it.photo.name:
+            # fast: sign key, no listing
+            signed = get_signed_url_for_key(it.photo.name, expires_in=900)
+        items.append(
+            {
+                "text": it.text,
+                "result": it.result,
+                "comment": it.comment,
+                "signed_url": signed,
+            }
+        )
+
+    pdf_url = None
+    if getattr(checklist, "pdf_key", ""):
+        # If you have a function to turn your Dropbox path into a shareable URL, use it here.
+        # pdf_url = dropbox_shared_link_for_path(checklist.pdf_key)
+        pdf_url = None  # or keep None and the button will show "not ready"
+
+    return render(
+        request,
+        "quiz/checklist_detail.html",
+        {
+            "checklist": checklist,
+            "items": items,
+            "pdf_url": pdf_url,
+        },
+    )
 
 
 @login_required
@@ -639,3 +704,65 @@ class UploadChecklistItemPhotoView(LoginRequiredMixin, View):
         # Return a signed URL (so the client shows it only AFTER upload)
         signed_url = get_signed_url_for_key(key, expires_in=3600)
         return JsonResponse({"message": "ok", "key": key, "url": signed_url})
+
+
+@login_required
+def checklist_download_fresh_start_api(request, slug):
+    checklist = get_object_or_404(Checklist, slug=slug)
+    async_res = generate_fresh_checklist_pdf.delay(checklist.id)
+    return JsonResponse({"task_id": async_res.id})
+
+
+@login_required
+def checklist_download_fresh_status(request):
+    task_id = request.GET.get("task_id")
+    if not task_id:
+        return HttpResponseBadRequest("Missing task_id")
+
+    res = AsyncResult(task_id)
+    if not res.ready():
+        return JsonResponse({"ready": False}, status=202)
+
+    if res.failed():
+        # show the actual exception message from the task
+        return JsonResponse({"ready": True, "error": str(res.info) or "PDF generation failed"}, status=200)
+
+    key = res.result  # object key returned by the task
+    url = get_signed_url_for_key(key, expires_in=120)
+    return JsonResponse({"ready": True, "url": url}, status=200)
+
+
+@login_required
+def checklist_report_html(request, slug):
+    """
+    Render the checklist report HTML (same context as the PDF) directly in the browser.
+    Useful for debugging layout/styles without generating a PDF.
+    """
+    checklist = (
+        Checklist.objects
+        .select_related("created_by", "submitted_by", "store")
+        .prefetch_related("items")
+        .get(slug=slug)
+    )
+    print("checklist store :", checklist.store)
+    # Build items with short-lived signed URLs (so images load in browser)
+    items = []
+    for it in checklist.items.all().order_by("order", "id"):
+        photo_url = None
+        if it.photo and it.photo.name:
+            photo_url = get_signed_url_for_key(it.photo.name, expires_in=900)
+        items.append({
+            "text": it.text,
+            "result": it.result,
+            "comment": it.comment,
+            "photo_url": photo_url,
+        })
+
+    ctx = {
+        "checklist": checklist,
+        "items": items,
+        "store_number": getattr(checklist.store, "number", None),
+        "store_name": getattr(checklist.store, "name", None),
+    }
+    # Reuse the exact same template as the PDF:
+    return render(request, "quiz/checklist_pdf_for_app.html", ctx)

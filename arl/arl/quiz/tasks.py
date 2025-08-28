@@ -2,16 +2,23 @@ from __future__ import absolute_import, unicode_literals
 
 import logging
 import time
+import uuid
 from datetime import datetime
 from io import BytesIO
 
 import pdfkit
+import requests
 from django.template.loader import render_to_string
 from django.utils.text import slugify
+from PIL import Image
 
 from arl.celery import app
 from arl.dbox.helpers import master_upload_file_to_dropbox
-from arl.helpers import get_s3_images_for_salt_log, get_signed_url_for_key
+from arl.helpers import (
+    get_s3_images_for_salt_log,
+    get_signed_url_for_key,
+    upload_to_linode_object_storage,
+)
 from arl.quiz.models import Checklist, SaltLog
 from arl.user.models import CustomUser, Employer, Store
 
@@ -136,10 +143,11 @@ def generate_salt_log_pdf_task(incident_id):
 
 @app.task(name="create_checklist_pdf", bind=True, max_retries=3)
 def generate_checklist_pdf_task(self, checklist_id: int):
-    checklist = (Checklist.objects
-                 .select_related("created_by", "submitted_by", "store")
-                 .prefetch_related("items")
-                 .get(pk=checklist_id))
+    checklist = (
+        Checklist.objects.select_related("created_by", "submitted_by", "store")
+        .prefetch_related("items")
+        .get(pk=checklist_id)
+    )
     t0 = time.time()
     logger.info("[PDF] start checklist_id=%s task_id=%s", checklist_id, self.request.id)
 
@@ -153,7 +161,9 @@ def generate_checklist_pdf_task(self, checklist_id: int):
         store_label = None
         if getattr(checklist, "store", None):
             # prefer a store number if you have one; else name
-            store_label = getattr(checklist.store, "number", None) or getattr(checklist.store, "name", None)
+            store_label = getattr(checklist.store, "number", None) or getattr(
+                checklist.store, "name", None
+            )
         store_segment = slugify(store_label or "no-store")
         logger.info(
             "[PDF] loaded checklist slug=%s title=%s", checklist.slug, checklist.title
@@ -261,3 +271,105 @@ def generate_checklist_pdf_task(self, checklist_id: int):
         except Exception:
             pass
         return {"status": "error", "message": str(e)}
+
+
+@app.task(name="generate_fresh_checklist_pdf")
+def generate_fresh_checklist_pdf(checklist_id):
+    try:
+        checklist = (
+            Checklist.objects
+            .select_related("created_by", "submitted_by", "store")
+            .prefetch_related("items")
+            .get(pk=checklist_id)
+        )
+        logger.info("[PDF] Generating fresh PDF for checklist_id=%s title=%s",
+                    checklist.id, checklist.title)
+
+    except Checklist.DoesNotExist:
+        logger.error("[PDF] Checklist id=%s does not exist", checklist_id)
+        return None
+
+    def _downscale_for_pdf(http_url: str, max_px=800, jpeg_quality=75):
+        """
+        Fetch image URL, downscale, upload to TEMP, return signed URL.
+        """
+        try:
+            logger.debug("[PDF] Fetching image from %s", http_url)
+            r = requests.get(http_url, timeout=20)
+            r.raise_for_status()
+            im = Image.open(BytesIO(r.content)).convert("RGB")
+            im.thumbnail((max_px, max_px), Image.LANCZOS)
+
+            buf = BytesIO()
+            im.save(buf, format="JPEG", quality=jpeg_quality, optimize=True)
+            buf.seek(0)
+
+            tmp_key = f"TEMP/pdf-thumbs/{uuid.uuid4().hex}.jpg"
+            upload_to_linode_object_storage(buf, tmp_key)
+            buf.close()
+
+            signed_url = get_signed_url_for_key(tmp_key, expires_in=900)
+            logger.debug("[PDF] Uploaded downscaled image to %s", tmp_key)
+            return signed_url
+        except Exception as e:
+            logger.warning("[PDF] Could not process image %s: %s", http_url, e)
+            return None
+
+    # Build items
+    items = []
+    for it in checklist.items.all().order_by("order", "id"):
+        photo_url = None
+        if it.photo and it.photo.name:
+            orig = get_signed_url_for_key(it.photo.name, expires_in=900)
+            photo_url = _downscale_for_pdf(orig, max_px=800, jpeg_quality=75)
+        items.append({
+            "text": it.text,
+            "result": it.result,
+            "comment": it.comment,
+            "photo_url": photo_url,
+        })
+    logger.info("[PDF] Collected %s items for checklist_id=%s", len(items), checklist.id)
+
+    # Render template
+    html = render_to_string(
+        "quiz/checklist_pdf.html",
+        {
+            "checklist": checklist,
+            "items": items,
+            "store_number": getattr(checklist.store, "number", None),
+            "store_name": getattr(checklist.store, "name", None),
+        },
+    )
+    logger.debug("[PDF] Rendered HTML for checklist_id=%s", checklist.id)
+
+    # Generate PDF
+    try:
+        options = {
+            "enable-local-file-access": None,
+            "encoding": "UTF-8",
+            "--keep-relative-links": "",
+        }
+        pdf_bytes = pdfkit.from_string(html, False, options=options)
+        logger.info("[PDF] PDF generated successfully for checklist_id=%s", checklist.id)
+    except Exception as e:
+        logger.exception("[PDF] Failed to generate PDF for checklist_id=%s: %s", checklist.id, e)
+        return None
+
+    pdf_buffer = BytesIO(pdf_bytes)
+
+    # Upload to TEMP folder
+    tmp_id = uuid.uuid4().hex
+    filename = f"fresh-{slugify(checklist.slug or checklist.title)}-{tmp_id}.pdf"
+    folder_path = f"TEMP/{datetime.now().strftime('%Y/%m/%d')}"
+    full_path = f"{folder_path}/{filename}"
+
+    try:
+        upload_to_linode_object_storage(pdf_buffer, full_path)
+        logger.info("[PDF] Uploaded fresh PDF to %s for checklist_id=%s", full_path, checklist.id)
+    except Exception as e:
+        logger.exception("[PDF] Upload failed for checklist_id=%s: %s", checklist.id, e)
+        return None
+    finally:
+        pdf_buffer.close()
+
+    return full_path
