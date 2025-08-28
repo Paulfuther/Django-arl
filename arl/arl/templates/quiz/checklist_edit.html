@@ -67,10 +67,14 @@
           </div>
         {% endif %}
 
-        <!-- Row 1: text + result -->
-        <div class="row g-2">
-          <div class="col-md-8">{{ f.text|as_crispy_field }}</div>
-          <div class="col-md-4">{{ f.result|as_crispy_field }}</div>
+        <!-- Row 1: question (readonly) + result select -->
+        <div class="row g-2 align-items-center">
+          <div class="col-md-8">
+            <div class="fw-semibold">{{ f.instance.text }}</div>
+          </div>
+          <div class="col-md-4">
+            {{ f.result }}
+          </div>
         </div>
 
         <!-- Row 2: comments -->
