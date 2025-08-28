@@ -170,11 +170,11 @@ class ChecklistItemForm(forms.ModelForm):
 
     class Meta:
         model = ChecklistItem
-        fields = ["text", "result", "comment", "order"]  # ⬅️ removed "photo"
+        fields = ["result", "comment", "order"]  # ⬅️ removed "photo"
         widgets = {
-            "text": forms.TextInput(attrs={"class": "form-control"}),
             "result": forms.Select(attrs={"class": "form-select"}),
             "comment": forms.Textarea(attrs={"rows": 2, "class": "form-control"}),
+            "order": forms.HiddenInput(),
         }
 
     def __init__(self, *args, **kwargs):

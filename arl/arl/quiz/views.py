@@ -10,18 +10,17 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
+from django.http import HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse, reverse_lazy
+from django.urls import reverse_lazy
 from django.utils import timezone
 from django.utils.text import slugify
 from django.views.generic import CreateView, UpdateView, View
 from django.views.generic.list import ListView
-from PIL import Image, ImageOps
+from PIL import Image, ImageFile, ImageOps, UnidentifiedImageError
 from waffle import flag_is_active
 
 from arl.helpers import (
-    get_s3_image_for_checklist_item,
     get_s3_images_for_salt_log,
     get_signed_url_for_key,
     upload_to_linode_object_storage,
@@ -396,11 +395,14 @@ def template_detail(request, pk):
 def checklist_from_template(request, template_id):
     template = get_object_or_404(
         ChecklistTemplate.objects.prefetch_related("items"),
-        pk=template_id, is_active=True
+        pk=template_id,
+        is_active=True,
     )
 
     if request.method == "POST":
-        form = ChecklistForm(request.POST, user=request.user)  # pass user for store queryset
+        form = ChecklistForm(
+            request.POST, user=request.user
+        )  # pass user for store queryset
         if form.is_valid():
             checklist = form.save(commit=False)
             checklist.template = template
@@ -412,15 +414,17 @@ def checklist_from_template(request, template_id):
 
             # clone items in order
             t_items = template.items.all().order_by("order", "id")
-            ChecklistItem.objects.bulk_create([
-                ChecklistItem(
-                    checklist=checklist,
-                    template_item=ti,
-                    text=ti.text,
-                    order=(ti.order or idx),
-                )
-                for idx, ti in enumerate(t_items, start=1)
-            ])
+            ChecklistItem.objects.bulk_create(
+                [
+                    ChecklistItem(
+                        checklist=checklist,
+                        template_item=ti,
+                        text=ti.text,
+                        order=(ti.order or idx),
+                    )
+                    for idx, ti in enumerate(t_items, start=1)
+                ]
+            )
 
             messages.success(request, "Checklist created.")
             return redirect("checklist_edit", slug=checklist.slug)
@@ -431,7 +435,7 @@ def checklist_from_template(request, template_id):
 
     return render(
         request,
-        "quiz/checklist_from_template.html",   # your template above
+        "quiz/checklist_from_template.html",  # your template above
         {"template": template, "form": form},
     )
 
@@ -508,7 +512,11 @@ def checklist_edit(request, slug):
     for fr in formset.forms:
         item = fr.instance
         item.signed_url = None  # default
-        if getattr(item, "pk", None) and getattr(item, "photo", None) and item.photo.name:
+        if (
+            getattr(item, "pk", None)
+            and getattr(item, "photo", None)
+            and item.photo.name
+        ):
             # short-lived is fine for the edit page
             item.signed_url = get_signed_url_for_key(item.photo.name, expires_in=900)
 
@@ -658,52 +666,99 @@ def checklist_dashboard(request):
     return render(request, "quiz/checklist_dashboard.html", ctx)
 
 
-ACCEPTED_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
-MAX_BYTES = 10 * 1024 * 1024  # 10 MB per file, align with your quick email rules
+# Allow loading truncated streams (common from mobile)
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+# Optional: cap max pixels to prevent decompression bombs (18MP ~ 5184x3456)
+Image.MAX_IMAGE_PIXELS = 18_000_000
+
+ALLOWED_CT = {
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/gif",
+    "image/heic",
+    "image/heif",
+    "image/tiff",
+    "image/webp",
+    "application/octet-stream",  # many Android browsers use this
+    None,  # some clients omit CT
+}
+
+MAX_BYTES = 10 * 1024 * 1024  # 10MB
 
 
 class UploadChecklistItemPhotoView(LoginRequiredMixin, View):
     login_url = "/login/"
 
     def post(self, request, slug, item_uuid):
-        if "file" not in request.FILES:
-            return HttpResponseBadRequest("No file")
+        file = request.FILES.get("file")
+        if not file:
+            return JsonResponse({"error": "No file provided"}, status=400)
 
+        # (Optional) multi-tenant safety: ensure checklist belongs to user's employer
         checklist = get_object_or_404(Checklist, slug=slug)
         item = get_object_or_404(ChecklistItem, checklist=checklist, uuid=item_uuid)
 
-        f = request.FILES["file"]
+        # Quick size guard (cheap)
+        if getattr(file, "size", 0) > MAX_BYTES:
+            return JsonResponse({"error": "File too large (max 10MB)."}, status=400)
 
-        # Open/normalize/resize
-        img = Image.open(f)
-        if img.mode not in ("RGB", "L"):
-            img = img.convert("RGB")
+        # Content-type (defensive; we'll still try to decode)
+        ct = getattr(file, "content_type", None)
+        if ct not in ALLOWED_CT:
+            return JsonResponse({"error": f"Unsupported type: {ct}"}, status=400)
+
         try:
-            img = ImageOps.exif_transpose(img)
-        except Exception:
-            pass
-        img.thumbnail((1500, 1500), Image.LANCZOS)
+            # ---- Decode + normalize (HEIC works if pillow-heif is registered) ----
+            # Make sure you have run:  from pillow_heif import register_heif_opener; register_heif_opener()
+            # (do this once at app startup)
+            img = Image.open(file)
 
-        # Build key
-        employer_segment = str(getattr(request.user, "employer", "noemployer"))
-        base, _ = os.path.splitext(f.name)
-        filename = f"{slugify(base) or 'photo'}-{uuid.uuid4().hex[:8]}.jpg"
-        key = f"CHECKLISTS/{employer_segment}/{checklist.slug}/{item.uuid}/{filename}"
+            # Correct orientation from EXIF, ignore if missing
+            try:
+                img = ImageOps.exif_transpose(img)
+            except Exception:
+                pass
 
-        # Upload
-        buf = BytesIO()
-        img.save(buf, format="JPEG", quality=85, optimize=True)
-        buf.seek(0)
-        upload_to_linode_object_storage(buf, key)
-        buf.close()
+            # Normalize color mode (drop alpha)
+            if img.mode not in ("RGB", "L"):
+                img = img.convert("RGB")
 
-        # Persist on the model
-        item.photo.name = key
-        item.save(update_fields=["photo"])
+            # Resize to a sane maximum for your app
+            img.thumbnail((1500, 1500), Image.LANCZOS)
 
-        # Return a signed URL (so the client shows it only AFTER upload)
-        signed_url = get_signed_url_for_key(key, expires_in=3600)
-        return JsonResponse({"message": "ok", "key": key, "url": signed_url})
+            # ---- Build storage key ----
+            employer_segment = slugify(
+                str(getattr(request.user, "employer", "noemployer"))
+            )
+            base, _ = os.path.splitext(file.name)
+            filename = f"{slugify(base) or 'photo'}-{uuid.uuid4().hex[:8]}.jpg"
+            key = (
+                f"CHECKLISTS/{employer_segment}/{checklist.slug}/{item.uuid}/{filename}"
+            )
+
+            # ---- Encode JPEG + upload ----
+            buf = BytesIO()
+            img.save(buf, format="JPEG", quality=85, optimize=True)
+            buf.seek(0)
+            upload_to_linode_object_storage(buf, key)
+            buf.close()
+
+            # ---- Persist and return signed URL ----
+            item.photo.name = key
+            item.save(update_fields=["photo"])
+
+            signed_url = get_signed_url_for_key(key, expires_in=3600)
+            return JsonResponse({"message": "ok", "key": key, "url": signed_url})
+
+        except UnidentifiedImageError:
+            return JsonResponse({"error": "Unreadable image file."}, status=400)
+        except Image.DecompressionBombError:
+            return JsonResponse(
+                {"error": "Image too large (pixel dimensions)."}, status=400
+            )
+        except Exception as e:
+            return JsonResponse({"error": f"Upload failed: {e}"}, status=500)
 
 
 @login_required
@@ -725,7 +780,10 @@ def checklist_download_fresh_status(request):
 
     if res.failed():
         # show the actual exception message from the task
-        return JsonResponse({"ready": True, "error": str(res.info) or "PDF generation failed"}, status=200)
+        return JsonResponse(
+            {"ready": True, "error": str(res.info) or "PDF generation failed"},
+            status=200,
+        )
 
     key = res.result  # object key returned by the task
     url = get_signed_url_for_key(key, expires_in=120)
@@ -739,8 +797,7 @@ def checklist_report_html(request, slug):
     Useful for debugging layout/styles without generating a PDF.
     """
     checklist = (
-        Checklist.objects
-        .select_related("created_by", "submitted_by", "store")
+        Checklist.objects.select_related("created_by", "submitted_by", "store")
         .prefetch_related("items")
         .get(slug=slug)
     )
@@ -751,12 +808,14 @@ def checklist_report_html(request, slug):
         photo_url = None
         if it.photo and it.photo.name:
             photo_url = get_signed_url_for_key(it.photo.name, expires_in=900)
-        items.append({
-            "text": it.text,
-            "result": it.result,
-            "comment": it.comment,
-            "photo_url": photo_url,
-        })
+        items.append(
+            {
+                "text": it.text,
+                "result": it.result,
+                "comment": it.comment,
+                "photo_url": photo_url,
+            }
+        )
 
     ctx = {
         "checklist": checklist,
