@@ -1,0 +1,107 @@
+{% extends "../base/base.html" %}
+{% block title %}Checklist – {{ checklist.title }}{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+{{ form|as_crispy_errors }}
+
+<style>
+  /* Typography */
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    font-size:18px; color:#111; line-height:1.45;
+  }
+  h1{ font-size:24px; margin:0 0 12px; }
+  .meta{ font-size:16px; color:#444; margin-bottom:18px; }
+  .muted{ color:#666; }
+
+  /* Table */
+  .items{ width:100%; border-collapse:collapse; }
+  .items th, .items td{
+    vertical-align:top;           /* top align cells */
+    text-align:left;              /* left align text */
+    padding:6px 8px;              /* compact row height */
+    border-bottom:1px solid #ccc;
+    word-wrap:break-word;
+    white-space:normal;
+  }
+  .items th{
+    font-size:14px; color:#333; background:#f9f9f9;
+  }
+  .q{ width:60%; }                /* more room for question */
+  .a{ width:25%; }
+  .p{ width:15%; }                /* slimmer photo column */
+
+  /* Photo: keep aspect ratio without squashing */
+ .thumb {
+  display: inline-block;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: #f8f9fa;
+  overflow: hidden;
+  width: 160px;   /* bigger box */
+  height: 160px;  /* bigger box */
+}
+
+ .thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;  /* keeps aspect, fills nicely */
+  display: block;
+}
+
+</style>
+
+<div class="container">
+  <div class="row justify-content-center pt-5 mt-5"></div>
+  <div class="row justify-content-center">
+    <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+
+      <h1>{{ checklist.title }}</h1>
+      <div class="meta">
+        {% if store_number %}<div>Store #: {{ store_number }}</div>{% endif %}
+        {% if store_name %}<div>Store Name: {{ store_name }}</div>{% endif %}
+        <strong>Created by:</strong> {{ checklist.created_by }}<br>
+        {% if checklist.submitted_by %}
+          <strong>Submitted by:</strong> {{ checklist.submitted_by }} on {{ checklist.submitted_at|date:"Y-m-d H:i" }}
+        {% endif %}
+
+        {% if checklist.notes %}<div><strong>Notes :</strong> {{ checklist.notes }}</div>{% endif %}
+      </div>
+
+      <table class="items">
+        <thead>
+          <tr>
+            <th class="q">Question</th>
+            <th class="a">Result / Comment</th>
+            <th class="p">Photo</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for it in items %}
+          <tr>
+            <td class="q">
+              <strong>{{ it.text }}</strong>
+            </td>
+            <td class="a">
+              {% if it.result %}<strong>{{ it.result }}</strong>{% endif %}
+              {% if it.comment %}<span class="muted ms-1">{{ it.comment }}</span>{% endif %}
+              {% if not it.result and not it.comment %}<span class="muted">—</span>{% endif %}
+            </td>
+            <td class="p">
+              {% if it.photo_url %}
+                <span class="thumb"><img src="{{ it.photo_url }}" alt="photo"></span>
+              {% else %}
+                <span class="muted">No photo</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -19,6 +19,8 @@ from .models import (
     SaltLog,
 )
 
+from arl.user.models import Store
+
 
 class QuizForm(forms.ModelForm):
     class Meta:
@@ -142,16 +144,24 @@ class ChecklistForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
-        user = kwargs.pop("user", None)  # we’ll pass request.user from the view
+        user = kwargs.pop("user", None)  # pass request.user in the view
         super().__init__(*args, **kwargs)
-        # Make store optional for drafts; we’ll enforce on submit in the view.
-        self.fields["store"].required = False
 
-        # Scope the queryset to the user’s employer (adjust relation names to your schema)
+        # Filter store choices (optional, if you scope by employer)
+        qs = Store.objects.all()
         if user and hasattr(user, "employer"):
-            self.fields["store"].queryset = (
-                self.fields["store"].queryset.filter(employer=user.employer)
-            )
+            qs = qs.filter(employer=user.employer)
+        self.fields["store"].queryset = qs.order_by("number")
+
+        # Make store REQUIRED for starting a checklist
+        self.fields["store"].required = True
+        self.fields["store"].empty_label = "Select a store…"
+
+    def clean_store(self):
+        store = self.cleaned_data.get("store")
+        if not store:
+            raise forms.ValidationError("Please select a store.")
+        return store
 
 
 class ChecklistItemForm(forms.ModelForm):

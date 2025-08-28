@@ -6,7 +6,7 @@ from .views import (
     SaltLogCreateView,
     SaltLogListView,
     SaltLogUpdateView,
-    UploadChecklistItemPhotoView
+    UploadChecklistItemPhotoView,
 )
 
 urlpatterns = [
@@ -36,6 +36,21 @@ urlpatterns = [
         "checklists/<slug:slug>/items/<uuid:item_uuid>/upload/",
         UploadChecklistItemPhotoView.as_view(),
         name="upload_checklist_item_photo",
+    ),
+    path(
+        "checklists/<slug:slug>/download-pdf/start/",
+        views.checklist_download_fresh_start_api,
+        name="checklist_download_fresh_start_api",
+    ),
+    path(
+        "checklists/fresh-pdf/status/",
+        views.checklist_download_fresh_status,
+        name="checklist_download_fresh_status",
+    ),
+    path(
+        "checklists/<slug:slug>/report-html/",
+        views.checklist_report_html,
+        name="checklist_report_html",
     ),
     # path('saltlog-pdf/', views.generate_salt_log_pdf,
     #     name='generate_saltlog_pdf'),

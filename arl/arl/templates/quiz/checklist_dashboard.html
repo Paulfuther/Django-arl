@@ -13,132 +13,180 @@
         <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
   
 
-  <legend class="mb-3">Checklist Dashboard</legend>
+  <legend>Checklist Dashboard</legend>
 
-  <!-- Tabs -->
-  <ul class="nav nav-tabs" id="checklistTabs" role="tablist">
-    <li class="nav-item" role="presentation">
-      <button class="nav-link active" id="available-tab" data-bs-toggle="tab"
-              data-bs-target="#available" type="button" role="tab">
-        Available <span class="badge bg-light text-dark">{{ templates|length }}</span>
-      </button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="inprogress-tab" data-bs-toggle="tab"
-              data-bs-target="#inprogress" type="button" role="tab">
-        In Progress <span class="badge bg-light text-dark">{{ drafts|length }}</span>
-      </button>
-    </li>
-    <li class="nav-item" role="presentation">
-      <button class="nav-link" id="submitted-tab" data-bs-toggle="tab"
-              data-bs-target="#submitted" type="button" role="tab">
-        Submitted <span class="badge bg-light text-dark">{{ submitted|length }}</span>
-      </button>
-    </li>
-  </ul>
+<ul class="nav nav-tabs flex-wrap text-center" id="checklistTabs">
+  <li class="nav-item">
+    <a class="nav-link active" data-bs-toggle="tab" href="#available">
+      Available <br>
+      <span class="badge bg-light text-dark">{{ templates|length }}</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" data-bs-toggle="tab" href="#inprogress">
+      In Progress <br>
+      <span class="badge bg-light text-dark">{{ drafts|length }}</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" data-bs-toggle="tab" href="#submitted">
+      Submitted <br>
+      <span class="badge bg-light text-dark">{{ submitted|length }}</span>
+    </a>
+  </li>
+</ul>
 
   <!-- Tab panes -->
   <div class="tab-content border border-top-0 p-3 bg-white">
 
  
    <!-- Available -->
-<div class="tab-pane fade show active" id="available" role="tabpanel">
+<div class="tab-pane fade show active" id="available" role="tabpanel" aria-labelledby="available-tab">
   <div class="table-responsive">
     <table class="table table-sm align-middle">
       <thead class="table-light">
         <tr>
-          <th>Name</th>
-          <th style="width: 140px;">Items</th>
-          <th style="width: 120px;">Action</th>
+          <th>Template</th>
+          <th class="d-none d-md-table-cell">Description</th>
+          <th>Action</th>
         </tr>
       </thead>
       <tbody>
-      {% for t in templates %}
-        <tr>
-          <td>
-            <div class="fw-semibold">{{ t.name }}</div>
-            {% if t.description %}
-              <div class="text-muted small">{{ t.description|truncatechars:120 }}</div>
-            {% endif %}
-          </td>
-          <td><span class="badge text-bg-light">{{ t.items.count }}</span></td>
-          <td>
-            <form method="post" action="{% url 'checklist_from_template' template_id=t.pk %}">
-              {% csrf_token %}
-              <button class="btn btn-sm btn-primary">Start</button>
-            </form>
-          </td>
-        </tr>
-      {% empty %}
-        <tr><td colspan="3" class="text-muted">No templates available.</td></tr>
-      {% endfor %}
+        {% for t in templates %}
+          <tr>
+            <td class="fw-semibold">
+              {{ t.name }}
+              <!-- Small-screen meta -->
+              {% if t.description %}
+                <div class="small text-muted d-md-none mt-1">
+                  {{ t.description }}
+                </div>
+              {% endif %}
+            </td>
+
+            <!-- Hidden on < md -->
+            <td class="d-none d-md-table-cell">
+              {{ t.description|default:"—" }}
+            </td>
+
+            <td class="d-flex gap-2">
+              <a class="btn btn-sm btn-outline-primary"
+                 href="{% url 'checklist_from_template' template_id=t.pk %}">
+                Start
+              </a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="3" class="text-muted">No templates available.</td></tr>
+        {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
     <!-- In Progress -->
-    <div class="tab-pane fade" id="inprogress" role="tabpanel">
-      <div class="table-responsive">
-        <table class="table table-sm align-middle">
-          <thead class="table-light">
-            <tr>
-              <th>Title</th>
-              <th>Created</th>
-              <th>By</th>
-              <th style="width: 140px;">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-          {% for c in drafts %}
-            <tr>
-              <td class="fw-semibold">{{ c.title }}</td>
-              <td>{{ c.created_at|date:"Y-m-d H:i" }}</td>
-              <td>{% if c.created_by %}{{ c.created_by.get_full_name|default:c.created_by }}{% else %}—{% endif %}</td>
-              <td><a class="btn btn-sm btn-outline-primary" href="{% url 'checklist_edit' slug=c.slug %}">Resume</a></td>
-            </tr>
-          {% empty %}
-            <tr><td colspan="4" class="text-muted">No drafts.</td></tr>
-          {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Submitted -->
-    <div class="tab-pane fade" id="submitted" role="tabpanel">
-      <div class="table-responsive">
-        <table class="table table-sm align-middle">
-          <thead class="table-light">
-            <tr>
-              <th>Title</th>
-              <th>Submitted</th>
-              <th>By</th>
-              <th style="width: 180px;">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-          {% for c in submitted %}
-            <tr>
-              <td class="fw-semibold">{{ c.title }}</td>
-              <td>{{ c.submitted_at|date:"Y-m-d H:i" }}</td>
-              <td>{% if c.submitted_by %}{{ c.submitted_by.get_full_name|default:c.submitted_by }}{% else %}—{% endif %}</td>
-              <td class="d-flex gap-2">
-                <a class="btn btn-sm btn-outline-primary" href="{% url 'checklist_detail' slug=c.slug %}">View</a>
-                {% if c.pdf_file %}
-                  <a class="btn btn-sm btn-outline-success" target="_blank" href="{{ c.pdf_file.url }}">PDF</a>
-                {% else %}
-                  <span class="badge bg-warning text-dark">PDF pending</span>
+<div class="tab-pane fade" id="inprogress" role="tabpanel">
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Title</th>
+          <th class="d-none d-sm-table-cell">Created</th>
+          <th class="d-none d-lg-table-cell">By</th>
+          <th style="width: 140px;">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in drafts %}
+          <tr>
+            <td class="fw-semibold">
+              {{ c.title }}
+              <!-- Compact meta on small screens -->
+              <div class="small text-muted d-sm-none mt-1">
+                {{ c.created_at|date:"Y-m-d H:i" }}
+                {% if c.created_by %}
+                  · by {{ c.created_by.get_full_name|default:c.created_by }}
                 {% endif %}
-              </td>
-            </tr>
-          {% empty %}
-            <tr><td colspan="4" class="text-muted">No submitted checklists.</td></tr>
-          {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
+              </div>
+            </td>
+
+            <!-- Hidden on < sm -->
+            <td class="d-none d-sm-table-cell">
+              {{ c.created_at|date:"Y-m-d H:i" }}
+            </td>
+
+            <!-- Hidden on < lg -->
+            <td class="d-none d-lg-table-cell">
+              {% if c.created_by %}{{ c.created_by.get_full_name|default:c.created_by }}{% else %}—{% endif %}
+            </td>
+
+            <td>
+              <a class="btn btn-sm btn-outline-primary" href="{% url 'checklist_edit' slug=c.slug %}">Resume</a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4" class="text-muted">No drafts.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+        <!-- Submitted -->
+        <div class="tab-pane fade" id="submitted" role="tabpanel">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Title</th>
+                  <th class="d-none d-md-table-cell">Store</th>
+                  <th class="d-none d-sm-table-cell">Submitted</th>
+                  <th class="d-none d-lg-table-cell">By</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for c in submitted %}
+                  <tr>
+                    <td class="fw-semibold">
+                      {{ c.title }}
+                      <!-- Compact meta shown only on small screens -->
+                      <div class="small text-muted d-md-none mt-1">
+                        {% if c.store %}Store {{ c.store.number|default:c.store }}{% endif %}
+                        · {{ c.submitted_at|date:"Y-m-d H:i" }}<br>
+                        {% if c.submitted_by %}
+                          by {{ c.submitted_by.get_full_name|default:c.submitted_by }}
+                        {% endif %}
+                      </div>
+                    </td>
+
+                    <!-- Hidden on < md -->
+                    <td class="d-none d-md-table-cell">
+                      {% if c.store %}{{ c.store }}{% else %}—{% endif %}
+                    </td>
+
+                    <!-- Hidden on < sm -->
+                    <td class="d-none d-sm-table-cell">
+                      {{ c.submitted_at|date:"Y-m-d H:i" }}
+                    </td>
+
+                    <!-- Hidden on < lg -->
+                    <td class="d-none d-lg-table-cell">
+                      {% if c.submitted_by %}{{ c.submitted_by.get_full_name|default:c.submitted_by }}{% else %}—{% endif %}
+                    </td>
+
+                    <td class="d-flex gap-2">
+                      <a class="btn btn-sm btn-outline-primary" href="{% url 'checklist_detail' slug=c.slug %}">View</a>
+                      {% if c.pdf_url %}
+                        <a class="btn btn-sm btn-outline-secondary" target="_blank" href="{{ c.pdf_url }}">PDF</a>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
   </div>
 

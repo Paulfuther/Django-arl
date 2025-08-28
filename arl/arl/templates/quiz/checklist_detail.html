@@ -1,0 +1,195 @@
+
+{% extends "../base/base.html" %}
+{% block title %}Checklist – {{ checklist.title }}{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+{{ form|as_crispy_errors }}
+
+    <style>
+    .thumb-150 { width:150px; height: 150px; border:1px solid #ddd; border-radius:6px;
+                overflow:hidden; background:#f8f9fa; }
+    .thumb-150 img { width:100%; height:100%; object-fit:cover; display:block; }
+    .thumb-120 { width:120px; height:120px; border:1px solid #ddd; border-radius:6px;
+                overflow:hidden; background:#f8f9fa; }
+    .thumb-120 img { width:100%; height:100%; object-fit:cover; display:block; }
+    .kv { font-size:.95rem; }
+    .kv .k { color:#6c757d; min-width:9rem; display:inline-block; }
+    .badge-soft { background:#eef2ff; color:#3730a3; }
+    </style>
+
+
+<div class="container">
+    <div class="row justify-content-center pt-5 mt-5"></div>
+            <div class="row justify-content-center">
+                <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-6">
+
+                <div class="mb-3">
+                <legend class="mb-3">{{ checklist.title }}</legend>
+                <div class="mt-2 d-flex gap-2">
+                     <span  class="btn btn-sm btn-outline-primary"
+                        onclick="startFreshPdf('{{ checklist.slug }}')">
+                            Download Fresh PDF
+                </span>
+                   
+                   
+                    <a class="btn btn-sm btn-outline-primary" href="{% url 'checklist_dashboard' %}">Back to Checklists</a>
+                    <a class="btn btn-sm btn-outline-primary"
+                      href="{% url 'checklist_report_html' slug=checklist.slug %}">
+                      Preview Report (HTML)
+                    </a>
+                </div>
+                </div>
+
+                   
+   
+            <!-- Modal -->
+                    <div class="modal fade" id="pdfGenModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                        <div class="modal-body d-flex align-items-center gap-3">
+                            <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+                            <div>
+                            <div class="fw-semibold mb-1">Generating PDF…</div>
+                            <div class="text-muted small">This usually takes a few seconds.</div>
+                            </div>
+                        </div>
+                        <div class="modal-footer justify-content-between">
+                            <div class="text-muted small" id="pdfGenStatus">Starting…</div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        </div>
+                        </div>
+                    </div>
+                    </div>
+
+  <!-- Meta card -->
+  <div class="card mb-4 mt-4">
+    <div class="card-body kv">
+      <div><span class="k">Status:</span>
+        {% if checklist.status == "submitted" %}
+          <span class="badge text-bg-success">Submitted</span>
+        {% elif checklist.status == "draft" %}
+          <span class="badge text-bg-secondary">Draft</span>
+        {% else %}
+          <span class="badge text-bg-light text-dark">{{ checklist.status|default:"—" }}</span>
+        {% endif %}
+      </div>
+      {% if checklist.store %}
+        <div><span class="k">Store:</span>
+          {{ checklist.store.number|default:checklist.store|default:"—" }}
+          {% if checklist.store.name %} · {{ checklist.store.name }}{% endif %}
+        </div>
+      {% endif %}
+      <div><span class="k">Created by:</span> {{ checklist.created_by|default:"—" }}</div>
+      <div><span class="k">Submitted by:</span> {{ checklist.submitted_by|default:"—" }}</div>
+      <div><span class="k">Submitted at:</span> {{ checklist.submitted_at|date:"Y-m-d H:i" }}</div>
+      {% if checklist.notes %}
+        <div class="mt-2"><span class="k">Notes:</span> {{ checklist.notes }}</div>
+      {% endif %}
+    </div>
+  </div>
+  
+
+  <!-- Items -->
+   
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+  <strong>Items</strong>
+  <span class="text-muted small">{{ items|length }} total</span>
+</div>
+    <div class="card-body">
+      {% if items %}
+        {% for it in items %}
+          <div class="row g-3 align-items-start py-2 border-bottom">
+            <div class="col-md-6">
+              <div class="fw-semibold">{{ it.text }}</div>
+              {% if it.comment %}
+                <div class="text-muted small mt-1">{{ it.comment }}</div>
+              {% endif %}
+            </div>
+            <div class="col-md-2">
+              {% if it.result %}
+                <span class="badge badge-soft">{{ it.result }}</span>
+              {% else %}
+                <span class="text-muted small">—</span>
+              {% endif %}
+            </div>
+            <div class="col-md-4">
+              {% if it.signed_url %}
+                <a href="{{ it.signed_url }}" target="_blank" class="thumb-120 d-inline-block">
+                  <img src="{{ it.signed_url }}" alt="photo">
+                </a>
+              {% else %}
+                <span class="text-muted small">No photo</span>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="text-muted">No items.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+</div>
+</div>
+<script>
+  const STATUS_URL = "{% url 'checklist_download_fresh_status' %}";
+  const START_URL_TMPL = "{% url 'checklist_download_fresh_start_api' slug='__SLUG__' %}";
+
+  let pdfGenAbort = false;
+
+  function startFreshPdf(slug) {
+    pdfGenAbort = false;
+    const modalEl = document.getElementById('pdfGenModal');
+    const bsModal = new bootstrap.Modal(modalEl);
+    const statusEl = document.getElementById('pdfGenStatus');
+    statusEl.textContent = 'Starting…';
+    bsModal.show();
+
+    const startUrl = START_URL_TMPL.replace('__SLUG__', slug);
+
+    fetch(startUrl, {headers: {'X-Requested-With':'XMLHttpRequest'}})
+      .then(r => r.json())
+      .then(({task_id}) => {
+        if (!task_id) throw new Error('No task id');
+        statusEl.textContent = 'Generating…';
+        pollStatus(task_id, statusEl, bsModal);
+      })
+      .catch(err => {
+        statusEl.textContent = 'Failed to start PDF generation.';
+      });
+
+    // If user closes modal -> stop polling
+    modalEl.addEventListener('hidden.bs.modal', () => { pdfGenAbort = true; }, {once:true});
+  }
+
+  function pollStatus(taskId, statusEl, bsModal) {
+    if (pdfGenAbort) return;
+    fetch(`${STATUS_URL}?task_id=${encodeURIComponent(taskId)}`,
+          {headers: {'X-Requested-With':'XMLHttpRequest'}})
+      .then(r => r.json())
+      .then(data => {
+        if (pdfGenAbort) return;
+        if (!data.ready) {
+          setTimeout(() => pollStatus(taskId, statusEl, bsModal), 900);
+          return;
+        }
+        if (data.error) {
+          statusEl.textContent = data.error || 'PDF generation failed.';
+          return;
+        }
+        statusEl.textContent = 'Ready. Downloading…';
+        // Trigger download
+        window.location.href = data.url;
+        // Close the modal after a moment
+        setTimeout(() => bsModal.hide(), 1000);
+      })
+      .catch(() => {
+        if (!pdfGenAbort) setTimeout(() => pollStatus(taskId, statusEl, bsModal), 1200);
+      });
+  }
+</script>
+
+{% endblock %}
