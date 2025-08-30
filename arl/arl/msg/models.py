@@ -37,6 +37,7 @@ class EmailEvent(models.Model):
     sg_message_id = models.CharField(max_length=255)
     sg_template_id = models.CharField(max_length=255)
     sg_template_name = models.CharField(max_length=255)
+    subject = models.CharField(max_length=255, blank=True, null=True)
     timestamp = models.DateTimeField()
     url = models.URLField()
     useragent = models.TextField(max_length=1000)
@@ -244,3 +245,12 @@ class DraftEmail(models.Model):
     attachment_urls = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+
+class SMSReply(models.Model):
+    employer = models.ForeignKey(Employer, on_delete=models.CASCADE)
+    from_number = models.CharField(max_length=20)
+    to_number = models.CharField(max_length=20)
+    body = models.TextField()
+    message_sid = models.CharField(max_length=64, blank=True, null=True)
+    received_at = models.DateTimeField(auto_now_add=True)
