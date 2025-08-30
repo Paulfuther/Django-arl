@@ -801,7 +801,7 @@ def hr_dashboard(request):
     )  # Fetch pending invites
 
     if request.method == "POST":
-        form = NewHireInviteForm(request.POST, employer=employer)
+        form = NewHireInviteForm(request.POST, employer=employer, invited_by=request.user,)
 
         if form.is_valid():
             email = form.cleaned_data["email"]

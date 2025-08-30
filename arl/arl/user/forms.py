@@ -201,6 +201,7 @@ class NewHireInviteForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         self.employer = kwargs.pop("employer", None)
+        self.invited_by = kwargs.pop("invited_by", None)
         super().__init__(*args, **kwargs)
 
         # ✅ Dynamically set role choices
@@ -233,7 +234,9 @@ class NewHireInviteForm(forms.ModelForm):
     def save(self, commit=True):
         """Ensure employer is assigned & token is generated if missing."""
         invite = super().save(commit=False)
-        invite.employer = self.employer  # ✅ Assign employer automatically
+        invite.employer = self.employer
+        if self.invited_by:
+            invite.invited_by = self.invited_by     # ✅ Assign employer automatically
         invite.token = invite.token or get_random_string(
             64
         )  # ✅ Generate token if missing
