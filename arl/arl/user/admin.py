@@ -725,25 +725,53 @@ class NewHireInviteAdmin(admin.ModelAdmin):
         "name",
         "email",
         "role",
+        "invited_by",
         "employer",
         "created_at",
         "used",
         "invite_link_display",
     )
-    list_filter = ("employer", "role", "used")
+    list_filter = ("used", "role", "employer", "invited_by", "created_at")
     search_fields = ("name", "email", "employer__name")
     ordering = ("-created_at",)
+    date_hierarchy = "created_at"
+    # lets you quickly pick from large lists
+    autocomplete_fields = ("employer", "invited_by")
+
     readonly_fields = ("token", "created_at", "invite_link_display")
 
-    def invite_link_display(self, obj):
-        return obj.get_invite_link()
-
-    invite_link_display.short_description = "Invite Link"
-
     fieldsets = (
-        (None, {"fields": ("name", "email", "role", "employer", "used")}),
+        (None, {"fields": ("name", "email", "role")}),
+        ("Context", {"fields": ("employer", "invited_by", "used")}),
         ("Invite Details", {"fields": ("token", "invite_link_display", "created_at")}),
     )
+
+    actions = ["mark_as_used", "mark_as_unused"]
+
+    # ----- Link helpers -----
+    def invite_link_display(self, obj):
+        if not obj.pk:
+            return "—"
+        url = obj.get_invite_link()
+        return format_html('<a href="{}" target="_blank">{}</a>', url, url)
+    invite_link_display.short_description = "Invite Link"
+
+    def invite_link_short(self, obj):
+        if not obj.pk:
+            return "—"
+        return format_html('<a class="button" href="{}" target="_blank">Open</a>', obj.get_invite_link())
+    invite_link_short.short_description = "Link"
+
+    # ----- Actions -----
+    def mark_as_used(self, request, queryset):
+        count = queryset.update(used=True)
+        self.message_user(request, f"Marked {count} invite(s) as used.")
+    mark_as_used.short_description = "Mark selected invites as used"
+
+    def mark_as_unused(self, request, queryset):
+        count = queryset.update(used=False)
+        self.message_user(request, f"Marked {count} invite(s) as unused.")
+    mark_as_unused.short_description = "Mark selected invites as unused"
 
 
 class SignedDocumentSingleUploadForm(forms.Form):

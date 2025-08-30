@@ -265,6 +265,14 @@ def generate_random_token():
 
 class NewHireInvite(models.Model):
     employer = models.ForeignKey("user.Employer", on_delete=models.CASCADE, related_name="invites")
+    invited_by = models.ForeignKey(   # NEW FIELD
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sent_invites",
+        help_text="The user (manager/HR) who created this invite"
+    )
     email = models.EmailField(unique=True)
     name = models.CharField(max_length=255)
     role = models.CharField(max_length=100, choices=[("GSA", "GSA"), ("HR", "HR"), ("Manager", "Manager")])
