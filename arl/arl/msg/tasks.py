@@ -792,6 +792,7 @@ def process_sendgrid_webhook(payload):
             sg_message_id = event_data.get("sg_message_id", "")
             sg_template_id = event_data.get("sg_template_id", "")
             sg_template_name = event_data.get("sg_template_name", "")
+            subject = event_data.get("subject") or None
             event = event_data.get("event", "")
             timestamp = timezone.datetime.fromtimestamp(
                 event_data.get("timestamp", 0), tz=timezone.utc
@@ -818,6 +819,7 @@ def process_sendgrid_webhook(payload):
                 sg_message_id=sg_message_id,
                 sg_template_id=sg_template_id,
                 sg_template_name=sg_template_name,
+                subject=subject,
                 timestamp=timestamp,
                 url=url,
                 user=user,

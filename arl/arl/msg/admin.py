@@ -1,11 +1,10 @@
 from django.contrib import admin
-from .models import ComplianceFile
+from .models import ComplianceFile, EmailEvent
 from django.utils.html import format_html
 from arl.bucket.helpers import upload_to_linode_object_storage  # adjust if needed
 from uuid import uuid4
 from django.conf import settings
 import boto3
-
 
 
 @admin.register(ComplianceFile)
@@ -47,3 +46,10 @@ class ComplianceFileAdmin(admin.ModelAdmin):
             )
 
             obj.save(update_fields=["s3_key", "presigned_url"])
+
+@admin.register(EmailEvent)
+class EmailEventAdmin(admin.ModelAdmin):
+    list_display = ("timestamp", "email", "event", "subject", "sg_template_name", "employer")
+    list_filter = ("event", "employer", "sg_template_name", "timestamp")
+    search_fields = ("email", "subject", "sg_template_name", "sg_message_id", "sg_event_id")
+    ordering = ("-timestamp",)

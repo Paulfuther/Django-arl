@@ -821,6 +821,16 @@ def hr_dashboard(request):
 
             invite = form.save()
 
+            # 🔥 Log who invited whom
+            logger.info(
+                "New hire invite created: invited_by=%s (%s), new_hire=%s (%s), employer=%s",
+                request.user.get_full_name() or request.user.username,
+                request.user.id,
+                invite.name,
+                invite.email,
+                employer.name,
+            )
+
             send_new_hire_invite_task.delay(
                 new_hire_email=invite.email,
                 new_hire_name=invite.name,
