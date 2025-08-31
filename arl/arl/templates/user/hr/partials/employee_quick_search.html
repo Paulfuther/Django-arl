@@ -1,0 +1,45 @@
+{% if results %}
+  <ul class="list-group">
+    {% for u in results %}
+      <li class="list-group-item d-flex justify-content-between align-items-center">
+        <div>
+          <div class="fw-semibold">{{ u.get_full_name|default:u.username }}</div>
+          <div class="text-muted small">{{ u.email }}</div>
+        </div>
+        <button class="btn btn-sm btn-outline-primary"
+                onclick="chooseEmployeeForUpload({{ u.id }}, '{{ u.get_full_name|default:u.username|escapejs }}', '{{ u.email|escapejs }}')">
+          Select
+        </button>
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <div class="text-muted">No matches.</div>
+{% endif %}
+
+
+<script>
+  function chooseEmployeeForUpload(id, name, email) {
+    // Fill hidden field
+    document.getElementById('upload-user-id').value = id;
+
+    // Show chosen badge
+    document.getElementById('chosen-emp-name').textContent = name;
+    document.getElementById('chosen-emp-email').textContent = email;
+    document.getElementById('chosen-emp-pill').style.display = '';
+
+    // Reveal the upload form, hide the search card
+    document.getElementById('upload-form-card').classList.remove('d-none');
+    document.getElementById('upload-starter').classList.add('d-none');
+    // Optional: clear results
+    const results = document.getElementById('upload-search-results');
+    if (results) results.innerHTML = '';
+  }
+
+  function clearChosenEmployee() {
+    document.getElementById('upload-user-id').value = '';
+    document.getElementById('chosen-emp-pill').style.display = 'none';
+    document.getElementById('upload-form-card').classList.add('d-none');
+    document.getElementById('upload-starter').classList.remove('d-none');
+  }
+</script>

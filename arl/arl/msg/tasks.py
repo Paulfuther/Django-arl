@@ -130,6 +130,8 @@ def master_email_send_task(
             if not email:
                 print(f"Skipping recipient with no email: {recipient}")
                 continue
+            
+            effective_subject = subject or f"New Message from {employer.name if employer else 'Our Company'}"
 
             template_data = {
                 "name": name,
@@ -141,12 +143,22 @@ def master_email_send_task(
                 else f"New Message from {employer.name if employer else 'Our Company'}",
             }
 
+            # ✅ Custom args echoed back by SendGrid webhooks for this recipient
+            custom_args = {
+                # "email_log_id": per_recipient_log_id,
+                # "employer_id": str(employer_id) if employer_id else "",
+                # You *can* omit subject here if you prefer to store it only in your DB.
+                # Keeping it makes ad-hoc webhook-only analysis easier:
+                "subject": effective_subject,
+            }
+
             success = create_master_email(
                 to_email=email,
                 sendgrid_id=sendgrid_id,
                 template_data=template_data,
                 attachments=attachments,
                 verified_sender=verified_sender,
+                custom_args=custom_args,
             )
 
             if not success:

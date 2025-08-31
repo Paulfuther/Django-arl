@@ -5,146 +5,125 @@
 {% include "../base/navbar.html" %}
 {% load crispy_forms_tags %}
 
+
 <style>
-  
-  .placeholder-light::placeholder {
-  color: #999 !important; /* Light grey */
-  font-style: italic;
-  }
-  .mobile-btn {
-    font-size: 14px;
-    padding: 6px 12px;
-    border-radius: 8px;
-  }
+/* ========== General ========== */
+.placeholder-light::placeholder { color: #999 !important; font-style: italic; }
+.mobile-btn { font-size: 14px; padding: 6px 12px; border-radius: 8px; }
 
-  .card-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 1rem;
-  }
+/* ========== Grids ========== */
+.card-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+@media (min-width: 768px) { .card-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 992px) { .card-grid { grid-template-columns: repeat(3, 1fr); } }
 
-  .group-checkbox-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-  }
+.group-checkbox-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: .5rem; margin-top: .5rem;
+}
+.group-checkbox-grid .form-check { margin-bottom: 0; }
 
-  .group-checkbox-grid .form-check {
-    margin-bottom: 0;
-  }
+/* ========== Cards ========== */
+.user-card, .template-card, .invite-card {
+  background: #fff; border: 1px solid #dee2e6; border-radius: .5rem;
+  box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,.075);
+}
+.user-card { padding: 1rem; margin-bottom: 1rem; }
+.template-card { padding: 1rem; }
+.invite-card {
+  display: grid; grid-template-columns: 1fr auto; align-items: center;
+  gap: 1rem; padding: 1rem; font-size: 14px;
+}
+.template-meta { font-size: .85rem; color: #666; }
+.invite-info { font-size: 14px; }
+.invite-actions { display: flex; flex-direction: column; gap: .4rem; }
+.invite-actions .btn { font-size: 13px; padding: 6px 10px; white-space: nowrap; }
 
-  .user-role-wrapper {
+/* ========== Tabs (Desktop base) ========== */
+#hrTabs.nav-tabs {
+  display: flex; flex-wrap: wrap; gap: .5rem; justify-content: flex-start;
+  border-bottom: 1px solid var(--bs-border-color);
+}
+#hrTabs .nav-item { flex: 0 0 auto; }
+#hrTabs .nav-link { font-size: 1rem; padding: .5rem .9rem; line-height: 1.2; text-align: center; white-space: normal; }
+
+/* ========== Tables (Docs list) ========== */
+.docs-table { table-layout: fixed; width: 100%; border-collapse: collapse; }
+.docs-table th, .docs-table td { white-space: normal; vertical-align: middle; padding: .75rem; }
+.text-wrap { overflow-wrap: anywhere; word-break: break-word; }
+
+/* Document filename wraps early */
+.doc-name { overflow-wrap: anywhere; word-break: break-word; white-space: normal; max-width: 180px; }
+
+/* Action column stays compact and aligned */
+.actions-col { white-space: nowrap; width: 1%; text-align: right; }
+.actions-col .btn { display: inline-block; max-width: 100%; }
+
+/* Upload date size */
+.upload-date { font-size: .85rem; }
+
+/* ========== Employee header (accordion button content) ========== */
+.emp-btn { transition: none; }           /* stop hover jiggle */
+.emp-btn:focus { box-shadow: none; outline: none; }
+.emp-head { display: flex; flex-direction: column; min-width: 0; }
+.emp-name { font-weight: 600; line-height: 1.2; }
+.emp-email { color: #6c757d; font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.accordion-button::after { flex: 0 0 auto; } /* caret doesn't steal width */
+
+/* ========== Card headers with title + form ========== */
+.header-flex { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
+.header-title { font-weight: 600; line-height: 1.2; flex: 1 1 48%; min-width: 220px; word-break: break-word; }
+.header-form { flex: 0 0 auto; }
+
+/* ========== Mobile tweaks ========== */
+@media (max-width: 576px) {
+  .mobile-btn { font-size: 12px; padding: 4px 10px; }
+  .invite-card { grid-template-columns: 1fr; }
+  .invite-actions { flex-direction: row; flex-wrap: wrap; margin-top: .75rem; }
+  .invite-actions .btn { flex: 1 1 auto; }
+  .docs-table th, .docs-table td { padding: .5rem; }
+  .upload-date { font-size: .75rem; }
+  .emp-email { white-space: normal; }      /* allow wrapping on small screens */
+
+  /* Tabs: two per row, no clipping */
+  #hrTabs.nav-tabs { display: flex; flex-wrap: wrap; gap: 0; width: 100%; overflow: visible; }
+  #hrTabs .nav-item { flex: 0 0 50%; max-width: 50%; box-sizing: border-box; }
+  #hrTabs .nav-link { display: block; width: 100%; padding: .5rem .25rem; font-size: .95rem; }
+}
+
+/* ========== Very small screens ========== */
+@media (max-width: 480px) {
+  .header-title { flex-basis: 100%; }
+  .header-form { width: 100%; }
+  .header-form .form-control { width: 100%; }
+}
+</style>
+<style>
+  /* Make HR tabs fit in a single row and allow label wrapping */
+  #hrTabs.nav-tabs {
+    display: flex;
+    flex-wrap: nowrap;         /* keep one row */
     width: 100%;
+    gap: 0;                    /* avoid extra spacing pushing tabs off */
   }
-
-  .user-card {
-    border: 1px solid #dee2e6;
-    border-radius: 0.5rem;
-    padding: 1rem;
-    margin-bottom: 1rem;
-    background-color: #fff;
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+  #hrTabs .nav-item {
+    flex: 1 1 0;               /* equal widths across the row */
+    min-width: 0;              /* allow the link to shrink */
   }
-
-  @media (min-width: 768px) {
-    .card-grid {
-      grid-template-columns: repeat(2, 1fr);
-    }
-  }
-
-  @media (min-width: 992px) {
-    .card-grid {
-      grid-template-columns: repeat(3, 1fr);
-    }
-  }
-
-  .template-card {
-    background-color: #fff;
-    border: 1px solid #dee2e6;
-    border-radius: 0.5rem;
-    padding: 1rem;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-  }
-
-  .template-meta {
-    font-size: 0.85rem;
-    color: #666;
-  }
-
-  .invite-grid {
-    display: grid;
-    gap: 1rem;
-    grid-template-columns: 1fr;
-  }
-
-  .invite-card {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: center;
-    gap: 1rem;
-    background: #fff;
-    border: 1px solid #dee2e6;
-    border-radius: 0.5rem;
-    padding: 1rem;
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-    font-size: 14px;
-  }
-
-  .invite-info {
-    font-size: 14px;
-  }
-
-  .invite-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-    justify-content: start;
-  }
-
-  .invite-actions .btn {
-    font-size: 13px;
-    padding: 6px 10px;
-    white-space: nowrap;
-  }
-
-  @media (max-width: 576px) {
-    .mobile-btn {
-      font-size: 12px;
-      padding: 4px 10px;
-    }
-
-    .invite-card {
-      grid-template-columns: 1fr;
-    }
-
-    .invite-actions {
-      flex-direction: row;
-      flex-wrap: wrap;
-      margin-top: 0.75rem;
-    }
-
-    .invite-actions .btn {
-      flex: 1 1 auto;
-    }
-    .nav-tabs {
-    flex-wrap: nowrap !important;
-    display: flex;
-    justify-content: space-between;
-  }
-
-  .nav-tabs .nav-link {
-    font-size: 13px;
-    padding: 6px 8px;
-    white-space: normal; /* allows wrapping */
+  #hrTabs .nav-link {
+    display: block;
     text-align: center;
+    white-space: normal;       /* allow wrapping to multiple lines */
     line-height: 1.2;
-    flex: 1 1 33%;
+    padding: .5rem .4rem;      /* tighter padding */
+    font-size: .95rem;         /* slightly smaller to fit more text */
   }
 
-  .nav-tabs::-webkit-scrollbar {
-    display: none; /* Optional: hides scrollbar */
-  }
+  /* On very small screens, shrink a touch more */
+  @media (max-width: 576px) {
+    #hrTabs .nav-link {
+      font-size: .85rem;
+      padding: .45rem .35rem;
+    }
   }
 </style>
 
@@ -153,7 +132,16 @@
   <div class="row justify-content-center">
      
       <legend>HR Dashboard</legend>
-
+{% if messages %}
+  <div class="mt-3">
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
       <ul class="nav nav-tabs" id="hrTabs">
         <li class="nav-item">
           <a class="nav-link {% if active_tab == 'docusign' %}active{% endif %}" data-bs-toggle="tab" href="#docusign">DocuSign Templates</a>
@@ -165,10 +153,10 @@
           <a class="nav-link {% if active_tab == 'user-roles' %}active{% endif %}" data-bs-toggle="tab" href="#user-roles">User Roles</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link {% if active_tab == 'document_center' %}active{% endif %}" data-bs-toggle="tab" href="#document-center">
-            Document Center
-          </a>
-        </li>
+        <a class="nav-link {% if active_tab == 'employee_docs' %}active{% endif %}" data-bs-toggle="tab" href="#employee-docs">
+          Employee Documents
+        </a>
+      </li>
       </ul>
 
         <!--  Docusign Templates  -->
@@ -285,7 +273,7 @@
             {% else %}<p class="text-muted">No pending invitations.</p>{% endif %}
           </div>
 
-        
+        <!--   End of Invite. -->
 
         <!-- Getr and update roles for all employees  -->
 
@@ -301,77 +289,113 @@
             </div>
         </div>
         
-        <!-- 🚀 Document Center -->
+        <!--    End of roles.  -->
 
-        <div id="document-center" class="tab-pane fade {% if active_tab == 'document_center' %}show active{% endif %}">
-          <h4 class="mb-3">Document Center</h4>
-
-          <!-- 🧠 Sub-tabs: Employee vs Company -->
-          <ul class="nav nav-tabs mt-3" id="documentCenterTabs" role="tablist">
-            <li class="nav-item" role="presentation">
-              <button class="nav-link {% if document_tab == 'employee' %}active{% endif %}" id="employee-documents-tab" data-bs-toggle="tab" data-bs-target="#employee-documents" type="button" role="tab">
-                Employee Documents
-              </button>
-            </li>
-            <li class="nav-item" role="presentation">
-              <button class="nav-link {% if document_tab == 'company' %}active{% endif %}" id="company-documents-tab" data-bs-toggle="tab" data-bs-target="#company-documents" type="button" role="tab">
-                Company Documents
-              </button>
-            </li>
-          </ul>
-
-          <div class="tab-content p-3 border border-top-0 rounded-bottom">
-
+       <!-- 🗂 Employee Documents (HR-only) -->
+        <div id="employee-docs" class="tab-pane fade {% if active_tab == 'employee_docs' %}show active{% endif %}">
+          
+            <!-- Upload panel -->
            
-            <!-- 📄 Employee Documents (inside Document Center) -->
-            <div class="tab-pane fade {% if document_tab == 'employee' %}show active{% endif %}" id="employee-documents" role="tabpanel">
-
-              <legend class="mb-3">Search Signed Documents</legend>
-
-              <form method="get" class="mb-3"
-                    hx-get="{% url 'hr_document_view' %}"
-                    hx-target="#employee-table"
-                    hx-trigger="submit">
-                <input type="text" name="q" placeholder="Search by name or email" class="form-control mb-2" />
-                <input type="hidden" name="tab" value="document_center">
-                <button type="submit" class="btn btn-outline-primary mobile-btn">Search</button>
-              </form>
-
-              <div id="employee-table">
-                {% include "dsign/partials/employee_document_table.html" %}
+            <!-- 🔍 Search for Employee to Upload Documents -->
+              <div class="card mb-3" id="upload-starter">
+                <div class="card-header">
+                  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <strong class="flex-grow-1" style="min-width:220px; line-height:1.2;">
+                      Upload Employee Documents
+                    </strong>
+                    <form class="d-flex gap-2 w-100"
+                          hx-get="{% url 'employee_quick_search' %}"
+                          hx-target="#upload-search-results"
+                          hx-swap="innerHTML">
+                      <input type="text" name="q" class="form-control form-control-sm"
+                            placeholder="Search by name…" required>
+                      <button class="btn btn-sm btn-outline-primary">Search</button>
+                    </form>
+                  </div>
+                </div>
+                <div class="card-body" id="upload-search-results">
+                  <span class="text-muted small">Enter a name…</span>
+                </div>
               </div>
 
-            </div>
+            <!-- Upload form card (hidden until employee chosen) -->
+<div class="card mb-3 d-none" id="upload-form-card">
+  <div class="card-body">
+    <h5 class="card-title mb-3">Upload Document</h5>
+    <form id="employee-upload-form" method="post" enctype="multipart/form-data" action="{% url 'upload_employee_documents' %}">
+      {% csrf_token %}
+      <input type="hidden" name="user_id" id="upload-user-id">
 
-            <!-- 📄 Company Documents -->
-            <div class="tab-pane fade {% if document_tab == 'company' %}show active{% endif %}" id="company-documents" role="tabpanel">
-              {% if company_documents %}
-                <ul class="list-group">
-                  {% for doc in company_documents %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                      {{ doc.file_name }}
-                      <a href="{% url 'download_signed_document' doc.id %}" target="_blank" class="btn btn-outline-primary btn-sm">View</a>
-                   </li>
-                  {% endfor %}
-                </ul>
-              {% else %}
-                <p>No company documents available.</p>
-              {% endif %}
-            </div>
-
-        </div>
-
+      <!-- Chosen employee pill -->
+      <div class="mb-3" id="chosen-emp-pill" style="display:none;">
+        <span class="badge text-bg-light p-2">
+          Uploading for: <span id="chosen-emp-name" class="fw-semibold"></span>
+          <span class="text-muted">(<span id="chosen-emp-email"></span>)</span>
+        </span>
+        <button type="button" class="btn btn-sm btn-link ms-2" onclick="clearChosenEmployee()">Change</button>
       </div>
 
-    </div>
-
-        <div>
-        <a href="{% url 'home' %}" class="btn btn-outline-secondary mt-3">Back</a>
+      <!-- Fields -->
+      <div class="row g-2">
+        <div class="col-12 col-md-6">
+          <label class="form-label">Document Title</label>
+          <input type="text" name="document_title" class="form-control" placeholder="e.g., Work Permit, SIN Letter" required>
         </div>
+        <div class="col-12">
+          <label class="form-label">Notes (optional)</label>
+          <textarea name="notes" rows="2" class="form-control" placeholder="Any notes…"></textarea>
+        </div>
+        <div class="col-12">
+          <label class="form-label">File</label>
+          <input type="file" name="file" class="form-control"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.heic,.heif,.txt,.csv,.rtf,.webp,application/pdf,image/*" required>
+        </div>
+      </div>
 
+      <!-- Buttons + spinner -->
+      <div class="mt-3 d-flex gap-2 align-items-center">
+        <button id="upload-btn" class="btn btn-sm btn-outline-primary" type="submit">Upload</button>
+        <div id="upload-spinner" class="spinner-border spinner-border-sm text-primary" role="status" style="display:none;">
+          <span class="visually-hidden">Uploading...</span>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary rounded-0 px-3 py-1"
+                onclick="clearChosenEmployee()">Cancel</button>
+      </div>
+    </form>
   </div>
 </div>
+              <!--   End of Upload Panel. -->
 
+              <!-- Search panel -->
+               <div class="card mt-3">
+                <div class="card-header">
+                  <strong class="d-block mb-2">Search Employee Documents</strong>
+                  <form class="d-flex gap-2 w-100"
+                        method="get"
+                        hx-get="{% url 'employee_docs_search' %}"
+                        hx-target="#employee-doc-results"
+                        hx-swap="innerHTML">
+                    <input name="doc_q" value="{{ doc_q }}" 
+                          class="form-control form-control-sm"
+                          placeholder="Search by name…">
+                    <button class="btn btn-sm btn-outline-primary">Search</button>
+                  </form>
+                </div>
+
+                <div class="card-body p-0" id="employee-doc-results">
+                  {% include "user/hr/partials/employee_doc_list.html" %}
+                </div>
+              </div>
+            <!-- End of Search Panel. -->
+
+        </div>
+            <!--   End.   -->
+
+             
+      </div>
+
+</div>
+<!--   End of Employee Docs tab.  -->
 
 <script>
   document.addEventListener("DOMContentLoaded", function () {
@@ -385,5 +409,34 @@
     }
   });
 </script>
+<script>
+  function chooseEmployeeForUpload(id, name, email) {
+    document.getElementById('upload-user-id').value = id;
+    document.getElementById('chosen-emp-name').textContent = name;
+    document.getElementById('chosen-emp-email').textContent = email;
+    document.getElementById('chosen-emp-pill').style.display = '';
 
+    document.getElementById('upload-form-card').classList.remove('d-none');
+    document.getElementById('upload-starter').classList.add('d-none');
+  }
+
+  function clearChosenEmployee() {
+    document.getElementById('upload-user-id').value = '';
+    document.getElementById('chosen-emp-pill').style.display = 'none';
+    document.getElementById('upload-form-card').classList.add('d-none');
+    document.getElementById('upload-starter').classList.remove('d-none');
+  }
+</script>
+
+<script>
+document.getElementById("employee-upload-form").addEventListener("submit", function() {
+  const btn = document.getElementById("upload-btn");
+  const spinner = document.getElementById("upload-spinner");
+
+  // Disable upload button + show spinner
+  btn.disabled = true;
+  btn.textContent = "Uploading...";
+  spinner.style.display = "inline-block";
+});
+</script>
 {% endblock %}

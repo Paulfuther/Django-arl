@@ -1,10 +1,11 @@
 import base64
 import io
 import logging
+import mimetypes
 import os
 import traceback
 from functools import wraps
-from django.utils import timezone
+
 import qrcode
 from celery import chain
 from django.contrib import messages
@@ -14,7 +15,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import Group
 from django.contrib.auth.views import LoginView
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Count, Prefetch, Q
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.http import (
@@ -26,6 +27,8 @@ from django.http import (
 )
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
+from django.utils.text import slugify
 from django.views import View
 from django.views.generic import FormView, ListView
 from django_celery_results.models import TaskResult
@@ -50,6 +53,7 @@ from .forms import (
     NewHireInviteForm,
     TwoFactorAuthenticationForm,
 )
+from .helpers import send_new_hire_invite
 from .models import CustomUser, Employer, EmployerSettings, NewHireInvite
 from .tasks import (
     create_newhire_data_email,
@@ -58,7 +62,6 @@ from .tasks import (
     send_new_hire_invite_task,
     send_newhire_template_email_task,
 )
-from .helpers import send_new_hire_invite
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -801,7 +804,11 @@ def hr_dashboard(request):
     )  # Fetch pending invites
 
     if request.method == "POST":
-        form = NewHireInviteForm(request.POST, employer=employer, invited_by=request.user,)
+        form = NewHireInviteForm(
+            request.POST,
+            employer=employer,
+            invited_by=request.user,
+        )
 
         if form.is_valid():
             email = form.cleaned_data["email"]
@@ -860,33 +867,68 @@ def hr_dashboard(request):
         form = NewHireInviteForm(employer=employer)
 
     # ✅ Check for DocuSign event
-    event = request.GET.get('event')
-    tab = request.GET.get('tab')
-    document_tab = request.GET.get('document_tab', 'employee')
+    event = request.GET.get("event")
+    tab = request.GET.get("tab")
+    document_tab = request.GET.get("document_tab", "employee")
     if event and not tab:
         # ✅ If coming back from signing and no tab selected, default to "docusign"
         active_tab = "docusign"
     else:
-        active_tab = tab or "docusign"  # Default to docusign if nothing else is provided
+        active_tab = (
+            tab or "docusign"
+        )  # Default to docusign if nothing else is provided
 
     if event == "signing_complete":
         messages.success(request, "✅ Thanks for signing your document!")
     elif event == "decline":
         messages.warning(request, "⚠️ You declined to sign the document.")
     elif event == "cancel":
-        messages.warning(request, "⚠️ You canceled signing the document.")    
+        messages.warning(request, "⚠️ You canceled signing the document.")
 
     # ✅ Fetch employee documents (is_company_document = False)
     employee_documents = SignedDocumentFile.objects.filter(
-        employer=employer,
-        is_company_document=False
+        employer=employer, is_company_document=False
     )
 
     # ✅ Fetch company documents (is_company_document = True)
     company_documents = SignedDocumentFile.objects.filter(
-        employer=employer,
-        is_company_document=True
+        employer=employer, is_company_document=True
     )
+
+    # --- Employee Docs search ---
+    doc_q = (request.GET.get("doc_q") or "").strip()
+    employees = []
+    employee_documents = []
+
+    if active_tab == "employee_docs":
+        if doc_q:
+            employees = (
+                CustomUser.objects.filter(
+                    employer=employer, is_active=True
+                )
+                .filter(
+                    Q(first_name__icontains=doc_q)
+                    | Q(last_name__icontains=doc_q)
+                    | Q(email__icontains=doc_q)
+                )
+                .annotate(doc_count=Count("signed_documents"))
+                .order_by("first_name", "last_name")
+            )
+
+            # pull docs for only those employees
+            employee_documents = (
+                SignedDocumentFile.objects.filter(
+                    employer=employer,
+                    is_company_document=False,
+                    user__in=employees,
+                )
+                .select_related("user")
+                .order_by("-uploaded_at")
+            )
+        else:
+            # no query → show nothing
+            employees = []
+            employee_documents = []
 
     return render(
         request,
@@ -900,6 +942,111 @@ def hr_dashboard(request):
             "employer": employer,
             "employee_documents": employee_documents,
             "company_documents": company_documents,
+            "employees": employees,
+            "doc_q": doc_q,
+        },
+    )
+
+
+@login_required
+def employee_docs_search(request):
+    employer = request.user.employer
+    doc_q = (request.GET.get("doc_q") or "").strip()
+
+    employees_results, employee_documents = [], []
+
+    if doc_q:
+        employees_results = (
+            CustomUser.objects.filter(employer=employer, is_active=True)
+            .filter(
+                Q(first_name__icontains=doc_q)
+                | Q(last_name__icontains=doc_q)
+                | Q(email__icontains=doc_q)
+            )
+            .annotate(doc_count=Count("signed_documents"))
+            .order_by("first_name", "last_name")
+        )
+        employee_documents = (
+            SignedDocumentFile.objects.filter(
+                employer=employer,
+                is_company_document=False,
+                user__in=employees_results,
+            )
+            .select_related("user")
+            .order_by("-uploaded_at")
+        )
+
+    return render(
+        request,
+        "user/hr/partials/employee_doc_list.html",
+        {
+            "doc_q": doc_q,
+            "employees_results": employees_results,
+            "employee_documents": employee_documents,
+        },
+    )
+
+
+@login_required
+def employee_quick_search(request):
+    employer = request.user.employer
+    q = (request.GET.get("q") or "").strip()
+    results = []
+    if employer and q:
+        results = (CustomUser.objects
+                   .filter(employer=employer, is_active=True)
+                   .filter(Q(first_name__icontains=q) |
+                           Q(last_name__icontains=q) |
+                           Q(email__icontains=q))
+                   .order_by('first_name', 'last_name')[:20])
+    return render(request, "user/hr/partials/employee_quick_search.html", {"results": results})
+
+
+# Dedicated Documents Dashboard
+@login_required
+def documents_dashboard(request):
+    employer = getattr(request.user, "employer", None)
+    if not employer:
+        messages.error(request, "You must belong to a company to view documents.")
+        return redirect("home")
+
+    # Minimal RBAC (tweak as needed)
+    if not request.user.groups.filter(name__in=["Manager", "EMPLOYER", "HR"]).exists():
+        messages.error(request, "You do not have access to the Document Center.")
+        return redirect("home")
+
+    # Filter employees for this employer
+    employees = (
+        CustomUser.objects.filter(is_active=True, employer=employer)
+        .only("id", "first_name", "last_name", "email")
+        .order_by("first_name", "last_name", "email")
+    )
+
+    # Existing docs
+    employee_documents = (
+        SignedDocumentFile.objects.filter(employer=employer, is_company_document=False)
+        .select_related("user")
+        .order_by("-uploaded_at")
+    )
+
+    company_documents = SignedDocumentFile.objects.filter(
+        employer=employer, is_company_document=True
+    ).order_by("-uploaded_at")
+
+    # Which sub-tab to show by default
+    document_tab = request.GET.get("document_tab", "employee")
+    upload_tab = request.GET.get("upload_tab", "employee")
+
+    return render(
+        request,
+        "user/documents_dashboard.html",
+        {
+            "employer": employer,
+            "employees": employees,
+            "employee_documents": employee_documents,
+            "company_documents": company_documents,
+            "document_tab": document_tab,
+            "upload_tab": upload_tab,
         },
     )
 
@@ -1008,21 +1155,27 @@ def hr_document_view(request):
 
 def download_signed_document(request, doc_id):
     try:
-        print(doc_id)
-        # 🔍 Get the uploaded document
         doc = get_object_or_404(SignedDocumentFile, id=doc_id)
 
-        # 🧼 Build a clean, dynamic filename
-        employee_name = doc.user.get_full_name().replace(" ", "_") if doc.user else "Company"
-        template_clean = doc.template_name.replace(" ", "_") if doc.template_name else "Untitled"
-        today = timezone.now().strftime("%Y-%m-%d")
-        custom_filename = f"{employee_name}_{template_clean}_{today}.pdf"
+        # get original filename + ext
+        original_name = doc.file_name or os.path.basename(doc.file_path) or "document"
+        base, ext = os.path.splitext(original_name)
+        if not ext:
+            ext = mimetypes.guess_type(original_name)[0] or ""  # best effort
 
-        # 🔥 Pass this custom filename into download_from_s3
+        # build nice filename but KEEP extension
+        employee = slugify(doc.user.get_full_name()) if doc.user else "company"
+        title = slugify(doc.document_title or doc.template_name or base) or "file"
+        today = timezone.now().strftime("%Y-%m-%d")
+        custom_filename = (
+            f"{employee}_{title}_{today}{ext if ext.startswith('.') else ''}"
+        )
+
+        # hand off to your S3/Linode helper; DO NOT force .pdf inside it
         return download_from_s3(request, doc.file_path, custom_filename)
 
     except Exception as e:
-        print(f"Error in download_signed_document: {str(e)}")
+        print(f"Error in download_signed_document: {e}")
         return HttpResponse("Error downloading signed document", status=500)
 
 

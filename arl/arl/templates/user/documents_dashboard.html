@@ -1,0 +1,127 @@
+{# templates/user/documents_dashboard.html #}
+{% extends "../base/base.html" %}
+{% block title %}Document Center{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+
+<div class="container">
+  <div class="row justify-content-center pt-5 mt-5"></div>
+  <div class="row justify-content-center">
+    <div class="col-12 col-sm-10 col-md-8 col-lg-7 col-xl-7">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="mb-0">Document Center</h5>
+        <a class="btn btn-sm btn-outline-secondary" href="{% url 'hr_dashboard' %}">Back to HR</a>
+      </div>
+
+      <ul class="nav nav-tabs" id="documentCenterTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link {% if document_tab == 'employee' %}active{% endif %}"
+                  data-bs-toggle="tab" data-bs-target="#employee-docs" type="button" role="tab">
+            Employee Documents
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link {% if document_tab == 'company' %}active{% endif %}"
+                  data-bs-toggle="tab" data-bs-target="#company-docs" type="button" role="tab">
+            Company Documents
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content p-3 border border-top-0 rounded-bottom">
+
+        {# Employee docs list + upload #}
+        <div id="employee-docs" class="tab-pane fade {% if document_tab == 'employee' %}show active{% endif %}">
+          <form method="post" enctype="multipart/form-data" action="{% url 'upload_employee_documents' %}">
+            {% csrf_token %}
+            <div class="card mb-3">
+              <div class="card-body">
+                <div class="row g-2">
+                  <div class="col-12 col-md-6">
+                    <label class="form-label">Employee</label>
+                    <select name="user_id" class="form-select" required>
+                      {% for u in employees %}
+                        <option value="{{ u.id }}">{{ u.get_full_name|default:u.username|default:u.email }} ({{ u.email }})</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <label class="form-label">Document Title</label>
+                    <input name="document_title" class="form-control" placeholder="e.g., Work Permit, SIN Receipt" required>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">Notes (optional)</label>
+                    <textarea name="notes" rows="2" class="form-control" placeholder="Any notes…"></textarea>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">File</label>
+                    <input type="file" name="file" class="form-control"
+                           accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.heic,.heif,.txt,.csv,.rtf,.webp,image/*,application/pdf" required>
+                  </div>
+                </div>
+              </div>
+              <div class="card-footer d-flex gap-2">
+                <button class="btn btn-sm btn-primary rounded-0 px-3 py-1" type="submit">Upload</button>
+                <a href="{% url 'documents_dashboard' %}?document_tab=employee" class="btn btn-sm btn-outline-secondary rounded-0 px-3 py-1">Cancel</a>
+              </div>
+            </div>
+          </form>
+
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Employee</th>
+                  <th>Title</th>
+                  <th>Uploaded</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for d in employee_documents %}
+                  <tr>
+                    <td>{{ d.user.get_full_name|default:d.user.username|default:d.user.email }}</td>
+                    <td>{{ d.document_title|default:d.file_name }}</td>
+                    <td>{{ d.uploaded_at|date:"Y-m-d H:i" }}</td>
+                    <td><a class="btn btn-sm btn-outline-primary" href="{% url 'download_signed_document' d.id %}">View</a></td>
+                  </tr>
+                {% empty %}
+                  <tr><td colspan="4" class="text-muted">No employee documents.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {# Company docs list (you can add an upload form similarly) #}
+        <div id="company-docs" class="tab-pane fade {% if document_tab == 'company' %}show active{% endif %}">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th>Title</th>
+                  <th>Uploaded</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for d in company_documents %}
+                  <tr>
+                    <td>{{ d.document_title|default:d.file_name }}</td>
+                    <td>{{ d.uploaded_at|date:"Y-m-d H:i" }}</td>
+                    <td><a class="btn btn-sm btn-outline-primary" href="{% url 'download_signed_document' d.id %}">View</a></td>
+                  </tr>
+                {% empty %}
+                  <tr><td colspan="3" class="text-muted">No company documents.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
