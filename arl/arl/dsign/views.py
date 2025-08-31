@@ -1,7 +1,9 @@
 import json
 import logging
-import uuid
-
+import os
+import uuid, mimetypes
+from io import BytesIO
+import re
 from celery.result import AsyncResult
 from django.conf import settings
 from django.contrib import messages
@@ -9,24 +11,32 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.text import slugify
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from docusign_esign import ApiClient, ApiException, TemplatesApi
+from PIL import Image, ImageOps
+from pillow_heif import register_heif_opener
 
 from arl.bucket.helpers import upload_to_linode_object_storage
 from arl.dsign.helpers import (
     create_docusign_document,
+    create_envelope_for_in_app_signing,
     get_access_token,
     get_docusign_envelope,
     get_docusign_template_name_from_template,
-    create_envelope_for_in_app_signing,
     get_recipient_view_url,
-    get_template_signature_validation
+    get_template_signature_validation,
 )
-from arl.dsign.tasks import (get_outstanding_docs,
-                             list_all_docusign_envelopes_task)
+from arl.dsign.tasks import get_outstanding_docs, list_all_docusign_envelopes_task
+from arl.user.models import (
+    CustomUser,  # adjust import paths
+    Store,  # adjust if different
+)
 
-from .forms import MultiSignedDocUploadForm, NameEmailForm
+from .forms import EmployeeDocUploadForm, NameEmailForm
 from .helpers import get_docusign_edit_url
 from .models import DocuSignTemplate, SignedDocumentFile
 from .tasks import (
@@ -34,6 +44,8 @@ from .tasks import (
     process_docusign_webhook,
     validate_template_signature_tabs_task,
 )
+
+register_heif_opener()
 
 logger = logging.getLogger(__name__)
 
@@ -218,7 +230,7 @@ def edit_document_page(request, template_id):
 
     # ✅ Run the helper directly (sync)
     validation_result = get_template_signature_validation(template_id)
-    has_sign_here_tab = validation_result.get('has_sign_here', False)
+    has_sign_here_tab = validation_result.get("has_sign_here", False)
 
     return render(
         request,
@@ -342,18 +354,19 @@ def set_new_hire_template(request, template_id):
 
     if request.method == "POST":
         # ✅ If New Hire checkbox is checked, unset others first
-        if 'is_new_hire_template' in request.POST:
+        if "is_new_hire_template" in request.POST:
             # Unset all other templates first
             DocuSignTemplate.objects.filter(
-                employer=request.user.employer,
-                is_new_hire_template=True
+                employer=request.user.employer, is_new_hire_template=True
             ).update(is_new_hire_template=False)
             template.is_new_hire_template = True
         else:
             template.is_new_hire_template = False
 
         # ✅ In-App Signing is independent
-        template.is_in_app_signing_template = 'is_in_app_signing_template' in request.POST
+        template.is_in_app_signing_template = (
+            "is_in_app_signing_template" in request.POST
+        )
         # Handle company document toggle
         if request.POST.get("is_company_document"):
             template.is_company_document = True
@@ -370,7 +383,7 @@ def set_new_hire_template(request, template_id):
 @user_passes_test(lambda u: u.is_superuser)
 def bulk_upload_signed_documents_view(request):
     if request.method == "POST":
-        form = MultiSignedDocUploadForm(request.POST)
+        form = EmployeeDocUploadForm(request.POST)
         if form.is_valid():
             user = form.cleaned_data["user"]
             employer = form.cleaned_data["employer"]
@@ -396,7 +409,7 @@ def bulk_upload_signed_documents_view(request):
             return redirect("bulk_upload_signed_documents")
 
     else:
-        form = MultiSignedDocUploadForm()
+        form = EmployeeDocUploadForm()
 
     return render(request, "dsign/bulk_upload.html", {"form": form})
 
@@ -424,7 +437,7 @@ def start_in_app_signing(request, template_id):
         DocuSignTemplate,
         id=template_id,
         employer=request.user.employer,
-        is_in_app_signing_template=True, 
+        is_in_app_signing_template=True,
     )
 
     envelope_id = create_envelope_for_in_app_signing(
@@ -444,3 +457,241 @@ def start_in_app_signing(request, template_id):
     )
 
     return redirect(signing_url)
+
+
+MAX_EACH_BYTES = 25 * 1024 * 1024  # 25 MB per file (tune as needed)
+ALLOWED_EXTS = {
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".xls",
+    ".xlsx",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".heic",
+    ".heif",
+    ".txt",
+    ".csv",
+    ".rtf",
+    ".webp",
+}
+
+
+ALLOWED_UPLOAD_CT = {
+    # docs
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "text/plain",
+    "text/csv",
+    "application/rtf",
+    # images (we’ll normalize HEIC to JPG for safety)
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+    "image/heic",
+    "image/heif",
+    # some Androids use octet-stream for images; we’ll accept and probe
+    "application/octet-stream",
+}
+
+MAX_UPLOAD_MB = 25
+
+
+def _guess_ct(uploaded):
+    # Some Androids use octet-stream—fallback to filename
+    ct = getattr(uploaded, "content_type", None) or ""
+    if ct == "application/octet-stream":
+        guessed, _ = mimetypes.guess_type(uploaded.name)
+        return guessed or ct
+    return ct
+
+
+@login_required
+def upload_employee_documents(request):
+    if request.method != "POST":
+        return redirect(reverse("hr_dashboard") + "?tab=document_center")
+
+    employer = getattr(request.user, "employer", None)
+    if not employer:
+        messages.error(request, "You must belong to an employer to upload documents.")
+        return redirect(reverse("hr_dashboard") + "?tab=document_center")
+
+    # Pull form fields
+    user_id = request.POST.get("user_id")
+    title = (request.POST.get("document_title") or "").strip()
+    notes = (request.POST.get("notes") or "").strip()
+    fileobj = request.FILES.get("file")
+    print("file obj :", fileobj)
+
+    # Basic validations
+    if not user_id or not title or not fileobj:
+        messages.error(request, "Employee, title, and file are required.")
+        return redirect(reverse("hr_dashboard") + "?tab=document_center")
+
+    # Employee must be within the same employer
+    employee = get_object_or_404(
+        CustomUser, pk=user_id, employer=employer, is_active=True
+    )
+
+    # Size check
+    size_mb = fileobj.size / (1024 * 1024)
+    if size_mb > MAX_UPLOAD_MB:
+        messages.error(
+            request, f"File too large ({size_mb:.1f} MB). Max {MAX_UPLOAD_MB} MB."
+        )
+        return redirect(reverse("hr_dashboard") + "?tab=document_center")
+
+    # Content-type sanity (with a smarter guess for octet-stream)
+    ct = _guess_ct(fileobj)
+    if ct not in ALLOWED_UPLOAD_CT:
+        messages.error(request, f"Unsupported file type: {ct or 'unknown'}")
+        return redirect(reverse("hr_dashboard") + "?tab=document_center")
+
+    # Build path pieces
+    company = slugify(employer.name or "company")
+    today = timezone.now()
+    year = today.strftime("%Y")
+    month = today.strftime("%m")
+    base, ext = os.path.splitext(fileobj.name or "")
+    ext = (ext or "").lower()
+
+    # Decide if we should normalize to JPG
+    should_normalize_to_jpg = False
+    if ct in {"image/heic", "image/heif"} or ext in {".heic", ".heif"}:
+        should_normalize_to_jpg = True
+    elif ct == "application/octet-stream" and ext in {".heic", ".heif"}:
+        should_normalize_to_jpg = True
+
+    safe_title = slugify(title) or "document"
+    unique_id = uuid.uuid4().hex[:8]
+
+    # IMPORTANT: start with original ext (may be empty)
+    final_ext = ext
+    upload_buf = None
+
+    try:
+        if should_normalize_to_jpg:
+            # Convert HEIC/HEIF -> JPEG (with EXIF fix + resize cap)
+            img = Image.open(fileobj)
+            try:
+                img = ImageOps.exif_transpose(img)
+            except Exception:
+                pass
+            if img.mode not in ("RGB", "L"):
+                img = img.convert("RGB")
+            img.thumbnail((1500, 1500), Image.LANCZOS)
+
+            out = BytesIO()
+            img.save(out, format="JPEG", quality=85, optimize=True)
+            out.seek(0)
+            upload_buf = out
+            final_ext = ".jpg"
+        else:
+            # Non-images: upload as-is
+            upload_buf = fileobj
+
+            # If no extension, pick one based on content-type
+            if not final_ext:
+                if ct == "application/pdf":
+                    final_ext = ".pdf"
+                elif ct == "application/msword":
+                    final_ext = ".doc"
+                elif ct == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                    final_ext = ".docx"
+                elif ct == "application/vnd.ms-excel":
+                    final_ext = ".xls"
+                elif ct == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+                    final_ext = ".xlsx"
+                elif ct == "text/plain":
+                    final_ext = ".txt"
+                elif ct == "text/csv":
+                    final_ext = ".csv"
+                elif ct.startswith("image/"):
+                    final_ext = ".jpg"  # last resort for unknown image types
+                else:
+                    final_ext = ".bin"
+    except Exception as e:
+        messages.error(request, f"Could not process file: {e}")
+        return redirect(reverse("hr_dashboard") + "?tab=document_center")
+
+    filename = f"{safe_title}-{unique_id}{final_ext}"
+    object_key = f"DOCUMENTS/{company}/{year}/{month}/{employee.id}/{filename}"
+
+    try:
+        upload_to_linode_object_storage(upload_buf, object_key)
+    finally:
+        if isinstance(upload_buf, BytesIO):
+            upload_buf.close()
+
+    SignedDocumentFile.objects.create(
+        user=employee,
+        employer=employer,
+        envelope_id=uuid.uuid4().hex[:10],
+        file_name=filename,
+        file_path=object_key,
+        document_title=title,   # make sure migration added this
+        notes=notes,            # and this
+        is_company_document=False,
+    )
+
+    messages.success(
+        request, f"Uploaded '{title}' for {employee.get_full_name() or employee.email}."
+    )
+    return redirect(reverse("hr_dashboard") + "?tab=document_center")
+
+
+@login_required
+def upload_site_documents(request):
+    if request.method != "POST":
+        return redirect(reverse("hr_dashboard") + "?tab=document_center&upload=site")
+
+    employer = request.user.employer
+    store_id = request.POST.get("store_id")
+    category = (request.POST.get("category") or "").strip()
+    notes = (request.POST.get("notes") or "").strip()
+
+    store = get_object_or_404(Store, pk=store_id, employer=employer)
+
+    files = request.FILES.getlist("files")
+    if not files:
+        messages.error(request, "Please choose at least one file.")
+        return redirect(reverse("hr_dashboard") + "?tab=document_center&upload=site")
+
+    uploaded = 0
+    today = timezone.now()
+    year = today.strftime("%Y")
+    month = today.strftime("%m-%B")
+
+    for f in files:
+        try:
+            content = f.read()
+            company = (
+                slugify(employer.name) if employer and employer.name else "company"
+            )
+            base_name = slugify(category) if category else "general"
+            filename = f.name
+            folder = f"/DOCUMENTS/SITES/{company}/{year}/{month}"
+            path = f"{folder}/{store.number}-{base_name}-{filename}"
+
+            ok, msg = upload_to_linode_object_storage(content, path)
+            if not ok:
+                messages.error(request, f"Upload failed for {filename}: {msg}")
+                continue
+
+            # OPTIONAL: SiteDocument.objects.create(store=store, category=category, notes=notes, path=path, uploaded_by=request.user)
+
+            uploaded += 1
+        except Exception as e:
+            messages.error(request, f"Error uploading {f.name}: {e}")
+
+    if uploaded:
+        messages.success(
+            request, f"Uploaded {uploaded} file(s) for store {store.number}."
+        )
+    return redirect(reverse("hr_dashboard") + "?tab=document_center&doc=company")

@@ -669,7 +669,7 @@ def checklist_dashboard(request):
 # Allow loading truncated streams (common from mobile)
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 # Optional: cap max pixels to prevent decompression bombs (18MP ~ 5184x3456)
-Image.MAX_IMAGE_PIXELS = 18_000_000
+Image.MAX_IMAGE_PIXELS = 50_000_000
 
 ALLOWED_CT = {
     "image/jpeg",

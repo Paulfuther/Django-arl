@@ -45,20 +45,23 @@ class ProcessedDocsignDocument(models.Model):
     is_company_document = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"{self.envelope_id} - {self.user.username} - {self.template_name}"
-
+        envelope = self.envelope_id or "No Envelope ID"
+        user = self.user.username if self.user else "No User"
+        template = self.template_name or "No Template"
+        return f"{envelope} - {user} - {template}"
+    
 
 class SignedDocumentFile(models.Model):
-    user = models.ForeignKey(
-        CustomUser, on_delete=models.CASCADE, related_name="signed_documents"
-    )
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="signed_documents")
     employer = models.ForeignKey(Employer, on_delete=models.CASCADE)
     envelope_id = models.CharField(max_length=255)
-    file_name = models.CharField(max_length=255)
-    file_path = models.CharField(max_length=512)  # S3/Linode path
+    file_name = models.CharField(max_length=255)        # original filename
+    file_path = models.CharField(max_length=512)        # S3/Linode path
     template_name = models.CharField(max_length=255, null=True, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     is_company_document = models.BooleanField(default=False)
+    document_title = models.CharField(max_length=255, null=True, blank=True)  # your display title
+    notes = models.TextField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.file_name} for {self.user.get_full_name()}"
+        return self.document_title or self.file_name

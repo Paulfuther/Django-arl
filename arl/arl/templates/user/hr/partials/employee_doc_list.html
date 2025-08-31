@@ -1,0 +1,67 @@
+{% if not doc_q %}
+  <div class="text-muted p-3">Type a name or email above to find employee documents.</div>
+{% else %}
+  {% if employees_results %}
+    <div class="accordion" id="empDocsAcc">
+      {% for u in employees_results %}
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="emp-{{ u.id }}">
+            <button class="accordion-button collapsed emp-btn" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#emp-collapse-{{ u.id }}">
+            <div class="emp-head">
+                <div class="emp-name">{{ u.get_full_name|default:u.username }}</div>
+                <div class="emp-email">{{ u.email }}</div>
+            </div>
+            <span class="badge bg-light text-dark ms-auto">{{ u.doc_count|default:0 }}</span>
+            </button>
+          </h2>
+          <div id="emp-collapse-{{ u.id }}" class="accordion-collapse collapse" data-bs-parent="#empDocsAcc">
+            <div class="accordion-body p-0">
+
+              <table class="table table-sm mb-0 align-middle docs-table">
+  <thead class="table-light">
+    <tr>
+      <th>Title</th>
+      <th class="d-none d-md-table-cell">Notes</th>  {# desktop only column #}
+      <th class="text-end">Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for d in employee_documents %}
+      {% if d.user_id == u.id %}
+        <tr>
+          <td class="doc-name">
+            <div class="fw-semibold">{{ d.file_name }}</div>
+            <div class="upload-date text-muted">{{ d.uploaded_at|date:"Y-m-d H:i" }}</div>
+            
+            <!-- Notes shown under title/date on mobile only -->
+            <div class="d-md-none text-muted small mt-1">
+              {{ d.notes|default:"—" }}
+            </div>
+          </td>
+          
+          <!-- Notes in its own column on desktop -->
+          <td class="d-none d-md-table-cell text-muted small text-wrap">
+            {{ d.notes|default:"—" }}
+          </td>
+
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-primary"
+               href="{% url 'download_signed_document' doc_id=d.id %}">Download</a>
+          </td>
+        </tr>
+      {% endif %}
+    {% empty %}
+      <tr><td colspan="3" class="text-muted">No documents yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="text-muted p-3">No employees matched “{{ doc_q }}”.</div>
+  {% endif %}
+{% endif %}

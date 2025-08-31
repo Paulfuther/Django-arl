@@ -11,7 +11,9 @@ from .views import (CheckPhoneNumberUniqueView, RegisterView,
                     hr_dashboard, cancel_invite, resend_invite,
                     hr_document_view, download_signed_document,
                     fetch_signed_docs_by_user, search_user_roles,
-                    update_user_roles, setup_totp, verify_totp)
+                    update_user_roles, setup_totp, verify_totp,
+                    documents_dashboard, employee_docs_search,
+                    employee_quick_search)
 from django.views.generic import TemplateView
 
 
@@ -77,5 +79,7 @@ urlpatterns = [
     path("close-twilio-sub/<str:subaccount_sid>", close_twilio_sub, name = "close_twilio_sub"),
     path("hr/search-user-roles/", search_user_roles, name="search_user_roles"),
     path("hr/update-user-role/<int:user_id>/", update_user_roles, name="update_user_roles"),
-    
+    path("documents/", documents_dashboard, name="documents_dashboard"),
+    path("hr/employee-docs/search/", employee_docs_search, name="employee_docs_search"),
+    path("hr/employee-quick-search/", employee_quick_search, name="employee_quick_search"),
 ]
