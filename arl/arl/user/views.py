@@ -1002,55 +1002,6 @@ def employee_quick_search(request):
     return render(request, "user/hr/partials/employee_quick_search.html", {"results": results})
 
 
-# Dedicated Documents Dashboard
-@login_required
-def documents_dashboard(request):
-    employer = getattr(request.user, "employer", None)
-    if not employer:
-        messages.error(request, "You must belong to a company to view documents.")
-        return redirect("home")
-
-    # Minimal RBAC (tweak as needed)
-    if not request.user.groups.filter(name__in=["Manager", "EMPLOYER", "HR"]).exists():
-        messages.error(request, "You do not have access to the Document Center.")
-        return redirect("home")
-
-    # Filter employees for this employer
-    employees = (
-        CustomUser.objects.filter(is_active=True, employer=employer)
-        .only("id", "first_name", "last_name", "email")
-        .order_by("first_name", "last_name", "email")
-    )
-
-    # Existing docs
-    employee_documents = (
-        SignedDocumentFile.objects.filter(employer=employer, is_company_document=False)
-        .select_related("user")
-        .order_by("-uploaded_at")
-    )
-
-    company_documents = SignedDocumentFile.objects.filter(
-        employer=employer, is_company_document=True
-    ).order_by("-uploaded_at")
-
-    # Which sub-tab to show by default
-    document_tab = request.GET.get("document_tab", "employee")
-    upload_tab = request.GET.get("upload_tab", "employee")
-
-    return render(
-        request,
-        "user/documents_dashboard.html",
-        {
-            "employer": employer,
-            "employees": employees,
-            "employee_documents": employee_documents,
-            "company_documents": company_documents,
-            "document_tab": document_tab,
-            "upload_tab": upload_tab,
-        },
-    )
-
-
 @login_required
 def cancel_invite(request, invite_id):
     """Allows HR to cancel a new hire invitation."""
@@ -1250,3 +1201,5 @@ def update_user_roles(request, user_id):
         )
 
     return HttpResponseBadRequest("Invalid request")
+
+

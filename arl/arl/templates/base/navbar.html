@@ -78,13 +78,20 @@
               </i> HR
           </a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'documents_dashboard' %}">
+            <i class="material-symbols-outlined">
+              description
+              </i> Docs
+          </a>
+        </li>
 
         <!-- Reports & Forms -->
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="javascript:void(0)" id="formsDropdown" role="button" data-bs-toggle="dropdown">
             <i class="material-symbols-outlined">
-              description
-            </i> Forms & Reports
+              assignment
+            </i> Forms
           </a>
           <ul class="dropdown-menu">
             <li><a class="dropdown-item" href="{% url 'create_salt_log' %}">Create Salt Log</a></li>
@@ -100,7 +107,7 @@
          <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="javascript:void(0)" id="formsDropdown" role="button" data-bs-toggle="dropdown">
             <i class="material-symbols-outlined">
-              description
+              assignment_turned_in
             </i> rec and close
           </a>
           <ul class="dropdown-menu">

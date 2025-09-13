@@ -27,7 +27,7 @@ from arl.msg.models import SmsLog
 from arl.msg.tasks import send_bulk_sms
 from arl.setup.models import Employer, TenantApiKeys
 from arl.user.models import CustomUser, EmployerSMSTask
-
+from django.db import transaction
 from .helpers import (
     create_docusign_envelope,
     create_docusign_envelope_new_hire_quiz,
@@ -960,3 +960,31 @@ def validate_template_signature_tabs_task(template_id):
         "is_valid": is_valid,
         "issues": issues,
     }
+
+
+@app.task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=3)
+def process_company_document_task(self, sdf_id: str, tmp_path: str, object_key: str):
+    logger.info("[CompanyDocTask] Start sdf_id=%s key=%s tmp=%s", sdf_id, object_key, tmp_path)
+    try:
+        with open(tmp_path, "rb") as f:
+            upload_to_linode_object_storage(f, object_key)
+        with transaction.atomic():
+            sdf = SignedDocumentFile.objects.select_for_update().get(id=sdf_id)
+            # if you store size_bytes, you could set it here from os.path.getsize(tmp_path)
+            logger.info("[CompanyDocTask] Uploaded sdf_id=%s -> %s", sdf_id, object_key)
+    except Exception as e:
+        logger.exception("[CompanyDocTask] FAILED sdf_id=%s: %s", sdf_id, e)
+        # optionally: mark failed or delete SDF so list doesn’t show a broken entry
+        try:
+            SignedDocumentFile.objects.filter(id=sdf_id).delete()
+            logger.warning("[CompanyDocTask] Deleted SDF id=%s after failure", sdf_id)
+        except Exception:
+            logger.exception("[CompanyDocTask] Could not delete SDF id=%s after failure", sdf_id)
+        raise
+    finally:
+        try:
+            if tmp_path and os.path.exists(tmp_path):
+                os.remove(tmp_path)
+                logger.info("[CompanyDocTask] Temp removed %s", tmp_path)
+        except Exception:
+            logger.exception("[CompanyDocTask] Could not remove temp %s", tmp_path)

@@ -1,0 +1,121 @@
+{% if not doc_q %}
+  
+{% else %}
+  {% if employees_results %}
+    <div class="accordion" id="empDocsAcc">
+      {% for u in employees_results %}
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="emp-{{ u.id }}">
+            <button class="accordion-button collapsed emp-btn" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#emp-collapse-{{ u.id }}"
+                    aria-expanded="false" aria-controls="emp-collapse-{{ u.id }}">
+              <div class="me-2 fw-semibold">{{ u.get_full_name|default:u.username }}</div>
+              <div class="text-muted small">({{ u.email }})</div>
+              <span class="badge bg-light text-dark ms-2">{{ u.doc_count|default:0 }}</span>
+            </button>
+          </h2>
+
+          <div id="emp-collapse-{{ u.id }}" class="accordion-collapse collapse" data-bs-parent="#empDocsAcc">
+            <div class="accordion-body p-0">
+
+              {# --- Mobile list (xs only) --- #}
+              <div class="d-block d-sm-none">
+                {% with docs=employee_documents %}
+                  {% for d in docs %}
+                    {% if d.user_id == u.id %}
+                      <div class="docs-list-item">
+                        <div class="docs-list-text">
+                          {# Title (falls back to filename) #}
+                          <div class="line-1 text-truncate">
+                            {{ d.document_title|default:d.file_name }}
+                          </div>
+
+                          {# (filename.ext • size) #}
+                          <div class="line-2">
+                            <span class="text-muted small">
+                              ({{ d.file_name }}
+                              {% if d.size_bytes %} • {{ d.size_bytes|filesizeformat }}
+                              {% elif d.file_size_bytes %} • {{ d.file_size_bytes|filesizeformat }}
+                              {% elif d.size %} • {{ d.size|filesizeformat }}{% endif %})
+                            </span>
+                          </div>
+
+                          {# Uploaded date #}
+                          <div class="line-3">
+                            {{ d.uploaded_at|date:"Y-m-d H:i" }}
+                          </div>
+                        </div>
+                        <div class="docs-list-actions">
+                          <a class="btn btn-sm btn-outline-primary"
+                             href="{% url 'download_signed_document' doc_id=d.id %}">
+                            Download
+                          </a>
+                        </div>
+                      </div>
+                    {% endif %}
+                  {% empty %}
+                    <div class="p-3 text-muted">No documents.</div>
+                  {% endfor %}
+                {% endwith %}
+              </div>
+
+              {# --- Desktop table (sm and up) --- #}
+<div class="d-none d-sm-block">
+  <div class="table-responsive">
+    <table class="table table-sm mb-0 align-middle docs-table">
+      {# Force sane widths #}
+      <colgroup>
+        <col style="width:60%;">         {# Title (flexes, wraps) #}
+        <col style="width:25%;">        {# Uploaded date (fixed) #}
+        <col style="width:15%;">           {# Action (min, no wrap) #}
+      </colgroup>
+      <thead class="table-light">
+        <tr>
+          <th>Title</th>
+          <th>Uploaded</th>
+          <th class="actions-col text-end">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% with docs=employee_documents %}
+          {% for d in docs %}
+            {% if d.user_id == u.id %}
+              <tr>
+                <td class="doc-name">
+                  <div class="fw-semibold text-wrap">{{ d.document_title|default:d.file_name }}</div>
+                  <div class="text-muted small">
+                    ({{ d.file_name }}
+                    {% if d.size_bytes %} • {{ d.size_bytes|filesizeformat }}
+                    {% elif d.file_size_bytes %} • {{ d.file_size_bytes|filesizeformat }}
+                    {% elif d.size %} • {{ d.size|filesizeformat }}{% endif %})
+                    {% if d.notes %} — {{ d.notes }}{% endif %}
+                  </div>
+                </td>
+                <td class="upload-date">{{ d.uploaded_at|date:"Y-m-d H:i" }}</td>
+                <td class="actions-col text-end">
+                  <a class="btn btn-sm btn-outline-primary d-inline-flex align-items-center"
+                     href="{% url 'download_signed_document' doc_id=d.id %}">
+                    Download
+                  </a>
+                </td>
+              </tr>
+            {% endif %}
+          {% empty %}
+            <tr><td colspan="3" class="text-muted">No documents.</td></tr>
+          {% endfor %}
+        {% endwith %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="p-3 text-muted">No employees matched “{{ doc_q }}”.</div>
+  {% endif %}
+{% endif %}
