@@ -3,19 +3,22 @@ from django.urls import path
 from arl.dsign.views import (
     CreateEnvelopeView,
     bulk_upload_signed_documents_view,
+    company_docs_search,
     create_new_document_page,
+    documents_dashboard,
     docusign_close,
     docusign_webhook,
     edit_document_page,
+    employee_docs_search,
     get_docusign_template,
     in_app_signing_dashboard,
     list_docusign_envelope,
     retrieve_docusign_envelope,
     set_new_hire_template,
     start_in_app_signing,
-    waiting_for_others_view,
+    upload_company_documents_async,
     upload_employee_documents,
-    upload_site_documents
+    waiting_for_others_view,
 )
 
 urlpatterns = [
@@ -66,6 +69,14 @@ urlpatterns = [
         upload_employee_documents,
         name="upload_employee_documents",
     ),
-    path("hr/documents/upload/site/", upload_site_documents, name="upload_site_documents"),
-    
+    path("documents/", documents_dashboard, name="documents_dashboard"),
+    path(
+        "documents/search/employee/", employee_docs_search, name="employee_docs_search"
+    ),
+    path("documents/search/company/", company_docs_search, name="company_docs_search"),
+    path(
+        "documents/company/upload/",
+        upload_company_documents_async,
+        name="upload_company_documents_async",
+    ),
 ]

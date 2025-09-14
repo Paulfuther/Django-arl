@@ -1,15 +1,17 @@
 import json
 import logging
+import mimetypes
 import os
-import uuid, mimetypes
+import uuid
 from io import BytesIO
-import re
+
 from celery.result import AsyncResult
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.mixins import UserPassesTestMixin
-from django.http import JsonResponse
+from django.db.models import Count, Q
+from django.http import HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -602,11 +604,17 @@ def upload_employee_documents(request):
                     final_ext = ".pdf"
                 elif ct == "application/msword":
                     final_ext = ".doc"
-                elif ct == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                elif (
+                    ct
+                    == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                ):
                     final_ext = ".docx"
                 elif ct == "application/vnd.ms-excel":
                     final_ext = ".xls"
-                elif ct == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
+                elif (
+                    ct
+                    == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                ):
                     final_ext = ".xlsx"
                 elif ct == "text/plain":
                     final_ext = ".txt"
@@ -635,63 +643,330 @@ def upload_employee_documents(request):
         envelope_id=uuid.uuid4().hex[:10],
         file_name=filename,
         file_path=object_key,
-        document_title=title,   # make sure migration added this
-        notes=notes,            # and this
+        document_title=title,  # make sure migration added this
+        notes=notes,  # and this
         is_company_document=False,
     )
 
     messages.success(
         request, f"Uploaded '{title}' for {employee.get_full_name() or employee.email}."
     )
+    return redirect(reverse("documents_dashboard") + "?employee")
+
+
+@login_required
+def upload_store_documents(request):
+    if request.method != "POST":
+        return redirect(
+            reverse("hr_dashboard") + "?tab=document_center"
+        )  # or wherever you want
+
+    employer = getattr(request.user, "employer", None)
+    if not employer:
+        messages.error(request, "You must belong to an employer to upload documents.")
+        return redirect(reverse("hr_dashboard") + "?tab=document_center")
+
+    store_id = request.POST.get("store_id")
+    title = (request.POST.get("document_title") or "").strip()
+    notes = (request.POST.get("notes") or "").strip()
+    fileobj = request.FILES.get("file")
+
+    if not store_id or not title or not fileobj:
+        messages.error(request, "Store, title, and file are required.")
+        return redirect(reverse("hr_dashboard") + "?tab=document_center")
+
+    store = get_object_or_404(Store, pk=store_id, employer=employer)
+
+    # --- size/type checks (reuse your constants/helpers) ---
+    size_mb = fileobj.size / (1024 * 1024)
+    if size_mb > MAX_UPLOAD_MB:
+        messages.error(
+            request, f"File too large ({size_mb:.1f} MB). Max {MAX_UPLOAD_MB} MB."
+        )
+        return redirect(reverse("hr_dashboard") + "?tab=document_center")
+
+    ct = getattr(fileobj, "content_type", None)
+    if ct not in ALLOWED_UPLOAD_CT:
+        messages.error(request, f"Unsupported file type: {ct or 'unknown'}")
+        return redirect(reverse("hr_dashboard") + "?tab=document_center")
+
+    # --- prepare filename/path ---
+    company = slugify(employer.name or "company")
+    today = timezone.now()
+    year, month = today.strftime("%Y"), today.strftime("%m")
+
+    base, ext = os.path.splitext(fileobj.name or "")
+    ext = (ext or "").lower()
+
+    # Image normalization (HEIC/HEIF -> JPEG)
+    should_normalize_to_jpg = False
+    if ct in {"image/heic", "image/heif"} or ext in {".heic", ".heif"}:
+        should_normalize_to_jpg = True
+    elif ct == "application/octet-stream" and ext in {".heic", ".heif"}:
+        should_normalize_to_jpg = True
+
+    safe_title = slugify(title) or "document"
+    unique_id = uuid.uuid4().hex[:8]
+    final_ext = ext or ".bin"
+
+    try:
+        if should_normalize_to_jpg:
+            im = Image.open(fileobj).convert("RGB")
+            out = BytesIO()
+            im.save(out, format="JPEG", quality=85, optimize=True)
+            out.seek(0)
+            upload_buf = out
+            final_ext = ".jpg"
+        else:
+            upload_buf = fileobj
+            if not ext:
+                if ct == "application/pdf":
+                    final_ext = ".pdf"
+                elif ct in {"text/plain", "text/csv"}:
+                    final_ext = ".txt" if ct == "text/plain" else ".csv"
+                elif ct and ct.startswith("image/"):
+                    final_ext = ".jpg"
+                else:
+                    final_ext = ".bin"
+    except Exception as e:
+        messages.error(request, f"Could not process file: {e}")
+        return redirect(reverse("hr_dashboard") + "?tab=document_center")
+
+    filename = f"{safe_title}-{unique_id}{final_ext}"
+    # Foldering by store for easy browsing later
+    object_key = f"DOCUMENTSTEST/{company}/stores/{store.number or store.id}/{year}/{month}/{filename}"
+
+    try:
+        upload_to_linode_object_storage(upload_buf, object_key)
+    finally:
+        if isinstance(upload_buf, BytesIO):
+            upload_buf.close()
+
+    SignedDocumentFile.objects.create(
+        user=None,
+        store=store,
+        employer=employer,
+        envelope_id=uuid.uuid4().hex[:10],
+        file_name=filename,
+        file_path=object_key,
+        document_title=title,
+        notes=notes,
+        is_company_document=True,  # ← Use this to indicate non-employee doc
+    )
+
+    messages.success(
+        request, f"Uploaded '{title}' for store {store.number or store.name}."
+    )
     return redirect(reverse("hr_dashboard") + "?tab=document_center")
 
 
 @login_required
-def upload_site_documents(request):
-    if request.method != "POST":
-        return redirect(reverse("hr_dashboard") + "?tab=document_center&upload=site")
+def documents_dashboard(request):
+    print("DOCUMENTS DASHBOARD VIEW HIT")
+    employer = getattr(request.user, "employer", None)
+    if not employer:
+        return redirect("home")
 
-    employer = request.user.employer
-    store_id = request.POST.get("store_id")
-    category = (request.POST.get("category") or "").strip()
-    notes = (request.POST.get("notes") or "").strip()
+    active_tab = request.GET.get("tab", "employee")  # employee|store|company
 
-    store = get_object_or_404(Store, pk=store_id, employer=employer)
+    # base data for upload selects
+    employees = CustomUser.objects.filter(employer=employer, is_active=True).order_by(
+        "first_name", "last_name"
+    )
 
-    files = request.FILES.getlist("files")
-    if not files:
-        messages.error(request, "Please choose at least one file.")
-        return redirect(reverse("hr_dashboard") + "?tab=document_center&upload=site")
+    stores = Store.objects.filter(employer=employer).order_by("number")
 
-    uploaded = 0
-    today = timezone.now()
-    year = today.strftime("%Y")
-    month = today.strftime("%m-%B")
+    # quick recent lists (first paint)
+    # recent_employee_docs = (
+    #    SignedDocumentFile.objects.filter(employer=employer, user__isnull=False)
+    #    .select_related("user")
+    #    .order_by("-uploaded_at")[:20]
+    # )
+    #recent_store_docs = (
+    #    SignedDocumentFile.objects.filter(employer=employer, store__isnull=False)
+    #    .select_related("store")
+    #    .order_by("-uploaded_at")[:20]
+    #)
 
-    for f in files:
-        try:
-            content = f.read()
-            company = (
-                slugify(employer.name) if employer and employer.name else "company"
-            )
-            base_name = slugify(category) if category else "general"
-            filename = f.name
-            folder = f"/DOCUMENTS/SITES/{company}/{year}/{month}"
-            path = f"{folder}/{store.number}-{base_name}-{filename}"
+    recent_company_docs = (
+        SignedDocumentFile.objects
+        .filter(employer=employer, is_company_document=True)
+        .order_by("-uploaded_at")[:10]
+    )
 
-            ok, msg = upload_to_linode_object_storage(content, path)
-            if not ok:
-                messages.error(request, f"Upload failed for {filename}: {msg}")
-                continue
+    # print(recent_company_docs)
 
-            # OPTIONAL: SiteDocument.objects.create(store=store, category=category, notes=notes, path=path, uploaded_by=request.user)
+    return render(
+        request,
+        "user/documents/dashboard.html",
+        {
+            "active_tab": active_tab,
+            "employees": employees,
+            "stores": stores,
+            "company_results": recent_company_docs,  # << initial data for partial
+            "q": "",
+        },
+    )
 
-            uploaded += 1
-        except Exception as e:
-            messages.error(request, f"Error uploading {f.name}: {e}")
 
-    if uploaded:
-        messages.success(
-            request, f"Uploaded {uploaded} file(s) for store {store.number}."
+# ---------- HTMX searches ----------
+@login_required
+def employee_docs_search(request):
+    employer = getattr(request.user, "employer", None)
+    if not employer:
+        return render(
+            request,
+            "user/documents/partials/employee_results.html",
+            {"doc_q": "", "employees_results": [], "employee_documents": []},
         )
-    return redirect(reverse("hr_dashboard") + "?tab=document_center&doc=company")
+
+    q = (request.GET.get("doc_q") or "").strip()
+    employees_results = []
+    docs = []
+
+    if q:
+        employees_results = (
+            CustomUser.objects.filter(employer=employer, is_active=True)
+            .filter(
+                Q(first_name__icontains=q)
+                | Q(last_name__icontains=q)
+                | Q(email__icontains=q)
+            )
+            .annotate(doc_count=Count("signed_documents"))
+            .order_by("first_name", "last_name")
+        )
+        docs = (
+            SignedDocumentFile.objects.filter(
+                employer=employer, user__in=employees_results
+            )
+            .select_related("user")
+            .order_by("-uploaded_at")
+        )
+
+    return render(
+        request,
+        "user/documents/partials/employee_results.html",
+        {
+            "doc_q": q,
+            "employees_results": employees_results,
+            "employee_documents": docs,
+        },
+    )
+
+
+@login_required
+def company_docs_search(request):
+    employer = getattr(request.user, "employer", None)
+    q = (request.GET.get("q") or "").strip()
+
+    qs = SignedDocumentFile.objects .filter(employer=employer,
+                                            is_company_document=True)
+    # print("q :", q, "qs :", qs)
+    if q:
+        qs = qs.filter(
+            Q(document_title__icontains=q) |
+            Q(file_name__icontains=q) |
+            Q(notes__icontains=q)
+        )
+    company_documents = qs.order_by("-uploaded_at")[:50]
+    # print(q, company_documents)
+
+    return render(
+        request,
+        "user/documents/partials/company_results.html",
+        {"company_results": company_documents, "q": q},
+    )
+
+
+MAX_BYTES = 100 * 1024 * 1024  # 100 MB
+
+
+def _human_size(n: int) -> str:
+    # same helper you used for stores
+    for unit in ["B", "KB", "MB", "GB", "TB"]:
+        if n < 1024 or unit == "TB":
+            return f"{n:.0f}{unit}" if unit == "B" else f"{n:.1f}{unit}"
+        n /= 1024.0
+
+
+def _save_to_temp(uploaded, suffix: str = "") -> str:
+    from tempfile import NamedTemporaryFile
+
+    from django.core.files.uploadedfile import InMemoryUploadedFile
+
+    ext = suffix or (os.path.splitext(getattr(uploaded, "name", ""))[1] or ".bin")
+    tmp = NamedTemporaryFile(
+        delete=False, dir=getattr(settings, "MEDIA_TMP", None), suffix=ext
+    )
+    if isinstance(uploaded, InMemoryUploadedFile):
+        tmp.write(uploaded.read())
+    else:
+        for chunk in uploaded.chunks():
+            tmp.write(chunk)
+    tmp.flush()
+    tmp.close()
+    return tmp.name
+
+
+@login_required
+def upload_company_documents_async(request):
+    if request.method != "POST":
+        return HttpResponseBadRequest("POST only")
+
+    employer = getattr(request.user, "employer", None)
+    if not employer:
+        return JsonResponse({"ok": False, "error": "No employer"}, status=403)
+
+    title = (request.POST.get("document_title") or "").strip()
+    notes = (request.POST.get("notes") or "").strip()
+    fileobj = request.FILES.get("file")
+
+    if not title or not fileobj:
+        return JsonResponse(
+            {"ok": False, "error": "Title and file are required."}, status=400
+        )
+
+    if getattr(fileobj, "size", 0) > MAX_BYTES:
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": f"File too large (max {MAX_BYTES // (1024 * 1024)}MB).",
+            },
+            status=400,
+        )
+
+    # Build S3 object key (company docs folder)
+    company = slugify(employer.name or "company")
+    year, month = timezone.now().strftime("%Y"), timezone.now().strftime("%m")
+    base, ext = os.path.splitext(fileobj.name or "")
+    safe_title = slugify(title) or "document"
+    unique_id = uuid.uuid4().hex[:8]
+    final_ext = ext or ".bin"
+    size_label = _human_size(fileobj.size)
+    filename = f"{safe_title}-{size_label}-{unique_id}{final_ext}"
+    object_key = f"DOCUMENTS/{company}/company/{year}/{month}/{filename}"
+
+    sdf = SignedDocumentFile.objects.create(
+        user=None,
+        store=None,
+        employer=employer,
+        envelope_id=uuid.uuid4().hex[:10],
+        file_name=filename,
+        file_path=object_key,
+        document_title=title,
+        notes=notes,
+        is_company_document=True,
+    )
+
+    # Save temp & enqueue task
+    tmp_path = _save_to_temp(fileobj, suffix=final_ext)
+
+    # Fire Celery task
+    from arl.user.tasks import process_company_document_task  # see below
+
+    process_company_document_task.delay(str(sdf.id), tmp_path, object_key)
+
+    # HTMX: fire event so UI refreshes without navigation
+    resp = JsonResponse({"ok": True, "doc_id": sdf.id}, status=202)
+    resp["HX-Trigger"] = json.dumps({"companyUploadQueued": {"doc_id": sdf.id}})
+    return resp

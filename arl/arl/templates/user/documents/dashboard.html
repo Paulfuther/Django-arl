@@ -1,0 +1,453 @@
+{% extends "base/base.html" %}
+{% block title %}Doc Dashboard{% endblock %}
+{% block template %}
+
+{% include "base/navbar.html" %}
+{% load crispy_forms_tags %}
+
+<style>
+/* ==============================
+   Collapsibles (chevron)
+============================== */
+.collapse-toggle{
+  display:flex;align-items:center;gap:.5rem;width:100%;justify-content:space-between
+}
+.collapse-toggle[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.chev{transition:transform .2s ease}
+
+/* ==============================
+   Tables (desktop + responsive)
+============================== */
+.docs-table{
+  table-layout:fixed;width:100%;border-collapse:collapse;margin-bottom:0
+}
+.docs-table th,.docs-table td{
+  vertical-align:middle;white-space:normal;padding:.5rem .75rem
+}
+.text-wrap{overflow-wrap:anywhere;word-break:break-word}
+.doc-name{
+  max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap
+}
+.actions-col{
+  width:1%;white-space:nowrap;text-align:right
+}
+.upload-date{font-size:.85rem}
+
+/* Wider screens can allow a bit more title width */
+@media (min-width: 1200px){
+  .doc-name{max-width:420px}
+}
+
+/* ==============================
+   Mobile HR-style list (xs)
+============================== */
+.docs-list-item{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:.75rem;border-bottom:1px solid var(--bs-border-color);padding:.75rem 1rem
+}
+.docs-list-text{
+  flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:.15rem
+}
+.docs-list-text .line-1{font-weight:600;line-height:1.2}
+.docs-list-text .line-2{
+  font-size:.9rem;color:var(--bs-secondary-color);overflow:hidden;text-overflow:ellipsis;white-space:nowrap
+}
+.docs-list-text .line-3{font-size:.8rem;color:#6c757d}
+.docs-list-actions{flex:0 0 auto}
+
+/* Small screens: tighter cell padding + date size */
+@media (max-width:576px){
+  .docs-table th,.docs-table td{padding:.5rem}
+  .upload-date{font-size:.75rem}
+}
+
+/* ==============================
+   Left Sidebar (Twitter-style)
+============================== */
+#docNav{
+  min-height:100vh;border-right:1px solid #dee2e6;background-color:#fff;
+  padding:.5rem
+}
+.sidebar-legend{
+  font-size:.7rem;letter-spacing:.05em;line-height:1.1;text-transform:uppercase;
+  color:#6c757d;margin-bottom:1rem
+}
+.nav-icon-link {
+  color: inherit;
+  text-decoration: none;
+  padding: .5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nav-icon-link .material-symbols-outlined {
+  font-size: 28px;
+  line-height: 1;
+}
+.nav-icon-link.active,
+.nav-icon-link:hover {
+  color: #0d6efd;
+}
+
+/* ==============================
+   Layout niceties
+============================== */
+.container-95vh{min-height:95vh}
+
+/* Mobile top tab bar */
+#docNavMobile{
+  position: sticky; top: 0; z-index: 1020; /* stay visible while scrolling */
+  background: #fff;
+}
+#docNavMobile .nav-icon-link{
+  padding: .75rem;       /* bigger touch target */
+}
+@media (hover:none){
+  /* On touch devices, ignore hover color changes */
+  .nav-icon-link:hover{ color: inherit; }
+}
+</style>
+
+<div class="container mb-2" style="height: 95vh;">
+  <div class="row justify-content-center pt-5 mt-5"></div>
+  <div class="row justify-content-center">
+    <div >
+
+      {% if messages %}
+        <div class="mt-3">
+          {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+              {{ message }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+     <div class="row g-3">
+
+        <!-- Sidebar -->
+       <aside class="d-none d-lg-block col-lg-1 px-0">
+        <div id="docNav" class="d-flex flex-column align-items-start py-3">
+          <div class="sidebar-legend fw-semibold">
+            <div>Document</div><div>Center</div>
+          </div>
+          <nav class="nav flex-column align-items-start" role="tablist" aria-orientation="vertical">
+            <a class="nav-icon-link {% if active_tab == 'employee' %}active{% endif %}"
+              data-bs-toggle="tab" href="#tab-employee" role="tab" aria-controls="tab-employee"
+              data-title="Employee Docs">
+              <i class="material-symbols-outlined">person_apron</i>
+            </a>
+            <a class="nav-icon-link {% if active_tab == 'store' %}active{% endif %}"
+              data-bs-toggle="tab" href="#tab-store" role="tab" aria-controls="tab-store"
+              data-title="Store Docs">
+              <i class="material-symbols-outlined">location_on</i>
+            </a>
+            <a class="nav-icon-link {% if active_tab == 'company' %}active{% endif %}"
+              data-bs-toggle="tab" href="#tab-company" role="tab" aria-controls="tab-company"
+              data-title="Company Docs">
+              <i class="material-symbols-outlined">business_center</i>
+            </a>
+          </nav>
+        </div>
+      </aside>
+
+      <!--  Mobile Nav  -->
+        <!-- Top nav (mobile) -->
+      <div id="docNavMobile" class="d-flex d-lg-none justify-content-around border-bottom py-2 mb-3" role="tablist">
+        <a class="nav-icon-link {% if active_tab == 'employee' %}active{% endif %}"
+          data-bs-toggle="tab" href="#tab-employee" role="tab"
+          data-title="Employee Docs">
+          <i class="material-symbols-outlined">person_apron</i>
+        </a>
+        <a class="nav-icon-link {% if active_tab == 'store' %}active{% endif %}"
+          data-bs-toggle="tab" href="#tab-store" role="tab"
+          data-title="Store Docs">
+          <i class="material-symbols-outlined">location_on</i>
+        </a>
+        <a class="nav-icon-link {% if active_tab == 'company' %}active{% endif %}"
+          data-bs-toggle="tab" href="#tab-company" role="tab"
+          data-title="Company Docs">
+          <i class="material-symbols-outlined">business_center</i>
+        </a>
+      </div>
+
+      <!-- Content -->
+        <section class="col-12 col-lg-9">
+          <div class="tab-content" id="docTabContent">
+
+        {# ================= EMPLOYEE TAB ================= #}
+        <div id="tab-employee" class="tab-pane fade {% if active_tab == 'employee' %}show active{% endif %}">
+          <!-- Upload -->
+          <div class="card mb-3">
+            <div class="card-header">
+              <button class="btn btn-link text-decoration-none collapse-toggle"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#employeeUploadCollapse"
+                      aria-expanded="false"
+                      aria-controls="employeeUploadCollapse">
+                <span class="fw-semibold">Upload Employee Document</span>
+                <span class="chev">▾</span>
+              </button>
+            </div>
+            <div id="employeeUploadCollapse" class="collapse">
+              <div class="card-body">
+                <form method="post" enctype="multipart/form-data" action="{% url 'upload_employee_documents' %}">
+                  {% csrf_token %}
+                  <div class="row g-2">
+                    <div class="col-12 col-md-6">
+                      <label class="form-label">Employee</label>
+                      <select name="user_id" class="form-select" required>
+                        {% for u in employees %}
+                          <option value="{{ u.id }}">{{ u.get_full_name|default:u.username }} ({{ u.email }})</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label">Document Title</label>
+                      <input type="text" name="document_title" class="form-control" required>
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label">Notes (optional)</label>
+                      <textarea name="notes" rows="2" class="form-control"></textarea>
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label">File</label>
+                      <input type="file" name="file" class="form-control"
+                             accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.heic,.heif,.txt,.csv,.rtf,.webp,application/pdf,image/*" required>
+                    </div>
+                  </div>
+                  <div class="mt-3 d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-primary" type="submit">Upload</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <!-- Search & results (EMPLOYEE) -->
+          <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <strong>Search Employee Documents</strong>
+              <form class="d-flex gap-2"
+                    hx-get="{% url 'employee_docs_search' %}"
+                    hx-target="#employee-results"
+                    hx-swap="innerHTML">
+                <input name="doc_q" class="form-control form-control-sm" placeholder="Type name or email…">
+                <button class="btn btn-sm btn-outline-primary">Search</button>
+              </form>
+            </div>
+            <div class="card-body p-0" id="employee-results">
+              {% include "user/documents/partials/employee_results.html" %}
+            </div>
+          </div>
+        </div>
+
+        {# ================= STORE TAB ================= #}
+        <div id="tab-store" class="tab-pane fade {% if active_tab == 'store' %}show active{% endif %}">
+          <!-- Upload -->
+          <div class="card mb-3">
+            <div class="card-header">
+              <button class="btn btn-link text-decoration-none collapse-toggle"
+                      type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#storeUploadCollapse"
+                      aria-expanded="false"
+                      aria-controls="storeUploadCollapse">
+                <span class="fw-semibold">Upload Location Document</span>
+                <span class="chev">▾</span>
+              </button>
+            </div>
+            <div id="storeUploadCollapse" class="collapse">
+              <div class="card-body">
+                <form method="post" enctype="multipart/form-data" action="{% url 'upload_store_documents' %}">
+                  {% csrf_token %}
+                  <div class="row g-2">
+                    <div class="col-12 col-md-6">
+                      <label class="form-label">Store</label>
+                      <select name="store_id" class="form-select" required>
+                        {% for s in stores %}
+                          <option value="{{ s.id }}">
+                            {% if s.number %}#{{ s.number }} – {% endif %}{{ s.name|default:"Store" }}
+                          </option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label">Document Title</label>
+                      <input type="text" name="document_title" class="form-control" required>
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label">Notes (optional)</label>
+                      <textarea name="notes" rows="2" class="form-control"></textarea>
+                    </div>
+                    <div class="col-12">
+                      <label class="form-label">File</label>
+                      <input type="file" name="file" class="form-control"
+                             accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.heic,.heif,.txt,.csv,.rtf,.webp,application/pdf,image/*" required>
+                    </div>
+                  </div>
+                  <div class="mt-3 d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-primary" type="submit">Upload</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <!-- Search & results (STORE) -->
+          <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+              <strong>Search Location Documents</strong>
+              <form class="d-flex gap-2"
+                    hx-get="{% url 'store_docs_search' %}"
+                    hx-target="#store-results"
+                    hx-swap="innerHTML">
+                <input name="q" class="form-control form-control-sm" placeholder="Type store #">
+                <button class="btn btn-sm btn-outline-primary">Search</button>
+              </form>
+            </div>
+            <div class="card-body p-0" id="store-results" aria-live="polite">
+              {% include "user/documents/partials/store_results.html" with docs=store_results %}
+            </div>
+          </div>
+        </div>
+
+        {# ================= COMPANY TAB ================= #}
+        <div id="tab-company" class="tab-pane fade {% if active_tab == 'company' %}show active{% endif %}">
+        <!-- Upload (accordion) -->
+              <div class="card mb-3">
+                <div class="card-header">
+                  <button class="btn btn-link text-decoration-none collapse-toggle"
+                          type="button"
+                          data-bs-toggle="collapse"
+                          data-bs-target="#companyUploadCollapse"
+                          aria-expanded="false"
+                          aria-controls="companyUploadCollapse">
+                    <span class="fw-semibold">Upload Company Document</span>
+                    <span class="chev">▾</span>
+                  </button>
+                </div>
+                <div id="companyUploadCollapse" class="collapse">
+                  <div class="card-body">
+                    <form id="company-upload-form"
+                    method="post"
+                    enctype="multipart/form-data"
+                    action="{% url 'upload_company_documents_async' %}"
+                    hx-post="{% url 'upload_company_documents_async' %}"
+                    hx-encoding="multipart/form-data"
+                    hx-swap="none">
+                {% csrf_token %}
+                <!-- title, notes, file fields... -->
+                <button class="btn btn-sm btn-outline-primary" type="submit">Upload</button>
+              </form>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Search & results -->
+              <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                  <strong>Search Company Documents. Last 10 shown</strong>
+                  <form class="d-flex gap-2"
+                        method="get"
+                        hx-get="{% url 'company_docs_search' %}"
+                        hx-target="#company-results"
+                        hx-swap="innerHTML">
+                    <input name="q" class="form-control form-control-sm" placeholder="Type title, file or note…">
+                    <button class="btn btn-sm btn-outline-primary">Search</button>
+                  </form>
+                </div>
+
+                <div class="card-body p-0" id="company-results">
+                  {# Initial render uses the same partial #}
+                  {% include "user/documents/partials/company_results.html" with docs=company_results q=q %}
+                </div>
+              </div>
+       </div>
+</div>
+</section>
+</div>
+  </div>
+</div>
+
+
+
+
+<!-- Alert auto-dismiss -->
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const alerts = document.querySelectorAll(".alert");
+    alerts.forEach(alert => {
+      setTimeout(() => {
+        alert.classList.add("fade");
+        alert.classList.remove("show");
+        setTimeout(() => {
+          if (alert.parentNode) alert.parentNode.removeChild(alert);
+        }, 500);
+      }, 5000);
+    });
+  });
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  // ---- Choose initial tab from hash or server active_tab
+  const defaultHash = `#tab-{{ active_tab|default:'employee' }}`;
+  const desired = (location.hash && document.querySelector(`[data-bs-toggle="tab"][href="${location.hash}"]`))
+                  ? location.hash : defaultHash;
+
+  // Try to find a trigger in either nav (desktop or mobile)
+  const initialTrigger = document.querySelector(`#docNav a[href="${desired}"], #docNavMobile a[href="${desired}"]`);
+  if (initialTrigger) new bootstrap.Tab(initialTrigger).show();
+
+  // ---- Keep desktop & mobile navs visually in sync when a tab is shown
+  document.querySelectorAll('[data-bs-toggle="tab"]').forEach(link => {
+    link.addEventListener('shown.bs.tab', (e) => {
+      const targetHref = e.target.getAttribute('href');  // like "#tab-store"
+      // Update hash (so a refresh keeps you on this tab)
+      history.replaceState(null, '', targetHref);
+
+      // Toggle .active on all matching links in both navs
+      document.querySelectorAll(`#docNav a[href="${targetHref}"], #docNavMobile a[href="${targetHref}"]`)
+        .forEach(a => a.classList.add('active'));
+      document.querySelectorAll(`#docNav a:not([href="${targetHref}"]), #docNavMobile a:not([href="${targetHref}"])`)
+        .forEach(a => a.classList.remove('active'));
+    });
+  });
+
+  // ---- Tooltips: desktop sidebar only (avoid sticky tooltips on touch)
+  const desktopLinks = document.querySelectorAll('#docNav a[data-title]');
+  const ttMap = new WeakMap();
+
+  desktopLinks.forEach(el => {
+    const titleText = el.getAttribute('data-title') || '';
+    if (el.hasAttribute('title')) el.removeAttribute('title');
+
+    const tt = new bootstrap.Tooltip(el, {
+      title: titleText,
+      placement: 'right',
+      trigger: 'manual',
+      container: 'body',
+      boundary: 'window'
+    });
+    ttMap.set(el, tt);
+
+    // Show/hide on hover/focus
+    el.addEventListener('mouseenter', () => tt.show());
+    el.addEventListener('focusin',   () => tt.show());
+    el.addEventListener('mouseleave', () => tt.hide());
+    el.addEventListener('focusout',   () => tt.hide());
+
+    // On click: let tab switch, then blur + hide to prevent stickiness
+    el.addEventListener('click', () => setTimeout(() => { el.blur(); tt.hide(); }, 0));
+  });
+
+  // When any tab is shown, hide any visible desktop tooltips
+  document.getElementById('docNav')?.addEventListener('shown.bs.tab', () => {
+    desktopLinks.forEach(el => ttMap.get(el)?.hide());
+  });
+});
+</script>
+{% endblock %}

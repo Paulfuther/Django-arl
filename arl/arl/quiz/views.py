@@ -17,8 +17,9 @@ from django.utils import timezone
 from django.utils.text import slugify
 from django.views.generic import CreateView, UpdateView, View
 from django.views.generic.list import ListView
-from PIL import Image, ImageFile, ImageOps, UnidentifiedImageError
+from PIL import Image, UnidentifiedImageError
 from waffle import flag_is_active
+from arl.utils.images import normalize_to_jpeg
 
 from arl.helpers import (
     get_s3_images_for_salt_log,
@@ -43,7 +44,8 @@ from .tasks import (
     generate_salt_log_pdf_task,
     save_salt_log,
 )
-
+import logging
+logger = logging.getLogger(__name__)
 
 @login_required
 def create_quiz(request):
@@ -666,25 +668,17 @@ def checklist_dashboard(request):
     return render(request, "quiz/checklist_dashboard.html", ctx)
 
 
-# Allow loading truncated streams (common from mobile)
-ImageFile.LOAD_TRUNCATED_IMAGES = True
-# Optional: cap max pixels to prevent decompression bombs (18MP ~ 5184x3456)
-Image.MAX_IMAGE_PIXELS = 50_000_000
+# ------------------------------------------------ #
+
+# Upload images for checklists
+
 
 ALLOWED_CT = {
-    "image/jpeg",
-    "image/jpg",
-    "image/png",
-    "image/gif",
-    "image/heic",
-    "image/heif",
-    "image/tiff",
-    "image/webp",
-    "application/octet-stream",  # many Android browsers use this
-    None,  # some clients omit CT
+    "image/jpeg", "image/jpg", "image/png", "image/gif",
+    "image/heic", "image/heif", "image/tiff", "image/webp",
+    "application/octet-stream", None,
 }
-
-MAX_BYTES = 10 * 1024 * 1024  # 10MB
+MAX_BYTES = 50 * 1024 * 1024  # 10 MB
 
 
 class UploadChecklistItemPhotoView(LoginRequiredMixin, View):
@@ -695,56 +689,53 @@ class UploadChecklistItemPhotoView(LoginRequiredMixin, View):
         if not file:
             return JsonResponse({"error": "No file provided"}, status=400)
 
-        # (Optional) multi-tenant safety: ensure checklist belongs to user's employer
         checklist = get_object_or_404(Checklist, slug=slug)
-        item = get_object_or_404(ChecklistItem, checklist=checklist, uuid=item_uuid)
 
-        # Quick size guard (cheap)
+        # 🔒 Multi-tenant guard
+        employer = getattr(request.user, "employer", None)
+        # print("Employer :", employer)
+        if employer is None:
+            # This should never happen for a logged-in user
+            logger.error(
+                "NO_EMPLOYER: user_id=%s path=%s checklist_slug=%s",
+                getattr(request.user, "id", None), request.path, slug
+            )
+            return JsonResponse(
+                {"error": "Account misconfigured. Please contact support."},
+                status=403
+            )
+
+        item = get_object_or_404(ChecklistItem, checklist=checklist, uuid=item_uuid)
+        # print("item :", item)
+        # Size guard
         if getattr(file, "size", 0) > MAX_BYTES:
             return JsonResponse({"error": "File too large (max 10MB)."}, status=400)
 
-        # Content-type (defensive; we'll still try to decode)
+        # Content-type (defensive)
         ct = getattr(file, "content_type", None)
         if ct not in ALLOWED_CT:
             return JsonResponse({"error": f"Unsupported type: {ct}"}, status=400)
-
+        print("ct :", ct)
         try:
-            # ---- Decode + normalize (HEIC works if pillow-heif is registered) ----
-            # Make sure you have run:  from pillow_heif import register_heif_opener; register_heif_opener()
-            # (do this once at app startup)
-            img = Image.open(file)
-
-            # Correct orientation from EXIF, ignore if missing
-            try:
-                img = ImageOps.exif_transpose(img)
-            except Exception:
-                pass
-
-            # Normalize color mode (drop alpha)
-            if img.mode not in ("RGB", "L"):
-                img = img.convert("RGB")
-
-            # Resize to a sane maximum for your app
-            img.thumbnail((1500, 1500), Image.LANCZOS)
-
-            # ---- Build storage key ----
-            employer_segment = slugify(
-                str(getattr(request.user, "employer", "noemployer"))
+            # ✅ Normalize all images to JPEG, consistent with store uploads
+            # For checklist images we can be a tad smaller to keep UI snappy:
+            # long edge 1800, ~800–900KB target
+            buf, ext = normalize_to_jpeg(
+                file,
+                target_long_edge=1800,
+                target_bytes=850_000,
             )
-            base, _ = os.path.splitext(file.name)
+            print("buffer :", buf)
+            employer_segment = slugify(str(getattr(employer, "name", "noemployer")))
+            base, _ = os.path.splitext(file.name or "")
             filename = f"{slugify(base) or 'photo'}-{uuid.uuid4().hex[:8]}.jpg"
-            key = (
-                f"CHECKLISTS/{employer_segment}/{checklist.slug}/{item.uuid}/{filename}"
-            )
+            key = f"CHECKLISTS/{employer_segment}/{checklist.slug}/{item.uuid}/{filename}"
 
-            # ---- Encode JPEG + upload ----
-            buf = BytesIO()
-            img.save(buf, format="JPEG", quality=85, optimize=True)
-            buf.seek(0)
             upload_to_linode_object_storage(buf, key)
-            buf.close()
+            if isinstance(buf, BytesIO):
+                buf.close()
 
-            # ---- Persist and return signed URL ----
+            # Persist and respond
             item.photo.name = key
             item.save(update_fields=["photo"])
 
@@ -754,12 +745,12 @@ class UploadChecklistItemPhotoView(LoginRequiredMixin, View):
         except UnidentifiedImageError:
             return JsonResponse({"error": "Unreadable image file."}, status=400)
         except Image.DecompressionBombError:
-            return JsonResponse(
-                {"error": "Image too large (pixel dimensions)."}, status=400
-            )
+            return JsonResponse({"error": "Image too large (pixel dimensions)."}, status=400)
         except Exception as e:
             return JsonResponse({"error": f"Upload failed: {e}"}, status=500)
 
+
+# ------------------------------------------------ #
 
 @login_required
 def checklist_download_fresh_start_api(request, slug):

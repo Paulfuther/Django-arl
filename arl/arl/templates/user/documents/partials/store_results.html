@@ -1,0 +1,74 @@
+{# expects: docs -> queryset of SignedDocumentFile for STORE documents #}
+
+<div>
+  {# Mobile list #}
+  <div class="d-block d-sm-none mt-2">
+    {% for d in docs %}
+      <div class="docs-list-item">
+        <div class="docs-list-text">
+          <div class="line-1">
+            {% if d.store.number %}#{{ d.store.number }} – {% endif %}
+            {{ d.store.city|default:"Store" }}
+          </div>
+          <div class="line-2 text-truncate">
+            {{ d.file_name|default:d.document_title }}
+          </div>
+          <div class="line-3">{{ d.uploaded_at|date:"Y-m-d H:i" }}</div>
+        </div>
+        <div class="docs-list-actions">
+          <a class="btn btn-sm btn-outline-primary"
+             href="{% url 'download_signed_document' doc_id=d.id %}">
+            Download
+          </a>
+        </div>
+      </div>
+    {% empty %}
+     
+    {% endfor %}
+  </div>
+
+  {# Desktop table #}
+  <div class="d-none d-sm-block">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle docs-table mt-2" style="table-layout: fixed; width: 100%;">
+        <colgroup>
+          <col style="width:20%;">   {# Store #}
+          <col style="width:30%;">   {# Title (wrap/truncate) #}
+          <col style="width:15%;">   {# Uploaded #}
+          <col style="width:25%;">    {# Action (nowrap) #}
+        </colgroup>
+        <thead class="table-light">
+          <tr>
+            <th>Store</th>
+            <th>Title</th>
+            <th>Uploaded</th>
+            <th class="actions-col text-end">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in docs %}
+            <tr>
+              <td class="text-wrap">
+                {% if d.store.number %}#{{ d.store.number }} – {% endif %}
+                {{ d.store.city|default:"Store" }}
+              </td>
+              <td class="doc-name">
+                <div class="fw-semibold text-wrap">{{ d.file_name|default:d.document_title }}</div>
+              </td>
+              <td class="upload-date">{{ d.uploaded_at|date:"Y-m-d H:i" }}</td>
+              <td class="actions-col text-end">
+                <a class="btn btn-sm btn-outline-primary d-inline-flex align-items-center"
+                   href="{% url 'download_signed_document' doc_id=d.id %}">
+                  Download
+                </a>
+              </td>
+            </tr>
+          {% empty %}
+           
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
