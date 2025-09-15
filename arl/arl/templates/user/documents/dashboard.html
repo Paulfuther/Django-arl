@@ -239,7 +239,7 @@
               </form>
             </div>
             <div class="card-body p-0" id="employee-results">
-              {% include "user/documents/partials/employee_results.html" %}
+              {% include "user/documents/partials/employee_results.html" with employees_results=recent_employee_heads employee_documents=recent_employee_docs_all doc_q="recent" %}
             </div>
           </div>
         </div>
