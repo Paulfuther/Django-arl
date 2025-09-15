@@ -10,7 +10,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.mixins import UserPassesTestMixin
-from django.db.models import Count, Q
+from django.db.models import Count, Max, Q
 from django.http import HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -43,6 +43,7 @@ from .helpers import get_docusign_edit_url
 from .models import DocuSignTemplate, SignedDocumentFile
 from .tasks import (
     create_docusign_envelope_task,
+    process_company_document_task,
     process_docusign_webhook,
     validate_template_signature_tabs_task,
 )
@@ -777,22 +778,50 @@ def documents_dashboard(request):
     stores = Store.objects.filter(employer=employer).order_by("number")
 
     # quick recent lists (first paint)
-    # recent_employee_docs = (
-    #    SignedDocumentFile.objects.filter(employer=employer, user__isnull=False)
-    #    .select_related("user")
-    #    .order_by("-uploaded_at")[:20]
-    # )
-    #recent_store_docs = (
-    #    SignedDocumentFile.objects.filter(employer=employer, store__isnull=False)
-    #    .select_related("store")
-    #    .order_by("-uploaded_at")[:20]
-    #)
+    # --- NEW: last 5 employees who uploaded something most recently
+    # find the latest upload per user, order by that, take 5
+    latest_per_user = (
+        SignedDocumentFile.objects.filter(employer=employer, user__isnull=False)
+        .values("user")
+        .annotate(last_upload=Max("uploaded_at"))
+        .order_by("-last_upload")[:5]
+    )
 
-    recent_company_docs = (
+    user_ids = [row["user"] for row in latest_per_user]
+
+    recent_employee_heads = (
+        CustomUser.objects
+        .filter(id__in=user_ids)
+        .annotate(
+            # NOTE: use the correct reverse name "signed_documents"
+            last_upload=Max(
+                "signed_documents__uploaded_at",
+                filter=Q(signed_documents__employer=employer),
+            ),
+            doc_count=Count(
+                "signed_documents",
+                filter=Q(signed_documents__employer=employer),
+            ),
+        )
+        .order_by("-last_upload")
+    )
+
+    recent_employee_docs_all = (
         SignedDocumentFile.objects
-        .filter(employer=employer, is_company_document=True)
+        .filter(employer=employer, user_id__in=user_ids)
+        .select_related("user")
+        .order_by("-uploaded_at")
+    )
+    
+    recent_store_docs = (
+        SignedDocumentFile.objects.filter(employer=employer, store__isnull=False)
+        .select_related("store")
         .order_by("-uploaded_at")[:10]
     )
+    # print("store docs :", recent_store_docs)
+    recent_company_docs = SignedDocumentFile.objects.filter(
+        employer=employer, is_company_document=True
+    ).order_by("-uploaded_at")[:10]
 
     # print(recent_company_docs)
 
@@ -803,7 +832,10 @@ def documents_dashboard(request):
             "active_tab": active_tab,
             "employees": employees,
             "stores": stores,
-            "company_results": recent_company_docs,  # << initial data for partial
+            "recent_employee_heads": recent_employee_heads,
+            "recent_employee_docs_all": recent_employee_docs_all,
+            "recent_store_docs": recent_store_docs,
+            "company_results": recent_company_docs,
             "q": "",
         },
     )
@@ -859,14 +891,13 @@ def company_docs_search(request):
     employer = getattr(request.user, "employer", None)
     q = (request.GET.get("q") or "").strip()
 
-    qs = SignedDocumentFile.objects .filter(employer=employer,
-                                            is_company_document=True)
+    qs = SignedDocumentFile.objects.filter(employer=employer, is_company_document=True)
     # print("q :", q, "qs :", qs)
     if q:
         qs = qs.filter(
-            Q(document_title__icontains=q) |
-            Q(file_name__icontains=q) |
-            Q(notes__icontains=q)
+            Q(document_title__icontains=q)
+            | Q(file_name__icontains=q)
+            | Q(notes__icontains=q)
         )
     company_documents = qs.order_by("-uploaded_at")[:50]
     # print(q, company_documents)
@@ -960,9 +991,6 @@ def upload_company_documents_async(request):
 
     # Save temp & enqueue task
     tmp_path = _save_to_temp(fileobj, suffix=final_ext)
-
-    # Fire Celery task
-    from arl.user.tasks import process_company_document_task  # see below
 
     process_company_document_task.delay(str(sdf.id), tmp_path, object_key)
 

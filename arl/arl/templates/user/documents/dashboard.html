@@ -239,7 +239,7 @@
               </form>
             </div>
             <div class="card-body p-0" id="employee-results">
-              {% include "user/documents/partials/employee_results.html" %}
+              {% include "user/documents/partials/employee_results.html" with employees_results=recent_employee_heads employee_documents=recent_employee_docs_all doc_q="recent" %}
             </div>
           </div>
         </div>
@@ -309,7 +309,7 @@
               </form>
             </div>
             <div class="card-body p-0" id="store-results" aria-live="polite">
-              {% include "user/documents/partials/store_results.html" with docs=store_results %}
+              {% include "user/documents/partials/store_results.html" with docs=recent_store_results %}
             </div>
           </div>
         </div>
@@ -332,16 +332,34 @@
                 <div id="companyUploadCollapse" class="collapse">
                   <div class="card-body">
                     <form id="company-upload-form"
-                    method="post"
-                    enctype="multipart/form-data"
-                    action="{% url 'upload_company_documents_async' %}"
-                    hx-post="{% url 'upload_company_documents_async' %}"
-                    hx-encoding="multipart/form-data"
-                    hx-swap="none">
-                {% csrf_token %}
-                <!-- title, notes, file fields... -->
-                <button class="btn btn-sm btn-outline-primary" type="submit">Upload</button>
-              </form>
+      method="post"
+      enctype="multipart/form-data"
+      hx-post="{% url 'upload_company_documents_async' %}"
+      hx-encoding="multipart/form-data"
+      hx-swap="none">
+  {% csrf_token %}
+
+  <div class="row g-2">
+    <div class="col-12 col-md-6">
+      <label class="form-label">Document Title</label>
+      <input type="text" name="document_title" class="form-control" required>
+    </div>
+    <div class="col-12">
+      <label class="form-label">Notes (optional)</label>
+      <textarea name="notes" rows="2" class="form-control"></textarea>
+    </div>
+    <div class="col-12">
+      <label class="form-label">File</label>
+      <input type="file" name="file" class="form-control"
+             accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.heic,.heif,.txt,.csv,.rtf,.webp,application/pdf,image/*"
+             required>
+    </div>
+  </div>
+
+  <div class="mt-3 d-flex gap-2">
+    <button class="btn btn-sm btn-outline-primary" type="submit">Upload</button>
+  </div>
+</form>
                   </div>
                 </div>
               </div>

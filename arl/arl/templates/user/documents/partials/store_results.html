@@ -1,9 +1,8 @@
-{# expects: docs -> queryset of SignedDocumentFile for STORE documents #}
 
 <div>
   {# Mobile list #}
   <div class="d-block d-sm-none mt-2">
-    {% for d in docs %}
+    {% for d in recent_store_docs %}
       <div class="docs-list-item">
         <div class="docs-list-text">
           <div class="line-1">
@@ -46,7 +45,7 @@
           </tr>
         </thead>
         <tbody>
-          {% for d in docs %}
+          {% for d in recent_store_docs %}
             <tr>
               <td class="text-wrap">
                 {% if d.store.number %}#{{ d.store.number }} – {% endif %}
