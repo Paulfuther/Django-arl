@@ -45,6 +45,7 @@ from .tasks import (
     create_docusign_envelope_task,
     process_docusign_webhook,
     validate_template_signature_tabs_task,
+    process_company_document_task,
 )
 
 register_heif_opener()
@@ -782,12 +783,13 @@ def documents_dashboard(request):
     #    .select_related("user")
     #    .order_by("-uploaded_at")[:20]
     # )
-    #recent_store_docs = (
-    #    SignedDocumentFile.objects.filter(employer=employer, store__isnull=False)
-    #    .select_related("store")
-    #    .order_by("-uploaded_at")[:20]
-    #)
 
+    recent_store_docs = (
+        SignedDocumentFile.objects.filter(employer=employer, store__isnull=False)
+        .select_related("store")
+        .order_by("-uploaded_at")[:10]
+    )
+    # print("store docs :", recent_store_docs)
     recent_company_docs = (
         SignedDocumentFile.objects
         .filter(employer=employer, is_company_document=True)
@@ -803,6 +805,7 @@ def documents_dashboard(request):
             "active_tab": active_tab,
             "employees": employees,
             "stores": stores,
+            "recent_store_docs": recent_store_docs,
             "company_results": recent_company_docs,  # << initial data for partial
             "q": "",
         },
@@ -960,9 +963,6 @@ def upload_company_documents_async(request):
 
     # Save temp & enqueue task
     tmp_path = _save_to_temp(fileobj, suffix=final_ext)
-
-    # Fire Celery task
-    from arl.user.tasks import process_company_document_task  # see below
 
     process_company_document_task.delay(str(sdf.id), tmp_path, object_key)
 
