@@ -1191,6 +1191,7 @@ def process_twilio_short_link_event(data):
         click_time = data.get("click_time") or now()
         user_agent = data.get("user_agent")
         error_code = data.get("ErrorCode") or data.get("error_code")
+        body = data.get("Body") or data.get("body")
 
         user = (
             CustomUser.objects.filter(phone_number__icontains=to).first()
@@ -1218,6 +1219,7 @@ def process_twilio_short_link_event(data):
             employer=employer,
             error_code=error_code,
             created_at=now(),
+            body=body or None,
         )
 
     except Exception:
