@@ -459,9 +459,9 @@ def lotto_theft_sms_link_task(self):
             # Define message
             body = (
                 "Hello, this is Terry from Petro Canada. This is an urgent message regarding a recent lottary theft. "
-                "Remove all 100 and 30 dollar lotto tickets. Don’t activate again and lock up"
+                "Remove all 100 and 30 dollar lotto tickets. Do not activate anymore of these and lock up the ones you have."
                 "Please review an image of the suspect: "
-                "compliance/83d38dc5-4198-4d47-a710-97017e2173c6_compliance/f738598d-b7e8-497b-9da1-5393e8c74625.jpeg "
+                "https://paulfuther.eu-central-1.linodeobjects.com/compliance/83d38dc5-4198-4d47-a710-97017e2173c6_compliance/f738598d-b7e8-497b-9da1-5393e8c74625.jpeg "
                 "Reply STOP to opt out."
             )
             # Send individually to each user so link gets shortened per-message
