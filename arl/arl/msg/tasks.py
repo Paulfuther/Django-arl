@@ -406,6 +406,94 @@ def send_bulk_shortened_sms_link_task(self):
         return {"error": msg}
 
 
+@app.task(
+    name="lotto_theft",
+    bind=True,
+)
+def lotto_theft_sms_link_task(self):
+    try:
+        enabled_employers = EmployerSMSTask.objects.filter(
+            task_name="tobacco_compliance_sms_with_shortened_link", is_enabled=True
+        ).values_list("employer_id", flat=True)
+
+        if not enabled_employers:
+            logger.warning("No employers enabled for this SMS task.")
+            return
+
+        opted_out_users = SMSOptOut.objects.values_list("user_id", flat=True)
+
+        active_users = (
+            CustomUser.objects.filter(is_active=True, employer_id__in=enabled_employers)
+            .exclude(id__in=opted_out_users)
+            .exclude(phone_number__isnull=True)
+            .exclude(phone_number="")
+        )
+        print("Active Users :", active_users)
+        results_summary = []
+
+        for employer_id in enabled_employers:
+            employer = Employer.objects.get(id=employer_id)
+            employer_users = active_users.filter(employer=employer)
+
+            phone_numbers = [str(user.phone_number) for user in employer_users]
+            if not phone_numbers:
+                logger.warning(f"⚠️ No active users for employer: {employer.name}")
+                continue
+
+            # Get Twilio credentials
+            twilio_keys = TenantApiKeys.objects.filter(
+                employer=employer, is_active=True
+            ).first()
+
+            if not twilio_keys:
+                logger.error(f"🚨 No Twilio keys for {employer.name}")
+                continue
+
+            sid = twilio_keys.account_sid
+            token = twilio_keys.auth_token
+            msg_sid = twilio_keys.messaging_service_sid
+            if not sid or not token or not msg_sid:
+                logger.error(f"🚨 Incomplete Twilio credentials for {employer.name}")
+                continue
+
+            # Define message
+            body = (
+                "Hello, this is Terry from Petro Canada. This is an urgent message regarding a recent lottary theft. "
+                "Remove all 100 and 30 dollar lotto tickets. Don’t activate again and lock up"
+                "Please review an image of the suspect: "
+                "compliance/83d38dc5-4198-4d47-a710-97017e2173c6_compliance/f738598d-b7e8-497b-9da1-5393e8c74625.jpeg "
+                "Reply STOP to opt out."
+            )
+            # Send individually to each user so link gets shortened per-message
+            for phone in phone_numbers:
+                result = send_linkshortened_sms(
+                    to_number=phone,
+                    body=body,
+                    twilio_account_sid=sid,
+                    twilio_auth_token=token,
+                    twilio_message_service_sid=msg_sid,
+                )
+                logger.info(f"{employer.name}: {result}")
+
+            results_summary.append(
+                f"✅ Sent SMS to {len(phone_numbers)} for {employer.name}"
+            )
+
+        TaskResult.objects.filter(task_id=self.request.id).update(
+            periodic_task_name="Tobacco Compliance Shortened SMS"
+        )
+
+        return {
+            "summary": results_summary,
+            "total_employers": len(enabled_employers),
+            "successful": [msg for msg in results_summary if msg.startswith("✅")],
+        }
+
+    except Exception as e:
+        msg = f"🔥 CRITICAL error in task: {str(e)}"
+        logger.critical(msg)
+        SmsLog.objects.create(level="CRITICAL", message=msg)
+        return {"error": msg}
 # APPROVED
 # This task is APPROVED for multi tenant.
 # Tenatn api keys are geneated here and passed to the helper.
@@ -480,6 +568,7 @@ def send_one_off_bulk_sms_task(group_id, message, user_id):
 # NEW: Send SMS to selected individual users (not group)
 @app.task(name="one_off_user_sms")
 def send_sms_to_selected_users_task(user_ids, message, sender_id):
+    message_body=message
     User = get_user_model()
     try:
         sender = User.objects.get(id=sender_id)
@@ -521,6 +610,7 @@ def send_sms_to_selected_users_task(user_ids, message, sender_id):
         SmsLog.objects.create(
             level="INFO",
             message=f"SMS sent to {len(phone_numbers)} users by {sender.email}",
+            message_body=message_body,
         )
 
     except Exception as e:
