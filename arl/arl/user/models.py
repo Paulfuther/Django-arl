@@ -10,6 +10,8 @@ from phonenumber_field.modelfields import PhoneNumberField
 from django.utils.timezone import now
 from django.utils.crypto import get_random_string
 from django.conf import settings
+from arl.utils.crypto import sin_decrypt
+from typing import Optional
 
 
 class Employer(models.Model):
@@ -93,6 +95,10 @@ class CustomUser(AbstractUser):
         ],
         null=True,
     )
+    # NEW encrypted fields
+    sin_encrypted = models.TextField(null=True, blank=True)
+    sin_last4 = models.CharField(max_length=4, null=True, blank=True, db_index=True)
+    sin_hash = models.CharField(max_length=64, null=True, blank=True, db_index=True)
     sin_expiration_date = models.DateField(blank=True, null=True, verbose_name="SIN Expiration Date")
     work_permit_expiration_date = models.DateField(blank=True, null=True, verbose_name="Work Permit Expiration Date")
     dob = models.DateField(blank=True, null=True, verbose_name="Date of Birth")
@@ -108,6 +114,17 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return self.first_name
+
+    # Decrypt on demand (never render directly in templates)
+    @property
+    def sin_plain(self) -> Optional[str]:
+        try:
+            return sin_decrypt(self.sin_encrypted) if self.sin_encrypted else None
+        except Exception:
+            return None
+
+    def masked_sin(self) -> str:
+        return f"*** *** {self.sin_last4}" if self.sin_last4 else "*********"
 
     @property
     def is_docusign(self):

@@ -4,6 +4,7 @@ import logging
 from dotenv import load_dotenv
 from django.contrib.messages import constants as messages
 import socket
+
 load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -25,6 +26,12 @@ SECRET_KEY = os.environ.get("SECRET_KEY")
 DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
+# Trust the HTTPS origin for CSRF (must include scheme)
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.ngrok-free.app",
+    "https://*.ngrok.app",
+    "https://*.ngrok.io",
+]
 ADMINS = [
     ("Paul Futher", "paul.futher@gmail.com"),
     # Add more admins if needed
@@ -60,7 +67,7 @@ LOGGING = {
     'loggers': {
         'django': {
             'handlers': ['file', 'console'], # Use both file and console
-            'level': 'INFO', # Change to INFO or higher
+            'level': 'ERROR', # Change to INFO or higher
             'propagate': True,
         },
             'django.template': {
@@ -329,13 +336,20 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 # STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
 
 # BASE URL DEV
-BASE_URL = "https://731d-2607-fea8-2840-b200-a520-f762-b4dc-93b5.ngrok-free.app"
+BASE_URL = "https://81d2723ffa9e.ngrok-free.app"
 SITE_URL = BASE_URL
 OWNER_EMAIL = os.environ.get("OWNER_EMAIL")
 ADMIN_PHONE_NUMBER = os.environ.get("ADMIN_PHONE_NUMBER")
 MESSAGE_TAGS = {
     messages.ERROR: 'danger',  # ✅ this converts 'error' → 'danger' for Bootstrap styling
 }
+
+# cryptography
+
+FERNET_PRIMARY_KEY = os.environ["FERNET_PRIMARY_KEY"]          # 32-byte urlsafe base64
+FERNET_OLD_KEYS = [k for k in os.environ.get("FERNET_OLD_KEYS", "").split(",") if k]
+SIN_HASH_SALT = os.environ["SIN_HASH_SALT"]
+
 print("site url:", SITE_URL)
 print("Twilio Message Service Sid :", MESSAGE_SERVICE_SID)
 

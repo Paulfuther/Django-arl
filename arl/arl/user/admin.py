@@ -45,6 +45,7 @@ from .models import (
     Store,
     UserManager,
 )
+from arl.utils.crypto import normalize_digits, sin_hash
 
 
 class ExternalRecipientAdmin(admin.ModelAdmin):
@@ -155,6 +156,7 @@ class ProcessedDocusignDocumentInline(
 class CustomUserAdmin(ExportActionMixin, UserAdmin):
     resource_class = UserResource
 
+    
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         if db_field.name in ["sin_expiration_date", "work_permit_expiration_date"]:
             kwargs["widget"] = TextInput(
@@ -167,11 +169,14 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
     list_display = (
         "is_active",
         "username",
+        "full_name",
         "email",
         "store_number",
         "employer",
         "phone_number",
-        "sin",
+        "masked_sin",
+        "sin_last4",
+        "sin_status",
         "get_consent",
         "sin_expiration_date",
         "work_permit_expiration_date",
@@ -179,6 +184,10 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         "last_login",
         "get_groups",
     )
+    # Keep edits safe: never expose encrypted internals
+    # Show masked fields as read-only; hide the encrypted fields entirely.
+    readonly_fields = ("masked_sin", "sin_last4")
+    exclude = ("sin_encrypted", "sin_hash")  # don’t show in forms
     list_filter = (
         "is_active",
         "groups",
@@ -186,7 +195,59 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         "work_permit_expiration_date",
         SINFirstDigitFilter,
     )
-    search_fields = ("username", "email", "phone_number", "sin")
+    ordering = ("-id",)
+    autocomplete_fields = ("employer", "store")
+
+    # A simple colored badge: Valid/Expiring/Expired/Unknown
+    def sin_status(self, obj):
+        # derive status from expiration date + presence of encrypted SIN
+        if not obj.sin_encrypted:
+            return format_html('<span style="color:#999;">Unknown</span>')
+        if obj.sin_expiration_date is None:
+            return format_html('<span style="color:#0a7;">Valid</span>')
+        days = (obj.sin_expiration_date - obj.sin_expiration_date.today()).days \
+               if hasattr(obj.sin_expiration_date, "today") else None
+        if days is None:
+            return format_html('<span style="color:#0a7;">Valid</span>')
+        if days < 0:
+            return format_html('<span style="color:#c00;">Expired</span>')
+        if days <= 30:
+            return format_html('<span style="color:#d97d00;">Expiring</span>')
+        return format_html('<span style="color:#0a7;">Valid</span>')
+    sin_status.short_description = "SIN Status"
+
+    # ✅ Smart search: if the admin search box contains a 9-digit SIN,
+    # we hash it and include exact matches; if it’s 4 digits, we match last4.
+    def get_search_results(self, request, queryset, search_term):
+        qs, use_distinct = super().get_search_results(request, queryset, search_term)
+        digits = normalize_digits(search_term or "")
+        try:
+            if len(digits) == 9:
+                # exact SIN lookup via salted hash
+                qs |= self.model.objects.filter(sin_hash=sin_hash(digits))
+            elif len(digits) == 4:
+                # support quick last-4 search
+                qs |= self.model.objects.filter(sin_last4=digits)
+        except Exception:
+            pass
+        return qs, use_distinct
+
+    # Optional: prevent anyone from editing the masked fields
+    def get_readonly_fields(self, request, obj=None):
+        # keep masked/last4 readonly on change view
+        ro = list(super().get_readonly_fields(request, obj))
+        if obj:  # editing existing user
+            for f in ("masked_sin", "sin_last4"):
+                if f not in ro:
+                    ro.append(f)
+        return ro
+
+    # Clean name for display
+
+    def full_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}".strip() or obj.username
+    full_name.short_description = "Name"
+    search_fields = ("username", "email", "phone_number", "sin_last4", "first_name", "last_name")
     list_editable = (
         "sin_expiration_date",
         "work_permit_expiration_date",
