@@ -19,6 +19,8 @@ jobs:
       TWILIO_ACCOUNT_SID: ${{ secrets.TWILIO_ACCOUNT_SID }}
       TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
       SECRET_ENCRYPTION_KEY: ${{ secrets.SECRET_ENCRYPTION_KEY }}
+      FERNET_PRIMARY_KEY: ${{ secrets.FERNET_PRIMARY_KEY }}
+      SIN_HASH_SALT: ${{ secrets.SIN_HASH_SALE }}
 
     steps:
     - name: Checkout code

@@ -2,12 +2,31 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Div, Field, Layout, Submit
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
+from django.core.validators import (
+    MaxLengthValidator,
+    MinLengthValidator,
+    RegexValidator,
+)
 from django.urls import reverse_lazy
 from django.utils.crypto import get_random_string
+
 from .models import CustomUser, Employer, NewHireInvite, Store
+from arl.user.services import set_user_sin
 
 
 class CustomUserCreationForm(UserCreationForm):
+    # WRITE-ONLY SIN FIELD (not bound to model)
+    sin_input = forms.CharField(
+        label="SIN (9 digits)",
+        required=True,
+        validators=[
+            MinLengthValidator(9),
+            MaxLengthValidator(9),
+            RegexValidator(r"^\d{9}$", "SIN number must be 9 digits"),
+        ],
+        widget=forms.TextInput(attrs={"autocomplete": "off"}),
+    )
+
     store = forms.ModelChoiceField(
         queryset=Store.objects.none(),
         required=False,  # ✅ Make store optional for employers
@@ -32,7 +51,7 @@ class CustomUserCreationForm(UserCreationForm):
             "dob",
             "email",
             "phone_number",
-            "sin",
+            "sin_input",
             "sin_expiration_date",
             "work_permit_expiration_date",
             "address",
@@ -93,7 +112,7 @@ class CustomUserCreationForm(UserCreationForm):
             "country",
             "postal",
             "email",
-            "sin",
+            "sin_input",
             "dob",
         ]
         for field in required_fields:
@@ -128,7 +147,7 @@ class CustomUserCreationForm(UserCreationForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        sin = cleaned_data.get("sin")
+        sin = cleaned_data.get("sin_input")
         sin_expiration_date = cleaned_data.get("sin_expiration_date")
         work_permit_expiration_date = cleaned_data.get("work_permit_expiration_date")
 
@@ -146,6 +165,22 @@ class CustomUserCreationForm(UserCreationForm):
 
         return cleaned_data
 
+    def save(self, commit=True):
+        """
+        Create the user, then encrypt & store the SIN into
+        sin_encrypted/sin_last4/sin_hash. Never save plaintext.
+        """
+        user = super().save(commit=False)
+
+        # Ensure employer/store disabled field doesn't block save
+        if self.fields["store"].widget.attrs.get("disabled"):
+            user.store = None
+
+        if commit:
+            user.save()
+
+        return user
+    
 
 class TwoFactorAuthenticationForm(forms.Form):
     verification_code = forms.CharField(
@@ -191,10 +226,16 @@ class NewHireInviteForm(forms.ModelForm):
         fields = ["email", "name", "role"]
         widgets = {
             "email": forms.EmailInput(
-                attrs={"class": "form-control placeholder-light", "placeholder": "Enter new hire's email"}
+                attrs={
+                    "class": "form-control placeholder-light",
+                    "placeholder": "Enter new hire's email",
+                }
             ),
             "name": forms.TextInput(
-                attrs={"class": "form-control placeholder-light", "placeholder": "Full Name"}
+                attrs={
+                    "class": "form-control placeholder-light",
+                    "placeholder": "Full Name",
+                }
             ),
             "role": forms.Select(attrs={"class": "form-control mb-4"}),
         }
@@ -236,7 +277,7 @@ class NewHireInviteForm(forms.ModelForm):
         invite = super().save(commit=False)
         invite.employer = self.employer
         if self.invited_by:
-            invite.invited_by = self.invited_by     # ✅ Assign employer automatically
+            invite.invited_by = self.invited_by  # ✅ Assign employer automatically
         invite.token = invite.token or get_random_string(
             64
         )  # ✅ Generate token if missing

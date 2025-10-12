@@ -62,6 +62,7 @@ from .tasks import (
     send_new_hire_invite_task,
     send_newhire_template_email_task,
 )
+from arl.user.services import set_user_sin
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -96,18 +97,24 @@ class RegisterView(FormView):
             token = self.kwargs.get("token")
             invite = get_object_or_404(NewHireInvite, token=token, used=False)
             verified_phone_number = self.request.POST.get("phone_number")
+            print("verified :", verified_phone_number)
             if verified_phone_number is None:
                 raise Http404("Phone number not found in form data.")
 
             user = form.save(commit=False)
             user.phone_number = verified_phone_number
             user.employer = invite.employer
-            # Serialize the form data
+            user.save()
+
+            # 🔐 Encrypt SIN here (view owns it; form does not)
+            sin_plain = form.cleaned_data.get("sin_input")
+            if sin_plain:
+                set_user_sin(user, sin_plain, validate_luhn=True, save=True)
+
+            # Prepare safe payload (no plaintext SIN or phone verification field)
             serialized_data = self.serialize_user_data(form.cleaned_data)
             print(serialized_data)
-            # Pass the serialized data as kwargs to the Celery task
-            user = form.save(commit=False)
-            user.save()
+            serialized_data.pop("sin_input", None)
             serialized_data["user_id"] = user.id
             # Pass the serialized data as kwargs to the Celery task
             save_user_to_db.delay(**serialized_data)
