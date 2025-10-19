@@ -336,7 +336,7 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 # STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
 
 # BASE URL DEV
-BASE_URL = "https://8fde8e56967e.ngrok-free.app"
+BASE_URL = "https://81d2723ffa9e.ngrok-free.app"
 SITE_URL = BASE_URL
 OWNER_EMAIL = os.environ.get("OWNER_EMAIL")
 ADMIN_PHONE_NUMBER = os.environ.get("ADMIN_PHONE_NUMBER")
