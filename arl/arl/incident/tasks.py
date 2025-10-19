@@ -1,9 +1,11 @@
 from __future__ import absolute_import, unicode_literals
-from django.conf import settings
+
+import base64
 import logging
 from io import BytesIO
-import base64
+
 import pdfkit
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from django.template.loader import render_to_string
@@ -11,19 +13,22 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from arl.celery import app
-from arl.dbox.helpers import (master_upload_file_to_dropbox,
-                              upload_major_incident_file_to_dropbox)
-from arl.helpers import (get_s3_images_for_incident,
-                         upload_to_linode_object_storage)
-from arl.msg.helpers import (create_incident_file_email,
-                             create_incident_file_email_by_rule,
-                             send_incident_email, create_master_email)
-from arl.msg.models import EmailTemplate
-from arl.user.models import CustomUser, Employer, Store, ExternalRecipient
+from arl.dbox.helpers import (
+    master_upload_file_to_dropbox,
+    upload_major_incident_file_to_dropbox,
+)
+from arl.helpers import get_s3_images_for_incident, upload_to_linode_object_storage
+from arl.msg.helpers import (
+    create_incident_file_email,
+    create_incident_file_email_by_rule,
+    create_master_email,
+    send_incident_email,
+)
+from arl.setup.models import TenantApiKeys
+from arl.user.models import CustomUser, Employer, ExternalRecipient, Store
 
 from .helpers import create_pdf, create_restricted_pdf
 from .models import Incident, MajorIncident
-from arl.setup.models import TenantApiKeys
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +44,11 @@ def get_employer_sender_email(employer_id):
             employer=employer, is_active=True
         ).first()
 
-        return tenant_api_key.sender_email if tenant_api_key else settings.MAIL_DEFAULT_SENDER
+        return (
+            tenant_api_key.sender_email
+            if tenant_api_key
+            else settings.MAIL_DEFAULT_SENDER
+        )
     except Employer.DoesNotExist:
         logger.warning(f"⚠️ Employer ID {employer_id} not found. Using default sender.")
         return settings.MAIL_DEFAULT_SENDER
@@ -49,6 +58,7 @@ def get_employer_sender_email(employer_id):
 # we call this task to save the data to the database.
 # This takes some load off of the server.
 # Then we call a signal to send the emails.
+
 
 @app.task(name="save_major_inciddent_file")
 def save_major_incident_file(**kwargs):
@@ -83,6 +93,7 @@ def save_major_incident_file(**kwargs):
         logger.error(f"Error saving incident: {e}")
         return {"error": str(e)}
 
+
 # This route takes the newly created Major Incident
 # and sends out a copy to the appropriate emails
 # and uploads it to dropbox.
@@ -95,15 +106,15 @@ def generate_major_incident_pdf_task(incident_id):
         try:
             incident = MajorIncident.objects.get(pk=incident_id)
         except ObjectDoesNotExist:
-            raise ValueError("Incident with ID {} does not exist.".
-                             format(incident_id))
+            raise ValueError("Incident with ID {} does not exist.".format(incident_id))
 
         images = get_s3_images_for_incident(
             incident.image_folder, incident.user_employer
         )
         context = {"incident": incident, "images": images}
         html_content = render_to_string(
-            "incident/major_incident_form_pdf.html", context)
+            "incident/major_incident_form_pdf.html", context
+        )
         #  Generate the PDF using pdfkit
         options = {
             "enable-local-file-access": None,
@@ -119,10 +130,7 @@ def generate_major_incident_pdf_task(incident_id):
         brief_description = incident.brief_description
         # Create a unique file name for the PDF using store number and brief
         # description
-        pdf_filename = (
-            f"{store_number}_{slugify(brief_description)}"
-            f"_report.pdf"
-        )
+        pdf_filename = f"{store_number}_{slugify(brief_description)}_report.pdf"
 
         # Close the BytesIO buffer to free up resources
         # Set the BytesIO buffer's position to the beginning
@@ -143,10 +151,7 @@ def generate_major_incident_pdf_task(incident_id):
         # the group incident_form_email
 
         subject = "A New Major Incident Report Has Been Created"
-        body = (
-            "Thank you for using our services. Attached "
-            "is your incident report."
-        )
+        body = "Thank you for using our services. Attached is your incident report."
         # attachment_data = pdf_buffer.getvalue()
 
         # Call the create_incident_file_email_by_rule
@@ -176,9 +181,7 @@ def generate_major_incident_pdf_from_list_task(incident_id, user_email):
         try:
             incident = MajorIncident.objects.get(pk=incident_id)
         except ObjectDoesNotExist:
-            raise ValueError(
-                "Incident with ID {} does not exist.".format(incident_id)
-            )
+            raise ValueError("Incident with ID {} does not exist.".format(incident_id))
 
         # get images, if there are any, from the s3 bucket
         images = get_s3_images_for_incident(
@@ -187,7 +190,7 @@ def generate_major_incident_pdf_from_list_task(incident_id, user_email):
         context = {"incident": incident, "images": images}
         html_content = render_to_string(
             "incident/major_incident_form_pdf.html", context
-            )
+        )
         #  Generate the PDF using pdfkit
         options = {
             "enable-local-file-access": None,
@@ -204,10 +207,7 @@ def generate_major_incident_pdf_from_list_task(incident_id, user_email):
         brief_description = incident.brief_description
         # Create a unique file name for the PDF
         # using store number and brief description
-        pdf_filename = (
-            f"{store_number}_{slugify(brief_description)}"
-            f"_report.pdf"
-        )
+        pdf_filename = f"{store_number}_{slugify(brief_description)}_report.pdf"
 
         # Close the BytesIO buffer to free up resources
         # Then email to the current user
@@ -219,8 +219,7 @@ def generate_major_incident_pdf_from_list_task(incident_id, user_email):
 
         # Call the create_single_email function with
         # user_email and other details
-        create_incident_file_email(user_email, subject, body,
-                                   pdf_buffer, pdf_filename)
+        create_incident_file_email(user_email, subject, body, pdf_buffer, pdf_filename)
         # create_single_email(user_email, subject, body, pdf_buffer)
 
         return {
@@ -272,9 +271,9 @@ def save_incident_file(**kwargs):
 # and send_email_to_group_task
 @app.task(name="create_incident_pdf")
 def generate_pdf_task(incident_id):
-    '''
+    """
     This task is used to create a pdf of a site incident form.
-    '''
+    """
     logger.info(f"[PDF Task] Starting PDF generation for Incident ID: {incident_id}")
     try:
         pdf_result = create_pdf(incident_id)
@@ -305,9 +304,7 @@ def upload_to_linode_task(data):
         pdf_buffer = BytesIO(pdf_data)
         # Upload to Linode Object Storage
         user_employer = Incident.objects.get(pk=incident_id).user_employer
-        object_key = (
-            f"SITEINCIDENT/{user_employer}/INCIDENTPDF/{pdf_filename}"
-        )
+        object_key = f"SITEINCIDENT/{user_employer}/INCIDENTPDF/{pdf_filename}"
         upload_to_linode_object_storage(pdf_buffer, object_key)
         # Update and return the data dictionary
         data["object_key"] = object_key
@@ -332,14 +329,16 @@ def upload_file_to_dropbox_task(data):
         dropbox_file_path = f"/SITEINCIDENTS/{pdf_filename}"
 
         # Call the helper function to upload the file
-        success, message = master_upload_file_to_dropbox(pdf_data,
-                                                         dropbox_file_path)
+        success, message = master_upload_file_to_dropbox(pdf_data, dropbox_file_path)
 
         if not success:
             # Check for specific error cases
             if "insufficient_space" in message:
                 logger.error("Dropbox upload failed: Dropbox is full.")
-                return {"status": "failure", "message": "Dropbox is full. Please free up some space."}
+                return {
+                    "status": "failure",
+                    "message": "Dropbox is full. Please free up some space.",
+                }
             else:
                 raise Exception(f"Dropbox upload failed: {message}")
 
@@ -348,7 +347,9 @@ def upload_file_to_dropbox_task(data):
         return data
 
     except KeyError as e:
-        error_message = f"Missing key in data passed to upload_file_to_dropbox_task: {e}"
+        error_message = (
+            f"Missing key in data passed to upload_file_to_dropbox_task: {e}"
+        )
         logger.error(error_message)
         raise Exception(error_message)
 
@@ -362,43 +363,56 @@ def upload_file_to_dropbox_task(data):
 # APPROVED for muluti tenant
 @app.task(name="email_incident_pdf_to_group")
 def send_email_to_group_task(data, group_name, employer_id):
-    logger.info(f"[Incident Email Task] Starting email task for group '{group_name}' and employer ID {employer_id}")
+    logger.info(
+        f"[Incident Email Task] Starting email task for group '{group_name}' and employer ID {employer_id}"
+    )
     try:
-
         # ✅ Pick the SendGrid template ID directly
         if group_name == "incident_update_email":
-            sendgrid_id = "d-d732a2877dc14881aac8f2f637c0fa71"  # replace with actual update ID
+            sendgrid_id = (
+                "d-d732a2877dc14881aac8f2f637c0fa71"  # replace with actual update ID
+            )
         else:
-            sendgrid_id = "d-d24563b3a2c14e9ebb1ebae50b6097f1"  # replace with actual create ID
+            sendgrid_id = (
+                "d-d24563b3a2c14e9ebb1ebae50b6097f1"  # replace with actual create ID
+            )
 
         logger.info(f"[Incident Email Task] Using template ID: {sendgrid_id}")
 
         # Fetch the emails of active users in the specified group
         to_emails = CustomUser.objects.filter(
-            Q(is_active=True) & 
-            Q(groups__name=group_name) & 
-            Q(employer_id=employer_id)  # ✅ Filter by employer
+            Q(is_active=True)
+            & Q(groups__name=group_name)
+            & Q(employer_id=employer_id)  # ✅ Filter by employer
         ).values_list("email", flat=True)
 
         if not to_emails:
             raise ValueError(f"No active users found in group: {group_name}")
-        logger.info(f"[Incident Email Task] Found {len(to_emails)} recipients in group '{group_name}'")
+        logger.info(
+            f"[Incident Email Task] Found {len(to_emails)} recipients in group '{group_name}'"
+        )
 
         # Get verified sender
         # ✅ Fetch tenant sender email
         tenant_api_key = TenantApiKeys.objects.filter(employer_id=employer_id).first()
-        sender_email = tenant_api_key.verified_sender_email if tenant_api_key else settings.MAIL_DEFAULT_SENDER
+        sender_email = (
+            tenant_api_key.verified_sender_email
+            if tenant_api_key
+            else settings.MAIL_DEFAULT_SENDER
+        )
 
         # ✅ Prepare PDF as attachment
         pdf_buffer = BytesIO(data["pdf_buffer"])
         pdf_filename = data["pdf_filename"]
         logger.info(f"[Incident Email Task] Preparing attachment: {pdf_filename}")
 
-        attachments = [{
-            "content": base64.b64encode(pdf_buffer.getvalue()).decode(),
-            "filename": pdf_filename,
-            "file_type": "application/pdf",
-        }]
+        attachments = [
+            {
+                "content": base64.b64encode(pdf_buffer.getvalue()).decode(),
+                "filename": pdf_filename,
+                "file_type": "application/pdf",
+            }
+        ]
 
         # ✅ Prepare dynamic template data
         first_email = to_emails[0]
@@ -414,7 +428,9 @@ def send_email_to_group_task(data, group_name, employer_id):
             "name": full_name,
             "company_name": company_name,
         }
-        logger.info(f"[Incident Email Task] Sending email to {len(to_emails)} users with template data: {template_data}")
+        logger.info(
+            f"[Incident Email Task] Sending email to {len(to_emails)} users with template data: {template_data}"
+        )
 
         # Send the email via your helper
         # ✅ Now call your master helper
@@ -425,7 +441,9 @@ def send_email_to_group_task(data, group_name, employer_id):
             attachments=attachments,
             verified_sender=sender_email,
         )
-        logger.info(f"[Incident Email Task] Email successfully sent to group '{group_name}'")
+        logger.info(
+            f"[Incident Email Task] Email successfully sent to group '{group_name}'"
+        )
 
         return {
             "status": "success",
@@ -449,18 +467,14 @@ def generate_pdf_email_to_user_task(incident_id, user_email):
         try:
             incident = Incident.objects.get(pk=incident_id)
         except ObjectDoesNotExist:
-            raise ValueError(
-                "Incident with ID {} does not exist.".format(incident_id)
-            )
+            raise ValueError("Incident with ID {} does not exist.".format(incident_id))
 
         # get images, if there are any, from the s3 bucket
         images = get_s3_images_for_incident(
             incident.image_folder, incident.user_employer
         )
         context = {"incident": incident, "images": images}
-        html_content = render_to_string(
-            "incident/incident_form_pdf.html", context
-            )
+        html_content = render_to_string("incident/incident_form_pdf.html", context)
         #  Generate the PDF using pdfkit
         options = {
             "enable-local-file-access": None,
@@ -477,17 +491,16 @@ def generate_pdf_email_to_user_task(incident_id, user_email):
         brief_description = incident.brief_description
         # Create a unique file name for the PDF
         # using store number and brief description
-        pdf_filename = (
-            f"{store_number}_{slugify(brief_description)}"
-            f"_report.pdf"
-        )
+        pdf_filename = f"{store_number}_{slugify(brief_description)}_report.pdf"
 
         # ✅ Prepare the attachment for SendGrid
-        attachments = [{
-            "content": base64.b64encode(pdf_buffer.getvalue()).decode(),
-            "filename": pdf_filename,
-            "file_type": "application/pdf",
-        }]
+        attachments = [
+            {
+                "content": base64.b64encode(pdf_buffer.getvalue()).decode(),
+                "filename": pdf_filename,
+                "file_type": "application/pdf",
+            }
+        ]
 
         # ✅ Fetch user and dynamic template data
         try:
@@ -513,7 +526,7 @@ def generate_pdf_email_to_user_task(incident_id, user_email):
         # ✅ Call master email helper
         create_master_email(
             to_email=[user_email],
-            sendgrid_id="d-f76eb0684e444e29b0a3cfc621cefd6a", 
+            sendgrid_id="d-f76eb0684e444e29b0a3cfc621cefd6a",
             template_data=template_data,
             attachments=attachments,
             verified_sender=sender_email,
@@ -538,22 +551,24 @@ def generate_restricted_incident_pdf_email_task(incident_id, user_email):
         try:
             incident = Incident.objects.get(pk=incident_id)
         except ObjectDoesNotExist:
-            raise ValueError(
-                "Incident with ID {} does not exist.".format(incident_id)
-            )
-        employer = incident.user_employer if hasattr(incident, "user_employer") else None
+            raise ValueError("Incident with ID {} does not exist.".format(incident_id))
+        employer = (
+            incident.user_employer if hasattr(incident, "user_employer") else None
+        )
 
         # ✅ Fetch the sender email from Tenant API Keys
         sender_email = settings.MAIL_DEFAULT_SENDER  # Default sender
         if employer:
             tenant_api_key = TenantApiKeys.objects.filter(employer=employer).first()
-            sender_email = tenant_api_key.sender_email if tenant_api_key else sender_email
+            sender_email = (
+                tenant_api_key.sender_email if tenant_api_key else sender_email
+            )
 
         # ✅ Render HTML for PDF
         context = {"incident": incident}
         html_content = render_to_string(
             "incident/restricted_incident_form_pdf.html", context
-            )
+        )
         #  Generate the PDF using pdfkit
         options = {
             "enable-local-file-access": None,
@@ -570,10 +585,7 @@ def generate_restricted_incident_pdf_email_task(incident_id, user_email):
         brief_description = incident.brief_description
         # Create a unique file name for the PDF
         # using store number and brief description
-        pdf_filename = (
-            f"{store_number}_{slugify(brief_description)}"
-            f"_report.pdf"
-        )
+        pdf_filename = f"{store_number}_{slugify(brief_description)}_report.pdf"
 
         # Close the BytesIO buffer to free up resources
         # Then email to the current user
@@ -585,9 +597,14 @@ def generate_restricted_incident_pdf_email_task(incident_id, user_email):
 
         # Call the create_single_email function with
         # user_email and other details
-        create_incident_file_email(user_email, subject, body,
-                                   pdf_buffer, pdf_filename,
-                                   sender_email=sender_email)
+        create_incident_file_email(
+            user_email,
+            subject,
+            body,
+            pdf_buffer,
+            pdf_filename,
+            sender_email=sender_email,
+        )
         # create_single_email(user_email, subject, body, pdf_buffer)
 
         return {
@@ -600,7 +617,7 @@ def generate_restricted_incident_pdf_email_task(incident_id, user_email):
 
 
 # this task sends incident forms to those on the external sedners list
-@app.task(name='generate_and_send_pdf_task')
+@app.task(name="generate_and_send_pdf_task")
 def generate_and_send_pdf_task(incident_id):
     try:
         # Fetch the incident
@@ -617,16 +634,16 @@ def generate_and_send_pdf_task(incident_id):
 
         # Define email details
         # Fetch active external recipients
-        to_emails = ExternalRecipient.objects.filter(
-            is_active=True
-            ).values_list("email", flat=True)
+        to_emails = ExternalRecipient.objects.filter(is_active=True).values_list(
+            "email", flat=True
+        )
         subject = f"Incident Report: {incident.brief_description}"
         body = (
-                f"<p>An incident occurred on {incident.eventdate} "
-                f"at {incident.store}.</p>"
-                f"<p>Details: {incident.brief_description}</p>"
-                f"<p>Please find the incident report attached.</p>"
-            )
+            f"<p>An incident occurred on {incident.eventdate} "
+            f"at {incident.store}.</p>"
+            f"<p>Details: {incident.brief_description}</p>"
+            f"<p>Please find the incident report attached.</p>"
+        )
 
         # Send the email
         send_incident_email(
@@ -651,5 +668,3 @@ def generate_and_send_pdf_task(incident_id):
     except Exception as e:
         logger.error(f"Error processing incident {incident_id}: {str(e)}")
         return f"Error processing incident {incident_id}: {str(e)}"
-
-
