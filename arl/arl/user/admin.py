@@ -1,5 +1,4 @@
 import uuid
-from datetime import datetime
 from django import forms
 from django.contrib import admin, messages
 from django.contrib.admin import SimpleListFilter
@@ -53,7 +52,7 @@ class ExternalRecipientAdmin(admin.ModelAdmin):
     search_fields = ("first_name", "last_name", "company", "email", "group__name")
 
 
-# This calss is used for exporting
+# This class is used for exporting
 class UserResource(resources.ModelResource):
     manager = export_fields.Field()
     whatsapp_consent = export_fields.Field()
@@ -70,6 +69,7 @@ class UserResource(resources.ModelResource):
 
     class Meta:
         model = CustomUser
+        exclude = ("sin", "sin_encrypted", "sin_hash")
         fields = (
             "username",
             "first_name",
@@ -79,7 +79,7 @@ class UserResource(resources.ModelResource):
             "phone_number",
             "manager",
             "whatsapp_consent",
-            "sin",
+            "sin_last4",
             "sin_expiration_date",
             "work_permit_expiration_date",
             "all_docusign_templates",
@@ -156,7 +156,6 @@ class ProcessedDocusignDocumentInline(
 class CustomUserAdmin(ExportActionMixin, UserAdmin):
     resource_class = UserResource
 
-    
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         if db_field.name in ["sin_expiration_date", "work_permit_expiration_date"]:
             kwargs["widget"] = TextInput(
