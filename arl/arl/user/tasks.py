@@ -49,7 +49,7 @@ def send_newhire_template_email_task(
         print(f"Error in send_master_email_task: {e}")
     return False
 
-
+# confirm this works.
 @app.task(name="create_hr_newhire_email")
 def create_newhire_data_email(email_data):
     try:
