@@ -1,5 +1,6 @@
 from __future__ import absolute_import, unicode_literals
 
+import base64
 import logging
 import time
 import uuid
@@ -8,10 +9,6 @@ from io import BytesIO
 
 import pdfkit
 import requests
-from django.template.loader import render_to_string
-from django.utils.text import slugify
-from PIL import Image
-
 from arl.celery import app
 from arl.dbox.helpers import master_upload_file_to_dropbox
 from arl.helpers import (
@@ -19,8 +16,16 @@ from arl.helpers import (
     get_signed_url_for_key,
     upload_to_linode_object_storage,
 )
+from arl.msg.helpers import create_master_email
 from arl.quiz.models import Checklist, SaltLog
+from arl.setup.models import TenantApiKeys
 from arl.user.models import CustomUser, Employer, Store
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.db.models import Q
+from django.template.loader import render_to_string
+from django.utils.text import slugify
+from PIL import Image
 
 logger = logging.getLogger(__name__)
 
@@ -232,6 +237,118 @@ def generate_checklist_pdf_task(self, checklist_id: int):
 
         # Upload
         ok, msg = master_upload_file_to_dropbox(pdf_buffer.getvalue(), full_file_path)
+
+        # ================== EMAIL CHECKLIST PDF ==================
+
+        group_name = "quiz_email"  # or "checklist_email" if that's the group
+        sendgrid_id = "d-7e7eb87381b04ef59bc39abc16550ead"
+        logger.info("[Checklist Email Task] Using template ID: %s", sendgrid_id)
+
+        # employer_id: derive from checklist (no request in Celery)
+        employer_id = getattr(
+            getattr(checklist.created_by, "employer", None), "id", None
+        )
+        if not employer_id:
+            logger.warning(
+                "[Checklist Email Task] No employer on checklist.created_by; skipping email."
+            )
+        else:
+            User = get_user_model()
+            to_emails = list(
+                User.objects.filter(
+                    Q(is_active=True),
+                    Q(groups__name=group_name),
+                    Q(employer_id=employer_id),
+                )
+                .values_list("email", flat=True)
+                .distinct()
+            )
+
+            if not to_emails:
+                logger.warning(
+                    "[Checklist Email Task] No active users in group '%s' for employer_id=%s",
+                    group_name,
+                    employer_id,
+                )
+            else:
+                # Verified sender
+                tenant_api_key = TenantApiKeys.objects.filter(
+                    employer_id=employer_id
+                ).first()
+                sender_email = (
+                    tenant_api_key.verified_sender_email
+                    if tenant_api_key
+                    else settings.MAIL_DEFAULT_SENDER
+                )
+
+                # Use the PDF bytes you already generated
+                pdf_filename = filename  # re-use from above
+                logger.info(
+                    "[Checklist Email Task] Preparing attachment: %s (%s bytes)",
+                    pdf_filename,
+                    len(pdf_bytes),
+                )
+
+                MAX_ATTACH_BYTES = 6_500_000  # conservative for SendGrid
+                attachments = None
+                if pdf_bytes and len(pdf_bytes) <= MAX_ATTACH_BYTES:
+                    attachments = [
+                        {
+                            "content": base64.b64encode(pdf_bytes).decode(),
+                            "filename": pdf_filename,
+                            "type": "application/pdf",  # <-- correct key name
+                            "disposition": "attachment",
+                        }
+                    ]
+                else:
+                    logger.info(
+                        "[Checklist Email Task] Attachment too large/missing; sending without file"
+                    )
+
+                # Template data (name/company from first recipient)
+                first_email = to_emails[0]
+                try:
+                    recip = User.objects.get(email=first_email)
+                    full_name = recip.get_full_name() or recip.username
+                    company_name = (
+                        getattr(getattr(recip, "employer", None), "name", None)
+                        or "Company"
+                    )
+                except User.DoesNotExist:
+                    full_name = "Team"
+                    company_name = "Company"
+
+                template_data = {
+                    "subject": f"Checklist #{checklist.id} PDF",
+                    "name": full_name,
+                    "company_name": company_name,
+                    # add any fields your SendGrid template expects
+                }
+
+                try:
+                    ok_email = create_master_email(
+                        to_email=to_emails,  # list is OK
+                        sendgrid_id=sendgrid_id,
+                        template_data=template_data,
+                        attachments=attachments,
+                        verified_sender=sender_email,
+                    )
+                    if ok_email:
+                        logger.info(
+                            "[Checklist Email Task] Email sent to %d recipients in '%s'",
+                            len(to_emails),
+                            group_name,
+                        )
+                    else:
+                        logger.error(
+                            "[Checklist Email Task] SendGrid send returned False"
+                        )
+                except Exception as e:
+                    logger.exception(
+                        "[Checklist Email Task] Error sending email: %s", e
+                    )
+        # ================== /EMAIL CHECKLIST PDF ==================
+
         pdf_buffer.close()
 
         if not ok:
@@ -277,13 +394,15 @@ def generate_checklist_pdf_task(self, checklist_id: int):
 def generate_fresh_checklist_pdf(checklist_id):
     try:
         checklist = (
-            Checklist.objects
-            .select_related("created_by", "submitted_by", "store")
+            Checklist.objects.select_related("created_by", "submitted_by", "store")
             .prefetch_related("items")
             .get(pk=checklist_id)
         )
-        logger.info("[PDF] Generating fresh PDF for checklist_id=%s title=%s",
-                    checklist.id, checklist.title)
+        logger.info(
+            "[PDF] Generating fresh PDF for checklist_id=%s title=%s",
+            checklist.id,
+            checklist.title,
+        )
 
     except Checklist.DoesNotExist:
         logger.error("[PDF] Checklist id=%s does not exist", checklist_id)
@@ -322,13 +441,17 @@ def generate_fresh_checklist_pdf(checklist_id):
         if it.photo and it.photo.name:
             orig = get_signed_url_for_key(it.photo.name, expires_in=900)
             photo_url = _downscale_for_pdf(orig, max_px=800, jpeg_quality=75)
-        items.append({
-            "text": it.text,
-            "result": it.result,
-            "comment": it.comment,
-            "photo_url": photo_url,
-        })
-    logger.info("[PDF] Collected %s items for checklist_id=%s", len(items), checklist.id)
+        items.append(
+            {
+                "text": it.text,
+                "result": it.result,
+                "comment": it.comment,
+                "photo_url": photo_url,
+            }
+        )
+    logger.info(
+        "[PDF] Collected %s items for checklist_id=%s", len(items), checklist.id
+    )
 
     # Render template
     html = render_to_string(
@@ -350,9 +473,13 @@ def generate_fresh_checklist_pdf(checklist_id):
             "--keep-relative-links": "",
         }
         pdf_bytes = pdfkit.from_string(html, False, options=options)
-        logger.info("[PDF] PDF generated successfully for checklist_id=%s", checklist.id)
+        logger.info(
+            "[PDF] PDF generated successfully for checklist_id=%s", checklist.id
+        )
     except Exception as e:
-        logger.exception("[PDF] Failed to generate PDF for checklist_id=%s: %s", checklist.id, e)
+        logger.exception(
+            "[PDF] Failed to generate PDF for checklist_id=%s: %s", checklist.id, e
+        )
         return None
 
     pdf_buffer = BytesIO(pdf_bytes)
@@ -365,7 +492,11 @@ def generate_fresh_checklist_pdf(checklist_id):
 
     try:
         upload_to_linode_object_storage(pdf_buffer, full_path)
-        logger.info("[PDF] Uploaded fresh PDF to %s for checklist_id=%s", full_path, checklist.id)
+        logger.info(
+            "[PDF] Uploaded fresh PDF to %s for checklist_id=%s",
+            full_path,
+            checklist.id,
+        )
     except Exception as e:
         logger.exception("[PDF] Upload failed for checklist_id=%s: %s", checklist.id, e)
         return None
