@@ -21,10 +21,11 @@ from sendgrid.helpers.mail import (
     FileType,
     Mail,
     Personalization,
-    To
+    To,
 )
 from twilio.base.exceptions import TwilioException
 from twilio.rest import Client
+
 from arl.setup.models import TenantApiKeys
 from arl.user.models import CustomUser, Store
 from .models import DraftEmail
@@ -81,8 +82,19 @@ def create_tobacco_email(to_email, name):
 # And the onbording of a new hire.
 # This will be the master function going forward.
 def create_master_email(
-    to_email, sendgrid_id, template_data, attachments=None, verified_sender=None
+    to_email,
+    sendgrid_id,
+    template_data,
+    attachments=None,
+    verified_sender=None,
+    custom_args=None,
 ):
+    logger.info("create_master_email types: attachments=%s, recipients=%s, template_data=%s, custom_args=%s",
+                type(attachments).__name__, type(to_email).__name__,
+                type(template_data).__name__, type(custom_args).__name__)
+    logger.info("create_master_email samples: attachments_head=%r, custom_args=%r, template_data_keys=%r",
+                attachments[:1] if isinstance(attachments, list) else attachments,
+                custom_args, list(template_data.keys()) if isinstance(template_data, dict) else template_data)
     try:
         unsubscribe_group_id = 24753
         if not isinstance(template_data, dict):
@@ -92,11 +104,11 @@ def create_master_email(
         # Ensure to_email is a list, even if a single string is passed
         if isinstance(to_email, str):
             to_email = [to_email]  # Convert single email to list
-        print(f"📧 The helper is sending email to: {', '.join(to_email)}")
+        logger.info(f"📧 The helper is sending email to: {', '.join(to_email)}")
         # ✅ If `verified_sender` is explicitly provided, use it without any lookup
         if verified_sender:
             sender_email = verified_sender
-            print(f"✅ Using explicitly provided sender email: {verified_sender}")
+            logger.info(f"✅ Using explicitly provided sender email: {verified_sender}")
         else:
             # ✅ Look up the employer and their verified sender email
             user_email = (
@@ -105,9 +117,9 @@ def create_master_email(
             try:
                 user = CustomUser.objects.get(email=user_email)
                 employer = user.employer
-                print(f"✅ Found user: {user.email}, Employer: {employer}")
+                logger.info(f"✅ Found user: {user.email}, Employer: {employer}")
             except CustomUser.DoesNotExist:
-                print(
+                logger.info(
                     f"❌ No user found with email {user_email}. Using default sender."
                 )
                 sender_email = settings.MAIL_DEFAULT_SENDER
@@ -120,38 +132,34 @@ def create_master_email(
                     else settings.MAIL_DEFAULT_SENDER
                 )
 
-        print(f"📧 Final sender email: {sender_email}")
+        logger.info(f"📧 Final sender email: {sender_email}")
+
         # Initialize the email message
-        message = Mail(
-            from_email=sender_email,
-        )
+        # (optional) normalize recipients a bit; Mail accepts str or list
+        if isinstance(to_email, str):
+            to_email = [e.strip() for e in [to_email] if e and e.strip()]
+        else:
+            to_email = [e.strip() for e in (to_email or []) if isinstance(e, str) and e.strip()]
+        if not to_email:
+            logger.error("❌ create_master_email: no valid recipient emails provided")
+            return False
 
-        print(f"📜 Email Template Data: {template_data}")
+        # Build message with recipients directly; SDK creates personalizations for you
+        message = Mail(from_email=sender_email, to_emails=to_email)
         message.template_id = sendgrid_id
-        asm = Asm(
-            group_id=unsubscribe_group_id,
-        )
-        message.asm = asm
+        message.dynamic_template_data = template_data
+        message.asm = Asm(group_id=unsubscribe_group_id)
 
-        # ✅ Create Personalization
-        personalization = Personalization()
-        for email in to_email:
-            personalization.add_to(To(email))
-        personalization.dynamic_template_data = template_data
-
-        if "subject" in template_data:
-            personalization.subject = template_data["subject"]
-
-        message.add_personalization(personalization)
-
-        print("✅ Final Email attachments summary:")
+        logger.info("✅ Final Email attachments summary:")
         for a in attachments or []:
             filename = a.get("filename", "Unnamed file")
             content = a.get("content", b"")
             filetype = a.get("type", "unknown")
 
-            size_kb = len(content) // 1024 if isinstance(content, (bytes, str)) else "N/A"
-            print(f"• {filename} ({filetype}) - {size_kb} KB")
+            size_kb = (
+                len(content) // 1024 if isinstance(content, (bytes, str)) else "N/A"
+            )
+            logger.info(f"• {filename} ({filetype}) - {size_kb} KB")
 
         # Handle attachments if provided
         if attachments:
@@ -173,10 +181,10 @@ def create_master_email(
 
         # Check response status
         if response.status_code == 202:
-            print(f"Email sent successfully to {to_email}.")
+            logger.info(f"Email sent successfully to {to_email}.")
             return True
         else:
-            print(
+            logger.info(
                 f"Failed to send email to {to_email}. Status code: {response.status_code}"
             )
             return False
@@ -188,7 +196,7 @@ def create_master_email(
             error_details += f" Response body: {e.body}"
 
         # Log error details for debugging
-        print(f"Error in create_master_email: {error_details}")
+        logger.info(f"Error in create_master_email: {error_details}")
         traceback.print_exc()  # For detailed error trace
         return False
 
@@ -273,10 +281,15 @@ def send_sms(phone_number, body):
     return None
 
 
-def send_linkshortened_sms(to_number, body, twilio_account_sid,
-                           twilio_auth_token, twilio_message_service_sid):
+def send_linkshortened_sms(
+    to_number, body, twilio_account_sid, twilio_auth_token, twilio_message_service_sid
+):
     try:
-        if not twilio_account_sid or not twilio_auth_token or not twilio_message_service_sid:
+        if (
+            not twilio_account_sid
+            or not twilio_auth_token
+            or not twilio_message_service_sid
+        ):
             logger.error("🚨 Missing Twilio credentials. Cannot send SMS.")
             return False
 
@@ -286,9 +299,10 @@ def send_linkshortened_sms(to_number, body, twilio_account_sid,
         message = client.messages.create(
             to=to_number,
             body=body,
-            messaging_service_sid=(twilio_message_service_sid
-                                   or settings.TWILIO_MESSAGE_SERVICE_SID),
-            shorten_urls=True
+            messaging_service_sid=(
+                twilio_message_service_sid or settings.TWILIO_MESSAGE_SERVICE_SID
+            ),
+            shorten_urls=True,
         )
         return f"✅ Message sent. SID: {message.sid}"
     except Exception as e:
@@ -790,11 +804,13 @@ def collect_attachments(request, max_files=5):
             messages.error(request, f"{file.name} exceeds 10MB limit.")
             return None
 
-        attachments.append({
-            "file_name": file.name,
-            "file_type": file.content_type,
-            "file_content": base64.b64encode(file.read()).decode("utf-8"),
-        })
+        attachments.append(
+            {
+                "file_name": file.name,
+                "file_type": file.content_type,
+                "file_content": base64.b64encode(file.read()).decode("utf-8"),
+            }
+        )
 
     return attachments
 
@@ -881,6 +897,15 @@ def is_member_of_comms_group(user):
     return is_member
 
 
+def is_member_of_whatsapp_group(user):
+    is_member = user.groups.filter(name="SendWhatsapp").exists()
+    if is_member:
+        logger.info(f"{user} is a member of 'SendWhatsapp' group.")
+    else:
+        logger.info(f"{user} is not a member of 'SendWhatsapp' group.")
+    return is_member
+
+
 def custom_permission_denied(request, message=None):
     return render(request, "incident/403.html", {"message": message}, status=403)
 
@@ -895,6 +920,7 @@ def get_uploaded_urls_from_request(request):
 
 def save_email_draft(user, cleaned_data, attachment_urls, draft_id=None):
     from django.shortcuts import get_object_or_404
+
     if draft_id:
         draft = get_object_or_404(DraftEmail, id=draft_id, user=user)
     else:
@@ -912,20 +938,9 @@ def save_email_draft(user, cleaned_data, attachment_urls, draft_id=None):
     draft.save()
 
 
-def send_quick_email(user, recipients, subject, message, attachment_urls):
-    from .tasks import master_email_send_task
-    master_email_send_task.delay(
-        recipients=recipients,
-        sendgrid_id="d-4ac0497efd864e29b4471754a9c836eb",  # Fallback SendGrid ID
-        employer_id=user.employer.id,
-        body=message,
-        subject=subject,
-        attachment_urls=attachment_urls,
-    )
-
-
 def send_template_email(user, recipients, sendgrid_template, attachment_urls):
     from .tasks import master_email_send_task
+
     master_email_send_task.delay(
         recipients=recipients,
         sendgrid_id=sendgrid_template.sendgrid_id,

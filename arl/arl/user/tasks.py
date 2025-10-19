@@ -34,9 +34,9 @@ def send_newhire_template_email_task(
 
         senior_contact_name = template_data.get("senior_contact_name", "HR Team")
 
-        print(f"📧 Sending New Hire Email to: {to_email}")
-        print(f"📜 Senior Contact Name: {senior_contact_name}")
-        print(f"📜 Email Template Data: {template_data}")
+        logger.info(f"📧 Sending New Hire Email to: {to_email}")
+        logger.info(f"📜 Senior Contact Name: {senior_contact_name}")
+        logger.info(f"📜 Email Template Data: {template_data}")
 
         # Call the helper function, passing template_data
         create_master_email(
@@ -46,7 +46,7 @@ def send_newhire_template_email_task(
             attachments=attachments,
         )
     except Exception as e:
-        print(f"Error in send_master_email_task: {e}")
+        logger.info(f"Error in send_master_email_task: {e}")
     return False
 
 
@@ -54,7 +54,7 @@ def send_newhire_template_email_task(
 def create_newhire_data_email(email_data):
     try:
         logger.info("📩 New hire data email task started")
-        logger.debug(f"Raw email data: {email_data}")
+        logger.info(f"Raw email data: {email_data}")
 
         # Handle stringified input
         if isinstance(email_data, str):
@@ -87,6 +87,8 @@ def create_newhire_data_email(email_data):
                 error_msg = f"❌ No HR or fallback email for employer ID {employer_id}"
                 logger.error(error_msg)
                 return error_msg
+        logger.info("To emails :", to_emails)
+
 
         # ✅ Send via Master Email Function
         create_master_email(
