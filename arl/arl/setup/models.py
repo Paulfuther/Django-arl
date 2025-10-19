@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 cipher = Fernet(settings.SECRET_ENCRYPTION_KEY)
-print(cipher, "Secret Key :", settings.SECRET_ENCRYPTION_KEY)
+# print(cipher, "Secret Key :", settings.SECRET_ENCRYPTION_KEY)
 
 
 class TenantApiKeys(models.Model):

@@ -350,8 +350,8 @@ FERNET_PRIMARY_KEY = os.environ["FERNET_PRIMARY_KEY"]          # 32-byte urlsafe
 FERNET_OLD_KEYS = [k for k in os.environ.get("FERNET_OLD_KEYS", "").split(",") if k]
 SIN_HASH_SALT = os.environ["SIN_HASH_SALT"]
 
-print("site url:", SITE_URL)
-print("Twilio Message Service Sid :", MESSAGE_SERVICE_SID)
+# print("site url:", SITE_URL)
+# print("Twilio Message Service Sid :", MESSAGE_SERVICE_SID)
 
 # settings.py (only for local dev!)
 # SESSION_COOKIE_SAMESITE = None
