@@ -688,6 +688,10 @@ class UploadChecklistItemPhotoView(LoginRequiredMixin, View):
         file = request.FILES.get("file")
         if not file:
             return JsonResponse({"error": "No file provided"}, status=400)
+        # Now safe to log size
+        logger.info("📸 Incoming upload: name=%s size=%.2f MB ct=%s",
+                    getattr(file, "name", ""), getattr(file, "size", 0) / 1024 / 1024,
+                    getattr(file, "content_type", None))
 
         checklist = get_object_or_404(Checklist, slug=slug)
 
@@ -704,9 +708,15 @@ class UploadChecklistItemPhotoView(LoginRequiredMixin, View):
                 {"error": "Account misconfigured. Please contact support."},
                 status=403
             )
+        # 🔒 Extra guard: make sure checklist belongs to same employer
+        checklist_employer = getattr(getattr(checklist, "created_by", None), "employer", None)
+        if checklist_employer and checklist_employer != employer:
+            logger.warning("TENANT_MISMATCH: user_emp=%s checklist_emp=%s slug=%s",
+                           getattr(employer, "id", None), getattr(checklist_employer, "id", None), slug)
+            return JsonResponse({"error": "Forbidden"}, status=403)
 
         item = get_object_or_404(ChecklistItem, checklist=checklist, uuid=item_uuid)
-        # print("item :", item)
+
         # Size guard
         if getattr(file, "size", 0) > MAX_BYTES:
             return JsonResponse({"error": "File too large (max 10MB)."}, status=400)
