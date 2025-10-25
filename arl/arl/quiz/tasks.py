@@ -165,7 +165,6 @@ def generate_checklist_pdf_task(self, checklist_id: int):
         # --- store segment (folder + filename) ---
         store_label = None
         if getattr(checklist, "store", None):
-            # prefer a store number if you have one; else name
             store_label = getattr(checklist.store, "number", None) or getattr(
                 checklist.store, "name", None
             )
@@ -174,53 +173,24 @@ def generate_checklist_pdf_task(self, checklist_id: int):
             "[PDF] loaded checklist slug=%s title=%s", checklist.slug, checklist.title
         )
 
-        # Build items + signed photo URLs
-        items = []
-        count_photos = 0
-        for item in checklist.items.all().order_by("order", "id"):
-            photo_url = None
-            if item.photo and item.photo.name:
-                photo_url = get_signed_url_for_key(item.photo.name, expires_in=3600)
-                count_photos += 1
-            items.append(
-                {
-                    "text": item.text,
-                    "result": item.result,
-                    "comment": item.comment,
-                    "photo_url": photo_url,
-                }
-            )
-        logger.info("[PDF] items=%d photos=%d", len(items), count_photos)
+        # ================== CHANGED: use your SMALL-PDF task ==================
+        # Produce the small PDF in TEMP via your generate_fresh_checklist_pdf task
+        # (This is a normal function call here; runs synchronously in this worker.)
 
-        store_number = None
-        store_name = None
-        if checklist.store:
-            # change these attr names if your Store model differs
-            store_number = getattr(checklist.store, "number", None)
-            store_name = getattr(checklist.store, "name", None)
-            # Render HTML
-        html_content = render_to_string(
-            "quiz/checklist_pdf.html",
-            {
-                "checklist": checklist,
-                "items": items,
-                "store_number": store_number,
-                "store_name": store_name,
-            },
-        )
-        logger.info("[PDF] html_len=%d", len(html_content))
+        temp_key = generate_fresh_checklist_pdf(checklist_id)
+        if not temp_key:
+            raise RuntimeError("fresh-pdf task returned no key")
 
-        # Generate PDF
-        pdf_options = {
-            "enable-local-file-access": None,
-            "encoding": "UTF-8",
-            "--keep-relative-links": "",
-        }
-        pdf_bytes = pdfkit.from_string(html_content, False, options=pdf_options)
-        logger.info("[PDF] pdf_size_bytes=%d", len(pdf_bytes))
+        # Sign & download the small PDF bytes
+        signed = get_signed_url_for_key(temp_key, expires_in=900)
+        r = requests.get(signed, timeout=30)
+        r.raise_for_status()
+        pdf_bytes = r.content
         pdf_buffer = BytesIO(pdf_bytes)
+        logger.info("[PDF] fresh pdf_size_bytes=%d (key=%s)", len(pdf_bytes), temp_key)
+        # ================== /CHANGED ==================
 
-        # Build Dropbox path
+        # Build Dropbox path (unchanged)
         company_name = slugify(
             getattr(
                 getattr(checklist.created_by, "employer", None), "name", "no-company"
@@ -235,16 +205,14 @@ def generate_checklist_pdf_task(self, checklist_id: int):
         full_file_path = f"{folder_path}/{filename}"
         logger.info("[PDF] upload_path=%s", full_file_path)
 
-        # Upload
+        # Upload to Dropbox (unchanged)
         ok, msg = master_upload_file_to_dropbox(pdf_buffer.getvalue(), full_file_path)
 
-        # ================== EMAIL CHECKLIST PDF ==================
-
-        group_name = "quiz_email"  # or "checklist_email" if that's the group
+        # ================== EMAIL CHECKLIST PDF (unchanged) ==================
+        group_name = "quiz_email"  # or "checklist_email"
         sendgrid_id = "d-7e7eb87381b04ef59bc39abc16550ead"
         logger.info("[Checklist Email Task] Using template ID: %s", sendgrid_id)
 
-        # employer_id: derive from checklist (no request in Celery)
         employer_id = getattr(
             getattr(checklist.created_by, "employer", None), "id", None
         )
@@ -271,7 +239,6 @@ def generate_checklist_pdf_task(self, checklist_id: int):
                     employer_id,
                 )
             else:
-                # Verified sender
                 tenant_api_key = TenantApiKeys.objects.filter(
                     employer_id=employer_id
                 ).first()
@@ -281,22 +248,21 @@ def generate_checklist_pdf_task(self, checklist_id: int):
                     else settings.MAIL_DEFAULT_SENDER
                 )
 
-                # Use the PDF bytes you already generated
-                pdf_filename = filename  # re-use from above
+                pdf_filename = filename  # keep your naming
                 logger.info(
                     "[Checklist Email Task] Preparing attachment: %s (%s bytes)",
                     pdf_filename,
                     len(pdf_bytes),
                 )
 
-                MAX_ATTACH_BYTES = 6_500_000  # conservative for SendGrid
+                MAX_ATTACH_BYTES = 15_500_000  # conservative SG limit
                 attachments = None
                 if pdf_bytes and len(pdf_bytes) <= MAX_ATTACH_BYTES:
                     attachments = [
                         {
                             "content": base64.b64encode(pdf_bytes).decode(),
                             "filename": pdf_filename,
-                            "type": "application/pdf",  # <-- correct key name
+                            "type": "application/pdf",
                             "disposition": "attachment",
                         }
                     ]
@@ -305,7 +271,6 @@ def generate_checklist_pdf_task(self, checklist_id: int):
                         "[Checklist Email Task] Attachment too large/missing; sending without file"
                     )
 
-                # Template data (name/company from first recipient)
                 first_email = to_emails[0]
                 try:
                     recip = User.objects.get(email=first_email)
@@ -322,12 +287,11 @@ def generate_checklist_pdf_task(self, checklist_id: int):
                     "subject": f"Checklist #{checklist.id} PDF",
                     "name": full_name,
                     "company_name": company_name,
-                    # add any fields your SendGrid template expects
                 }
 
                 try:
                     ok_email = create_master_email(
-                        to_email=to_emails,  # list is OK
+                        to_email=to_emails,  # list OK
                         sendgrid_id=sendgrid_id,
                         template_data=template_data,
                         attachments=attachments,
@@ -354,7 +318,7 @@ def generate_checklist_pdf_task(self, checklist_id: int):
         if not ok:
             raise RuntimeError(msg or "Upload failed")
 
-        # Persist (if you have these fields)
+        # Persist (unchanged if you have these fields)
         update_fields = []
         if hasattr(checklist, "pdf_key"):
             checklist.pdf_key = full_file_path
@@ -379,7 +343,6 @@ def generate_checklist_pdf_task(self, checklist_id: int):
 
     except Exception as e:
         logger.exception("[PDF] error checklist_id=%s err=%s", checklist_id, e)
-        # Optional: mark error status on model
         try:
             checklist = Checklist.objects.get(pk=checklist_id)
             if hasattr(checklist, "pdf_status"):
@@ -428,7 +391,7 @@ def generate_fresh_checklist_pdf(checklist_id):
             buf.close()
 
             signed_url = get_signed_url_for_key(tmp_key, expires_in=900)
-            logger.debug("[PDF] Uploaded downscaled image to %s", tmp_key)
+            logger.info("[PDF] Uploaded downscaled image to %s", tmp_key)
             return signed_url
         except Exception as e:
             logger.warning("[PDF] Could not process image %s: %s", http_url, e)

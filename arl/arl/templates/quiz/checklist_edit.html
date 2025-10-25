@@ -8,9 +8,45 @@
 
 
 <style>
-  .thumb-120 { width:120px; height:120px; border:1px solid #ddd; border-radius:6px; overflow:hidden; background:#f8f9fa }
-  .thumb-120 img { width:100%; height:100%; object-fit:cover; display:block }
-  .dz-check-photo { border:2px dashed #ccc; border-radius:6px; padding:12px; min-height:90px; background:#f9f9f9; text-align:center; color:#777; font-size:.9rem }
+  .thumb-120 {
+    width:80px; height:80px;
+    border:1px solid #ddd; border-radius:6px;
+    overflow:hidden; background:#f8f9fa;
+    display:flex; align-items:center; justify-content:center;
+    margin-top: 6px;
+  }
+  .thumb-120 img {
+    width:100%; height:100%; object-fit:cover; display:block;
+  }
+
+  /* ✅ Force Dropzone to match 80×80 */
+  .dz-check-photo {
+    width:80px !important;
+    height:80px !important;
+    min-width:80px !important;
+    min-height:80px !important;
+    max-width:80px !important;
+    max-height:80px !important;
+
+    border:2px dashed #ccc; border-radius:6px;
+    background:#f9f9f9;
+    display:flex; align-items:center; justify-content:center;
+    text-align:center; color:#777; font-size:.8rem;
+    padding:0;
+    margin-top:6px;
+  }
+
+  /* Dropzone’s auto-generated preview box sometimes adds extra height */
+  .dz-preview, .dz-message {
+    margin:0 !important;
+    padding:0 !important;
+  }
+
+  /* Align both columns top */
+  .row.align-items-start .col-auto {
+  display: flex;
+  align-items: flex-end; /* aligns bottom edge with comment */
+}
 </style>
 
 <div class="container">
@@ -28,8 +64,10 @@
             {% endfor %}
           </div>
       {% endif %}
-
+<div id="autosave-status" class="text-muted small mb-2" style="display:none;"></div>
 <legend class="mb-3">Edit: {{ checklist.title }}</legend>
+
+
 
 <div class="d-flex gap-2 mb-2">
   <a href="{% url 'checklist_dashboard' %}" class="btn btn-sm btn-outline-primary">
@@ -77,34 +115,27 @@
           </div>
         </div>
 
-        <!-- Row 2: comments -->
-        <div class="row g-2">
-          <div class="col-12">{{ f.comment|as_crispy_field }}</div>
-        </div>
+        <!-- Row 2: comment (left) + image/dropzone (right) -->
+        <div class="row g-2 align-items-start mt-2">
+          <div class="col">
+            {{ f.comment|as_crispy_field }}
+          </div>
 
-        <!-- Hide the built-in file input; uploads are separate -->
-        <div class="d-none">{{ f.photo }}</div>
+          <!-- Hide the built-in file input; uploads are separate -->
+          <div class="d-none">{{ f.photo }}</div>
 
-        <!-- Row 3: Image area -->
-        <div class="row g-2 align-items-center mt-2">
-          {% if f.instance.signed_url %}
-            <!-- Show thumbnail ONLY (no editing) -->
-            <div class="col-auto">
-              <a href="{{ f.instance.signed_url }}" target="_blank" class="thumb-120 d-inline-block">
+          <div class="col-auto">
+            {% if f.instance.signed_url %}
+              <a href="{{ f.instance.signed_url }}" target="_blank" class="thumb-120 d-inline-block" rel="noopener">
                 <img src="{{ f.instance.signed_url }}" alt="photo">
               </a>
-            </div>
-          {% else %}
-            <!-- No image yet: show Dropzone upload -->
-            <div class="col-auto">
+            {% else %}
               <div class="dropzone dz-check-photo"
-                   data-upload-url="{% url 'upload_checklist_item_photo' slug=checklist.slug item_uuid=f.instance.uuid %}">
-                <div class="dz-message">Upload Photo</div>
+                  data-upload-url="{% url 'upload_checklist_item_photo' slug=checklist.slug item_uuid=f.instance.uuid %}">
+                <div class="dz-message small">Upload<br>Photo</div>
               </div>
-            </div>
-          {% endif %}
-
-         
+            {% endif %}
+          </div>
         </div>
       </div>
     </div>
@@ -128,6 +159,41 @@
   document.addEventListener('DOMContentLoaded', function () {
     const CSRF = getCookie('csrftoken');
 
+    // ↓ Small helper: downscale to max 1600px, JPEG ~80%
+    function downscaleImageFile(file, {maxDim=1600, quality=0.82} = {}) {
+      return new Promise((resolve, reject) => {
+        // If HEIC/HEIF (often not decodable in browser), skip transform
+        if (!file.type.startsWith('image/') || /heic|heif/i.test(file.type)) {
+          resolve(file);
+          return;
+        }
+        const img = new Image();
+        img.onload = () => {
+          let {width:w, height:h} = img;
+          if (w <= maxDim && h <= maxDim) {
+            resolve(file); // already small
+            URL.revokeObjectURL(img.src);
+            return;
+          }
+          const ratio = Math.min(maxDim / w, maxDim / h);
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(w * ratio);
+          canvas.height = Math.round(h * ratio);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          canvas.toBlob(blob => {
+            if (!blob) { resolve(file); return; }
+            const name = file.name.replace(/\.\w+$/, '') + '.jpg';
+            resolve(new File([blob], name, { type: 'image/jpeg' }));
+          }, 'image/jpeg', quality);
+          URL.revokeObjectURL(img.src);
+        };
+        img.onerror = () => reject(new Error('Image decode failed'));
+        img.src = URL.createObjectURL(file);
+      });
+    }
+
+
     document.querySelectorAll('.dz-check-photo').forEach(function (el) {
       const url = el.getAttribute('data-upload-url');
 
@@ -142,6 +208,23 @@
         createImageThumbnails: false,          // ✅ save mobile CPU/RAM
         clickable: true,                       // ✅ tap anywhere to open picker
         timeout: 60 * 1000,                    // ✅ 60s network timeout
+
+        // ↓ NEW: resize/compress before upload
+        transformFile: async function (file, done) {
+          try {
+            console.log(`[Dropzone] Original file: ${file.name}, ${(file.size / 1024 / 1024).toFixed(2)} MB`);
+
+            const optimized = await downscaleImageFile(file, { maxDim: 1600, quality: 0.82 });
+
+            console.log(`[Dropzone] Optimized file: ${optimized.name}, ${(optimized.size / 1024 / 1024).toFixed(2)} MB`);
+
+            done(optimized);
+          } catch (err) {
+            console.warn("[Dropzone] Resize failed, uploading original file:", err);
+            done(file);
+          }
+        },
+
         init: function () {
           const ensureCameraHints = () => {
             if (this.hiddenFileInput) {
@@ -222,5 +305,75 @@
       }, 5000);
     });
   });
+</script>
+
+<script>
+  (function () {
+    const form = document.querySelector('form');
+    if (!form) return;
+
+    const CSRF = (typeof getCookie === 'function') ? getCookie('csrftoken') : null;
+    const statusEl = document.getElementById('autosave-status');
+    const actionUrl = (typeof form.action === 'string' && form.action) ? form.action : window.location.href;
+    const AUTOSAVE_URL = actionUrl + (actionUrl.includes('?') ? '&' : '?') + 'autosave=1';
+    let saveTimer = null;
+    let inflight = false;
+
+    // Show “last saved …” helper
+    function showSavedAt(ts) {
+      if (!statusEl) return;
+      statusEl.style.display = '';
+      statusEl.textContent = `💾 Draft auto-saved ${new Date(ts).toLocaleTimeString()}`;
+    }
+
+    // Fire the autosave
+    async function doAutosave() {
+      if (inflight) return; // don’t pile up
+      inflight = true;
+      try {
+        const fd = new FormData(form);
+        const resp = await fetch(AUTOSAVE_URL, {
+          method: 'POST',
+          body: fd,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            ...(CSRF ? {'X-CSRFToken': CSRF} : {})
+          },
+          credentials: 'same-origin'
+        });
+        if (resp.ok) {
+          const data = await resp.json().catch(() => ({}));
+          showSavedAt(data.saved_at || Date.now());
+        }
+      } catch (e) {
+        // silent fail is fine for drafts
+        // console.warn('autosave failed', e);
+      } finally {
+        inflight = false;
+      }
+    }
+
+    // Debounce on input/change
+    const onChange = () => {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(doAutosave, 1500);
+    };
+
+    // Watch all inputs (incl. formset rows)
+    form.querySelectorAll('input, textarea, select').forEach(el => {
+      el.addEventListener('input', onChange, { passive: true });
+      el.addEventListener('change', onChange, { passive: true });
+    });
+
+    // Save when the page is backgrounded (user puts phone down / switches apps)
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') doAutosave();
+    });
+
+    // Don’t double-post if they actually submit
+    form.addEventListener('submit', () => {
+      clearTimeout(saveTimer);
+    });
+  })();
 </script>
 {% endblock %}
