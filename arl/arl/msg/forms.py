@@ -1,10 +1,11 @@
 from collections import defaultdict
-from django.forms import RadioSelect
+
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.db import models
 from django.db.models import CharField, IntegerField, Value
+from django.forms import RadioSelect
 from django.forms.widgets import Select
 
 from arl.msg.models import EmailTemplate, WhatsAppTemplate
@@ -36,7 +37,7 @@ class SMSForm(forms.Form):
     selected_users = forms.ModelMultipleChoiceField(
         queryset=CustomUser.objects.none(),
         required=False,
-        widget=forms.CheckboxSelectMultiple
+        widget=forms.CheckboxSelectMultiple,
     )
 
     def __init__(self, *args, **kwargs):
@@ -53,8 +54,7 @@ class SMSForm(forms.Form):
 
             # ✅ Populate users for this employer
             self.fields["selected_users"].queryset = CustomUser.objects.filter(
-                employer=employer,
-                is_active=True
+                employer=employer, is_active=True
             ).order_by("first_name", "last_name")
 
     def clean_message(self):
@@ -66,21 +66,29 @@ class SMSForm(forms.Form):
 
 class TemplateWhatsAppForm(forms.Form):
     whatsapp_id = forms.ModelChoiceField(
-        queryset=WhatsAppTemplate.objects.all(), label="Select Template"
+        queryset=WhatsAppTemplate.objects.all(),
+        required=True,
+        label="Select WhatsApp Template",
     )
 
     selected_group = forms.ModelChoiceField(
-        queryset=Group.objects.all(),
-        required=True,
-        label="Select Group to Send Whatsapp",
-        widget=forms.Select(attrs={"class": "custom-input"}),
+        queryset=Group.objects.none(),  # Populated in __init__
+        required=True,  # Now required
+        label="Select Group to Send WhatsApp",
+        widget=forms.RadioSelect,
     )
 
     def __init__(self, *args, **kwargs):
+        user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
-        for field_name, field in self.fields.items():
-            if field_name != "csrfmiddlewaretoken":  # Skip CSRF token field
-                field.widget.attrs.update({"class": "custom-input"})
+
+        if user and user.employer:
+            employer = user.employer
+
+            # ✅ Only include groups related to this employer
+            self.fields["selected_group"].queryset = Group.objects.filter(
+                user__employer=employer
+            ).distinct()
 
 
 class SendGridFilterForm(forms.Form):
@@ -197,12 +205,10 @@ class SMSLogFilterForm(forms.Form):
     start_date = forms.DateField(
         required=False,
         widget=forms.DateInput(attrs={"type": "date"}),
-        label="Start Date"
+        label="Start Date",
     )
     end_date = forms.DateField(
-        required=False,
-        widget=forms.DateInput(attrs={"type": "date"}),
-        label="End Date"
+        required=False, widget=forms.DateInput(attrs={"type": "date"}), label="End Date"
     )
 
 
@@ -256,7 +262,7 @@ class EmailForm(forms.Form):
     email_mode = forms.ChoiceField(
         choices=MODE_CHOICES,
         widget=forms.RadioSelect,
-        initial="text",
+        initial="template",
         required=True,
         label="Choose Email Mode",
     )
@@ -265,13 +271,15 @@ class EmailForm(forms.Form):
         max_length=255,
         required=False,
         label="Email Subject",
-        widget=forms.TextInput(attrs={"placeholder": "Enter a subject..."})
+        widget=forms.TextInput(attrs={"placeholder": "Enter a subject..."}),
     )
 
     message = forms.CharField(
-        widget=forms.Textarea(attrs={"rows": 5, "placeholder": "Write your message here..."}),
+        widget=forms.Textarea(
+            attrs={"rows": 5, "placeholder": "Write your message here..."}
+        ),
         required=False,
-        label="Message Body"
+        label="Message Body",
     )
 
     sendgrid_id = forms.ModelChoiceField(
@@ -311,17 +319,22 @@ class EmailForm(forms.Form):
         if user and hasattr(user, "employer"):
             employer = user.employer
 
-            self.fields["sendgrid_id"].queryset = EmailTemplate.objects.filter(
-                models.Q(employers=employer) | models.Q(employers__isnull=True)
-            ).distinct().order_by("name")
+            self.fields["sendgrid_id"].queryset = (
+                EmailTemplate.objects.filter(
+                    models.Q(employers=employer) | models.Q(employers__isnull=True)
+                )
+                .distinct()
+                .order_by("name")
+            )
 
-            self.fields["selected_group"].queryset = Group.objects.filter(
-                user__employer=employer
-            ).distinct().order_by("name")
+            self.fields["selected_group"].queryset = (
+                Group.objects.filter(user__employer=employer)
+                .distinct()
+                .order_by("name")
+            )
 
             self.fields["selected_users"].queryset = User.objects.filter(
-                employer=employer,
-                is_active=True
+                employer=employer, is_active=True
             ).order_by("last_name")
 
             self.fields["selected_users"].label_from_instance = lambda u: (
@@ -341,7 +354,9 @@ class EmailForm(forms.Form):
                 cleaned_data["email_mode"] = "text"
 
             if mode == "template":
-                raise forms.ValidationError("Drafts can only be saved when composing a custom message.")
+                raise forms.ValidationError(
+                    "Drafts can only be saved when composing a custom message."
+                )
 
             return cleaned_data
 
@@ -355,14 +370,20 @@ class EmailForm(forms.Form):
 
         # Validate group/user selection
         if not selected_group and not selected_users:
-            raise forms.ValidationError("You must select either a group or at least one user.")
+            raise forms.ValidationError(
+                "You must select either a group or at least one user."
+            )
         if selected_group and selected_users:
-            raise forms.ValidationError("You cannot select both a group and individual users.")
+            raise forms.ValidationError(
+                "You cannot select both a group and individual users."
+            )
 
         # Validate mode-based inputs
         if mode == "text":
             if not subject or not message:
-                raise forms.ValidationError("Subject and message are required for text mode.")
+                raise forms.ValidationError(
+                    "Subject and message are required for text mode."
+                )
         elif mode == "template":
             if not sendgrid_id:
                 raise forms.ValidationError("You must select a template.")

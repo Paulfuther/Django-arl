@@ -1,744 +1,386 @@
 {% load crispy_forms_tags %}
 {% load static %}
 
+<div x-data="emailComposer()" x-init="init()" class="container my-4">
+  {% if draft_id %}<input type="hidden" id="draft-id" value="{{ draft_id }}">{% endif %}
+  <input type="hidden" id="uploaded_file_urls" value='{{ attachment_urls|default:"[]"|safe }}'>
 
-<script src="https://unpkg.com/dropzone@5/dist/min/dropzone.min.js"></script>
+  <!-- Mode toggle -->
+  <fieldset class="mb-3">
+    <label class="me-3">
+      <input type="radio" name="mode" id="email_mode_template" value="template" x-model="mode">
+      Use Prebuilt Template
+    </label>
+    <label>
+      <input type="radio" name="mode" id="email_mode_text" value="text" x-model="mode">
+      Compose Message
+    </label>
+  </fieldset>
 
-<style>
-
-  /* Loader Animation */
-    .loading-container {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100px;
-    }
-
-    .loading-bounce {
-      display: flex;
-      justify-content: space-between;
-      width: 50px;
-    }
-
-    .loading-bounce div {
-      width: 12px;
-      height: 12px;
-      background-color: #007bff;
-      border-radius: 50%;
-      animation: loadingBounce 1.5s infinite ease-in-out;
-    }
-
-    .loading-bounce div:nth-child(1) {
-      animation-delay: 0s;
-    }
-    .loading-bounce div:nth-child(2) {
-      animation-delay: 0.2s;
-    }
-    .loading-bounce div:nth-child(3) {
-      animation-delay: 0.4s;
-    }
-
-    @keyframes loadingBounce {
-      0%,
-      80%,
-      100% {
-        transform: scale(0);
-      }
-      40% {
-        transform: scale(1);
-      }
-    }
-
-
-  .dz-preview .dz-image img {
-  width: auto !important;
-  height: auto !important;
-  max-width: 100% !important;
-  max-height: 200px; /* adjust if you want a consistent max height */
-  object-fit: contain; /* ensures full image is shown */
-}
-
-  #template-email-dropzone {
-  border: 2px dashed #ccc;
-  border-radius: 6px;
-  padding: 20px;
-  min-height: 120px;
-  background: #f9f9f9;
-  text-align: center;
-  color: #777;
-}
-
-
-  .dropdown-toggle-btn.open::after {
-    transform: rotate(180deg);
-    content: "▲";
-  }
-
-  .dropdown-box {
-    border: 1px solid #ccc;
-    border-top: none;
-    border-radius: 0 0 8px 8px;
-    overflow: hidden;
-    max-height: 0;
-    opacity: 0;
-    transition: max-height 0.4s ease, opacity 0.4s ease;
-    background: white;
-    padding: 0;
-  }
-
-  .dropdown-box.open {
-    max-height: 400px; /* adjust if needed */
-    opacity: 1;
-    padding: 8px 0;
-  }
-
-  .custom-upload {
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  background-color: #f9f9f9;
-  padding: 6px;
-  font-size: 14px;
-}
-
-  .checkbox-group label {
-    display: block;
-    margin-bottom: 4px;
-  }
-
- 
-</style>
-
-<form id="template-email-form" method="post" action="{% url 'comms' %}" enctype="multipart/form-data">
-{% csrf_token %}
-{% if draft_id %}
-  <input type="hidden" name="draft_id" value="{{ draft_id }}">
-{% endif %}
+  <!-- Compose section -->
+  <div x-show="mode === 'text'" id="compose-email-section" class="mb-4">
+    <!-- Saved Drafts -->
     <div class="mb-3">
-        <h6 class="text-muted mb-2">Saved Drafts</h6>
-        <ul class="list-group">
-          {% for draft in drafts %}
-            <li class="list-group-item d-flex justify-content-between align-items-center px-2 py-2">
-              <div class="d-flex align-items-center">
-                {% if draft.id != email_form.initial.draft_id %}
-                 <button
-                  type="submit"
-                  formaction="{% url 'delete_draft_email' draft.id %}"
-                  formmethod="post"
-                  class="btn btn-sm btn-light py-0 px-2 text-danger"
-                  title="Delete Draft"
-                  onclick="return confirm('Are you sure you want to delete this draft?');"
-                >
-                 <i class="fas fa-trash" style="color: #007bff;"></i> 
+      <h6 class="text-muted mb-2">Saved Drafts</h6>
+      <ul class="list-group">
+        {% for d in drafts %}
+          <li class="list-group-item d-flex justify-content-between align-items-center px-2 py-2">
+            <div class="d-flex align-items-center">
+              <!-- delete on the left -->
+              <form method="post" action="{% url 'delete_draft_email' d.id %}" class="me-2">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-link p-0 text-danger" title="Delete draft"
+                        onclick="return confirm('Delete this draft?');">
+                  <i class="fas fa-trash"></i>
                 </button>
-                {% else %}
-                  <span class="me-2 text-muted">📝</span>
-                {% endif %}
-
-
-
-
-                <a href="{% url 'edit_draft_email' draft.id %}" class="text-decoration-none text-dark">
-                  {{ draft.subject|default:"(No Subject)" }}
-                </a>
-
-                {% if draft.id == email_form.initial.draft_id %}
-                  <span class="badge bg-secondary ms-2">Editing</span>
-                {% endif %}
-              </div>
-            </li>
-          {% empty %}
-            <li class="list-group-item text-muted small">No drafts saved yet.</li>
-          {% endfor %}
-        </ul>
-    </div>
-  
-  
-  <input type="hidden" name="uploaded_file_urls" id="uploaded_file_urls" value='{{ attachment_urls|default:"[]"|safe }}'>
-  <input type="hidden" name="form_type" value="email" />
-    {% if messages %}
-    <div class="mt-3">
-      {% for message in messages %}
-        <div class="alert {% if message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %} alert-dismissible fade show" role="alert">
-          {{ message }}
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-      {% endfor %}
-    </div>
-    {% endif %}
-
-        {% if email_form.errors %}
-          <div class="alert alert-danger">
-            <strong>Form Errors:</strong>
-            <ul>
-              {% for field in email_form %}
-                {% for error in field.errors %}
-                  <li><strong>{{ field.label }}:</strong> {{ error }}</li>
-                {% endfor %}
-              {% endfor %}
-              {% for error in email_form.non_field_errors %}
-                <li>{{ error }}</li>
-              {% endfor %}
-            </ul>
-          </div>
-        {% endif %}
-
-<div id="template-email-spinner" class="mt-3 text-center" style="display: none;">
-  <span class="dot-loader"><span></span><span></span><span></span></span>
-  <div class="text-muted small mt-1">Sending your email…</div>
-</div>
- 
-
-
-        <fieldset class="mb-4">
-          <legend class="fs-6 fw-semibold text-secondary mb-2">Email Mode</legend>
-          <div class="form-check">
-            <input class="form-check-input" type="radio" name="email_mode" id="email_mode_text" value="text" checked>
-            <label class="form-check-label" for="email_mode_text">
-              Compose Message
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="radio" name="email_mode" id="email_mode_template" value="template">
-            <label class="form-check-label" for="email_mode_template">
-              Use Prebuilt Template
-            </label>
-          </div>
-        </fieldset>
-
-        <!--  AI prompt -->
-        <div id="ai-prompt-wrapper" class="mb-3">
-            <label for="ai-prompt" class="form-label">Need help from AI to write your message?</label>
-            <textarea id="ai-prompt" class="form-control mb-2" rows="2" placeholder="Describe what you want to say..."></textarea>
-            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="generateEmailAI()">Generate with AI</button>
-          </div>
-
-          <div id="ai-generated-result" style="display: none;" class="mb-3">
-            <label class="form-label">Suggested Message:</label>
-            <textarea id="ai-body" class="form-control" rows="6"></textarea>
-            <button type="button" class="btn btn-link btn-sm mt-1" onclick="insertGeneratedEmail()">⬇️ Insert into form</button>
-      </div>
-
-         <!-- Spinner for SMS AI -->
-      <div id="email-ai-spinner" class="loading-container" style="display: none;">
-        <div class="loading-bounce">
-          <div></div>
-          <div></div>
-          <div></div>
-        </div>
-      </div>
-
-
-          <div id="quick-email-section">
-              <div class="mb-3">
-                {{ email_form.subject|as_crispy_field }}
-              </div>
-              <div class="mb-3">
-                {{ email_form.message|as_crispy_field }}
-              </div>
-        </div>
-
-
-          <!-- Template Selection -->
-       
-        <div id="template-email-section" style="display: none;">
-            <button type="button" id="toggle-template-dropdown" class="dropdown-toggle-btn">Select Template</button>
-            <div id="template-dropdownBox" class="dropdown-box mb-3">
-              {% for radio in email_form.sendgrid_id %}
-                <div class="dropdown-option">
-                  {{ radio.tag }} {{ radio.choice_label }}
-                </div>
-              {% endfor %}
+              </form>
+              <!-- title (edit only) -->
+              <a href="{% url 'edit_draft_email' d.id %}" class="text-decoration-none text-dark">
+                {{ d.subject|default:"(No Subject)" }}
+              </a>
+              {% if d.id == draft_id %}
+                <span class="badge bg-secondary ms-2">Editing</span>
+              {% endif %}
             </div>
-      </div>
-
-        <!-- Group Selection -->
-        <button type="button" id="toggle-template-group" class="dropdown-toggle-btn">Select Group</button>
-
-        <div id="template-groupBox" class="dropdown-box mb-3">
-        <div class="dropdown-option">
-          <input type="radio" name="selected_group" id="group_none" value="" checked>
-          <label for="group_none">🚫 No Group</label>
-        </div>
-
-        {% for radio in email_form.selected_group %}
-          <div class="dropdown-option">
-            {{ radio.tag }} {{ radio.choice_label }}
-          </div>
+          </li>
+        {% empty %}
+          <li class="list-group-item text-muted small">No drafts saved yet.</li>
         {% endfor %}
+      </ul>
+    </div>
+
+    <!-- AI helper -->
+    <div id="ai-prompt-wrapper" class="mb-4">
+      <label>Need help from AI?</label>
+      <textarea x-model="aiPrompt" placeholder="Describe your message..." class="form-control mb-2"></textarea>
+      <button type="button" class="btn btn-outline-secondary btn-sm" @click="generateAI" :disabled="loadingAI">
+        <span x-show="loadingAI" x-cloak>⏳ Generating…</span>
+        <span x-show="!loadingAI" x-cloak>Generate with AI</span>
+      </button>
+
+      <div x-show="aiMessage" class="mt-3" id="ai-generated-result">
+        <label>AI Suggested Message</label>
+        <textarea class="form-control" x-model="aiMessage"></textarea>
+        <button class="btn btn-link btn-sm mt-1" @click="insertAI">⬇️ Insert into form</button>
       </div>
+    </div>
 
-          <!-- User Selection -->
-          <button type="button" id="toggle-user-dropdown" class="dropdown-toggle-btn">
-            <span id="selected-summary-label" class="d-inline">Select Users</span>
-          </button>
+    <!-- Compose fields -->
+    <label>Subject</label>
+    <input type="text" x-model="form.subject" class="form-control mb-2">
+    <label>Message</label>
+    <textarea x-model="form.message" class="form-control" rows="6"></textarea>
+  </div>
 
-          <div id="user-dropdownBox" class="dropdown-box mb-3">
+  <!-- Template section -->
+  <div x-show="mode === 'template'" id="template-email-section" class="mb-4">
+    <label>Select Template</label>
+    <select x-model="form.templateId" class="form-select" id="template-select">
+    <option value="">-- Choose a template --</option>
+    {% for value, label in email_form.fields.sendgrid_id.choices %}
+      {% if value %}
+        <option value="{{ value }}">{{ label }}</option>
+      {% endif %}
+    {% endfor %}
+  </select>
+  </div>
 
-            <!-- 🔍 Search Input -->
-            <div class="px-3 mb-2">
-            <input type="text"
-                  name="search"
-                  class="form-control mb-2"
-                  placeholder="Search users..."
-                  hx-get="{% url 'search_users' %}"
-                  hx-trigger="keyup changed delay:200ms"
-                  hx-target="#user-checkbox-list"
-                  hx-include="[name='csrfmiddlewaretoken'], input[name='selected_users']:checked"
-                  autocomplete="off">
-            </div>
-            
-            <!-- 🔁 Live Result Target -->
-            <div id="user-checkbox-list">
-             <!-- Template Email -->
-             {% include "msg/partials/user_checkboxes.html" with users=email_form.fields.selected_users.queryset selected_ids=selected_ids summary_id="selected-summary" %}
-            </div>
+  <!-- Group (EMAIL) -->
+  <label class="form-label">Select Group</label>
+  <button type="button" id="toggle-email-group" class="dropdown-toggle-btn">Choose Group</button>
+  <div id="email-groupBox" class="dropdown-box mb-3">
+    {% for radio in email_form.selected_group %}
+      <div class="dropdown-option">
+        {{ radio.tag }} {{ radio.choice_label }}
+      </div>
+    {% empty %}
+      <p class="text-muted px-3">No groups available for your employer.</p>
+    {% endfor %}
+  </div>
 
-          </div>
-          <!-- Attachment Uploads -->
-        <div id="upload-size-warning" class="text-muted small mt-2">
-          <fieldset class="mb-4">
-            <legend class="fs-6 fw-semibold text-secondary mb-2">
-              📎 Upload Files
-            </legend>
-            <p class="text-muted small mb-1">
-              You can upload <strong>up to 5 files</strong>. Total combined size must not exceed <strong>25 MB</strong>.
-            </p>
-            <div class="text-muted small">
-              <strong>Total uploaded:</strong>
-              <span id="upload-total-size" class="fw-bold text-dark">0</span> MB / 25 MB
-            </div>
-          </fieldset>
-        </div>
-        <div id="template-email-dropzone" class="dropzone" data-url="{% url 'upload_attachment' %}"></div>
-        <ul id="upload-file-list" class="list-unstyled mt-2 text-muted small"></ul>
-        <button type="submit" class="btn btn-outline-primary mt-3">Send Email</button>
-       <button type="button" id="save-draft-btn" class="btn btn-outline-secondary mt-3">Save as Draft</button>
-      </form>
+  <!-- Or Individuals (EMAIL) -->
+  <label class="form-label">Or Select Individuals</label>
+  <button type="button" id="toggle-email-user-dropdown" class="dropdown-toggle-btn">
+    <span id="email-selected-summary-label" class="d-inline">Select Users</span>
+  </button>
+  <div id="email-user-dropdownBox" class="dropdown-box mb-3">
+    <div class="px-3 mt-3 mb-2">
+      <input type="text"
+             name="search"
+             class="form-control mb-2"
+             placeholder="Search users..."
+             hx-get="{% url 'search_users' %}"
+             hx-trigger="keyup changed delay:200ms"
+             hx-target="#email-user-checkbox-list"
+             hx-include="[name='csrfmiddlewaretoken'], input[name='selected_users']:checked"
+             autocomplete="off">
+    </div>
+    <div id="email-user-checkbox-list" class="text-muted small px-3">
+      Start typing to search for users...
+    </div>
+  </div>
+
+  <!-- Attachments -->
+  <div class="mb-3">
+  <label>Upload Attachments</label>
+
+  <!-- Dropzone target -->
+  <div class="dz-attachments border p-3 text-muted"
+       data-upload-url="{% url 'upload_attachment' %}">
+    📎 Click or drop files here
+  </div>
+
+  <!-- Optional: simple list of added attachments -->
+  <ul id="attachment-list" class="list-group mt-2"></ul>
+</div>
+
+  <!-- ACTIONS (below dropzone) -->
+  <div class="d-flex gap-2 mt-2">
+    <button class="btn btn-primary" @click.prevent="submit">📤 Send</button>
+    <button class="btn btn-secondary" id="save-draft-btn" @click.prevent="saveDraft">💾 Save Draft</button>
+  </div>
+</div>
+
+<!-- Hidden backend form (posts to original route) -->
+<form id="email-send-form" method="post" action="{% url 'comms' %}" style="display:none;">
+  {% csrf_token %}
+  <input type="hidden" name="form_type" value="email">
+  <input type="hidden" name="email_mode" id="send-email_mode">
+  <input type="hidden" name="subject" id="send-subject">
+  <input type="hidden" name="message" id="send-message">
+  <input type="hidden" name="sendgrid_id" id="send-templateId">
+  <input type="hidden" name="selected_group" id="send-groupId">
+  <input type="hidden" name="uploaded_file_urls" id="send-uploaded_file_urls">
+  {% if draft_id %}<input type="hidden" name="draft_id" value="{{ draft_id }}">{% endif %}
+</form>
+
+
+
 
 <script>
-          document.addEventListener("DOMContentLoaded", function () {
-          
-            // === 🔽 Dropdown Setup (Template, Group, Users) ===
-            function initDropdown(toggleSelector, boxSelector, inputType = "radio") {
-              const toggleBtn = document.querySelector(toggleSelector);
-              const box = document.querySelector(boxSelector);
-          
-              if (!toggleBtn || !box) return;
-          
-              toggleBtn.addEventListener("click", function () {
-                box.classList.toggle("open");
-                toggleBtn.classList.toggle("open");
-              });
-          
-              box.querySelectorAll(`input[type=${inputType}]`).forEach(input => {
-                input.addEventListener("change", () => {
-                  if (inputType === "radio") {
-                    const label = input.closest(".dropdown-option")?.textContent.trim();
-                    toggleBtn.textContent = label || "Select";
-                    box.classList.remove("open");
-                    toggleBtn.classList.remove("open");
-                  } else if (inputType === "checkbox") {
-                    const selected = Array.from(box.querySelectorAll('input[type=checkbox]:checked'))
-                      .map(cb => cb.closest(".dropdown-option")?.textContent.trim())
-                      .join(", ");
-                      updateSelectedSummary();;
-                  }
-                });
-              });
-            }
-          
-            // ✅ Hook up dropdowns
-            initDropdown("#toggle-template-dropdown", "#template-dropdownBox", "radio");
-            initDropdown("#toggle-template-group", "#template-groupBox", "radio");
-            initDropdown("#toggle-user-dropdown", "#user-dropdownBox", "checkbox");
-          
-            // === ☑️ "Select All" for user checkboxes ===
-            const selectAll = document.getElementById("select-all-users");
-            const userCheckboxes = document.querySelectorAll(".user-checkbox");
-          
-            if (selectAll && userCheckboxes.length > 0) {
-              selectAll.addEventListener("change", function () {
-                userCheckboxes.forEach(cb => cb.checked = this.checked);
-              });
-            }
-          
-            // === 📎 Attachment Validation + Spinner ===
-            const form = document.getElementById("template-email-form");
-            const fileInput = document.querySelector('#template-email-form input[type="file"][name="attachments"]');
-          
-            if (form && fileInput) {
-              form.addEventListener("submit", function (e) {
-                if (form.dataset.submitted) {
-                  e.preventDefault();
-                  return;
-                }
-          
-                const files = fileInput.files;
-                const maxFiles = 5;
-                const maxSize = 10 * 1024 * 1024;
-          
-                if (files.length > maxFiles) {
-                  alert(`❌ You can upload up to ${maxFiles} files.`);
-                  e.preventDefault();
-                  return;
-                }
-          
-                for (let file of files) {
-                  if (file.size > maxSize) {
-                    alert(`❌ ${file.name} exceeds the 10MB size limit.`);
-                    e.preventDefault();
-                    return;
-                  }
-                }
-          
-                // ✅ Valid — Show spinner and block resubmit
-                form.dataset.submitted = true;
-          
-                const spinner = document.getElementById("template-email-spinner");
-                if (spinner) spinner.style.display = "block";
-          
-                const submitBtn = form.querySelector('button[type="submit"]');
-                if (submitBtn) {
-                  submitBtn.disabled = true;
-                  submitBtn.innerHTML = "Sending...";
-                }
-              });
-            }
-          
-          });
-</script>
+function emailComposer() {
+  return {
+    mode: 'template',
+    loadingAI: false,
+    aiPrompt: '',
+    aiMessage: '',
+    form: { subject: '', message: '', templateId: '', groupId: '' },
+    templates: [],
+    groups:    [],
 
-<!-- Check boxes for select all and users -->
-<script>
-  document.addEventListener("htmx:afterSwap", function (e) {
-    if (e.detail.target.id === "user-checkbox-list") {
-      const selectAll = document.getElementById("select-all-users");
-      const checkboxes = document.querySelectorAll(".user-checkbox");
+    init() {
+      const subj = "{{ draft.subject|default:''|escapejs }}";
+      const msg  = "{{ draft.message|default:''|escapejs }}";
+      const mode = "{{ draft.mode|default:''|escapejs }}";
+      const tmpl = "{{ draft.sendgrid_template|default:''|escapejs }}";
+      const grp  = "{{ draft.selected_group|default:''|escapejs }}";
+      const hasDraft = "{{ draft_id|default:''|escapejs }}";
 
-      if (selectAll && checkboxes.length > 0) {
-        selectAll.addEventListener("change", function () {
-          checkboxes.forEach(cb => cb.checked = this.checked);
-          updateSelectedSummary();
+      if (subj) this.form.subject = subj;
+      if (msg)  this.form.message = msg;
+      if (tmpl) this.form.templateId = tmpl;
+      if (grp)  this.form.groupId = grp;
+
+      // If editing a draft, default to compose mode
+      this.mode = mode || (hasDraft ? 'text' : 'template');
+    },
+
+    // collect selected user IDs from the checkbox list
+    getSelectedUserIds() {
+      return Array.from(document.querySelectorAll('#email-user-dropdownBox .user-checkbox:checked'))
+                  .map(el => el.value);
+    },
+
+    // find selected group value (from Django radios)
+    getSelectedGroupId() {
+      const g = document.querySelector('#email-groupBox input[name="selected_group"]:checked');
+      return g ? g.value : '';
+    },
+
+    async saveDraft() {
+      const fd = new FormData();
+      fd.set('subject', this.form.subject);
+      fd.set('message', this.form.message);
+      fd.set('email_mode', this.mode);
+      fd.set('sendgrid_id', this.form.templateId);
+      fd.set('selected_group', this.getSelectedGroupId());
+      const urlsEl = document.getElementById('uploaded_file_urls');
+      if (urlsEl) fd.set('uploaded_file_urls', urlsEl.value);
+
+      // include selected users (multiple)
+      this.getSelectedUserIds().forEach(id => fd.append('selected_users', id));
+
+      const draftId = document.getElementById('draft-id')?.value;
+      if (draftId) fd.set('draft_id', draftId);
+
+      fd.append('action', 'save');
+
+      try {
+        const res = await fetch("{% url 'save_draft_ajax' %}", {
+          method: 'POST',
+          headers: { 'X-CSRFToken': getCSRFToken() },
+          body: fd
         });
+        const data = await res.json();
+        if (data.success) {
+          alert('✅ Draft saved!');
+          window.location.href = `/comms/?tab=email&draft_id=${data.draft_id}`;
+        } else {
+          alert('❌ Save failed: ' + (data.error || 'unknown'));
+        }
+      } catch (e) {
+        console.error(e);
+        alert('❌ Network error saving draft.');
       }
+    },
 
-      checkboxes.forEach(cb => {
-        cb.addEventListener("change", updateSelectedSummary);
+    submit() {
+      // fill hidden form
+      document.getElementById('send-email_mode').value = this.mode;
+      document.getElementById('send-subject').value    = this.form.subject;
+      document.getElementById('send-message').value    = this.form.message;
+      document.getElementById('send-templateId').value = this.form.templateId;
+      document.getElementById('send-groupId').value    = this.getSelectedGroupId();
+      document.getElementById('send-uploaded_file_urls').value =
+        document.getElementById('uploaded_file_urls').value;
+
+      // inject selected_users as multiple hidden inputs (fresh each time)
+      const sendForm = document.getElementById('email-send-form');
+      // clean previous clones
+      sendForm.querySelectorAll('input[name="selected_users"]').forEach(n => n.remove());
+      this.getSelectedUserIds().forEach(id => {
+        const inp = document.createElement('input');
+        inp.type = 'hidden';
+        inp.name = 'selected_users';
+        inp.value = id;
+        sendForm.appendChild(inp);
       });
 
-      updateSelectedSummary();
-    }
-  });
+      sendForm.submit(); // posts to original 'comms' route
+    },
 
-  function updateSelectedSummary() {
-    const checked = document.querySelectorAll(".user-checkbox:checked");
-    const summary = document.getElementById("selected-summary");
-
-    if (summary) {
-      const count = checked.length;
-      summary.textContent = `${count} user${count === 1 ? '' : 's'} selected`;
-    }
-  }
-
-  // Initial run for when page first loads
-  document.addEventListener("DOMContentLoaded", updateSelectedSummary);
-</script>
-
-
-<!-- 📦 Dropzone for Quick Email -->
-<script>
-  document.addEventListener("DOMContentLoaded", function () {
-    const dropzoneEl = document.getElementById("template-email-dropzone");
-    if (!dropzoneEl || dropzoneEl.classList.contains("dz-initialized")) return;
-
-    Dropzone.autoDiscover = false;
-
-    const dz = new Dropzone("#template-email-dropzone", {
-      url: dropzoneEl.dataset.url,
-      headers: { "X-CSRFToken": getCSRFToken() },
-      maxFilesize: 10,
-      maxFiles: 5,
-      acceptedFiles: "image/*,application/pdf",
-      addRemoveLinks: true,
-      init: function () {
-        const form = document.getElementById("template-email-form");
-        if (!form) return;
-
-        const submitBtn = form.querySelector('button[type="submit"]');
-        const fileListEl = document.getElementById("upload-file-list");
-        const hiddenInput = document.getElementById("uploaded_file_urls");
-        let uploadedUrls = [];
-        let existingFiles = [];
-
-        try {
-          const raw = hiddenInput.value;
-          if (raw && raw.trim() !== "") {
-            existingFiles = JSON.parse(raw);
-            uploadedUrls = [...existingFiles];
-          } else {
-            existingFiles = [];
-            uploadedUrls = [];
-          }
-        } catch (e) {
-          console.warn("⚠️ Failed to parse uploaded_file_urls:", e);
-          existingFiles = [];
-          uploadedUrls = [];
-        }
-
-        existingFiles.forEach(url => {
-          const filename = url.split("/").pop();
-          const mockFile = {
-            name: filename,
-            size: 12345,
-            accepted: true
-          };
-
-          this.emit("addedfile", mockFile);
-          if (/\.(jpe?g|png|gif)$/i.test(filename)) {
-            this.emit("thumbnail", mockFile, url);
-          }
-          this.emit("complete", mockFile);
-          this.files.push(mockFile);
-
-          const icon = /\.(jpe?g|png|gif)$/i.test(filename)
-            ? "🖼️"
-            : filename.includes("pdf")
-            ? "📄"
-            : "📎";
-
-          const li = document.createElement("li");
-          li.textContent = `${icon} ${filename}`;
-          fileListEl.appendChild(li);
+    async generateAI() {
+      if (!this.aiPrompt.trim()) return alert('Enter a prompt first.');
+      this.loadingAI = true;
+      try {
+        const res = await fetch("{% url 'generate_ai_content' %}", {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json', 'X-CSRFToken': getCSRFToken() },
+          body: JSON.stringify({ prompt: this.aiPrompt, mode: 'email' })
         });
-
-        this.on("sending", () => { if (submitBtn) submitBtn.disabled = true; });
-
-        this.on("success", function (file, response) {
-          if (response.url) {
-            uploadedUrls.push(response.url);
-            if (hiddenInput) hiddenInput.value = JSON.stringify(uploadedUrls);
-
-            const icon = file.type.startsWith("image/")
-              ? "🖼️" : file.type.includes("pdf")
-              ? "📄" : "📎";
-
-            const li = document.createElement("li");
-            li.textContent = `${icon} ${file.name}`;
-            fileListEl.appendChild(li);
-          }
-
-          if (this.getUploadingFiles().length === 0 && this.getQueuedFiles().length === 0) {
-            if (submitBtn) submitBtn.disabled = false;
-          }
-        });
-
-        this.on("removedfile", function (file) {
-          uploadedUrls = uploadedUrls.filter(url => !url.includes(file.name));
-          hiddenInput.value = JSON.stringify(uploadedUrls);
-
-          [...fileListEl.children].forEach(child => {
-            if (child.textContent.includes(file.name)) child.remove();
-          });
-
-          if (this.getUploadingFiles().length === 0 && this.getQueuedFiles().length === 0) {
-            if (submitBtn) submitBtn.disabled = false;
-          }
-        });
-
-        this.on("error", () => { if (submitBtn) submitBtn.disabled = false; });
+        const data = await res.json();
+        this.aiMessage = data.message || '';
+      } catch (e) {
+        console.error(e);
+        alert('AI error.');
+      } finally {
+        this.loadingAI = false;
       }
-    });
+    },
 
-    dropzoneEl.classList.add("dz-initialized");
-
-    const form = document.getElementById("template-email-form");
-    form.addEventListener("submit", function (e) {
-      if (dz.getUploadingFiles().length > 0 || dz.getQueuedFiles().length > 0) {
-        e.preventDefault();
-        alert("⏳ Please wait until all files are uploaded before submitting.");
-      }
-    });
-
-    const saveBtn = document.getElementById("save-draft-btn");
-    if (saveBtn) {
-      dz.on("sending", () => saveBtn.disabled = true);
-      dz.on("queuecomplete", () => saveBtn.disabled = false);
-      dz.on("removedfile", () => {
-        if (dz.getUploadingFiles().length === 0 && dz.getQueuedFiles().length === 0) {
-          saveBtn.disabled = false;
-        }
-      });
-    }
-  });
-
-  function getCSRFToken() {
-    const cookies = document.cookie.split(';');
-    for (const cookie of cookies) {
-      const [name, value] = cookie.trim().split('=');
-      if (name === 'csrftoken') return decodeURIComponent(value);
-    }
-    return null;
+    insertAI() { this.form.message = this.aiMessage; }
   }
-</script>
-
-
-<!-- Alert Messages fade out -->
-<script>
-  document.addEventListener("DOMContentLoaded", function () {
-    const alerts = document.querySelectorAll(".alert");
-
-    alerts.forEach(alert => {
-      setTimeout(() => {
-        alert.classList.add("fade"); // Bootstrap fade
-        alert.classList.remove("show");
-
-        // Remove from DOM after fade transition completes (500ms)
-        setTimeout(() => {
-          if (alert.parentNode) {
-            alert.parentNode.removeChild(alert);
-          }
-        }, 500);
-      }, 5000); // Show for 5 seconds
-    });
-  });
-</script>
-
-<!-- hides submit draft button if using tempalte emails -->
-<script>
-  const saveButton = document.getElementById("save-draft-btn");
-  document.addEventListener("DOMContentLoaded", function () {
-    const quickSection = document.getElementById("quick-email-section");
-    const templateSection = document.getElementById("template-email-section");
-
-    const quickRadio = document.getElementById("email_mode_text");
-    const templateRadio = document.getElementById("email_mode_template");
-
-    function toggleSections() {
-    const aiWrapper = document.getElementById("ai-prompt-wrapper");
-
-    if (quickRadio.checked) {
-      quickSection.style.display = "block";
-      templateSection.style.display = "none";
-      if (saveButton) saveButton.style.display = "inline-block";
-      if (aiWrapper) aiWrapper.style.display = "block";  // ✅ Show AI tools
-    } else {
-      quickSection.style.display = "none";
-      templateSection.style.display = "block";
-      if (saveButton) saveButton.style.display = "none";
-      if (aiWrapper) aiWrapper.style.display = "none";  // ✅ Hide AI tools
-      // ✅ Clear any previous prompt or results
-      document.getElementById("ai-prompt").value = "";
-      document.getElementById("ai-body").value = "";
-      document.getElementById("ai-generated-result").style.display = "none";
-    }
-  }
-
-    quickRadio.addEventListener("change", toggleSections);
-    templateRadio.addEventListener("change", toggleSections);
-
-    toggleSections(); // initial run
-  });
-</script>
-
-<script>
-  document.addEventListener("DOMContentLoaded", function () {
-    const saveButton = document.getElementById("save-draft-btn");
-
-    saveButton?.addEventListener("click", function (e) {
-      e.preventDefault();
-      const form = document.getElementById("template-email-form");
-      const formData = new FormData(form);
-      for (let pair of formData.entries()) {
-  console.log(pair[0] + ": " + pair[1]);
 }
-      // Ensure selected radio button value is added for email_mode
-      const emailMode = form.querySelector('input[name="email_mode"]:checked');
-      if (emailMode) {
-        formData.set("email_mode", emailMode.value);
-      }
 
-      formData.append("action", "save");
-      for (let [key, value] of formData.entries()) {
-      console.log(`${key}: ${value}`);
-    }
-      fetch("{% url 'save_draft_ajax' %}", {
-        method: "POST",
-        headers: {
-          "X-CSRFToken": getCSRFToken(),
-        },
-        body: formData,
-      })
-        .then((response) => response.json())
-        .then((data) => {
-          console.log("📥 Response from backend:", data);
-          if (data.success) {
-            alert("✅ Draft saved!");
-            window.location.href = `/comms/?tab=email&draft_id=${data.draft_id}`;
-          } else {
-            alert("❌ Error saving draft: " + (data.error || "Unknown error"));
-
-            if (data.errors) {
-              console.error("🔍 Validation details:", JSON.parse(data.errors));
-            }
-          }
-        })
-        .catch((error) => {
-          console.error("❌ AJAX error:", error);
-          alert("❌ Network or server error.");
-        });
-    });
-
-    function getCSRFToken() {
-      const cookies = document.cookie.split(";");
-      for (const cookie of cookies) {
-        const [name, value] = cookie.trim().split("=");
-        if (name === "csrftoken") return decodeURIComponent(value);
-      }
-      return "";
-    }
-  });
+function getCSRFToken() {
+  const m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : '';
+}
 </script>
 
-<!-- Generate Email AI -->
 <script>
-  function generateEmailAI() {
-    const prompt = document.getElementById("ai-prompt").value.trim();
-    if (!prompt) return alert("Please enter a prompt for the email.");
-
-    const spinner = document.getElementById("email-ai-spinner");
-    const resultBox = document.getElementById("ai-generated-result");
-
-    spinner.style.display = "flex"; // 👈 show spinner
-    resultBox.style.display = "none"; // hide previous result
-
-    fetch("{% url 'generate_ai_content' %}", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": getCSRFToken()
-      },
-      body: JSON.stringify({ prompt: prompt, mode: "email" })
-    })
-    .then(res => res.json())
-    .then(data => {
-      if (data.message) {
-        document.getElementById("ai-body").value = data.message;
-        document.getElementById("ai-generated-result").style.display = "block";
-      } else {
-        alert("❌ AI failed: " + (data.error || "Unknown error"));
-      }
-    })
-    .catch(err => {
-      console.error("Email AI error:", err);
-      alert("Network error while generating email.");
-     })
-    .finally(() => {
-      spinner.style.display = "none";
+document.addEventListener('DOMContentLoaded', function () {
+  // open/close dropdowns
+  function wireDropdown(toggleSel, boxSel) {
+    const btn = document.querySelector(toggleSel);
+    const box = document.querySelector(boxSel);
+    if (!btn || !box) return;
+    btn.addEventListener('click', () => {
+      box.classList.toggle('open');
+      btn.classList.toggle('open');
     });
   }
+  wireDropdown('#toggle-email-group', '#email-groupBox');
+  wireDropdown('#toggle-email-user-dropdown', '#email-user-dropdownBox');
 
-  function insertGeneratedEmail() {
-    const aiText = document.getElementById("ai-body").value;
-    document.getElementById("id_message").value = aiText;  // or whatever the field ID is
+  // update "X users selected"
+  function updateSummary() {
+    const checked = document.querySelectorAll('#email-user-dropdownBox .user-checkbox:checked');
+    const label = document.getElementById('email-selected-summary-label');
+    if (label) {
+      const n = checked.length;
+      label.textContent = n ? `${n} user${n===1?'':'s'} selected` : 'Select Users';
+    }
   }
+  document.addEventListener('change', (e) => {
+    if (e.target && e.target.classList.contains('user-checkbox')) updateSummary();
+  });
+  document.addEventListener('htmx:afterSwap', (e) => {
+    if (e.detail.target.id === 'email-user-checkbox-list') updateSummary();
+  });
+  updateSummary();
+});
+</script>
+
+<script>
+  // Reuse your existing CSRF helper
+  function getCSRFToken() {
+    const m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+    return m ? decodeURIComponent(m[1]) : '';
+  }
+
+  if (window.Dropzone) Dropzone.autoDiscover = false;
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const CSRF = getCSRFToken();
+
+    document.querySelectorAll('.dz-attachments').forEach(function (el) {
+      const url = el.getAttribute('data-upload-url');
+      const dz = new Dropzone(el, {
+        url: url,
+        headers: { 'X-CSRFToken': CSRF },
+        paramName: 'file',
+        clickable: true,
+        maxFilesize: 15, // MB
+        timeout: 60 * 1000,
+        // allow common docs + images; tweak as needed
+        acceptedFiles: "image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt",
+        previewsContainer: null, // no preview grid; we append to a list on success
+
+        init: function () {
+          this.on('success', function (file, resp) {
+            try {
+              if (resp && resp.success && resp.url) {
+                // Update the hidden JSON array
+                const hidden = document.getElementById('uploaded_file_urls');
+                let arr = [];
+                try { arr = JSON.parse(hidden.value || '[]'); } catch (e) {}
+                arr.push(resp.url);
+                hidden.value = JSON.stringify(arr);
+
+                // Show a simple attachment entry
+                const list = document.getElementById('attachment-list');
+                if (list) {
+                  const li = document.createElement('li');
+                  li.className = 'list-group-item py-1 small';
+                  li.innerHTML = `<a href="${resp.url}" target="_blank" rel="noopener">${file.name}</a>`;
+                  list.appendChild(li);
+                }
+              } else {
+                alert('Upload finished but no URL returned.');
+              }
+            } finally {
+              // Remove file from Dropzone UI (we keep only our list)
+              this.removeFile(file);
+            }
+          });
+
+          this.on('error', function (file, message) {
+            alert(typeof message === 'string' ? message : 'Upload failed.');
+            this.removeFile(file);
+          });
+        }
+      });
+    });
+  });
 </script>

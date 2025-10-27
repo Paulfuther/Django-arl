@@ -92,11 +92,11 @@ def create_master_email(
         # Ensure to_email is a list, even if a single string is passed
         if isinstance(to_email, str):
             to_email = [to_email]  # Convert single email to list
-        print(f"📧 The helper is sending email to: {', '.join(to_email)}")
+        logger.info(f"📧 The helper is sending email to: {', '.join(to_email)}")
         # ✅ If `verified_sender` is explicitly provided, use it without any lookup
         if verified_sender:
             sender_email = verified_sender
-            print(f"✅ Using explicitly provided sender email: {verified_sender}")
+            logger.info(f"✅ Using explicitly provided sender email: {verified_sender}")
         else:
             # ✅ Look up the employer and their verified sender email
             user_email = (
@@ -105,9 +105,9 @@ def create_master_email(
             try:
                 user = CustomUser.objects.get(email=user_email)
                 employer = user.employer
-                print(f"✅ Found user: {user.email}, Employer: {employer}")
+                logger.info(f"✅ Found user: {user.email}, Employer: {employer}")
             except CustomUser.DoesNotExist:
-                print(
+                logger.info(
                     f"❌ No user found with email {user_email}. Using default sender."
                 )
                 sender_email = settings.MAIL_DEFAULT_SENDER
@@ -120,13 +120,13 @@ def create_master_email(
                     else settings.MAIL_DEFAULT_SENDER
                 )
 
-        print(f"📧 Final sender email: {sender_email}")
+        logger.info(f"📧 Final sender email: {sender_email}")
         # Initialize the email message
         message = Mail(
             from_email=sender_email,
         )
 
-        print(f"📜 Email Template Data: {template_data}")
+        logger.info(f"📜 Email Template Data: {template_data}")
         message.template_id = sendgrid_id
         asm = Asm(
             group_id=unsubscribe_group_id,
@@ -144,14 +144,14 @@ def create_master_email(
 
         message.add_personalization(personalization)
 
-        print("✅ Final Email attachments summary:")
+        logger.info("✅ Final Email attachments summary:")
         for a in attachments or []:
             filename = a.get("filename", "Unnamed file")
             content = a.get("content", b"")
             filetype = a.get("type", "unknown")
 
             size_kb = len(content) // 1024 if isinstance(content, (bytes, str)) else "N/A"
-            print(f"• {filename} ({filetype}) - {size_kb} KB")
+            logger.info(f"• {filename} ({filetype}) - {size_kb} KB")
 
         # Handle attachments if provided
         if attachments:
@@ -165,7 +165,7 @@ def create_master_email(
                     )
                     message.add_attachment(attachment_instance)
                 except Exception as e:
-                    print(f"❌ Error adding attachment {att.get('filename', '')}: {e}")
+                    logger.info(f"❌ Error adding attachment {att.get('filename', '')}: {e}")
 
         # Send the email via SendGrid
         sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
@@ -173,10 +173,10 @@ def create_master_email(
 
         # Check response status
         if response.status_code == 202:
-            print(f"Email sent successfully to {to_email}.")
+            logger.info(f"Email sent successfully to {to_email}.")
             return True
         else:
-            print(
+            logger.info(
                 f"Failed to send email to {to_email}. Status code: {response.status_code}"
             )
             return False
@@ -188,7 +188,7 @@ def create_master_email(
             error_details += f" Response body: {e.body}"
 
         # Log error details for debugging
-        print(f"Error in create_master_email: {error_details}")
+        logger.info(f"Error in create_master_email: {error_details}")
         traceback.print_exc()  # For detailed error trace
         return False
 
@@ -924,11 +924,4 @@ def send_quick_email(user, recipients, subject, message, attachment_urls):
     )
 
 
-def send_template_email(user, recipients, sendgrid_template, attachment_urls):
-    from .tasks import master_email_send_task
-    master_email_send_task.delay(
-        recipients=recipients,
-        sendgrid_id=sendgrid_template.sendgrid_id,
-        employer_id=user.employer.id,
-        attachment_urls=attachment_urls,
-    )
+
