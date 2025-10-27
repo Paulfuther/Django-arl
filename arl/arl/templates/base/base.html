@@ -26,6 +26,8 @@
   /* Constrain Dropzone and thumb blocks to viewport */
   .dz-check-photo { max-width: 100%; }
   .thumb-120 { max-width: 100%; }
+
+  x-cloak{ display: none !important; }
 </style>
 
 <head>
@@ -59,6 +61,9 @@
   <!-- jQuery -->
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 
+  <!-- base.html -->
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+
   
 </head>
 
@@ -75,7 +80,8 @@
     integrity="sha384-wg5Y/JwF7VxGk4zLsJEcAojRtlVp1FKKdGy1qN+OMtdq72WRvX/EdRdqg/LOhYeV"
     crossorigin="anonymous"></script>
 
-  
+  <!-- Dropbox -->
+   <script src="https://unpkg.com/dropzone@5/dist/min/dropzone.min.js"></script>
 
   <!-- Bootstrap Bundle JS -->
   
@@ -100,6 +106,11 @@
   <script>
   window.Dropzone = window.Dropzone || {};
   Dropzone.autoDiscover = false;
+</script>
+<script>
+  document.addEventListener('alpine:init', () => {
+    Alpine.store('ui', { loadingAI: false })
+  })
 </script>
   
 </body>

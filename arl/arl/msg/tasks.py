@@ -64,6 +64,11 @@ def master_email_send_task(
     subject=None,
     attachment_urls=None,
 ):
+    logger.info(
+        "[EmailTask] start sg_id=%s employer_id=%s recipients_count=%s",
+        sendgrid_id, employer_id, len(recipients or []),
+    )
+
     """
     Master task to send emails using the provided template and recipient data.
 
@@ -77,12 +82,12 @@ def master_email_send_task(
         str: Success or error message.
     """
     attachment_urls = attachment_urls or []
-    print("attachment urls :", attachment_urls)
+    logger.info("attachment urls :", attachment_urls)
     attachments = []
     for url in attachment_urls:
         try:
             response = requests.get(url)
-            print(f"📡 Fetching: {url} → Status: {response.status_code}")
+            logger.info(f"📡 Fetching: {url} → Status: {response.status_code}")
             if response.status_code == 200:
                 content_type = response.headers.get(
                     "Content-Type", "application/octet-stream"
@@ -98,13 +103,13 @@ def master_email_send_task(
                     }
                 )
             else:
-                print(f"❌ Failed to fetch {url} → {response.status_code}")
+                logger.info(f"❌ Failed to fetch {url} → {response.status_code}")
         except Exception as e:
-            print(f"🚨 Error fetching {url}: {e}")
+            logger.info(f"🚨 Error fetching {url}: {e}")
 
-    print("✅ Final attachments summary:")
+    logger.info("✅ Final attachments summary:")
     for a in attachments:
-        print(f"• {a['filename']} ({a['type']}) - {len(a['content']) // 1024} KB")
+        logger.info(f"• {a['filename']} ({a['type']}) - {len(a['content']) // 1024} KB")
 
     try:
         # Default sender
@@ -119,7 +124,7 @@ def master_email_send_task(
                 if tenant_api_key and tenant_api_key.verified_sender_email:
                     verified_sender = tenant_api_key.verified_sender_email
 
-        print(f"📧 Using verified sender: {verified_sender}")
+        logger.info(f"📧 Using verified sender: {verified_sender}")
 
         failed_emails = []
 
@@ -128,42 +133,52 @@ def master_email_send_task(
             name = recipient.get("name")
 
             if not email:
-                print(f"Skipping recipient with no email: {recipient}")
+                logger.info(f"Skipping recipient with no email: {recipient}")
                 continue
-            
-            effective_subject = subject or f"New Message from {employer.name if employer else 'Our Company'}"
 
-            template_data = {
-                "name": name,
-                "body": body,
-                "senior_contact_name": employer.senior_contact_name,
-                "company_name": employer.name if employer else "Company",
-                "subject": subject
-                if subject
-                else f"New Message from {employer.name if employer else 'Our Company'}",
+            # --- Type/shape hardening at call site ---
+            to_email = (email or "").strip()
+            name_str = (name or "").strip()
+
+            # ensure dicts
+            td = {
+                "name": name_str,
+                "body": body or "",
+                "senior_contact_name": getattr(employer, "senior_contact_name", "") or "",
+                "company_name": getattr(employer, "name", "") or "Company",
+                "subject": subject or f"New Message from {employer.name if employer else 'Our Company'}",
             }
-
-            # ✅ Custom args echoed back by SendGrid webhooks for this recipient
-            custom_args = {
-                # "email_log_id": per_recipient_log_id,
-                # "employer_id": str(employer_id) if employer_id else "",
-                # You *can* omit subject here if you prefer to store it only in your DB.
-                # Keeping it makes ad-hoc webhook-only analysis easier:
-                "subject": effective_subject,
+            ca = {
+                "subject": subject or f"New Message from {employer.name if employer else 'Our Company'}",
             }
+            logger.info("template data :", td, "custom args :", ca)
+            # ensure attachments is a list of dicts
+            att_list = attachments if isinstance(attachments, list) else []
+            att_list = [a for a in att_list if isinstance(a, dict)]
 
-            success = create_master_email(
-                to_email=email,
-                sendgrid_id=sendgrid_id,
-                template_data=template_data,
-                attachments=attachments,
-                verified_sender=verified_sender,
-                custom_args=custom_args,
-            )
+            # defensive: skip if no valid email
+            if not to_email:
+                logger.warning("Skipping recipient with empty email: %r", recipient)
+                continue
+
+            try:
+                success = create_master_email(
+                    to_email=email,
+                    sendgrid_id=sendgrid_id,
+                    template_data=td,
+                    attachments=attachments,
+                    verified_sender=verified_sender,
+                    # custom_args=ca,
+                )
+
+            except Exception as e:
+                logger.exception(f"🚨 Exception sending to {email} ,{e}")  # full traceback
+                failed_emails.append(email)
+                continue
 
             if not success:
+                logger.error(f"❌ create_master_email returned False for {email}")
                 failed_emails.append(email)
-                print(f"❌ Failed to send email to {email}")
 
         if failed_emails:
             return f"Emails sent with some failures. Failed emails: {', '.join(failed_emails)}"
@@ -172,7 +187,7 @@ def master_email_send_task(
 
     except Exception as e:
         error_message = f"🔥 Critical error in master_email_send_task: {str(e)}"
-        print(error_message)
+        logger.info(error_message)
         return error_message
 
 

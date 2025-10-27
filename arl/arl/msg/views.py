@@ -45,8 +45,6 @@ from arl.msg.helpers import (
     prepare_sms_recipient_data,
     save_email_draft,
     send_linkshortened_sms,
-    send_quick_email,
-    send_template_email,
     send_whats_app_carwash_sites_template,
 )
 from arl.msg.tasks import (
@@ -54,6 +52,7 @@ from arl.msg.tasks import (
     process_whatsapp_webhook,
     send_template_whatsapp_task,
     start_campaign_task,
+    master_email_send_task
 )
 from arl.setup.models import TenantApiKeys
 from arl.user.models import CustomUser, Employer, Store
@@ -70,7 +69,11 @@ from .forms import (
     TemplateFilterForm,
     TemplateWhatsAppForm,
 )
-from .models import ComplianceFile, DraftEmail, ShortenedSMSLog
+from .models import (ComplianceFile,
+                     DraftEmail,
+                     ShortenedSMSLog,
+                     SMSReply
+                     )
 from .tasks import (
     fetch_twilio_sms_task,
     fetch_twilio_summary,
@@ -295,6 +298,8 @@ def communications(request):
         valid_tabs.append("sms")
     if is_member_of_docusign_group(user):
         valid_tabs.append("docusign")
+    # if is_member_of_whatsapp_group(user):
+    #    valid_tabs.append("whatsapp")
 
     if active_tab not in valid_tabs:
         active_tab = valid_tabs[0] if valid_tabs else None
@@ -324,6 +329,7 @@ def communications(request):
     sms_form = SMSForm(user=user)
     email_form = EmailForm(user=user, initial=initial_data)
     docusign_form = NameEmailForm(user=user)
+    whatsapp_form = TemplateWhatsAppForm(user=user)
 
     if request.method == "POST":
         form_type = request.POST.get("form_type")
@@ -335,8 +341,21 @@ def communications(request):
             email_form = EmailForm(
                 request.POST, request.FILES, user=user, initial=initial_data
             )
-
+            print(initial_data)
+            print("Raw sendgrid_id from POST:", request.POST.get("sendgrid_id"))
+            
+            logger.info("Lets check for valid")
+            if not email_form.is_valid():
+                logger.warning(
+                    "[Comms] Email form invalid for user=%s employer=%s errors=%s",
+                    request.user,
+                    getattr(request.user, "employer_id", None),
+                    email_form.errors.as_json(),
+                )
+                messages.error(request, "Please correct the errors below.")
+                    
             if email_form.is_valid():
+                print("valid")
                 mode = email_form.cleaned_data["email_mode"]
                 selected_group = email_form.cleaned_data["selected_group"]
                 selected_users = email_form.cleaned_data["selected_users"]
@@ -345,6 +364,10 @@ def communications(request):
                 recipients = prepare_recipient_data(
                     user, selected_group, selected_users
                 )
+
+                if not recipients:
+                    messages.error(request, "No recipients found. Please select a group or users.")
+                    return redirect("/comms/?tab=email")
 
                 if action == "save":
                     draft_id = request.POST.get("draft_id")
@@ -358,16 +381,31 @@ def communications(request):
                     return redirect("/comms/?tab=email")
 
                 if mode == "text":
+                    print("going to send")
                     subject = email_form.cleaned_data["subject"]
                     raw_message = email_form.cleaned_data["message"]
                     message = render_message_to_sendgrid(raw_message)
-                    send_quick_email(
-                        user, recipients, subject, message, attachment_urls
+                    print(message)
+                    res = master_email_send_task.delay(
+                        recipients=recipients,                 # ensure JSON-serializable!
+                        sendgrid_id="d-4ac0497efd864e29b4471754a9c836eb",
+                        employer_id=user.employer.id,          # ensure int
+                        body=message,                          # str
+                        subject=subject,                       # str
+                        attachment_urls=attachment_urls,       # ensure list[str]
                     )
+                    print("queued master_email_send_task:", res.id)
+                    
                 else:
-                    sendgrid_template = email_form.cleaned_data["sendgrid_id"]
-                    send_template_email(
-                        user, recipients, sendgrid_template, attachment_urls
+                    sendgrid_template = email_form.cleaned_data["sendgrid_id"]   # <EmailTemplate ...>
+                    logger.info("Passing EmailTemplate: %s", sendgrid_template)
+                    logger.info("SendGrid template: %s", getattr(sendgrid_template, "sendgrid_id", sendgrid_template))
+
+                    master_email_send_task.delay(
+                        recipients=recipients,
+                        sendgrid_id=sendgrid_template.sendgrid_id,
+                        employer_id=user.employer.id,
+                        attachment_urls=attachment_urls,
                     )
 
                 messages.success(request, "Email has been queued for delivery.")
@@ -403,6 +441,29 @@ def communications(request):
 
                 messages.success(request, "SMS is being sent.")
                 return redirect("/comms/?tab=sms")
+
+        elif form_type == "whatsapp":
+            active_tab = "whatsapp"
+            whatsapp_form = TemplateWhatsAppForm(request.POST, user=user)
+            print(whatsapp_form.errors)
+
+            if not whatsapp_form.is_valid():
+                print("❌ WhatsApp form errors:")
+                for field, errors in whatsapp_form.errors.items():
+                    print(f" - {field}: {errors}")
+                messages.error(request, "Please correct the WhatsApp form.")
+            else:
+                selected_group = whatsapp_form.cleaned_data["selected_group"]
+                whatsapp_template = whatsapp_form.cleaned_data["whatsapp_id"]
+                from_id = "MGb005e5fe6d147e13d0b2d1322e00b1cb"
+
+                group = get_object_or_404(Group, pk=selected_group.id)
+                whatsapp_id = whatsapp_template.content_sid
+
+                send_template_whatsapp_task.delay(whatsapp_id, from_id, group.id)
+
+                messages.success(request, "✅ WhatsApp messages queued for sending.")
+                return redirect("/comms/?tab=whatsapp")
 
         elif form_type == "docusign":
             active_tab = "docusign"
@@ -441,10 +502,12 @@ def communications(request):
             "email_form": email_form,
             "sms_form": sms_form,
             "docusign_form": docusign_form,
+            "whatsapp_form": whatsapp_form,
             "active_tab": active_tab,
             "can_send_email": is_member_of_email_group(user),
             "can_send_sms": is_member_of_msg_group(user),
             "can_send_docusign": is_member_of_docusign_group(user),
+           # "can_send_whatsapp": is_member_of_whatsapp_group(user),
             "selected_ids": selected_ids,
             "draft_id": draft_id,
             "attachment_urls": attachment_urls,
@@ -967,3 +1030,29 @@ def generate_ai_content(request):
             return JsonResponse({"message": message})
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
+
+
+@csrf_exempt
+@require_POST
+def sms_reply_webhook(request):
+    to_number = request.POST.get("To")
+    from_number = request.POST.get("From")
+    body = request.POST.get("Body")
+    message_sid = request.POST.get("MessageSid")
+
+    tenant = TenantApiKeys.objects.filter(phone_number=to_number).first()
+    if not tenant:
+        # Optional: Log or notify here
+        return HttpResponse("Tenant not found", status=204)
+
+    employer = tenant.employer
+
+    SMSReply.objects.create(
+        employer=employer,
+        from_number=from_number,
+        to_number=to_number,
+        body=body,
+        message_sid=message_sid,
+    )
+
+    return HttpResponse(status=204)
