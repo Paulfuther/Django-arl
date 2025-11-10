@@ -170,6 +170,7 @@
         url: "{% url 'salt_log_upload' %}",
         maxFilesize: 8, // MB
         maxFiles: 4,
+        parallelUploads: 4,
         acceptedFiles: "image/*",
         headers: { "X-CSRFToken": getCSRFToken() },
         init: function () {
