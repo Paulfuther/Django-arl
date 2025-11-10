@@ -1,7 +1,15 @@
+import logging
 import os
 import uuid
 from io import BytesIO
+from uuid import uuid4
 
+from arl.helpers import (
+    get_s3_images_for_salt_log,
+    get_signed_url_for_key,
+    upload_to_linode_object_storage,
+)
+from arl.utils.images import normalize_to_jpeg
 from celery.result import AsyncResult
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -15,17 +23,11 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils import timezone
 from django.utils.text import slugify
+from django.views import View
 from django.views.generic import CreateView, UpdateView, View
 from django.views.generic.list import ListView
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 from waffle import flag_is_active
-from arl.utils.images import normalize_to_jpeg
-
-from arl.helpers import (
-    get_s3_images_for_salt_log,
-    get_signed_url_for_key,
-    upload_to_linode_object_storage,
-)
 
 from .forms import (
     AnswerFormSet,
@@ -44,8 +46,9 @@ from .tasks import (
     generate_salt_log_pdf_task,
     save_salt_log,
 )
-import logging
+
 logger = logging.getLogger(__name__)
+
 
 @login_required
 def create_quiz(request):
@@ -199,53 +202,102 @@ class SaltLogCreateView(LoginRequiredMixin, CreateView):
         return form_data
 
 
+# Accept only basic image mimes that browsers/cameras send commonly
+ALLOWED_CONTENT_TYPES = {
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/heic",
+    "image/heif",
+    "image/webp",
+}
+
+
+def _sanitize_folder(s: str) -> str:
+    # keep it simple: strip spaces, remove path traversal, collapse weird chars
+    s = (s or "").strip().strip("/").replace("..", "")
+    # optional: further restrict to safe chars
+    return "".join(ch for ch in s if ch.isalnum() or ch in ("-", "_", "/"))
+
+
 class ProcessSaltLogImagesView(LoginRequiredMixin, View):
     login_url = "/login/"
 
     def post(self, request, *args, **kwargs):
-        if request.method == "POST":
-            user = request.user  # Authenticated user
-            # print(user.employer)
-            image_folder = request.POST.get("image_folder")
-            print(image_folder)
-            employer = user.employer
-            # Process the uploaded files here
-            uploaded_files = request.FILES.getlist(
-                "file"
-            )  # 'file' is the field name used by Dropzone
-            for uploaded_file in uploaded_files:
-                # print(uploaded_file.name)
-                file = uploaded_file
-                folder_name = f"SALTLOG/{employer}/{image_folder}/"
-                filename = uploaded_file.name
-                employee_key = "{}/{}".format(folder_name, filename)
-                # print(employee_key)
-                # Open the uploaded image using Pillow
-                image = Image.open(file)
-                # Resize the image to a larger thumbnail size, e.g.,
-                # 1000x1000 pixels
-                thumbnail_size = (1500, 1500)
-                image.thumbnail(thumbnail_size, Image.LANCZOS)
-                # Resize the image to your desired dimensions (e.g., 1000x1000)
-                # resized_image = image.resize((500, 500), Image.LANCZOS)
-                # print(image)
-                # Save the resized image to a temporary BytesIO object
-                temp_buffer = BytesIO()
-                image.save(temp_buffer, format="JPEG")
-                temp_buffer.seek(0)
-                # Upload the resized image to Linode Object Storage
-                upload_to_linode_object_storage(temp_buffer, employee_key)
-                # Close the temporary buffer
-                temp_buffer.close()
-                # Process and save the files to the desired location
-                # You can use the uploaded_files list to iterate through
-                # the files and save them
+        user = request.user
+        employer = user.employer
 
-                # Return a JSON response indicating success
-            return JsonResponse({"message": "Files uploaded successfully"})
-        else:
-            # Handle GET request or other methods
-            return JsonResponse({"message": "Invalid request method"})
+        # Dropzone sends 'file' (one per request by default; can be many if uploadMultiple=true)
+        uploaded_files = request.FILES.getlist("file")
+        if not uploaded_files:
+            return JsonResponse({"ok": False, "error": "No files received"}, status=400)
+
+        raw_folder = request.POST.get("image_folder", "")
+        image_folder = _sanitize_folder(raw_folder) or "misc"
+        base_prefix = f"SALTLOG/{employer}/{image_folder}"
+
+        results = []
+        for uploaded in uploaded_files:
+            try:
+                # Basic content-type guard (client-supplied but useful)
+                ctype = (uploaded.content_type or "").lower()
+                if ctype and ctype not in ALLOWED_CONTENT_TYPES:
+                    results.append(
+                        {
+                            "name": uploaded.name,
+                            "ok": False,
+                            "error": f"Unsupported content-type: {ctype}",
+                        }
+                    )
+                    continue
+
+                # Open and normalize
+                img = Image.open(uploaded)
+
+                # Autorotate by EXIF orientation (no-op if none)
+                try:
+                    img = ImageOps.exif_transpose(img)
+                except Exception:
+                    # ignore EXIF issues — keep going
+                    pass
+
+                # Convert to RGB so we can save as JPEG
+                if img.mode not in ("RGB", "L"):
+                    img = img.convert("RGB")
+
+                # Resize in-place keeping aspect ratio (max 1500px)
+                img.thumbnail((1500, 1500), Image.LANCZOS)
+
+                # Encode as JPEG (progressive helps size; tune quality as you like)
+                buf = BytesIO()
+                img.save(
+                    buf, format="JPEG", quality=85, optimize=True, progressive=True
+                )
+                buf.seek(0)
+
+                # Always use a unique filename and .jpg extension (since we encoded JPEG)
+                unique_name = f"{uuid4().hex}.jpg"
+                key = f"{base_prefix}/{unique_name}"
+
+                # Your helper likely takes a file-like and a key
+                upload_to_linode_object_storage(buf, key)
+
+                results.append({"name": uploaded.name, "ok": True, "key": key})
+                buf.close()
+                img.close()
+            except Exception as e:
+                results.append(
+                    {
+                        "name": getattr(uploaded, "name", "?"),
+                        "ok": False,
+                        "error": str(e),
+                    }
+                )
+
+        # Consider overall success only if at least one succeeded
+        any_success = any(r.get("ok") for r in results)
+        status_code = 200 if any_success else 400
+        return JsonResponse({"ok": any_success, "results": results}, status=status_code)
 
 
 class SaltLogListView(LoginRequiredMixin, ListView):
@@ -674,9 +726,16 @@ def checklist_dashboard(request):
 
 
 ALLOWED_CT = {
-    "image/jpeg", "image/jpg", "image/png", "image/gif",
-    "image/heic", "image/heif", "image/tiff", "image/webp",
-    "application/octet-stream", None,
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/gif",
+    "image/heic",
+    "image/heif",
+    "image/tiff",
+    "image/webp",
+    "application/octet-stream",
+    None,
 }
 MAX_BYTES = 50 * 1024 * 1024  # 10 MB
 
@@ -689,9 +748,12 @@ class UploadChecklistItemPhotoView(LoginRequiredMixin, View):
         if not file:
             return JsonResponse({"error": "No file provided"}, status=400)
         # Now safe to log size
-        logger.info("📸 Incoming upload: name=%s size=%.2f MB ct=%s",
-                    getattr(file, "name", ""), getattr(file, "size", 0) / 1024 / 1024,
-                    getattr(file, "content_type", None))
+        logger.info(
+            "📸 Incoming upload: name=%s size=%.2f MB ct=%s",
+            getattr(file, "name", ""),
+            getattr(file, "size", 0) / 1024 / 1024,
+            getattr(file, "content_type", None),
+        )
 
         checklist = get_object_or_404(Checklist, slug=slug)
 
@@ -702,17 +764,24 @@ class UploadChecklistItemPhotoView(LoginRequiredMixin, View):
             # This should never happen for a logged-in user
             logger.error(
                 "NO_EMPLOYER: user_id=%s path=%s checklist_slug=%s",
-                getattr(request.user, "id", None), request.path, slug
+                getattr(request.user, "id", None),
+                request.path,
+                slug,
             )
             return JsonResponse(
-                {"error": "Account misconfigured. Please contact support."},
-                status=403
+                {"error": "Account misconfigured. Please contact support."}, status=403
             )
         # 🔒 Extra guard: make sure checklist belongs to same employer
-        checklist_employer = getattr(getattr(checklist, "created_by", None), "employer", None)
+        checklist_employer = getattr(
+            getattr(checklist, "created_by", None), "employer", None
+        )
         if checklist_employer and checklist_employer != employer:
-            logger.warning("TENANT_MISMATCH: user_emp=%s checklist_emp=%s slug=%s",
-                           getattr(employer, "id", None), getattr(checklist_employer, "id", None), slug)
+            logger.warning(
+                "TENANT_MISMATCH: user_emp=%s checklist_emp=%s slug=%s",
+                getattr(employer, "id", None),
+                getattr(checklist_employer, "id", None),
+                slug,
+            )
             return JsonResponse({"error": "Forbidden"}, status=403)
 
         item = get_object_or_404(ChecklistItem, checklist=checklist, uuid=item_uuid)
@@ -739,7 +808,9 @@ class UploadChecklistItemPhotoView(LoginRequiredMixin, View):
             employer_segment = slugify(str(getattr(employer, "name", "noemployer")))
             base, _ = os.path.splitext(file.name or "")
             filename = f"{slugify(base) or 'photo'}-{uuid.uuid4().hex[:8]}.jpg"
-            key = f"CHECKLISTS/{employer_segment}/{checklist.slug}/{item.uuid}/{filename}"
+            key = (
+                f"CHECKLISTS/{employer_segment}/{checklist.slug}/{item.uuid}/{filename}"
+            )
 
             upload_to_linode_object_storage(buf, key)
             if isinstance(buf, BytesIO):
@@ -755,12 +826,15 @@ class UploadChecklistItemPhotoView(LoginRequiredMixin, View):
         except UnidentifiedImageError:
             return JsonResponse({"error": "Unreadable image file."}, status=400)
         except Image.DecompressionBombError:
-            return JsonResponse({"error": "Image too large (pixel dimensions)."}, status=400)
+            return JsonResponse(
+                {"error": "Image too large (pixel dimensions)."}, status=400
+            )
         except Exception as e:
             return JsonResponse({"error": f"Upload failed: {e}"}, status=500)
 
 
 # ------------------------------------------------ #
+
 
 @login_required
 def checklist_download_fresh_start_api(request, slug):
