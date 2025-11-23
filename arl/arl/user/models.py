@@ -67,7 +67,7 @@ class Store(models.Model):
     phone_number = PhoneNumberField(null=True)
     created = models.DateTimeField(auto_now_add=True, null=True)
     updated = models.DateTimeField(auto_now=True, null=True)
-
+    is_active = models.BooleanField(default=True)
     employer = models.ForeignKey(
         Employer, on_delete=models.CASCADE, null=True, related_name="stores"
     )

@@ -155,6 +155,17 @@ class ProcessedDocusignDocumentInline(
 # CustomUser model
 class CustomUserAdmin(ExportActionMixin, UserAdmin):
     resource_class = UserResource
+    # Completely disables delete everywhere in admin
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    # Removes “delete selected” from actions dropdown
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        if 'delete_selected' in actions:
+            del actions['delete_selected']
+        return actions
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
         if db_field.name in ["sin_expiration_date", "work_permit_expiration_date"]:
@@ -404,6 +415,7 @@ class UserConsentAdmin(admin.ModelAdmin):
 class StoreAdmin(admin.ModelAdmin):
     list_display = ("number", "employer", "manager")
     search_fields = ("number", "employer__name", "manager__username")
+    list_filter = ("is_active", "carwash", "employer")
 
 
 class AnswerInline(admin.TabularInline):
@@ -475,8 +487,6 @@ class CustomTaskResultAdmin(DefaultTaskResultAdmin):
             return str(obj.result)[:75] + "..." if len(str(obj.result)) > 75 else obj.result
         return "No result"
     short_result.short_description = "Result (short)"
-
-
 
 
 @admin.register(DocumentType)
