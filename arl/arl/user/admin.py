@@ -10,7 +10,8 @@ from django.utils.html import format_html, strip_tags
 from import_export import fields, resources
 from import_export import fields as export_fields
 from import_export.admin import ExportActionMixin
-from django_celery_results.admin import TaskResultAdmin as DefaultTaskResultAdmin
+from django_celery_results.admin import (
+    TaskResultAdmin as DefaultTaskResultAdmin)
 from arl.bucket.helpers import upload_to_linode_object_storage
 from arl.carwash.models import CarwashStatus
 from arl.dsign.models import (
@@ -49,7 +50,8 @@ from arl.utils.crypto import normalize_digits, sin_hash
 
 class ExternalRecipientAdmin(admin.ModelAdmin):
     list_display = ("first_name", "last_name", "company", "email", "group")
-    search_fields = ("first_name", "last_name", "company", "email", "group__name")
+    search_fields = ("first_name", "last_name", "company", "email",
+                     "group__name")
 
 
 # This class is used for exporting
@@ -61,7 +63,8 @@ class UserResource(resources.ModelResource):
         column_name="Docusign Documents", attribute="all_docusign_templates"
     )
     work_permit_expiration_date = fields.Field(
-        column_name="Permit Expiration", attribute=("work_permit_expiration_date")
+        column_name="Permit Expiration",
+        attribute=("work_permit_expiration_date")
     )
     sin_expiration_date = fields.Field(
         column_name="SIN Expiration", attribute="sin_expiration_date"
@@ -145,7 +148,7 @@ class ProcessedDocusignDocumentInline(
 ):  # Or use admin.StackedInline for a different layout
     model = ProcessedDocsignDocument
     extra = 0  # Don't show empty extra forms
-    fields = ("template_name", "processed_at")  # Adjust based on available fields
+    fields = ("template_name", "processed_at")
     readonly_fields = (
         "template_name",
         "processed_at",
@@ -155,9 +158,21 @@ class ProcessedDocusignDocumentInline(
 # CustomUser model
 class CustomUserAdmin(ExportActionMixin, UserAdmin):
     resource_class = UserResource
+    # Completely disables delete everywhere in admin
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    # Removes “delete selected” from actions dropdown
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        if 'delete_selected' in actions:
+            del actions['delete_selected']
+        return actions
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
-        if db_field.name in ["sin_expiration_date", "work_permit_expiration_date"]:
+        if db_field.name in ["sin_expiration_date",
+                             "work_permit_expiration_date"]:
             kwargs["widget"] = TextInput(
                 attrs={"type": "date"}
             )  # ✅ Uses native date input, no calendar
@@ -205,7 +220,7 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         if obj.sin_expiration_date is None:
             return format_html('<span style="color:#0a7;">Valid</span>')
         days = (obj.sin_expiration_date - obj.sin_expiration_date.today()).days \
-               if hasattr(obj.sin_expiration_date, "today") else None
+            if hasattr(obj.sin_expiration_date, "today") else None
         if days is None:
             return format_html('<span style="color:#0a7;">Valid</span>')
         if days < 0:
@@ -218,7 +233,8 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
     # ✅ Smart search: if the admin search box contains a 9-digit SIN,
     # we hash it and include exact matches; if it’s 4 digits, we match last4.
     def get_search_results(self, request, queryset, search_term):
-        qs, use_distinct = super().get_search_results(request, queryset, search_term)
+        qs, use_distinct = super().get_search_results(request,
+                                                      queryset, search_term)
         digits = normalize_digits(search_term or "")
         try:
             if len(digits) == 9:
@@ -246,7 +262,8 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
     def full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}".strip() or obj.username
     full_name.short_description = "Name"
-    search_fields = ("username", "email", "phone_number", "sin_last4", "first_name", "last_name")
+    search_fields = ("username", "email", "phone_number", "sin_last4",
+                     "first_name", "last_name")
     list_editable = (
         "sin_expiration_date",
         "work_permit_expiration_date",
@@ -396,7 +413,8 @@ class UserManagerAdmin(admin.ModelAdmin):
 
 @admin.register(UserConsent)
 class UserConsentAdmin(admin.ModelAdmin):
-    list_display = ("user", "consent_type", "is_granted", "granted_on", "revoked_on")
+    list_display = ("user", "consent_type", "is_granted",
+                    "granted_on", "revoked_on")
     list_filter = ("consent_type", "is_granted")
     search_fields = ("user__username",)
 
@@ -404,6 +422,7 @@ class UserConsentAdmin(admin.ModelAdmin):
 class StoreAdmin(admin.ModelAdmin):
     list_display = ("number", "employer", "manager")
     search_fields = ("number", "employer__name", "manager__username")
+    list_filter = ("is_active", "carwash", "employer")
 
 
 class AnswerInline(admin.TabularInline):
@@ -468,15 +487,13 @@ class CustomTaskResultAdmin(DefaultTaskResultAdmin):
     )
 
     search_fields = ("task_id", "task_name", "periodic_task_name")
-    list_filter = ("status", "task_name", "periodic_task_name")  # ✅ Add filtering
+    list_filter = ("status", "task_name", "periodic_task_name")
 
     def short_result(self, obj):
         if obj.result:
             return str(obj.result)[:75] + "..." if len(str(obj.result)) > 75 else obj.result
         return "No result"
     short_result.short_description = "Result (short)"
-
-
 
 
 @admin.register(DocumentType)
@@ -643,7 +660,7 @@ class SMSOptOutAdmin(ExportActionMixin, admin.ModelAdmin):
 
 @admin.register(EmployerSMSTask)
 class EmployerSMSTaskAdmin(admin.ModelAdmin):
-    list_display = ("employer", "task_name", "is_enabled")  # Show employer & status
+    list_display = ("employer", "task_name", "is_enabled")
     list_filter = ("task_name", "is_enabled")  # Filter by task and status
     search_fields = ("employer__name", "task_name")  # Search by employer name
     list_editable = (
@@ -671,7 +688,8 @@ class TenantApiKeysAdmin(admin.ModelAdmin):
 
 @admin.register(DocuSignTemplate)
 class DocuSignTemplateAdmin(admin.ModelAdmin):
-    list_display = ("template_name", "employer", "is_new_hire_template", "created_at")
+    list_display = ("template_name", "employer",
+                    "is_new_hire_template", "created_at")
     search_fields = ("template_name",)
     list_filter = (
         "employer",
@@ -681,12 +699,14 @@ class DocuSignTemplateAdmin(admin.ModelAdmin):
 
 @admin.register(EmailTemplate)
 class EmailTemplateAdmin(admin.ModelAdmin):
-    list_display = ("name", "get_employers", "sendgrid_id", "include_in_report")
+    list_display = ("name", "get_employers", "sendgrid_id",
+                    "include_in_report")
     search_fields = ("name", "sendgrid_id", "employers__name")
     list_filter = ("employers",)
 
     def get_employers(self, obj):
-        """Display employers in alphabetical order as comma-separated string."""
+        """Display employers in alphabetical"""
+        """order as comma-separated string."""
         sorted_employers = sorted(emp.name for emp in obj.employers.all())
         return ", ".join(sorted_employers)
 
@@ -767,7 +787,8 @@ class EmployerAdmin(admin.ModelAdmin):
 
         if employer.is_active:
             self.message_user(
-                request, f"Employer {employer.name} is now active.", messages.SUCCESS
+                request, f"Employer {employer.name} is now active.",
+                messages.SUCCESS
             )
         else:
             self.message_user(
@@ -803,7 +824,8 @@ class NewHireInviteAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {"fields": ("name", "email", "role")}),
         ("Context", {"fields": ("employer", "invited_by", "used")}),
-        ("Invite Details", {"fields": ("token", "invite_link_display", "created_at")}),
+        ("Invite Details", {"fields": ("token", "invite_link_display",
+                                       "created_at")}),
     )
 
     actions = ["mark_as_used", "mark_as_unused"]
@@ -893,7 +915,8 @@ class SignedDocumentFileAdmin(admin.ModelAdmin):
         context = {
             "form": form,
         }
-        return render(request, "admin/signed_documents_upload_one.html", context)
+        return render(request, "admin/signed_documents_upload_one.html",
+                      context)
 
 
 @admin.register(StripePlan)
@@ -905,7 +928,8 @@ class StripePlanAdmin(admin.ModelAdmin):
 @admin.register(StripePayment)
 class StripePaymentAdmin(admin.ModelAdmin):
     list_display = ("employer", "amount", "is_paid", "payment_date")
-    search_fields = ("employer__name", "stripe_customer_id", "stripe_subscription_id")
+    search_fields = ("employer__name", "stripe_customer_id",
+                     "stripe_subscription_id")
     list_filter = ("is_paid",)
 
 
@@ -930,4 +954,3 @@ admin.site.register(Answer)
 admin.site.register(Question, QuestionAdmin)
 admin.site.register(ExternalRecipient, ExternalRecipientAdmin)
 admin.site.register(SMSOptOut, SMSOptOutAdmin)
-

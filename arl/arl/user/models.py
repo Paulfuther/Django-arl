@@ -67,11 +67,13 @@ class Store(models.Model):
     phone_number = PhoneNumberField(null=True)
     created = models.DateTimeField(auto_now_add=True, null=True)
     updated = models.DateTimeField(auto_now=True, null=True)
-
+    is_active = models.BooleanField(default=True)
     employer = models.ForeignKey(
         Employer, on_delete=models.CASCADE, null=True, related_name="stores"
     )
-    manager = models.ForeignKey('CustomUser', on_delete=models.SET_NULL, null=True, blank=True, related_name='managed_stores')
+    manager = models.ForeignKey('CustomUser', on_delete=models.SET_NULL,
+                                null=True, blank=True,
+                                related_name='managed_stores')
 
     def __str__(self):
         if self.employer:
@@ -97,10 +99,14 @@ class CustomUser(AbstractUser):
     )
     # NEW encrypted fields
     sin_encrypted = models.TextField(null=True, blank=True)
-    sin_last4 = models.CharField(max_length=4, null=True, blank=True, db_index=True)
-    sin_hash = models.CharField(max_length=64, null=True, blank=True, db_index=True)
+    sin_last4 = models.CharField(max_length=4, null=True, blank=True,
+                                 db_index=True)
+    sin_hash = models.CharField(max_length=64, null=True, blank=True,
+                                db_index=True)
     sin_expiration_date = models.DateField(blank=True, null=True, verbose_name="SIN Expiration Date")
-    work_permit_expiration_date = models.DateField(blank=True, null=True, verbose_name="Work Permit Expiration Date")
+    work_permit_expiration_date = models.DateField(
+        blank=True, null=True,
+        verbose_name="Work Permit Expiration Date")
     dob = models.DateField(blank=True, null=True, verbose_name="Date of Birth")
     address = models.CharField(max_length=100, null=True)
     address_two = models.CharField(max_length=100, null=True, blank=True)
@@ -108,9 +114,12 @@ class CustomUser(AbstractUser):
     state_province = models.CharField(max_length=100, null=True)
     country = CountryField(null=True)
     postal = models.CharField(max_length=7, null=True)
-    store = models.ForeignKey(Store, on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
-    employer = models.ForeignKey(Employer, on_delete=models.SET_NULL, null=True)
-    store = models.ForeignKey(Store, on_delete=models.SET_NULL, null=True, blank=True, related_name='users')
+    store = models.ForeignKey(Store, on_delete=models.SET_NULL,
+                              null=True, blank=True, related_name='users')
+    employer = models.ForeignKey(Employer,
+                                 on_delete=models.SET_NULL, null=True)
+    store = models.ForeignKey(Store, on_delete=models.SET_NULL,
+                              null=True, blank=True, related_name='users')
 
     def __str__(self):
         return self.first_name
@@ -153,8 +162,8 @@ class CustomUser(AbstractUser):
 
 class SMSOptOut(models.Model):
     user = models.OneToOneField(
-        CustomUser, 
-        on_delete=models.CASCADE, 
+        CustomUser,
+        on_delete=models.CASCADE,
         related_name="sms_opt_out"
     )
     employer = models.ForeignKey(
@@ -165,7 +174,7 @@ class SMSOptOut(models.Model):
         blank=True,  # Allow blank values for optional selection
         help_text="Employer associated with this opt-out."
     )
-    reason = models.TextField(blank=True, null=True)  # Optional reason why they're opted out
+    reason = models.TextField(blank=True, null=True)
     date_added = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
@@ -205,7 +214,8 @@ class ExternalRecipient(models.Model):
     last_name = models.CharField(max_length=50, blank=True, null=True)
     company = models.CharField(max_length=100, blank=True, null=True)
     email = models.EmailField(unique=True)
-    group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True, blank=True)
+    group = models.ForeignKey(Group, on_delete=models.SET_NULL,
+                              null=True, blank=True)
     is_active = models.BooleanField(default=True)  # New field
 
     def __str__(self):
@@ -217,21 +227,34 @@ class ExternalRecipient(models.Model):
 
 
 class DocumentType(models.Model):
-    name = models.CharField(max_length=100, unique=True, help_text="Name of the document type (e.g., Work Permit, Visa).")
-    description = models.TextField(blank=True, help_text="Optional description of the document type.")
+    name = models.CharField(max_length=100,
+                            unique=True, help_text="Name of the document type (e.g., Work Permit, Visa).")
+    description = models.TextField(blank=True,
+                                   help_text="Optional description of the document type.")
 
     def __str__(self):
         return self.name
 
 
 class EmployeeDocument(models.Model):
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name="documents")
-    document_type = models.ForeignKey(DocumentType, on_delete=models.CASCADE, related_name="documents")
-    document_number = models.CharField(max_length=100, blank=True, null=True, help_text="Unique identifier, if applicable.")
-    issue_date = models.DateField(blank=True, null=True, help_text="The date the document was issued.")
-    expiration_date = models.DateField(blank=True, null=True, help_text="The date the document expires, if applicable.")
-    notes = models.TextField(blank=True, help_text="Additional notes about the document.")
-    # file = models.FileField(upload_to="employee_documents/", blank=True, null=True, help_text="Upload a copy of the document.")
+    user = models.ForeignKey(CustomUser,
+                             on_delete=models.CASCADE,
+                             related_name="documents")
+    document_type = models.ForeignKey(DocumentType, on_delete=models.CASCADE,
+                                      related_name="documents")
+    document_number = models.CharField(max_length=100,
+                                       blank=True, null=True,
+                                       help_text="Unique identifier, if applicable.")
+    issue_date = models.DateField(blank=True,
+                                  null=True,
+                                  help_text="The date the document was issued.")
+    expiration_date = models.DateField(blank=True,
+                                       null=True,
+                                       help_text="The date the document expires, if applicable.")
+    notes = models.TextField(blank=True,
+                             help_text="Additional notes about the document.")
+    # file = models.FileField(upload_to="employee_documents/",
+    # blank=True, null=True, help_text="Upload a copy of the document.")
 
     def is_expired(self):
         return self.expiration_date and self.expiration_date < now().date()
@@ -250,11 +273,12 @@ class EmployerSMSTask(models.Model):
     is_enabled = models.BooleanField(default=True)  # Toggle SMS per employer
 
     class Meta:
-        unique_together = ("employer", "task_name")  # Ensure one entry per task per employer
+        unique_together = ("employer", "task_name")  
+        # Ensure one entry per task per employer
 
     def __str__(self):
         return f"{self.employer} - {self.task_name} - {'Enabled' if self.is_enabled else 'Disabled'}"
-    
+
 
 class PhoneEntry(models.Model):
     phone_number = PhoneNumberField(
@@ -265,11 +289,14 @@ class PhoneEntry(models.Model):
 
     def __str__(self):
         return str(self.phone_number)
-    
+
 
 class EmployerSettings(models.Model):
-    employer = models.OneToOneField(Employer, on_delete=models.CASCADE, related_name="settings")
-    send_new_hire_file = models.BooleanField(default=True)  # ✅ Toggle for new hire file
+    employer = models.OneToOneField(Employer,
+                                    on_delete=models.CASCADE,
+                                    related_name="settings")
+    send_new_hire_file = models.BooleanField(default=True)  
+    # ✅ Toggle for new hire file
 
     def __str__(self):
         return f"{self.employer.name} - {'Send' if self.send_new_hire_file else 'Do Not Send'} New Hire File"
@@ -281,7 +308,9 @@ def generate_random_token():
 
 
 class NewHireInvite(models.Model):
-    employer = models.ForeignKey("user.Employer", on_delete=models.CASCADE, related_name="invites")
+    employer = models.ForeignKey("user.Employer",
+                                 on_delete=models.CASCADE,
+                                 related_name="invites")
     invited_by = models.ForeignKey(   # NEW FIELD
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -292,8 +321,11 @@ class NewHireInvite(models.Model):
     )
     email = models.EmailField(unique=True)
     name = models.CharField(max_length=255)
-    role = models.CharField(max_length=100, choices=[("GSA", "GSA"), ("HR", "HR"), ("Manager", "Manager")])
-    token = models.CharField(max_length=64, unique=True, default=generate_random_token)
+    role = models.CharField(max_length=100,
+                            choices=[("GSA", "GSA"), ("HR", "HR"),
+                                     ("Manager", "Manager")])
+    token = models.CharField(max_length=64,
+                             unique=True, default=generate_random_token)
     created_at = models.DateTimeField(auto_now_add=True)
     used = models.BooleanField(default=False)
 
@@ -303,5 +335,3 @@ class NewHireInvite(models.Model):
 
     def __str__(self):
         return f"Invite for {self.name} ({self.email})"
-
-
