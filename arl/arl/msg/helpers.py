@@ -26,8 +26,8 @@ from sendgrid.helpers.mail import (
 from twilio.base.exceptions import TwilioException
 from twilio.rest import Client
 from arl.setup.models import TenantApiKeys
-from arl.user.models import CustomUser, Store
-from .models import DraftEmail
+from arl.user.models import CustomUser, Store, SMSOptOut
+
 
 logger = get_task_logger(__name__)
 
@@ -832,17 +832,87 @@ def prepare_sms_recipient_data(user, selected_group, selected_users):
     recipients = []
     employer = user.employer
 
+    # Preload SMS opt-out numbers for this employer
+    opt_out_user_ids = set(
+        SMSOptOut.objects.filter(employer=employer)
+        .values_list("user_id", flat=True)
+    )
+    
+    skipped_no_phone = []
+    skipped_opt_out = []
+
+    # We'll keep a map of user_id -> user instance so we can log names later
+    user_map = {}
+
+    # 🔹 Collect recipients from selected group
     if selected_group:
-        for u in selected_group.user_set.filter(is_active=True, employer=employer):
+        qs = selected_group.user_set.filter(is_active=True, employer=employer)
+        for u in qs:
+            user_map[u.id] = u
+            if not u.phone_number:
+                skipped_no_phone.append(u)
+                continue
             recipients.append({"id": u.id, "phone": u.phone_number})
 
+    # 🔹 Collect individually selected users
     if selected_users:
-        for u in selected_users.order_by("first_name", "last_name"):
+        qs = selected_users.order_by("first_name", "last_name")
+        for u in qs:
+            user_map[u.id] = u
+            if not u.phone_number:
+                skipped_no_phone.append(u)
+                continue
             recipients.append({"id": u.id, "phone": u.phone_number})
 
-    # ✅ Remove duplicates by phone number
+    # 🔹 Remove duplicates by phone number
     unique_recipients = {r["phone"]: r for r in recipients}
-    return list(unique_recipients.values())
+
+    # 🔹 Filter out opt-outs
+    filtered_recipients = []
+    for r in unique_recipients.values():
+        if r["id"] in opt_out_user_ids:
+            skipped_opt_out.append(r)
+        else:
+            filtered_recipients.append(r)
+
+    # 🔹 Log skipped users: no phone
+    for u in skipped_no_phone:
+        logger.info(
+            "[SMS] Skipped user %s (%s %s, employer=%s) – NO phone number",
+            u.id,
+            u.first_name,
+            u.last_name,
+            getattr(employer, "name", employer.id if employer else "None"),
+        )
+
+    # 🔹 Log skipped users: opted out
+    for r in skipped_opt_out:
+        u = user_map.get(r["id"])
+        if u:
+            logger.info(
+                "[SMS] Skipped user %s (%s %s, employer=%s) – opted out of SMS",
+                u.id,
+                u.first_name,
+                u.last_name,
+                getattr(employer, "name", employer.id if employer else "None"),
+            )
+        else:
+            # Fallback if for some reason we don't have the user object
+            logger.info(
+                "[SMS] Skipped user id=%s – opted out of SMS",
+                r["id"],
+            )
+
+    # 🔹 Summary line
+    logger.info(
+        "[SMS] Prepared %d recipients for employer=%s, skipped %d opted-out, %d without phone",
+        len(filtered_recipients),
+        getattr(employer, "name", employer.id if employer else "None"),
+        len(skipped_opt_out),
+        len(skipped_no_phone),
+    )
+
+    return filtered_recipients
 
 
 def is_member_of_msg_group(user):
