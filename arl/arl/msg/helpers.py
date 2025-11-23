@@ -26,8 +26,8 @@ from sendgrid.helpers.mail import (
 from twilio.base.exceptions import TwilioException
 from twilio.rest import Client
 from arl.setup.models import TenantApiKeys
-from arl.user.models import CustomUser, Store
-from .models import DraftEmail
+from arl.user.models import CustomUser, Store, SMSOptOut
+
 
 logger = get_task_logger(__name__)
 
@@ -832,6 +832,12 @@ def prepare_sms_recipient_data(user, selected_group, selected_users):
     recipients = []
     employer = user.employer
 
+    # Preload SMS opt-out numbers for this employer
+    opt_out_numbers = set(
+        SMSOptOut.objects.filter(employer=employer)
+        .values_list("user_id", flat=True)
+    )
+
     if selected_group:
         for u in selected_group.user_set.filter(is_active=True, employer=employer):
             recipients.append({"id": u.id, "phone": u.phone_number})
@@ -842,7 +848,14 @@ def prepare_sms_recipient_data(user, selected_group, selected_users):
 
     # ✅ Remove duplicates by phone number
     unique_recipients = {r["phone"]: r for r in recipients}
-    return list(unique_recipients.values())
+
+    # Remove users who opted out of SMS
+    filtered_recipients = [
+        r for r in unique_recipients.values()
+        if r["id"] not in opt_out_numbers
+    ]
+
+    return filtered_recipients
 
 
 def is_member_of_msg_group(user):
