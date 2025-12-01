@@ -154,7 +154,7 @@
           <div id="sms-user-dropdownBox" class="dropdown-box mb-3">
 
             <!-- 🔍 Search Input -->
-            <div class="px-3 mb-2">
+            <div class="px-3 mt-3 mb-2">
               <input type="text"
                     name="search"
                     class="form-control mb-2"
@@ -167,7 +167,7 @@
             </div>
             
             <!-- 🔁 Live Result Target -->
-            <div id="sms-user-checkbox-list">
+            <div id="sms-user-checkbox-list" class="text-muted small px-3">
              <!-- Template Email -->
              {% include "msg/partials/user_checkboxes.html" with users=email_form.fields.selected_users.queryset selected_ids=selected_ids summary_id="sms-selected-summary" %}
             </div>

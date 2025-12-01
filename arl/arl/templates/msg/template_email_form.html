@@ -116,7 +116,8 @@
              autocomplete="off">
     </div>
     <div id="email-user-checkbox-list" class="text-muted small px-3">
-      Start typing to search for users...
+      {% include "msg/partials/user_checkboxes.html" with users=email_form.fields.selected_users.queryset selected_ids=selected_ids summary_id="email-selected-summary" %}
+          
     </div>
   </div>
 
@@ -136,8 +137,8 @@
 
   <!-- ACTIONS (below dropzone) -->
   <div class="d-flex gap-2 mt-2">
-    <button class="btn btn-primary" @click.prevent="submit">📤 Send</button>
-    <button class="btn btn-secondary" id="save-draft-btn" @click.prevent="saveDraft">💾 Save Draft</button>
+    <button class="btn btn-outline-primary mt-3" @click.prevent="submit">Send Email</button>
+    <button class="btn btn-outline-primary mt-3" id="save-draft-btn" @click.prevent="saveDraft">Save Draft</button>
   </div>
 </div>
 
