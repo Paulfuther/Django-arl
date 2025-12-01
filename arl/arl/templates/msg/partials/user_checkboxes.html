@@ -1,57 +1,68 @@
 {% with summary_id|default:"selected-summary" as sid %}
-<!-- 🔘 Select All -->
-<div class="form-check mb-2 m-3">
-  <input type="checkbox" class="form-check-input" id="select-all-users-{{ sid }}">
-  <label class="form-check-label ps-2" for="select-all-users-{{ sid }}">Select All Users</label>
-</div>
-
-<!-- 👤 User Checkboxes -->
-{% for user in users %}
-  <div class="dropdown-option">
+  <!-- 🔘 Select All -->
+  <div class="form-check mb-2 m-3">
     <input type="checkbox"
-           name="selected_users"
-           value="{{ user.id }}"
-           class="form-check-input user-checkbox user-checkbox-{{ sid }}"
-           id="user-{{ sid }}-{{ user.id }}"
-           {% if user.id|stringformat:"s" in selected_ids %}checked{% endif %}>
-    <label class="form-check-label" for="user-{{ sid }}-{{ user.id }}">
-      {{ user.last_name }}, {{ user.first_name }} ({{ user.email }}) ({{ user.employer.name }})
+           class="form-check-input"
+           id="select-all-users-{{ sid }}">
+    <label class="form-check-label ps-2" for="select-all-users-{{ sid }}">
+      Select All Users
     </label>
   </div>
+
+  <!-- 👤 User Checkboxes -->
+  {% for user in users %}
+    <div class="dropdown-option">
+      <input type="checkbox"
+             name="selected_users"
+             value="{{ user.id }}"
+             class="form-check-input user-checkbox user-checkbox-{{ sid }}"
+             id="user-{{ sid }}-{{ user.id }}"
+             {% if user.id|stringformat:"s" in selected_ids %}checked{% endif %}>
+      <label class="form-check-label" for="user-{{ sid }}-{{ user.id }}">
+        {{ user.last_name }}, {{ user.first_name }} ({{ user.email }}) ({{ user.employer.name }})
+      </label>
+    </div>
   {% empty %}
-  <p class="text-muted px-2">No users found.</p>
-{% endfor %}
+    <p class="text-muted px-2">No users found.</p>
+  {% endfor %}
 
+  <script>
+  (function() {
+    const sid = "{{ sid }}";
+    const label = document.getElementById(sid + "-label");  // e.g. "sms-selected-summary-label"
+    const selectAll = document.getElementById("select-all-users-" + sid);
 
-<script>
-(function() {
-  const sid = "{{ sid }}";
-  const label = document.getElementById(`${sid}-label`);
-  const selectAll = document.getElementById(`select-all-users-${sid}`);
+    function updateSummary() {
+      const checkboxes = document.querySelectorAll(".user-checkbox-" + sid);
+      const checked = document.querySelectorAll(".user-checkbox-" + sid + ":checked");
 
-  function updateSummary() {
-    const checkboxes = document.querySelectorAll(`.user-checkbox-${sid}`);
-    const checked = document.querySelectorAll(`.user-checkbox-${sid}:checked`);
-    const summaryText = checked.length > 0 ? `${checked.length} user${checked.length === 1 ? '' : 's'} selected` : "Select Users";
+      const summaryText = checked.length > 0
+        ? `${checked.length} user${checked.length === 1 ? '' : 's'} selected`
+        : "Select Users";
 
-    if (label) label.textContent = summaryText;
-    if (selectAll) selectAll.checked = checked.length === checkboxes.length;
-  }
+      if (label) label.textContent = summaryText;
 
-  function bind() {
-    const checkboxes = document.querySelectorAll(`.user-checkbox-${sid}`);
-    if (selectAll) {
-      selectAll.addEventListener("change", function () {
-        checkboxes.forEach(cb => cb.checked = this.checked);
-        updateSummary();
-      });
+      if (selectAll) {
+        selectAll.checked = (checkboxes.length > 0 && checked.length === checkboxes.length);
+      }
     }
-    checkboxes.forEach(cb => cb.addEventListener("change", updateSummary));
-    updateSummary();
-  }
 
-  document.addEventListener("DOMContentLoaded", bind);
-  document.addEventListener("htmx:afterSwap", bind);
-})();
-</script>
+    function bind() {
+      const checkboxes = document.querySelectorAll(".user-checkbox-" + sid);
+
+      if (selectAll) {
+        selectAll.addEventListener("change", function () {
+          checkboxes.forEach(cb => { cb.checked = this.checked; });
+          updateSummary();
+        });
+      }
+
+      checkboxes.forEach(cb => cb.addEventListener("change", updateSummary));
+      updateSummary();
+    }
+
+    // Run immediately when the partial is injected
+    bind();
+  })();
+  </script>
 {% endwith %}
