@@ -115,6 +115,43 @@
         </div>
       {% endfor %}
     </div>
+
+{# 🔹 PAGINATION (for employee_documents) #}
+    {% if employee_documents.has_other_pages %}
+      <nav class="mt-3" aria-label="Employee document pages">
+        <ul class="pagination pagination-sm justify-content-center">
+
+          {% if employee_documents.has_previous %}
+            <li class="page-item">
+              <a class="page-link"
+                 href="?doc_q={{ doc_q|urlencode }}&page={{ employee_documents.previous_page_number }}">
+                Previous
+              </a>
+            </li>
+          {% endif %}
+
+          {% for num in employee_documents.paginator.page_range %}
+            <li class="page-item {% if num == employee_documents.number %}active{% endif %}">
+              <a class="page-link"
+                 href="?doc_q={{ doc_q|urlencode }}&page={{ num }}">
+                {{ num }}
+              </a>
+            </li>
+          {% endfor %}
+
+          {% if employee_documents.has_next %}
+            <li class="page-item">
+              <a class="page-link"
+                 href="?doc_q={{ doc_q|urlencode }}&page={{ employee_documents.next_page_number }}">
+                Next
+              </a>
+            </li>
+          {% endif %}
+
+        </ul>
+      </nav>
+    {% endif %}
+
   {% else %}
     <div class="p-3 text-muted">No employees matched “{{ doc_q }}”.</div>
   {% endif %}

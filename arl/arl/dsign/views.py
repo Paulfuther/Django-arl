@@ -10,6 +10,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.mixins import UserPassesTestMixin
+from django.core.paginator import Paginator
 from django.db.models import Count, Max, Q
 from django.http import HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -790,8 +791,7 @@ def documents_dashboard(request):
     user_ids = [row["user"] for row in latest_per_user]
 
     recent_employee_heads = (
-        CustomUser.objects
-        .filter(id__in=user_ids)
+        CustomUser.objects.filter(id__in=user_ids)
         .annotate(
             # NOTE: use the correct reverse name "signed_documents"
             last_upload=Max(
@@ -806,22 +806,46 @@ def documents_dashboard(request):
         .order_by("-last_upload")
     )
 
-    recent_employee_docs_all = (
-        SignedDocumentFile.objects
-        .filter(employer=employer, user_id__in=user_ids)
+    # ------------------------------
+    # Paginated full employee docs
+    # ------------------------------
+    employee_docs_qs = (
+        SignedDocumentFile.objects.filter(employer=employer, user__isnull=False)
         .select_related("user")
         .order_by("-uploaded_at")
     )
-    
-    recent_store_docs = (
+
+    page_number = request.GET.get("page", 1)
+    paginator = Paginator(employee_docs_qs, 10)  # 10 per page
+    page_obj = paginator.get_page(page_number)
+
+    # ------------------------------
+    # Paginated store docs (10 per page)
+    # ------------------------------
+    store_docs_qs = (
         SignedDocumentFile.objects.filter(employer=employer, store__isnull=False)
         .select_related("store")
-        .order_by("-uploaded_at")[:10]
+        .order_by("-uploaded_at")
     )
+
+    store_page_number = request.GET.get("store_page", 1)
+    store_paginator = Paginator(store_docs_qs, 10)  # 10 per page
+    recent_store_docs = store_paginator.get_page(store_page_number)
+
     # print("store docs :", recent_store_docs)
-    recent_company_docs = SignedDocumentFile.objects.filter(
-        employer=employer, is_company_document=True
-    ).order_by("-uploaded_at")[:10]
+
+    # ------------------------------
+    # Paginated company docs (10 per page)
+    # ------------------------------
+    company_docs_qs = (
+        SignedDocumentFile.objects
+        .filter(employer=employer, is_company_document=True)
+        .order_by("-uploaded_at")
+    )
+
+    company_page_number = request.GET.get("company_page", 1)
+    company_paginator = Paginator(company_docs_qs, 10)
+    recent_company_docs = company_paginator.get_page(company_page_number)
 
     # print(recent_company_docs)
 
@@ -833,7 +857,7 @@ def documents_dashboard(request):
             "employees": employees,
             "stores": stores,
             "recent_employee_heads": recent_employee_heads,
-            "recent_employee_docs_all": recent_employee_docs_all,
+            "employee_documents": page_obj,
             "recent_store_docs": recent_store_docs,
             "company_results": recent_company_docs,
             "q": "",

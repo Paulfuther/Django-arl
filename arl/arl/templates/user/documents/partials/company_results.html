@@ -76,4 +76,39 @@
       </table>
     </div>
   </div>
+  {# 🔹 Pagination for company_results (10 per page) #}
+  {% if company_results.has_other_pages %}
+    <nav class="mt-3" aria-label="Company document pages">
+      <ul class="pagination pagination-sm justify-content-center">
+
+        {% if company_results.has_previous %}
+          <li class="page-item">
+            <a class="page-link"
+               href="?tab=company&company_page={{ company_results.previous_page_number }}">
+              Previous
+            </a>
+          </li>
+        {% endif %}
+
+        {% for num in company_results.paginator.page_range %}
+          <li class="page-item {% if num == company_results.number %}active{% endif %}">
+            <a class="page-link"
+               href="?tab=company&company_page={{ num }}">
+              {{ num }}
+            </a>
+          </li>
+        {% endfor %}
+
+        {% if company_results.has_next %}
+          <li class="page-item">
+            <a class="page-link"
+               href="?tab=company&company_page={{ company_results.next_page_number }}">
+              Next
+            </a>
+          </li>
+        {% endif %}
+
+      </ul>
+    </nav>
+  {% endif %}
 </div>
