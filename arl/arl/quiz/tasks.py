@@ -107,7 +107,16 @@ def generate_salt_log_pdf_task(incident_id):
             if incident.date_salted
             else "no-date"
         )
-        pdf_filename = f"{store_number}_{slugify(date_salted_str)}_salt_log_report.pdf"
+        time_str = (
+            incident.time_salted.strftime("%H%M")
+            if incident.time_salted
+            else "no-time"
+        )
+        image_folder = incident.image_folder
+        pdf_filename = (
+            f"{store_number}_{slugify(date_salted_str)}_"
+            f"{time_str}_{image_folder}_salt_log_report.pdf"
+        )
 
         # Define folder structure parameters
         company_name = slugify(incident.user_employer.name)
@@ -115,7 +124,8 @@ def generate_salt_log_pdf_task(incident_id):
         current_year = datetime.now().strftime("%Y")
         current_month = datetime.now().strftime("%m-%B")
         folder_path = (
-            f"/SALTLOGS/{company_name}/{current_year}/{current_month}/{store_name}"
+            f"/SALTLOGS/{company_name}/"
+            f"{current_year}/{current_month}/{store_name}"
         )
 
         # Define the full file path
