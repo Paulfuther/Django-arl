@@ -6,6 +6,63 @@
 {% load crispy_forms_tags %}
 
 <style>
+ .emp-acc-btn {
+  display: flex;
+  align-items: center;
+}
+
+/* Keep the bootstrap chevron pinned to the far right */
+.emp-acc-btn::after {
+  margin-left: auto;
+}
+
+/* 3-column grid inside the button */
+.emp-row {
+  display: grid;
+  grid-template-columns: 1fr 90px 56px; /* name/email | status | count */
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  gap: .5rem;
+}
+
+/* Allow truncation */
+.emp-main {
+  min-width: 0;
+}
+
+/* Fixed columns align nicely */
+.emp-status {
+  justify-self: start;   /* left aligned within its fixed column */
+  white-space: nowrap;
+}
+
+.emp-count {
+  justify-self: start;
+  white-space: nowrap;
+}
+/* Actvie vs Inactive status badge */
+.status-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  justify-content:flex-start;
+  width:100%;           /* fill the grid column */
+  min-width:0;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-text {
+  font-size: 0.75rem;
+  color: #6c757d;
+  white-space: nowrap;
+}
 /* ==============================
    Collapsibles (chevron)
 ============================== */
@@ -228,18 +285,54 @@
 
           <!-- Search & results (EMPLOYEE) -->
           <div class="card mb-3">
-            <div class="card-header d-flex justify-content-between align-items-center">
-              <strong>Search Employee Documents</strong>
-              <form class="d-flex gap-2"
-                    hx-get="{% url 'employee_docs_search' %}"
-                    hx-target="#employee-results"
-                    hx-swap="innerHTML">
-                <input name="doc_q" class="form-control form-control-sm" placeholder="Type name or email…">
-                <button class="btn btn-sm btn-outline-primary">Search</button>
-              </form>
-            </div>
+          <div class="card-header">
+  <div class="row g-2 align-items-center">
+
+    <!-- Title (full row on mobile, left on desktop) -->
+    <div class="col-12 col-md-auto">
+      <strong class="d-block">Search Employee Documents</strong>
+    </div>
+
+    <!-- Controls (full row on mobile, right on desktop) -->
+    <div class="col-12 col-md">
+      <form class="row g-2 justify-content-md-end align-items-center"
+            hx-get="{% url 'employee_docs_search' %}"
+            hx-target="#employee-results"
+            hx-swap="innerHTML"
+            hx-trigger="keyup delay:300ms, change"
+            hx-push-url="false">
+
+        <!-- Search box -->
+        <div class="col">
+          <input name="doc_q"
+                 class="form-control form-control-sm"
+                 placeholder="Search name or email…"
+                 autocomplete="off">
+        </div>
+
+        <!-- Checkbox (right column) -->
+        <div class="col-auto">
+          <div class="form-check m-0">
+            <input class="form-check-input"
+                   type="checkbox"
+                   id="includeInactive"
+                   name="include_inactive"
+                   value="1">
+            <label class="form-check-label small" for="includeInactive">
+              Include inactive
+            </label>
+          </div>
+        </div>
+
+      </form>
+    </div>
+
+  </div>
+</div>
+
             <div class="card-body p-0" id="employee-results">
-              {% include "user/documents/partials/employee_results.html" with employees_results=recent_employee_heads employee_documents=recent_employee_docs_all doc_q="recent" %}
+            
+              {% include "user/documents/partials/employee_results.html" with employees_results=recent_employee_heads employee_documents=employee_documents doc_q="recent" %}
             </div>
           </div>
         </div>

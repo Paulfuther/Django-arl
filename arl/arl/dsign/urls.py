@@ -19,6 +19,7 @@ from arl.dsign.views import (
     upload_company_documents_async,
     upload_employee_documents,
     waiting_for_others_view,
+    employee_docs_panel
 )
 
 urlpatterns = [
@@ -79,4 +80,5 @@ urlpatterns = [
         upload_company_documents_async,
         name="upload_company_documents_async",
     ),
+    path("documents/employee/<int:user_id>/panel/", employee_docs_panel, name="employee_docs_panel"),
 ]
