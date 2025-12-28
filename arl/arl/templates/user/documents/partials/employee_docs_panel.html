@@ -1,0 +1,83 @@
+{% if error %}
+  <div class="p-3 text-danger">{{ error }}</div>
+{% elif not docs_page or not docs_page.object_list %}
+  <div class="p-3 text-muted">No documents.</div>
+{% else %}
+
+  {# Mobile list #}
+  <div class="d-block d-sm-none">
+    {% for d in docs_page %}
+      <div class="docs-list-item">
+        <div class="docs-list-text">
+          <div class="line-1 text-truncate">{{ d.document_title|default:d.file_name }}</div>
+          <div class="line-2 text-muted small">
+            ({{ d.file_name }}
+            {% if d.size_bytes %} • {{ d.size_bytes|filesizeformat }}
+            {% elif d.file_size_bytes %} • {{ d.file_size_bytes|filesizeformat }}
+            {% elif d.size %} • {{ d.size|filesizeformat }}{% endif %})
+          </div>
+          <div class="line-3">{{ d.uploaded_at|date:"Y-m-d H:i" }}</div>
+        </div>
+        <div class="docs-list-actions">
+          <a class="btn btn-sm btn-outline-primary"
+             href="{% url 'download_signed_document' doc_id=d.id %}">Download</a>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  {# Desktop table #}
+  <div class="d-none d-sm-block">
+    <div class="table-responsive">
+      <table class="table table-sm mb-0 align-middle docs-table">
+        <thead class="table-light">
+          <tr>
+            <th>Title</th>
+            <th>Uploaded</th>
+            <th class="text-end">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in docs_page %}
+            <tr>
+              <td>
+                <div class="fw-semibold text-wrap">{{ d.document_title|default:d.file_name }}</div>
+                <div class="text-muted small">
+                  ({{ d.file_name }}
+                  {% if d.size_bytes %} • {{ d.size_bytes|filesizeformat }}
+                  {% elif d.file_size_bytes %} • {{ d.file_size_bytes|filesizeformat }}
+                  {% elif d.size %} • {{ d.size|filesizeformat }}{% endif %})
+                  {% if d.notes %} — {{ d.notes }}{% endif %}
+                </div>
+              </td>
+              <td>{{ d.uploaded_at|date:"Y-m-d H:i" }}</td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-outline-primary"
+                   href="{% url 'download_signed_document' doc_id=d.id %}">Download</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if docs_page.has_other_pages %}
+    <nav class="mt-2 p-2" aria-label="Employee doc pages">
+      <ul class="pagination pagination-sm justify-content-center mb-0">
+        {% for num in docs_page.paginator.page_range %}
+          <li class="page-item {% if num == docs_page.number %}active{% endif %}">
+            <a class="page-link"
+               hx-get="{% url 'employee_docs_panel' user_id %}?page={{ num }}"
+               hx-target="closest .accordion-body"
+               hx-swap="innerHTML"
+               href="#">
+              {{ num }}
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    </nav>
+  {% endif %}
+
+{% endif %}
