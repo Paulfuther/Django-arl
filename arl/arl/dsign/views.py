@@ -34,10 +34,8 @@ from arl.dsign.helpers import (
     get_template_signature_validation,
 )
 from arl.dsign.tasks import get_outstanding_docs, list_all_docusign_envelopes_task
-from arl.user.models import (
-    CustomUser,  # adjust import paths
-    Store,  # adjust if different
-)
+from arl.user.models import CustomUser  # adjust import paths
+from arl.user.models import Store  # adjust if different
 
 from .forms import EmployeeDocUploadForm, NameEmailForm
 from .helpers import get_docusign_edit_url
@@ -801,6 +799,7 @@ def documents_dashboard(request):
             doc_count=Count(
                 "signed_documents",
                 filter=Q(signed_documents__employer=employer),
+                destinch=True,
             ),
         )
         .order_by("-last_upload")
@@ -837,11 +836,9 @@ def documents_dashboard(request):
     # ------------------------------
     # Paginated company docs (10 per page)
     # ------------------------------
-    company_docs_qs = (
-        SignedDocumentFile.objects
-        .filter(employer=employer, is_company_document=True)
-        .order_by("-uploaded_at")
-    )
+    company_docs_qs = SignedDocumentFile.objects.filter(
+        employer=employer, is_company_document=True
+    ).order_by("-uploaded_at")
 
     company_page_number = request.GET.get("company_page", 1)
     company_paginator = Paginator(company_docs_qs, 10)
@@ -877,27 +874,41 @@ def employee_docs_search(request):
         )
 
     q = (request.GET.get("doc_q") or "").strip()
-    employees_results = []
-    docs = []
+    include_inactive = request.GET.get("include_inactive") == "1"
 
-    if q:
-        employees_results = (
-            CustomUser.objects.filter(employer=employer, is_active=True)
-            .filter(
-                Q(first_name__icontains=q)
-                | Q(last_name__icontains=q)
-                | Q(email__icontains=q)
-            )
-            .annotate(doc_count=Count("signed_documents"))
-            .order_by("first_name", "last_name")
+    # ✅ IMPORTANT: if q is empty, return "Type..." UI (don’t match everyone)
+    if not q:
+        return render(
+            request,
+            "user/documents/partials/employee_results.html",
+            {"doc_q": "", "employees_results": [], "employee_documents": []},
         )
-        docs = (
-            SignedDocumentFile.objects.filter(
-                employer=employer, user__in=employees_results
-            )
-            .select_related("user")
-            .order_by("-uploaded_at")
+
+    qs = CustomUser.objects.filter(employer=employer)
+    if not include_inactive:
+        qs = qs.filter(is_active=True)
+
+    employees_results = (
+        qs.filter(
+            Q(first_name__icontains=q)
+            | Q(last_name__icontains=q)
+            | Q(email__icontains=q)
         )
+        .annotate(
+            doc_count=Count(
+                "signed_documents",
+                filter=Q(signed_documents__employer=employer),
+                distinct=True,
+            )
+        )
+        .order_by("-is_active", "first_name", "last_name")
+    )
+
+    docs = (
+        SignedDocumentFile.objects.filter(employer=employer, user__in=employees_results)
+        .select_related("user")
+        .order_by("-uploaded_at")
+    )
 
     return render(
         request,
@@ -907,6 +918,36 @@ def employee_docs_search(request):
             "employees_results": employees_results,
             "employee_documents": docs,
         },
+    )
+
+
+@login_required
+def employee_docs_panel(request, user_id):
+    employer = getattr(request.user, "employer", None)
+    if not employer:
+        return redirect("home")
+
+    # optional safety: ensure user belongs to employer
+    user = CustomUser.objects.filter(id=user_id, employer=employer).first()
+    if not user:
+        return render(
+            request,
+            "user/documents/partials/employee_docs_panel.html",
+            {"docs_page": None, "user_id": user_id, "error": "Employee not found"},
+        )
+
+    qs = SignedDocumentFile.objects.filter(employer=employer, user_id=user_id).order_by(
+        "-uploaded_at"
+    )
+
+    page_number = request.GET.get("page", 1)
+    paginator = Paginator(qs, 10)
+    docs_page = paginator.get_page(page_number)
+
+    return render(
+        request,
+        "user/documents/partials/employee_docs_panel.html",
+        {"docs_page": docs_page, "user_id": user_id},
     )
 
 
