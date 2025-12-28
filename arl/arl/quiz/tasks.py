@@ -108,9 +108,7 @@ def generate_salt_log_pdf_task(incident_id):
             else "no-date"
         )
         time_str = (
-            incident.time_salted.strftime("%H%M")
-            if incident.time_salted
-            else "no-time"
+            incident.time_salted.strftime("%H%M") if incident.time_salted else "no-time"
         )
         image_folder = incident.image_folder
         pdf_filename = (
@@ -124,8 +122,7 @@ def generate_salt_log_pdf_task(incident_id):
         current_year = datetime.now().strftime("%Y")
         current_month = datetime.now().strftime("%m-%B")
         folder_path = (
-            f"/SALTLOGS/{company_name}/"
-            f"{current_year}/{current_month}/{store_name}"
+            f"/SALTLOGS/{company_name}/{current_year}/{current_month}/{store_name}"
         )
 
         # Define the full file path

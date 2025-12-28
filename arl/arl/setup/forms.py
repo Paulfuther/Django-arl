@@ -10,26 +10,23 @@ class EmployerRegistrationForm(forms.ModelForm):
         max_length=255,
         required=True,
         label="Senior Contact Name",
-        help_text="Who is responsible for employee onboarding?"
+        help_text="Who is responsible for employee onboarding?",
     )
-    phone_number = PhoneNumberField(
-        required=True,
-        label="Contact Phone Number"
-    )
+    phone_number = PhoneNumberField(required=True, label="Contact Phone Number")
     verified_sender_local = forms.CharField(
         max_length=50,
         required=True,
         label="Verified Email (Local Part)",
-        help_text="Enter only the part before '@1553690ontarioinc.com'"
+        help_text="Enter only the part before '@1553690ontarioinc.com'",
     )
 
     widgets = {
-            "company_name": forms.TextInput(attrs={"placeholder": "Acme Inc."}),
-            "email": forms.EmailInput(attrs={"placeholder": "email@example.com"}),
-            "phone_number": forms.TextInput(attrs={"placeholder": "123-456-7890"}),
-            "senior_contact_first_name": forms.TextInput(attrs={"placeholder": "John"}),
-            "senior_contact_last_name": forms.TextInput(attrs={"placeholder": "Doe"}),
-        }
+        "company_name": forms.TextInput(attrs={"placeholder": "Acme Inc."}),
+        "email": forms.EmailInput(attrs={"placeholder": "email@example.com"}),
+        "phone_number": forms.TextInput(attrs={"placeholder": "123-456-7890"}),
+        "senior_contact_first_name": forms.TextInput(attrs={"placeholder": "John"}),
+        "senior_contact_last_name": forms.TextInput(attrs={"placeholder": "Doe"}),
+    }
 
     class Meta:
         model = EmployerRequest
@@ -46,7 +43,7 @@ class EmployerRegistrationForm(forms.ModelForm):
             "senior_contact_last_name",
             "verified_sender_local",  # ✅ Updated field
         ]
-    
+
     def clean_verified_sender_local(self):
         """Ensure only the local part is stored and is unique."""
         email_local_part = self.cleaned_data.get("verified_sender_local")
@@ -61,4 +58,3 @@ class EmployerRegistrationForm(forms.ModelForm):
             raise forms.ValidationError("An employer with this email already exists.")
 
         return email_local_part
-

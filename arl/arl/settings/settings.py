@@ -3,14 +3,14 @@ from pathlib import Path
 import logging
 from dotenv import load_dotenv
 from django.contrib.messages import constants as messages
-import socket
+
 
 load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 # print("BASE_DIR:", BASE_DIR)
 
-logger = logging.getLogger('django')
+logger = logging.getLogger("django")
 # logger.error("TEST LOGGING: This is a test error log.")
 
 # Quick-start development settings - unsuitable for production
@@ -39,55 +39,55 @@ ADMINS = [
 
 
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {message}',
-            'style': '{',
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {message}",
+            "style": "{",
         },
-        'simple': {
-            'format': '{levelname} {message}',
-            'style': '{',
-        },
-    },
-    'handlers': {
-        'file': {
-            'level': 'INFO',  # Change to INFO or higher (WARNING, ERROR, CRITICAL)
-            'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'django.log'), # Rename for clarity
-            'formatter': 'verbose',
-        },
-        'console': {  # Add a console handler for immediate feedback during development
-            'level': 'DEBUG', # Keep console at debug for development
-            'class': 'logging.StreamHandler',
-            'formatter': 'simple',
+        "simple": {
+            "format": "{levelname} {message}",
+            "style": "{",
         },
     },
-    'loggers': {
-        'django': {
-            'handlers': ['file', 'console'], # Use both file and console
-            'level': 'ERROR', # Change to INFO or higher
-            'propagate': True,
+    "handlers": {
+        "file": {
+            "level": "INFO",  # Change to INFO or higher (WARNING, ERROR, CRITICAL)
+            "class": "logging.FileHandler",
+            "filename": os.path.join(BASE_DIR, "django.log"),  # Rename for clarity
+            "formatter": "verbose",
         },
-            'django.template': {
-            'handlers': ['file'],
-            'level': 'ERROR',
-            'propagate': False,
+        "console": {  # Add a console handler for immediate feedback during development
+            "level": "DEBUG",  # Keep console at debug for development
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
         },
-        '': { # Catch-all logger for other applications
-            'handlers': ['file', 'console'],
-            'level': 'INFO', # Change to INFO or higher
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["file", "console"],  # Use both file and console
+            "level": "ERROR",  # Change to INFO or higher
+            "propagate": True,
         },
-        'my_app_name': {  # Example for a specific app
-            'handlers': ['file', 'console'],
-            'level': 'INFO', # Or a more specific level for your app
-            'propagate': True,
+        "django.template": {
+            "handlers": ["file"],
+            "level": "ERROR",
+            "propagate": False,
         },
-        'celery': {
-            'handlers': ['file', 'console'],
-            'level': 'INFO',
-            'propagate': False,
+        "": {  # Catch-all logger for other applications
+            "handlers": ["file", "console"],
+            "level": "INFO",  # Change to INFO or higher
+        },
+        "my_app_name": {  # Example for a specific app
+            "handlers": ["file", "console"],
+            "level": "INFO",  # Or a more specific level for your app
+            "propagate": True,
+        },
+        "celery": {
+            "handlers": ["file", "console"],
+            "level": "INFO",
+            "propagate": False,
         },
     },
 }
@@ -125,14 +125,14 @@ INSTALLED_APPS = [
     "arl.setup",
     "phonenumber_field",
     "arl.helpdesk",
-    'django_otp',
-    'django_otp.plugins.otp_totp',
-    'arl.reclose',
-    'arl.utils',
-    'arl.stores',
+    "django_otp",
+    "django_otp.plugins.otp_totp",
+    "arl.reclose",
+    "arl.utils",
+    "arl.stores",
 ]
 
-PHONENUMBER_DEFAULT_REGION = 'CA'
+PHONENUMBER_DEFAULT_REGION = "CA"
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -145,7 +145,7 @@ MIDDLEWARE = [
     "django_htmx.middleware.HtmxMiddleware",
     "arl.user.middleware.ErrorLoggingMiddleware",
     "waffle.middleware.WaffleMiddleware",
-    'django_otp.middleware.OTPMiddleware',
+    "django_otp.middleware.OTPMiddleware",
 ]
 
 ROOT_URLCONF = "arl.urls"
@@ -181,7 +181,7 @@ DATABASES = {
         "USER": "postgres",
         "PASSWORD": "Paulee12!@",
         "HOST": "localhost",
-        'PORT': '5433',
+        "PORT": "5433",
     }
 }
 
@@ -218,9 +218,9 @@ TIME_ZONE = "America/New_York"
 USE_TZ = True
 SITE_URL = os.getenv("SITE_URL", "http://127.0.0.1:8000")
 # print("site ure :", SITE_URL)
-#if socket.gethostname() == "":
+# if socket.gethostname() == "":
 #    SITE_URL = "https://www.1553690ontarioinc.com"
-#else:
+# else:
 #    SITE_URL = "http://127.0.0.1:8000"  # Local development
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
@@ -228,7 +228,7 @@ SITE_URL = os.getenv("SITE_URL", "http://127.0.0.1:8000")
 STATIC_URL = "/static/"
 STATIC_ROOT = "/var/www/static"
 # STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
-#STATICFILES_DIRS = [BASE_DIR / "static"]
+# STATICFILES_DIRS = [BASE_DIR / "static"]
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
@@ -242,7 +242,7 @@ CRISPY_TEMPLATE_PACK = "bootstrap4"
 
 CELERY_RESULT_BACKEND = "django-db"
 CELERY_TASK_TRACK_STARTED = True
-CELERY_TASK_SERIALIZER = 'json'
+CELERY_TASK_SERIALIZER = "json"
 
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",
@@ -250,8 +250,8 @@ AUTHENTICATION_BACKENDS = [
 
 LOGIN_URL = "/login/"
 
-#BROKER_URL = os.environ.get("CLOUDAMQP_URL")
-BROKER_URL ="amqps://ctscemmj:HzMGkRB1IsJJtlVT2DwfimyE1PBkocPj@rabbit.lmq.cloudamqp.com/ctscemmj"
+# BROKER_URL = os.environ.get("CLOUDAMQP_URL")
+BROKER_URL = "amqps://ctscemmj:HzMGkRB1IsJJtlVT2DwfimyE1PBkocPj@rabbit.lmq.cloudamqp.com/ctscemmj"
 
 EMAIL_BACKEND = "arl.msg.helpers.SendGridEmailBackend"
 
@@ -312,7 +312,9 @@ MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER")
 SENDGRID_NEWHIRE_ID = os.environ.get("SENDGRID_NEWHIRE_ID")
 SENDGRID_NEW_HIRE_FILE_ID = os.environ.get("SENDGRID_NEW_HIRE_FILE_ID")
 SENDGRID_SENDER_VERIFICATION_URL = os.environ.get("SENDGRID_SENDER_VERIFICATION_URL")
-SENDGRID_EMPLOYER_REGISTER_AS_USER = os.environ.get("SENDGRID_EMPLOYER_REGISTER_AS_USER")
+SENDGRID_EMPLOYER_REGISTER_AS_USER = os.environ.get(
+    "SENDGRID_EMPLOYER_REGISTER_AS_USER"
+)
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
@@ -341,12 +343,12 @@ SITE_URL = BASE_URL
 OWNER_EMAIL = os.environ.get("OWNER_EMAIL")
 ADMIN_PHONE_NUMBER = os.environ.get("ADMIN_PHONE_NUMBER")
 MESSAGE_TAGS = {
-    messages.ERROR: 'danger',  # ✅ this converts 'error' → 'danger' for Bootstrap styling
+    messages.ERROR: "danger",  # ✅ this converts 'error' → 'danger' for Bootstrap styling
 }
 
 # cryptography
 
-FERNET_PRIMARY_KEY = os.environ["FERNET_PRIMARY_KEY"]          # 32-byte urlsafe base64
+FERNET_PRIMARY_KEY = os.environ["FERNET_PRIMARY_KEY"]  # 32-byte urlsafe base64
 FERNET_OLD_KEYS = [k for k in os.environ.get("FERNET_OLD_KEYS", "").split(",") if k]
 SIN_HASH_SALT = os.environ["SIN_HASH_SALT"]
 

@@ -80,10 +80,12 @@ class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView
 
     def get(self, request, *args, **kwargs):
         form = self.form_class(user=self.request.user)
-        return self.render_to_response({
-            "form": form,
-            "existing_images": [],  # Add this line
-        })
+        return self.render_to_response(
+            {
+                "form": form,
+                "existing_images": [],  # Add this line
+            }
+        )
 
     def form_valid(self, form):
         form.instance.user_employer = self.request.user.employer
@@ -99,10 +101,12 @@ class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView
         return redirect("home")
 
     def form_invalid(self, form):
-        return self.render_to_response({
-            "form": form,
-            "existing_images": [],  # Add this line too
-        })
+        return self.render_to_response(
+            {
+                "form": form,
+                "existing_images": [],  # Add this line too
+            }
+        )
 
     def serialize_form_data(self, form_data):
         # Convert ForeignKey fields to their primary key values
@@ -657,7 +661,6 @@ class IncidentListView(PermissionRequiredMixin, ListView):
     context_object_name = "incidents"
     permission_required = "incident.view_incident"
     raise_exception = False
-    
 
     def get_queryset(self):
         """Filter incidents by the employer of the logged-in user."""
@@ -682,7 +685,7 @@ class IncidentListView(PermissionRequiredMixin, ListView):
     def handle_no_permission(self):
         # Render the custom 403.html template for permission denial
         return render(self.request, "incident/403.html", status=403)
-    
+
 
 class MajorIncidentListView(PermissionRequiredMixin, ListView):
     model = MajorIncident

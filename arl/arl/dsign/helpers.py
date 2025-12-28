@@ -4,7 +4,6 @@ import uuid
 import zipfile
 from datetime import datetime, timedelta
 from io import BytesIO
-import time
 import requests
 from django.conf import settings
 from django.db.models import Q
@@ -820,7 +819,7 @@ def validate_signature_roles(template_id):
                 full_url = f"{base_path}{tab_path}"
                 headers = {
                     "Authorization": f"Bearer {access_token}",
-                    "Accept": "application/json"
+                    "Accept": "application/json",
                 }
 
                 response = api_client.rest_client.GET(full_url, headers=headers)
@@ -835,9 +834,13 @@ def validate_signature_roles(template_id):
                     print(f"❌ Role {signer.role_name} has no Sign Here tabs.")
                     missing_roles.append(signer.role_name)
                 else:
-                    print(f"✅ Role {signer.role_name} has {len(sign_tabs)} Sign Here tab(s).")
+                    print(
+                        f"✅ Role {signer.role_name} has {len(sign_tabs)} Sign Here tab(s)."
+                    )
 
-                print(f"🔍 Tab types for {signer.role_name}: {list(response_data.keys())}")
+                print(
+                    f"🔍 Tab types for {signer.role_name}: {list(response_data.keys())}"
+                )
 
             except Exception as e:
                 print(f"❌ Error checking tabs for role {signer.role_name}: {e}")
@@ -872,7 +875,9 @@ def create_envelope_for_in_app_signing(user, template_id, employer):
                 email=user.email,
                 name=f"{user.first_name} {user.last_name}",
                 role_name="GSA",
-                client_user_id=str(user.id),  # Match the role you defined in your DocuSign template
+                client_user_id=str(
+                    user.id
+                ),  # Match the role you defined in your DocuSign template
             )
         ],
         status="sent",
@@ -890,7 +895,7 @@ def get_recipient_view_url(user, envelope_id, return_url):
     access_token = get_access_token().access_token
     base_path = settings.DOCUSIGN_BASE_PATH
     api_client = create_api_client(base_path, access_token)
-    
+
     envelopes_api = EnvelopesApi(api_client)
 
     recipient_view_request = RecipientViewRequest(
@@ -920,9 +925,9 @@ def get_template_signature_validation(template_id):
         tabs = templates_api.list_tabs(
             account_id=settings.DOCUSIGN_ACCOUNT_ID,
             template_id=template_id,
-            recipient_id="1"  # assuming recipient 1 = GSA
+            recipient_id="1",  # assuming recipient 1 = GSA
         )
-        #print("tabs :", tabs)
+        # print("tabs :", tabs)
         has_sign_here = bool(tabs.sign_here_tabs)
         print(f"Has Sign Here Tabs? {has_sign_here}")
         return {

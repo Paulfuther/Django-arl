@@ -1,5 +1,4 @@
 from django.contrib import admin, messages
-from django.middleware.csrf import get_token
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.utils.html import format_html
@@ -28,7 +27,7 @@ class EmployerRequestAdmin(admin.ModelAdmin):
         )
 
     approve_button.short_description = "Approve Employer"
-    
+
     def approve_selected_requests(self, request, queryset):
         approved_count = 0
 

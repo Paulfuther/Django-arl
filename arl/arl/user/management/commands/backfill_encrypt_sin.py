@@ -6,9 +6,11 @@ from django.db import transaction
 
 # Use your crypto helpers
 from arl.utils.crypto import normalize_digits, sin_encrypt, sin_last4, sin_hash
+
 try:
     from arl.utils.crypto import sin_luhn_valid  # optional, if present
 except Exception:
+
     def sin_luhn_valid(s: str) -> bool:
         d = "".join(ch for ch in s or "" if ch.isdigit())
         if len(d) != 9:
@@ -32,24 +34,28 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--chunk-size", type=int, default=500,
-            help="Batch size for updates (default: 500)"
+            "--chunk-size",
+            type=int,
+            default=500,
+            help="Batch size for updates (default: 500)",
         )
         parser.add_argument(
-            "--validate-luhn", action="store_true",
-            help="Validate SIN with Luhn before encrypting; skip invalids"
+            "--validate-luhn",
+            action="store_true",
+            help="Validate SIN with Luhn before encrypting; skip invalids",
         )
         parser.add_argument(
-            "--from-plaintext-only", action="store_true",
-            help="Only process rows where the old plaintext 'sin' column is non-empty"
+            "--from-plaintext-only",
+            action="store_true",
+            help="Only process rows where the old plaintext 'sin' column is non-empty",
         )
         parser.add_argument(
-            "--dry-run", action="store_true",
-            help="Do not write changes; just report what would happen"
+            "--dry-run",
+            action="store_true",
+            help="Do not write changes; just report what would happen",
         )
         parser.add_argument(
-            "--verbose", action="store_true",
-            help="Print each updated user id"
+            "--verbose", action="store_true", help="Print each updated user id"
         )
 
     def handle(self, *args, **opts):
@@ -86,11 +92,16 @@ class Command(BaseCommand):
         ids = list(base)
 
         for start in range(0, len(ids), chunk):
-            batch_ids = ids[start:start+chunk]
+            batch_ids = ids[start : start + chunk]
             # Load full rows for this chunk
             rows = list(
-                User.objects.filter(id__in=batch_ids)
-                .only("id", "sin_encrypted", "sin_last4", "sin_hash", *(["sin"] if has_plaintext_column else []))
+                User.objects.filter(id__in=batch_ids).only(
+                    "id",
+                    "sin_encrypted",
+                    "sin_last4",
+                    "sin_hash",
+                    *(["sin"] if has_plaintext_column else []),
+                )
             )
 
             to_update = []
@@ -126,7 +137,9 @@ class Command(BaseCommand):
                 if validate_luhn and not sin_luhn_valid(digits):
                     skipped_luhn += 1
                     if very_verbose:
-                        self.stdout.write(f"skip (luhn invalid) id={u.id} value={digits}")
+                        self.stdout.write(
+                            f"skip (luhn invalid) id={u.id} value={digits}"
+                        )
                     continue
 
                 # Set encrypted fields on the instance
@@ -138,7 +151,9 @@ class Command(BaseCommand):
             if to_update and not dry_run:
                 with transaction.atomic():
                     User.objects.bulk_update(
-                        to_update, ["sin_encrypted", "sin_last4", "sin_hash"], batch_size=chunk
+                        to_update,
+                        ["sin_encrypted", "sin_last4", "sin_hash"],
+                        batch_size=chunk,
                     )
                 updated += len(to_update)
 
@@ -150,8 +165,12 @@ class Command(BaseCommand):
 
         # Final summary
         if dry_run:
-            self.stdout.write(self.style.WARNING("DRY RUN: no database changes were written."))
-        self.stdout.write(self.style.SUCCESS(
-            f"Done. updated={updated}, already={already_done}, "
-            f"luhn_skipped={skipped_luhn}, missing_plaintext={missing_plaintext}, scanned={processed}"
-        ))
+            self.stdout.write(
+                self.style.WARNING("DRY RUN: no database changes were written.")
+            )
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Done. updated={updated}, already={already_done}, "
+                f"luhn_skipped={skipped_luhn}, missing_plaintext={missing_plaintext}, scanned={processed}"
+            )
+        )

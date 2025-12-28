@@ -13,10 +13,9 @@ class HelpCategory(models.Model):
 
 
 class HelpSection(models.Model):
-    category = models.ForeignKey("HelpCategory",
-                                 on_delete=models.CASCADE,
-                                 related_name="sections",
-                                 null=True)
+    category = models.ForeignKey(
+        "HelpCategory", on_delete=models.CASCADE, related_name="sections", null=True
+    )
     title = models.CharField(max_length=200)
     content = models.TextField()
     is_active = models.BooleanField(default=True)

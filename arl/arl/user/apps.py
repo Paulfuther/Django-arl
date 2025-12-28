@@ -1,13 +1,13 @@
 from django.apps import AppConfig
 from django.contrib import admin
 
+
 class UserConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "arl.user"
 
     def ready(self):
         # Ensure signals are still loaded
-        import arl.user.signals
 
         # ✅ Safe override of django_celery_results admin
         from django_celery_results.models import TaskResult

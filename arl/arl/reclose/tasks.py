@@ -35,7 +35,9 @@ def generate_recclose_pdf_task(recclose_id):
 
         # Build file/folder naming
         store_number = slugify(entry.store_number or "unknown-store")
-        date_str = entry.timestamp.strftime("%Y-%m-%d") if entry.timestamp else "no-date"
+        date_str = (
+            entry.timestamp.strftime("%Y-%m-%d") if entry.timestamp else "no-date"
+        )
         pdf_filename = f"{store_number}_{slugify(date_str)}_recclose.pdf"
 
         company_name = slugify(entry.user_employer.name)

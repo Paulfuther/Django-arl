@@ -136,7 +136,7 @@ TemplateItemFormSet = inlineformset_factory(
 class ChecklistForm(forms.ModelForm):
     class Meta:
         model = Checklist
-        fields = ["title", "notes", "store"]   # ← add store
+        fields = ["title", "notes", "store"]  # ← add store
         widgets = {
             "title": forms.TextInput(attrs={"class": "form-control"}),
             "notes": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
@@ -179,7 +179,7 @@ class ChecklistItemForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["result"].required = False   # ⬅️ drafts can leave blank
+        self.fields["result"].required = False  # ⬅️ drafts can leave blank
         self.fields["comment"].required = False  # ⬅️ drafts can leave blank
 
 

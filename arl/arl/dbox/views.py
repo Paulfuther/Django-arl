@@ -209,9 +209,9 @@ def download_file(request):
 
         # Set up the response as a downloadable file
         http_response = HttpResponse(content_type="application/force-download")
-        http_response[
-            "Content-Disposition"
-        ] = f'attachment; filename="{os.path.basename(file_path)}"'
+        http_response["Content-Disposition"] = (
+            f'attachment; filename="{os.path.basename(file_path)}"'
+        )
         http_response.write(file_content)
         return http_response
     except ApiError as e:

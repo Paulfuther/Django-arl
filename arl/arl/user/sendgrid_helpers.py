@@ -31,34 +31,44 @@ def add_sendgrid_verified_sender(employer):
         "country": employer.country.code if employer.country else "CA",
     }
 
-    response = requests.post(SENDGRID_SENDER_VERIFICATION_URL, json=data, headers=headers)
+    response = requests.post(
+        SENDGRID_SENDER_VERIFICATION_URL, json=data, headers=headers
+    )
 
     if response.status_code == 201:
-        logger.info(f"✅ SendGrid verified sender added: {employer.verified_sender_email}")
+        logger.info(
+            f"✅ SendGrid verified sender added: {employer.verified_sender_email}"
+        )
 
         # ✅ Check if a `TenantApiKeys` entry exists for this employer
         tenant_api_key, created = TenantApiKeys.objects.get_or_create(
             employer=employer,
-            defaults={"verified_sender_email": employer.verified_sender_email}
+            defaults={"verified_sender_email": employer.verified_sender_email},
         )
 
         if not created:
-            tenant_api_key.sender_email = employer.verified_sender_email  # ✅ Update existing
+            tenant_api_key.sender_email = (
+                employer.verified_sender_email
+            )  # ✅ Update existing
             tenant_api_key.save(update_fields=["verified_sender_email"])
 
         return True
 
     elif response.status_code == 400 and "already exists" in response.text:
-        logger.warning(f"⚠️ SendGrid sender {employer.verified_sender_email} already exists.")
+        logger.warning(
+            f"⚠️ SendGrid sender {employer.verified_sender_email} already exists."
+        )
 
         # ✅ Ensure it is stored in TenantApiKeys even if it already exists in SendGrid
         tenant_api_key, created = TenantApiKeys.objects.get_or_create(
             employer=employer,
-            defaults={"verified_sender_email": employer.verified_sender_email}
+            defaults={"verified_sender_email": employer.verified_sender_email},
         )
 
         if not created:
-            tenant_api_key.verified_sender_email = employer.verified_sender_email  # ✅ Update if necessary
+            tenant_api_key.verified_sender_email = (
+                employer.verified_sender_email
+            )  # ✅ Update if necessary
             tenant_api_key.save(update_fields=["verified_sender_email"])
 
         return True

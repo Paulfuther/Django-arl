@@ -1,6 +1,5 @@
 import traceback
 
-from django.db import connection
 from django.http import HttpResponse
 
 from .models import ErrorLog

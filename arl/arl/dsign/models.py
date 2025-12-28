@@ -33,11 +33,11 @@ class ProcessedDocsignDocument(models.Model):
     )  # Added field
     processed_at = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey(
-        CustomUser, 
+        CustomUser,
         on_delete=models.SET_NULL,  # ✅ Changed from CASCADE to SET_NULL
-        null=True,                  # ✅ Allow NULL in database
-        blank=True,                 # ✅ Allow form/model level blank
-        related_name="processed_documents"
+        null=True,  # ✅ Allow NULL in database
+        blank=True,  # ✅ Allow form/model level blank
+        related_name="processed_documents",
     )
     employer = models.ForeignKey(
         "user.Employer", on_delete=models.CASCADE, related_name="processed_documents"
@@ -53,15 +53,17 @@ class ProcessedDocsignDocument(models.Model):
 
 class SignedDocumentFile(models.Model):
     user = models.ForeignKey(
-        CustomUser, on_delete=models.CASCADE,
-        null=True, blank=True, related_name="signed_documents"
+        CustomUser,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="signed_documents",
     )
     employer = models.ForeignKey(Employer, on_delete=models.CASCADE)
 
     # NEW: link docs to a store (site)
     store = models.ForeignKey(
-        Store, on_delete=models.CASCADE,
-        null=True, blank=True, related_name="documents"
+        Store, on_delete=models.CASCADE, null=True, blank=True, related_name="documents"
     )
 
     envelope_id = models.CharField(max_length=255)
@@ -78,5 +80,6 @@ class SignedDocumentFile(models.Model):
     def clean(self):
         # Ensure either user OR store is set (but not both / not neither)
         if bool(self.user) == bool(self.store):
-            raise ValidationError("Document must be linked to either a user or a store.")
-        
+            raise ValidationError(
+                "Document must be linked to either a user or a store."
+            )

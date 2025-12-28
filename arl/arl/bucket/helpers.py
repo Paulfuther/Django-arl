@@ -115,7 +115,7 @@ def list_s3_objects(folder_name):
         filtered_keys = []
         for obj in objects:
             if not obj.key.endswith("/"):  # Exclude folders
-                file_name = unquote(obj.key[len(folder_prefix):].lstrip("/"))
+                file_name = unquote(obj.key[len(folder_prefix) :].lstrip("/"))
                 encoded_key = quote(obj.key, safe="")  # URL-encode the filename
 
                 # Check if the file matches the specified pattern
@@ -154,7 +154,7 @@ def download_from_s3(request, file_path, custom_filename=None):
             custom_filename = filename
 
         filename_encoded = quote(custom_filename, safe="")
-        
+
         # ⏳ Generate a pre-signed URL for 1 hour
         url = key.generate_url(
             expires_in=3600,
@@ -162,7 +162,7 @@ def download_from_s3(request, file_path, custom_filename=None):
             force_http=False,
             response_headers={
                 "response-content-disposition": f'attachment; filename="{filename_encoded}"'
-            }
+            },
         )
         # 🔁 Redirect user directly to the signed S3 URL
         return redirect(url)

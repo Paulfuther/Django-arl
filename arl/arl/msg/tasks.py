@@ -66,7 +66,9 @@ def master_email_send_task(
 ):
     logger.info(
         "[EmailTask] start sg_id=%s employer_id=%s recipients_count=%s",
-        sendgrid_id, employer_id, len(recipients or []),
+        sendgrid_id,
+        employer_id,
+        len(recipients or []),
     )
 
     """
@@ -144,12 +146,15 @@ def master_email_send_task(
             td = {
                 "name": name_str,
                 "body": body or "",
-                "senior_contact_name": getattr(employer, "senior_contact_name", "") or "",
+                "senior_contact_name": getattr(employer, "senior_contact_name", "")
+                or "",
                 "company_name": getattr(employer, "name", "") or "Company",
-                "subject": subject or f"New Message from {employer.name if employer else 'Our Company'}",
+                "subject": subject
+                or f"New Message from {employer.name if employer else 'Our Company'}",
             }
             ca = {
-                "subject": subject or f"New Message from {employer.name if employer else 'Our Company'}",
+                "subject": subject
+                or f"New Message from {employer.name if employer else 'Our Company'}",
             }
             logger.info("template data :", td, "custom args :", ca)
             # ensure attachments is a list of dicts
@@ -172,7 +177,9 @@ def master_email_send_task(
                 )
 
             except Exception as e:
-                logger.exception(f"🚨 Exception sending to {email} ,{e}")  # full traceback
+                logger.exception(
+                    f"🚨 Exception sending to {email} ,{e}"
+                )  # full traceback
                 failed_emails.append(email)
                 continue
 
@@ -509,6 +516,8 @@ def lotto_theft_sms_link_task(self):
         logger.critical(msg)
         SmsLog.objects.create(level="CRITICAL", message=msg)
         return {"error": msg}
+
+
 # APPROVED
 # This task is APPROVED for multi tenant.
 # Tenatn api keys are geneated here and passed to the helper.
@@ -583,7 +592,7 @@ def send_one_off_bulk_sms_task(group_id, message, user_id):
 # NEW: Send SMS to selected individual users (not group)
 @app.task(name="one_off_user_sms")
 def send_sms_to_selected_users_task(user_ids, message, sender_id):
-    message_body=message
+    message_body = message
     User = get_user_model()
     try:
         sender = User.objects.get(id=sender_id)
@@ -998,7 +1007,9 @@ def filter_sendgrid_events(date_from=None, date_to=None, template_id=None):
 
 
 @app.task(name="email_event_summary")
-def generate_email_event_summary(template_id=None, start_date=None, end_date=None, employer_id=None):
+def generate_email_event_summary(
+    template_id=None, start_date=None, end_date=None, employer_id=None
+):
     # Filter events based on template_id if provided
     events = EmailEvent.objects.all()
     if employer_id:
@@ -1275,7 +1286,11 @@ def process_twilio_short_link_event(data):
     account_sid = data.get("AccountSid") or data.get("account_sid")
 
     if account_sid:
-        api_key = TenantApiKeys.objects.filter(account_sid=account_sid).select_related("employer").first()
+        api_key = (
+            TenantApiKeys.objects.filter(account_sid=account_sid)
+            .select_related("employer")
+            .first()
+        )
         if api_key:
             employer = api_key.employer
 

@@ -38,10 +38,7 @@ def create_db_backup_and_upload():
         object_key = f"POSTGRES/postgres_{current_date}.sql"
         upload_to_linode_object_storage(in_memory_backup, object_key)
         remove_old_backups()
-        return (
-            f"Database backup created and uploaded successfully: "
-            f"{object_key}"
-        )
+        return f"Database backup created and uploaded successfully: {object_key}"
 
     except subprocess.CalledProcessError as e:
         print(f"An error occurred during backup or upload: {e}")

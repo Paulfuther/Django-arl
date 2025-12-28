@@ -8,6 +8,5 @@ urlpatterns = [
         upload_store_documents_async,
         name="upload_store_documents",
     ),
-    path("documents/search/store/", store_docs_search,
-         name="store_docs_search"),
+    path("documents/search/store/", store_docs_search, name="store_docs_search"),
 ]

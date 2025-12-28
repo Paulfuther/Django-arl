@@ -5,4 +5,4 @@ from .models import EmailEvent
 class EmailEventSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmailEvent
-        fields = '__all__'
+        fields = "__all__"

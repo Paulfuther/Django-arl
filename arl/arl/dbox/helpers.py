@@ -1,6 +1,5 @@
 import logging
 import os
-from datetime import datetime
 import dropbox
 import requests
 from celery.utils.log import get_task_logger
@@ -101,8 +100,9 @@ def upload_major_incident_file_to_dropbox(file_content, file_name):
             dbx = dropbox.Dropbox(new_access_token)
             # Upload the file content to Dropbox
             dbx.files_upload(
-                file_content, f"/MAJORSITEINCIDENTS/{file_name}",
-                mode=WriteMode("overwrite")
+                file_content,
+                f"/MAJORSITEINCIDENTS/{file_name}",
+                mode=WriteMode("overwrite"),
             )
             return True, f"Uploaded file: {file_name} to Dropbox."
         else:
@@ -118,7 +118,7 @@ def upload_major_incident_file_to_dropbox(file_content, file_name):
 def upload_to_dropbox_quiz(uploaded_file):
     # This uploads a completed new hire quiz
     # to dropbox in the folder NEWHIREQUIZ
-    
+
     try:
         new_access_token = generate_new_access_token()
         if new_access_token:

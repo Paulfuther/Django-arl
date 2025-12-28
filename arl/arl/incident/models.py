@@ -1,4 +1,3 @@
-
 from django.db import models
 
 from arl.user.models import Employer, Store
@@ -13,9 +12,9 @@ class Incident(models.Model):
     security = models.BooleanField(default=False)
     fire = models.BooleanField(default=False)
 
-    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='incidents')
-    brief_description = models.CharField(max_length=30, default='')
-    eventtimeline = models.TextField(default='')
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="incidents")
+    brief_description = models.CharField(max_length=30, default="")
+    eventtimeline = models.TextField(default="")
     eventdetails = models.TextField()
     eventdate = models.DateField(null=True)
     eventtime = models.TimeField(null=True)
@@ -121,9 +120,13 @@ class Incident(models.Model):
     emergency_responders = models.BooleanField(default=False)  # Ex. 911, Fire, Police
 
     # New fields for email tracking
-    queued_for_sending = models.BooleanField(default=False, help_text="Indicates if this file is queued for sending.")
+    queued_for_sending = models.BooleanField(
+        default=False, help_text="Indicates if this file is queued for sending."
+    )
     sent = models.BooleanField(default=False)
-    sent_at = models.DateTimeField(null=True, blank=True, help_text="The timestamp when the file was sent.")
+    sent_at = models.DateTimeField(
+        null=True, blank=True, help_text="The timestamp when the file was sent."
+    )
     do_not_send = models.BooleanField(default=False)
 
     def __str__(self):
@@ -137,7 +140,7 @@ class Incident(models.Model):
 
 
 class MajorIncident(models.Model):
-    brief_description = models.CharField(max_length=60, default='')
+    brief_description = models.CharField(max_length=60, default="")
     robbery = models.BooleanField(default=False)
     breakandenter = models.BooleanField(default=False)
     assault = models.BooleanField(default=False)
@@ -146,9 +149,10 @@ class MajorIncident(models.Model):
     fatality = models.BooleanField(default=False)
     criticalinjury = models.BooleanField(default=False)
 
-    store = models.ForeignKey(Store, on_delete=models.CASCADE,
-                              related_name='majorincidents')
-    policeagency = models.CharField(max_length=60, default='', blank=True)
+    store = models.ForeignKey(
+        Store, on_delete=models.CASCADE, related_name="majorincidents"
+    )
+    policeagency = models.CharField(max_length=60, default="", blank=True)
     officerdetails = models.TextField(blank=True)
     eventdate = models.DateField(null=True)
     eventtime = models.TimeField(null=True)

@@ -23,8 +23,9 @@ except ImportError:
         return (total % 10) == 0
 
 
-def set_user_sin(user, plaintext: Optional[str], *,
-                 validate_luhn: bool = True, save: bool = True):
+def set_user_sin(
+    user, plaintext: Optional[str], *, validate_luhn: bool = True, save: bool = True
+):
     """
     Normalizes and encrypts a SIN, updating the user's encrypted fields.
     Never stores plaintext.

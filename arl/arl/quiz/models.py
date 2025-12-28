@@ -131,9 +131,9 @@ class Checklist(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     submitted_at = models.DateTimeField(null=True, blank=True)
     store = models.ForeignKey(
-        "user.Store",     # or "yourapp.Store" — use the correct app label
+        "user.Store",  # or "yourapp.Store" — use the correct app label
         on_delete=models.PROTECT,
-        null=True,          # set null=True for the first migration to avoid breaking existing rows
+        null=True,  # set null=True for the first migration to avoid breaking existing rows
         blank=True,
         related_name="checklists",
     )

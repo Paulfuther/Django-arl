@@ -32,19 +32,19 @@ def truncate_legend(value, max_length):
 
 @register.filter(name="extract_filename")
 def extract_filename(value):
-    pattern = re.compile(r'^\d{8}_\d{6}_\d{6}___')
+    pattern = re.compile(r"^\d{8}_\d{6}_\d{6}___")
 
     if pattern.match(value):
-        parts = value.split('_')
+        parts = value.split("_")
 
         # Extract the desired portions when the pattern matches
-        new_filename = value[:8] + '_' + '_'.join(parts[6:])
+        new_filename = value[:8] + "_" + "_".join(parts[6:])
         return new_filename
 
     elif len(value) > 20:
         # Truncate the name and insert ellipsis in the middle if the length exceeds 30 characters
         half_length = len(value) // 2
-        new_filename = value[:half_length - 3] + '...' + value[half_length + 3:]
+        new_filename = value[: half_length - 3] + "..." + value[half_length + 3 :]
         return new_filename
 
     return value  # Return the original value if it doesn't meet the conditions

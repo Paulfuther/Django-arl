@@ -23,9 +23,13 @@ def rec_close_create_view(request):
             try:
                 result = generate_recclose_pdf_task.delay(instance.id)
                 print(f"🔄 Task triggered? ID: {result.id}")
-                messages.success(request, "Rec and Close PDF generation task initiated successfully.")
+                messages.success(
+                    request, "Rec and Close PDF generation task initiated successfully."
+                )
             except Exception as e:
-                messages.error(request, f"An error occurred while generating the PDF: {e}")
+                messages.error(
+                    request, f"An error occurred while generating the PDF: {e}"
+                )
 
             # Get recipients in 'rec_close' group
             recipients = CustomUser.objects.filter(
@@ -57,8 +61,8 @@ def rec_close_create_view(request):
             }
 
             sendgrid_template_id = (
-                "d-9ae56177150a49588cea9de1120eb186"
-            )  # make sure it's set
+                "d-9ae56177150a49588cea9de1120eb186"  # make sure it's set
+            )
             create_master_email(
                 to_email=list(recipients),
                 sendgrid_id=sendgrid_template_id,
@@ -69,11 +73,15 @@ def rec_close_create_view(request):
     else:
         form = RecCloseForm()
 
-    return render(request, "reclose/create_reclose.html", {
-        "form": form,
-        "tank_numbers": ["1", "2", "3", "4"],
-        "meter_numbers": ["1", "2", "3", "4"],
-    })
+    return render(
+        request,
+        "reclose/create_reclose.html",
+        {
+            "form": form,
+            "tank_numbers": ["1", "2", "3", "4"],
+            "meter_numbers": ["1", "2", "3", "4"],
+        },
+    )
 
 
 def rec_close_success(request):

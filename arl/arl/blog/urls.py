@@ -1,7 +1,10 @@
 from django.urls import path
 
-from . import views
 
 urlpatterns = [
-    path("", home, name="homepage",)
+    path(
+        "",
+        home,
+        name="homepage",
+    )
 ]

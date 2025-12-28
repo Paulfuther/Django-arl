@@ -20,7 +20,11 @@ def send_new_hire_invite(new_hire_email, new_hire_name, role, start_date, employ
         # ✅ Ensure the employer has a verified sender
         # ✅ Retrieve verified sender email from TenantApiKeys
         tenant_api_key = TenantApiKeys.objects.filter(employer=employer).first()
-        verified_sender = tenant_api_key.verified_sender_email if tenant_api_key else settings.MAIL_DEFAULT_SENDER
+        verified_sender = (
+            tenant_api_key.verified_sender_email
+            if tenant_api_key
+            else settings.MAIL_DEFAULT_SENDER
+        )
         if not verified_sender:
             print(f"❌ Employer {employer.name} does not have a verified sender email.")
             return False
@@ -33,15 +37,14 @@ def send_new_hire_invite(new_hire_email, new_hire_name, role, start_date, employ
                 "name": new_hire_name,
                 "role": role,
                 "token": get_random_string(64),  # Generate a secure token
-                "used": False  # Mark as unused
-            }
+                "used": False,  # Mark as unused
+            },
         )
 
         # ✅ Ensure we have a token in case the invite already existed
         if not created and not invite.token:
             invite.token = get_random_string(64)
             invite.save()
-
 
         # ✅ Generate the correct invite link
         invite_link = invite.get_invite_link()
@@ -62,9 +65,9 @@ def send_new_hire_invite(new_hire_email, new_hire_name, role, start_date, employ
             to_email=new_hire_email,
             sendgrid_id="d-88bef48e049c477b83f28764b842c7a2",
             template_data=template_data,
-            verified_sender=verified_sender  # Optional, if needed
+            verified_sender=verified_sender,  # Optional, if needed
         )
-    
+
     except Exception as e:
         print(f"🚨 Error sending new hire invite: {e}")
         return False

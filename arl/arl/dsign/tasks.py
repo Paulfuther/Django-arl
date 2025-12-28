@@ -599,7 +599,9 @@ def handle_envelope_sent(recipient_email, template_name):
 
 
 # ✅ Handles "recipient-completed" event
-def handle_recipient_completed(envelope_id, recipient_email, template_id, template_name):
+def handle_recipient_completed(
+    envelope_id, recipient_email, template_id, template_name
+):
     """Handles recipient completion events by saving the signed document."""
     try:
         # ✅ Fetch the template first
@@ -633,8 +635,9 @@ def handle_recipient_completed(envelope_id, recipient_email, template_id, templa
             fetch_and_upload_signed_documents.delay(
                 envelope_id,
                 user.id if user else None,
-                employer.id, template_name,
-                is_company_document=True
+                employer.id,
+                template_name,
+                is_company_document=True,
             )
 
             return {"status": "success", "document_id": processed_doc.id}
@@ -686,7 +689,7 @@ def handle_recipient_completed(envelope_id, recipient_email, template_id, templa
     except Exception as e:
         logger.error(f"❌ Error in handle_recipient_completed: {str(e)}")
         return {"error": str(e)}
-    
+
 
 # ✅ Sends SMS notifications to HR using the correct Twilio API keys
 @app.task(name="notify_hr_task")
@@ -870,12 +873,8 @@ def send_new_hire_quiz(envelope_args):
 # This is the FINAL version of the task to upload to linode.
 @app.task(name="fetch_and_upload_signed_documents")
 def fetch_and_upload_signed_documents(
-    envelope_id,
-    user_id,
-    employer_id,
-    template_name,
-        is_company_document=False):
-
+    envelope_id, user_id, employer_id, template_name, is_company_document=False
+):
     try:
         employer = Employer.objects.get(id=employer_id)
         user = None
@@ -912,14 +911,16 @@ def fetch_and_upload_signed_documents(
 
         zip_buffer = BytesIO(zip_bytes)
         folder_name = f"{uuid.uuid4().hex[:8]}"
-        
 
         # ✅ Determine the upload path based on document type
         if is_company_document:
-            upload_path_prefix = f"DOCUMENTS/{employer.name.replace(' ', '_')}/company/{folder_name}/"
+            upload_path_prefix = (
+                f"DOCUMENTS/{employer.name.replace(' ', '_')}/company/{folder_name}/"
+            )
         else:
-            upload_path_prefix = f"DOCUMENTS/{employer.name.replace(' ', '_')}/{folder_name}/"
-
+            upload_path_prefix = (
+                f"DOCUMENTS/{employer.name.replace(' ', '_')}/{folder_name}/"
+            )
 
         with zipfile.ZipFile(zip_buffer, "r") as zip_ref:
             for file_name in zip_ref.namelist():
@@ -964,7 +965,9 @@ def validate_template_signature_tabs_task(template_id):
 
 @app.task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=3)
 def process_company_document_task(self, sdf_id: str, tmp_path: str, object_key: str):
-    logger.info("[CompanyDocTask] Start sdf_id=%s key=%s tmp=%s", sdf_id, object_key, tmp_path)
+    logger.info(
+        "[CompanyDocTask] Start sdf_id=%s key=%s tmp=%s", sdf_id, object_key, tmp_path
+    )
     try:
         with open(tmp_path, "rb") as f:
             upload_to_linode_object_storage(f, object_key)
@@ -979,7 +982,9 @@ def process_company_document_task(self, sdf_id: str, tmp_path: str, object_key: 
             SignedDocumentFile.objects.filter(id=sdf_id).delete()
             logger.warning("[CompanyDocTask] Deleted SDF id=%s after failure", sdf_id)
         except Exception:
-            logger.exception("[CompanyDocTask] Could not delete SDF id=%s after failure", sdf_id)
+            logger.exception(
+                "[CompanyDocTask] Could not delete SDF id=%s after failure", sdf_id
+            )
         raise
     finally:
         try:

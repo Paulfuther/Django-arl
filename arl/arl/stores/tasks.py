@@ -4,15 +4,14 @@ import logging
 from arl.celery import app
 from arl.utils.images import normalize_to_jpeg
 
-from arl.bucket.helpers import upload_to_linode_object_storage 
+from arl.bucket.helpers import upload_to_linode_object_storage
 from arl.dsign.models import SignedDocumentFile
 
 from .models import StoreDocumentJob
 
 logger = logging.getLogger(__name__)
 
-IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".tiff", ".gif",
-              ".heic", ".heif"}
+IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".tiff", ".gif", ".heic", ".heif"}
 
 
 def _is_image(name: str, ct: str) -> bool:
@@ -20,8 +19,12 @@ def _is_image(name: str, ct: str) -> bool:
     return ext in IMAGE_EXTS or (ct or "").startswith("image/")
 
 
-@app.task(name="process_store_docuemnts_task",
-          bind=True, max_retries=3, default_retry_delay=15)
+@app.task(
+    name="process_store_docuemnts_task",
+    bind=True,
+    max_retries=3,
+    default_retry_delay=15,
+)
 def process_store_document_task(self, job_id: str):
     job = StoreDocumentJob.objects.get(pk=job_id)
     job.status = "processing"
@@ -35,7 +38,8 @@ def process_store_document_task(self, job_id: str):
         if _is_image(job.original_name, job.original_ct):
             logger.info(
                 "[StoreDocTask] Normalizing image name=%s ct=%s",
-                job.original_name, job.original_ct
+                job.original_name,
+                job.original_ct,
             )
             with open(job.tmp_path, "rb") as f:
                 buf, _ = normalize_to_jpeg(
@@ -50,14 +54,14 @@ def process_store_document_task(self, job_id: str):
             upload_to_linode_object_storage(buf, dest_key)
             if hasattr(buf, "close"):
                 buf.close()
-            logger.info("[StoreDocTask] Uploaded normalized image to %s",
-                        dest_key)
+            logger.info("[StoreDocTask] Uploaded normalized image to %s", dest_key)
 
         # B) Non-images → stream original
         else:
             logger.info(
                 "[StoreDocTask] Uploading raw file name=%s ct=%s",
-                job.original_name, job.original_ct
+                job.original_name,
+                job.original_ct,
             )
             with open(job.tmp_path, "rb") as fp:
                 if hasattr(fp, "seek"):
@@ -75,8 +79,9 @@ def process_store_document_task(self, job_id: str):
         # Roll back the SDF so you don’t have a dangling record
         try:
             SignedDocumentFile.objects.filter(pk=job.sdf_id).delete()
-            logger.warning("[StoreDocTask] Deleted SDF id=%s due to failure",
-                           job.sdf_id)
+            logger.warning(
+                "[StoreDocTask] Deleted SDF id=%s due to failure", job.sdf_id
+            )
         except Exception:
             pass
         job.status = "error"
@@ -88,5 +93,6 @@ def process_store_document_task(self, job_id: str):
             os.remove(job.tmp_path)
             logger.info("[StoreDocTask] Temp file removed: %s", job.tmp_path)
         except Exception as rm_err:
-            logger.warning("[StoreDocTask] Could not remove temp file %s: %s",
-                           job.tmp_path, rm_err)
+            logger.warning(
+                "[StoreDocTask] Could not remove temp file %s: %s", job.tmp_path, rm_err
+            )

@@ -15,7 +15,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import Group
 from django.contrib.auth.views import LoginView
 from django.core.paginator import Paginator
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, Q
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.http import (
@@ -910,9 +910,7 @@ def hr_dashboard(request):
     if active_tab == "employee_docs":
         if doc_q:
             employees = (
-                CustomUser.objects.filter(
-                    employer=employer, is_active=True
-                )
+                CustomUser.objects.filter(employer=employer, is_active=True)
                 .filter(
                     Q(first_name__icontains=doc_q)
                     | Q(last_name__icontains=doc_q)
@@ -1000,13 +998,18 @@ def employee_quick_search(request):
     q = (request.GET.get("q") or "").strip()
     results = []
     if employer and q:
-        results = (CustomUser.objects
-                   .filter(employer=employer, is_active=True)
-                   .filter(Q(first_name__icontains=q) |
-                           Q(last_name__icontains=q) |
-                           Q(email__icontains=q))
-                   .order_by('first_name', 'last_name')[:20])
-    return render(request, "user/hr/partials/employee_quick_search.html", {"results": results})
+        results = (
+            CustomUser.objects.filter(employer=employer, is_active=True)
+            .filter(
+                Q(first_name__icontains=q)
+                | Q(last_name__icontains=q)
+                | Q(email__icontains=q)
+            )
+            .order_by("first_name", "last_name")[:20]
+        )
+    return render(
+        request, "user/hr/partials/employee_quick_search.html", {"results": results}
+    )
 
 
 @login_required
@@ -1208,5 +1211,3 @@ def update_user_roles(request, user_id):
         )
 
     return HttpResponseBadRequest("Invalid request")
-
-

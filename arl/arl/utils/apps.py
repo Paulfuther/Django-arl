@@ -16,5 +16,8 @@ class UtilsConfig(AppConfig):
 
         # ✅ Increase Pillow’s pixel limit (default is ~89M, but safer to cap lower)
         Image.MAX_IMAGE_PIXELS = 50_000_000  # 50 million pixels (adjust if needed)
-        logger.info("✅ UtilsConfig.ready(): HEIC registered, pixel limit set to %s", Image.MAX_IMAGE_PIXELS)
+        logger.info(
+            "✅ UtilsConfig.ready(): HEIC registered, pixel limit set to %s",
+            Image.MAX_IMAGE_PIXELS,
+        )
         print(">>> UtilsConfig.ready() ran")  # fallback if logging not visible

@@ -25,7 +25,9 @@ class BulkEmailSendgrid(models.Model):
 
 
 class EmailEvent(models.Model):
-    employer = models.ForeignKey(Employer, null=True, blank=True, on_delete=models.SET_NULL)
+    employer = models.ForeignKey(
+        Employer, null=True, blank=True, on_delete=models.SET_NULL
+    )
     user = models.ForeignKey(
         CustomUser, on_delete=models.CASCADE, null=True, blank=True
     )
@@ -59,7 +61,9 @@ class SmsLog(models.Model):
 
 
 class EmailLog(models.Model):
-    employer = models.ForeignKey("user.Employer", on_delete=models.CASCADE, related_name="email_logs")
+    employer = models.ForeignKey(
+        "user.Employer", on_delete=models.CASCADE, related_name="email_logs"
+    )
     sender_email = models.EmailField(help_text="The verified sender email used")
     template_id = models.CharField(
         max_length=100, help_text="SendGrid Template ID used"
@@ -71,7 +75,9 @@ class EmailLog(models.Model):
         choices=[("SUCCESS", "Success"), ("FAILED", "Failed")],
         default="SUCCESS",
     )
-    error_message = models.TextField(blank=True, null=True, help_text="Error details if failed")
+    error_message = models.TextField(
+        blank=True, null=True, help_text="Error details if failed"
+    )
 
     def __str__(self):
         return f"EmailLog {self.id} - {self.employer.name} - {self.sent_at.strftime('%Y-%m-%d %H:%M')}"
@@ -79,14 +85,12 @@ class EmailLog(models.Model):
 
 class EmailTemplate(models.Model):
     employers = models.ManyToManyField(
-        Employer,
-        blank=True,
-        related_name="email_templates"
+        Employer, blank=True, related_name="email_templates"
     )
     name = models.CharField(
         max_length=100,
         null=True,
-        help_text="The name of the email template (e.g., 'New Hire Onboarding')"
+        help_text="The name of the email template (e.g., 'New Hire Onboarding')",
     )  # ✅ Allow same name for multiple employers
     sendgrid_id = models.TextField()  # ✅ Store SendGrid Template ID
     include_in_report = models.BooleanField(default=False)  # ✅ For analytics
@@ -151,7 +155,9 @@ class Message(models.Model):
     username = models.CharField(max_length=100, blank=True, null=True)
     action_time = models.DateTimeField(default=timezone.now)
     template_used = models.BooleanField(default=False)
-    message_type = models.CharField(max_length=10, default='WhatsApp')  # 'WhatsApp' or 'SMS'
+    message_type = models.CharField(
+        max_length=10, default="WhatsApp"
+    )  # 'WhatsApp' or 'SMS'
 
     def __str__(self):
         return f"{self.message_type} message from {self.sender} to {self.receiver}, status {self.message_status}, at {self.action_time}"
@@ -188,10 +194,11 @@ class ComplianceFile(models.Model):
             bucket = conn.get_bucket(settings.LINODE_BUCKET_NAME)
             key = bucket.get_key(unique_key)
             if key:
-                key.set_acl('public-read')
+                key.set_acl("public-read")
 
             # ✅ Public URL (not presigned)
             from urllib.parse import quote
+
             self.presigned_url = f"https://{settings.LINODE_BUCKET_NAME}.{settings.LINODE_REGION}/{quote(unique_key)}"
 
             super().save(update_fields=["s3_key", "presigned_url"])
@@ -211,8 +218,9 @@ class ShortenedSMSLog(models.Model):
         ("failed", "Failed"),
     ]
 
-    employer = models.ForeignKey(Employer, null=True, blank=True,
-                                 on_delete=models.SET_NULL)
+    employer = models.ForeignKey(
+        Employer, null=True, blank=True, on_delete=models.SET_NULL
+    )
     sms_sid = models.CharField(max_length=64)
     to = models.CharField(max_length=20)
     from_number = models.CharField(max_length=20)
@@ -236,12 +244,20 @@ class ShortenedSMSLog(models.Model):
 class DraftEmail(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     employer = models.ForeignKey("user.Employer", on_delete=models.CASCADE)
-    mode = models.CharField(max_length=20, choices=[("text", "Text"), ("template", "Template")])
+    mode = models.CharField(
+        max_length=20, choices=[("text", "Text"), ("template", "Template")]
+    )
     subject = models.CharField(max_length=255, blank=True)
     message = models.TextField(blank=True)
-    sendgrid_template = models.ForeignKey(EmailTemplate, null=True, blank=True, on_delete=models.SET_NULL)
-    selected_group = models.ForeignKey(Group, null=True, blank=True, on_delete=models.SET_NULL)
-    selected_users = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="draft_recipients", blank=True)
+    sendgrid_template = models.ForeignKey(
+        EmailTemplate, null=True, blank=True, on_delete=models.SET_NULL
+    )
+    selected_group = models.ForeignKey(
+        Group, null=True, blank=True, on_delete=models.SET_NULL
+    )
+    selected_users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, related_name="draft_recipients", blank=True
+    )
     attachment_urls = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

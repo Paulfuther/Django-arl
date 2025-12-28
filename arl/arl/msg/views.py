@@ -52,7 +52,7 @@ from arl.msg.tasks import (
     process_whatsapp_webhook,
     send_template_whatsapp_task,
     start_campaign_task,
-    master_email_send_task
+    master_email_send_task,
 )
 from arl.setup.models import TenantApiKeys
 from arl.user.models import CustomUser, Employer, Store
@@ -69,11 +69,7 @@ from .forms import (
     TemplateFilterForm,
     TemplateWhatsAppForm,
 )
-from .models import (ComplianceFile,
-                     DraftEmail,
-                     ShortenedSMSLog,
-                     SMSReply
-                     )
+from .models import ComplianceFile, DraftEmail, ShortenedSMSLog, SMSReply
 from .tasks import (
     fetch_twilio_sms_task,
     fetch_twilio_summary,
@@ -343,7 +339,7 @@ def communications(request):
             )
             print(initial_data)
             print("Raw sendgrid_id from POST:", request.POST.get("sendgrid_id"))
-            
+
             logger.info("Lets check for valid")
             if not email_form.is_valid():
                 logger.warning(
@@ -353,7 +349,7 @@ def communications(request):
                     email_form.errors.as_json(),
                 )
                 messages.error(request, "Please correct the errors below.")
-                    
+
             if email_form.is_valid():
                 print("valid")
                 mode = email_form.cleaned_data["email_mode"]
@@ -366,7 +362,9 @@ def communications(request):
                 )
 
                 if not recipients:
-                    messages.error(request, "No recipients found. Please select a group or users.")
+                    messages.error(
+                        request, "No recipients found. Please select a group or users."
+                    )
                     return redirect("/comms/?tab=email")
 
                 if action == "save":
@@ -387,19 +385,24 @@ def communications(request):
                     message = render_message_to_sendgrid(raw_message)
                     print(message)
                     res = master_email_send_task.delay(
-                        recipients=recipients,                 # ensure JSON-serializable!
+                        recipients=recipients,  # ensure JSON-serializable!
                         sendgrid_id="d-4ac0497efd864e29b4471754a9c836eb",
-                        employer_id=user.employer.id,          # ensure int
-                        body=message,                          # str
-                        subject=subject,                       # str
-                        attachment_urls=attachment_urls,       # ensure list[str]
+                        employer_id=user.employer.id,  # ensure int
+                        body=message,  # str
+                        subject=subject,  # str
+                        attachment_urls=attachment_urls,  # ensure list[str]
                     )
                     print("queued master_email_send_task:", res.id)
-                    
+
                 else:
-                    sendgrid_template = email_form.cleaned_data["sendgrid_id"]   # <EmailTemplate ...>
+                    sendgrid_template = email_form.cleaned_data[
+                        "sendgrid_id"
+                    ]  # <EmailTemplate ...>
                     logger.info("Passing EmailTemplate: %s", sendgrid_template)
-                    logger.info("SendGrid template: %s", getattr(sendgrid_template, "sendgrid_id", sendgrid_template))
+                    logger.info(
+                        "SendGrid template: %s",
+                        getattr(sendgrid_template, "sendgrid_id", sendgrid_template),
+                    )
 
                     master_email_send_task.delay(
                         recipients=recipients,
@@ -507,7 +510,7 @@ def communications(request):
             "can_send_email": is_member_of_email_group(user),
             "can_send_sms": is_member_of_msg_group(user),
             "can_send_docusign": is_member_of_docusign_group(user),
-           # "can_send_whatsapp": is_member_of_whatsapp_group(user),
+            # "can_send_whatsapp": is_member_of_whatsapp_group(user),
             "selected_ids": selected_ids,
             "draft_id": draft_id,
             "attachment_urls": attachment_urls,
@@ -736,13 +739,17 @@ def email_event_summary_view(request):
 
     # Only proceed with task if form is valid and template_id is provided
     if form.is_valid() and form.cleaned_data.get("template_id"):
-        employer_id = request.user.employer.id if hasattr(request.user, "employer") else None
+        employer_id = (
+            request.user.employer.id if hasattr(request.user, "employer") else None
+        )
         template_id = form.cleaned_data["template_id"].sendgrid_id
         start_date = form.cleaned_data.get("date_from")
         end_date = form.cleaned_data.get("date_to")
         # print(start_date, end_date, employer_id)
         # Call the Celery task
-        result = generate_email_event_summary.delay(template_id, start_date, end_date, employer_id)
+        result = generate_email_event_summary.delay(
+            template_id, start_date, end_date, employer_id
+        )
         summary_table = result.get(timeout=10)  # Wait for task completion
 
     return render(

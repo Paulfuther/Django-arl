@@ -86,5 +86,9 @@ def normalize_to_jpeg(
     best_buf.seek(0)
 
     if return_meta:
-        return best_buf, ".jpg", {"quality": best_q, "bytes": final_bytes, "size": img.size}
+        return (
+            best_buf,
+            ".jpg",
+            {"quality": best_q, "bytes": final_bytes, "size": img.size},
+        )
     return best_buf, ".jpg"

@@ -11,7 +11,6 @@ from django.urls import reverse_lazy
 from django.utils.crypto import get_random_string
 
 from .models import CustomUser, Employer, NewHireInvite, Store
-from arl.user.services import set_user_sin
 
 
 class CustomUserCreationForm(UserCreationForm):
@@ -180,7 +179,7 @@ class CustomUserCreationForm(UserCreationForm):
             user.save()
 
         return user
-    
+
 
 class TwoFactorAuthenticationForm(forms.Form):
     verification_code = forms.CharField(

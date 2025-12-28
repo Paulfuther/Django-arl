@@ -9,12 +9,14 @@ from .models import Incident, MajorIncident
 
 class IncidentForm(forms.ModelForm):
     # user_employer = forms.ChoiceField(choices=[], required=False)
-    image_folder = forms.CharField(widget=forms.TextInput(attrs={'style': 'display:none;'}))
+    image_folder = forms.CharField(
+        widget=forms.TextInput(attrs={"style": "display:none;"})
+    )
 
     class Meta:
         model = Incident
         fields = "__all__"
-        exclude = ['queued_for_sending', 'sent', 'sent_at']
+        exclude = ["queued_for_sending", "sent", "sent_at"]
         labels = {
             "syes": "Off Property Impact: Yes",
             "sno": "Off Property Impact: No",
@@ -88,8 +90,7 @@ class IncidentForm(forms.ModelForm):
     eventtime = forms.TimeField(widget=forms.TimeInput(attrs={"type": "time"}))
 
     def generate_random_folder(self):
-        return "".join(random.choices(string.ascii_letters + string.digits,
-                                      k=10))
+        return "".join(random.choices(string.ascii_letters + string.digits, k=10))
 
     def create_folder(self, instance):
         if not instance.image_folder:
@@ -118,9 +119,9 @@ class IncidentForm(forms.ModelForm):
         if user:
             self.fields["user_employer"].initial = self.get_user_employer(user)
             # Disable the user_employer field and set its initial value
-            self.fields['user_employer'].disabled = True
-            #self.fields['user_employer'].initial = self.get_user_employer(user)
-            #self.fields['user_employer'].widget.attrs['disabled'] = 'disabled'
+            self.fields["user_employer"].disabled = True
+            # self.fields['user_employer'].initial = self.get_user_employer(user)
+            # self.fields['user_employer'].widget.attrs['disabled'] = 'disabled'
 
     def get_user_employer(self, user):
         employer = user.employer
@@ -129,7 +130,9 @@ class IncidentForm(forms.ModelForm):
 
 class MajorIncidentForm(forms.ModelForm):
     # user_employer = forms.ChoiceField(choices=[], required=False)
-    image_folder = forms.CharField(widget=forms.TextInput(attrs={'style': 'display:none;'}))
+    image_folder = forms.CharField(
+        widget=forms.TextInput(attrs={"style": "display:none;"})
+    )
 
     class Meta:
         model = MajorIncident
@@ -170,8 +173,7 @@ class MajorIncidentForm(forms.ModelForm):
     eventtime = forms.TimeField(widget=forms.TimeInput(attrs={"type": "time"}))
 
     def generate_random_folder(self):
-        return "".join(random.choices(string.ascii_letters + string.digits,
-                                      k=10))
+        return "".join(random.choices(string.ascii_letters + string.digits, k=10))
 
     def create_folder(self, instance):
         if not instance.image_folder:
@@ -200,9 +202,9 @@ class MajorIncidentForm(forms.ModelForm):
         if user:
             self.fields["user_employer"].initial = self.get_user_employer(user)
             # Disable the user_employer field and set its initial value
-            self.fields['user_employer'].disabled = True
-            #self.fields['user_employer'].initial = self.get_user_employer(user)
-            #self.fields['user_employer'].widget.attrs['disabled'] = 'disabled'
+            self.fields["user_employer"].disabled = True
+            # self.fields['user_employer'].initial = self.get_user_employer(user)
+            # self.fields['user_employer'].widget.attrs['disabled'] = 'disabled'
 
     def get_user_employer(self, user):
         employer = user.employer

@@ -2,7 +2,7 @@ from __future__ import absolute_import, unicode_literals
 from collections import defaultdict
 from django.utils.timezone import localtime
 import json
-from collections import defaultdict, Counter
+from collections import Counter
 from arl.celery import app
 from arl.carwash.models import Store, CarwashStatus
 
@@ -10,7 +10,12 @@ from arl.carwash.models import Store, CarwashStatus
 @app.task(name="carwash_closure_report")
 def generate_carwash_status_report():
     stores = Store.objects.filter(carwash=True)
-    report_data = defaultdict(lambda: {"stores": [], "summary": defaultdict(lambda: {"duration": "0h 0m", "reason": "No data"})})
+    report_data = defaultdict(
+        lambda: {
+            "stores": [],
+            "summary": defaultdict(lambda: {"duration": "0h 0m", "reason": "No data"}),
+        }
+    )
 
     for store in stores:
         statuses = (
@@ -35,18 +40,20 @@ def generate_carwash_status_report():
                 # Convert to hours and minutes
                 duration_hours, remainder = divmod(duration.total_seconds(), 3600)
                 duration_minutes = remainder // 60
-                
+
                 month = closed_at.strftime("%Y-%m")  # Extract YYYY-MM
 
                 # ✅ Store reasons associated with this month
                 monthly_reasons[month].append(reason)
 
-                durations.append({
-                    "closed_at": localtime(closed_at).strftime("%Y-%m-%d %I:%M %p"),
-                    "opened_at": localtime(opened_at).strftime("%Y-%m-%d %I:%M %p"),
-                    "duration_closed": f"{int(duration_hours)}h {int(duration_minutes)}m",
-                    "reason": reason,
-                })
+                durations.append(
+                    {
+                        "closed_at": localtime(closed_at).strftime("%Y-%m-%d %I:%M %p"),
+                        "opened_at": localtime(opened_at).strftime("%Y-%m-%d %I:%M %p"),
+                        "duration_closed": f"{int(duration_hours)}h {int(duration_minutes)}m",
+                        "reason": reason,
+                    }
+                )
 
                 monthly_duration[month] += duration.total_seconds()
                 closed_at = None  # Reset for next closure
@@ -56,29 +63,35 @@ def generate_carwash_status_report():
             month = closed_at.strftime("%Y-%m")
             monthly_reasons[month].append("Still closed")
 
-            durations.append({
-                "closed_at": localtime(closed_at).strftime("%Y-%m-%d %I:%M %p"),
-                "opened_at": None,
-                "duration_closed": "Still closed",
-                "reason": "Still closed",
-            })
+            durations.append(
+                {
+                    "closed_at": localtime(closed_at).strftime("%Y-%m-%d %I:%M %p"),
+                    "opened_at": None,
+                    "duration_closed": "Still closed",
+                    "reason": "Still closed",
+                }
+            )
 
         # ✅ Convert monthly durations to formatted time strings
         formatted_summary = {
             month: {
                 "duration": f"{int(seconds // 3600)}h {int((seconds % 3600) // 60)}m",
-                "reason": Counter(monthly_reasons[month]).most_common(1)[0][0] if monthly_reasons[month] else "No data"
+                "reason": Counter(monthly_reasons[month]).most_common(1)[0][0]
+                if monthly_reasons[month]
+                else "No data",
             }
             for month, seconds in monthly_duration.items()
         }
 
         # ✅ Store data under the appropriate month
         for month in formatted_summary.keys():
-            report_data[month]["stores"].append({
-                "store_id": store.id,
-                "store_number": store.number,
-                "durations": durations,
-            })
+            report_data[month]["stores"].append(
+                {
+                    "store_id": store.id,
+                    "store_number": store.number,
+                    "durations": durations,
+                }
+            )
             report_data[month]["summary"][store.number] = formatted_summary[month]
 
     return json.dumps(report_data, default=str)

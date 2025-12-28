@@ -19,22 +19,36 @@ cipher = Fernet(settings.SECRET_ENCRYPTION_KEY)
 
 
 class TenantApiKeys(models.Model):
-    employer = models.ForeignKey(Employer, on_delete=models.CASCADE, related_name="api_keys")
+    employer = models.ForeignKey(
+        Employer, on_delete=models.CASCADE, related_name="api_keys"
+    )
 
     # Twilio Credentials
     account_sid = models.CharField(max_length=100, blank=True, null=True)  # Twilio SID
-    auth_token = models.CharField(max_length=100, blank=True, null=True)  # Twilio Auth Token
-    phone_number = models.CharField(max_length=20, blank=True, null=True)  # Twilio Phone
+    auth_token = models.CharField(
+        max_length=100, blank=True, null=True
+    )  # Twilio Auth Token
+    phone_number = models.CharField(
+        max_length=20, blank=True, null=True
+    )  # Twilio Phone
     phone_number_sid = models.CharField(max_length=100, blank=True, null=True)
-    messaging_service_sid = models.CharField(max_length=100, blank=True, null=True)  # ✅ Twilio Messaging Service ID
+    messaging_service_sid = models.CharField(
+        max_length=100, blank=True, null=True
+    )  # ✅ Twilio Messaging Service ID
     notify_service_sid = models.CharField(max_length=100, blank=True, null=True)
 
     # SendGrid Credentials
     sender_email = models.EmailField(blank=True, null=True)  # SendGrid Sender Email
-    verified_sender_email = models.EmailField(blank=True, null=True)  # ✅ SendGrid Verified Email
+    verified_sender_email = models.EmailField(
+        blank=True, null=True
+    )  # ✅ SendGrid Verified Email
 
     # Status Tracking
-    status = models.CharField(max_length=50, choices=[("Active", "Active"), ("Error", "Error")], default="Active")
+    status = models.CharField(
+        max_length=50,
+        choices=[("Active", "Active"), ("Error", "Error")],
+        default="Active",
+    )
     is_active = models.BooleanField(default=True)  # Easier filtering
 
     # Timestamp Fields
@@ -91,21 +105,21 @@ class EmployerRequest(models.Model):
         unique=True,
         blank=True,
         null=True,
-        help_text="Enter only the part before '@yourdomain.com'"
+        help_text="Enter only the part before '@yourdomain.com'",
     )
     verified_sender_email = models.EmailField(
         max_length=255,
         unique=True,
         blank=True,
         null=True,
-        help_text="This is the full email generated based on your input."
+        help_text="This is the full email generated based on your input.",
     )
     stripe_plan = models.ForeignKey(
         StripePlan,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        help_text="Select the Stripe plan for this employer (defaults to Free Plan)"
+        help_text="Select the Stripe plan for this employer (defaults to Free Plan)",
     )
 
     def clean(self):
@@ -116,12 +130,16 @@ class EmployerRequest(models.Model):
     def save(self, *args, **kwargs):
         if not self.stripe_plan:
             try:
-                self.stripe_plan = StripePlan.objects.get(stripe_price_id="price_000_free")
+                self.stripe_plan = StripePlan.objects.get(
+                    stripe_price_id="price_000_free"
+                )
             except StripePlan.DoesNotExist:
                 pass  # or raise an error
 
         if self.verified_sender_local:
-            self.verified_sender_email = f"{self.verified_sender_local}@1553690ontarioinc.com"
+            self.verified_sender_email = (
+                f"{self.verified_sender_local}@1553690ontarioinc.com"
+            )
         else:
             self.verified_sender_email = None
 
@@ -136,7 +154,9 @@ class EmployerRequest(models.Model):
 
 class StripePayment(models.Model):
     employer = models.OneToOneField("user.Employer", on_delete=models.CASCADE)
-    amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("300.00"))
+    amount = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal("300.00")
+    )
     is_paid = models.BooleanField(default=False)
     payment_date = models.DateTimeField(null=True, blank=True)
 
@@ -159,8 +179,9 @@ class StripePayment(models.Model):
         self.save()
 
     def __str__(self):
-        return f"Payment for {self.employer.name} - {'PAID' if self.is_paid else 'UNPAID'}"
+        return (
+            f"Payment for {self.employer.name} - {'PAID' if self.is_paid else 'UNPAID'}"
+        )
 
     class Meta:
         db_table = "user_stripepayment"
-

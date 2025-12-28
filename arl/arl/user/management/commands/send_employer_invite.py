@@ -9,7 +9,9 @@ class Command(BaseCommand):
     help = "Simulates Stripe webhook to send employer invite email"
 
     def add_arguments(self, parser):
-        parser.add_argument("email", type=str, help="Employer email to simulate webhook")
+        parser.add_argument(
+            "email", type=str, help="Employer email to simulate webhook"
+        )
 
     def handle(self, *args, **kwargs):
         email = kwargs["email"]
@@ -19,7 +21,9 @@ class Command(BaseCommand):
             employer.is_active = True
             employer.subscription_id = "sub_test_12345"
             employer.save()
-            self.stdout.write(self.style.SUCCESS(f"✅ Employer {employer.name} activated."))
+            self.stdout.write(
+                self.style.SUCCESS(f"✅ Employer {employer.name} activated.")
+            )
 
             # ✅ Ensure an invite exists
             invite = NewHireInvite.objects.filter(email=email, used=False).first()
@@ -30,9 +34,13 @@ class Command(BaseCommand):
                     email=email,
                     name=employer.name,
                     role="EMPLOYER",
-                    token=invite_token
+                    token=invite_token,
                 )
-                self.stdout.write(self.style.SUCCESS(f"📩 Invite Created! Use this link: /register/{invite.token}/"))
+                self.stdout.write(
+                    self.style.SUCCESS(
+                        f"📩 Invite Created! Use this link: /register/{invite.token}/"
+                    )
+                )
 
             invite_link = f"{settings.SITE_URL}/register/{invite.token}/"
 
@@ -50,6 +58,8 @@ class Command(BaseCommand):
             }
 
             create_master_email(**email_data)
-            self.stdout.write(self.style.SUCCESS(f"✅ Employer invite sent to {employer.email}"))
+            self.stdout.write(
+                self.style.SUCCESS(f"✅ Employer invite sent to {employer.email}")
+            )
         else:
             self.stdout.write(self.style.ERROR("⚠️ No employer found with that email."))

@@ -10,8 +10,7 @@ from django.utils.html import format_html, strip_tags
 from import_export import fields, resources
 from import_export import fields as export_fields
 from import_export.admin import ExportActionMixin
-from django_celery_results.admin import (
-    TaskResultAdmin as DefaultTaskResultAdmin)
+from django_celery_results.admin import TaskResultAdmin as DefaultTaskResultAdmin
 from arl.bucket.helpers import upload_to_linode_object_storage
 from arl.carwash.models import CarwashStatus
 from arl.dsign.models import (
@@ -28,6 +27,7 @@ from arl.msg.models import (
     WhatsAppTemplate,
 )
 from arl.msg.tasks import EmployerSMSTask
+
 # from arl.payroll.models import CalendarEvent, PayPeriod, StatutoryHoliday
 from arl.quiz.models import Answer, Question, Quiz, SaltLog
 from arl.setup.models import StripePayment, StripePlan, TenantApiKeys
@@ -50,8 +50,7 @@ from arl.utils.crypto import normalize_digits, sin_hash
 
 class ExternalRecipientAdmin(admin.ModelAdmin):
     list_display = ("first_name", "last_name", "company", "email", "group")
-    search_fields = ("first_name", "last_name", "company", "email",
-                     "group__name")
+    search_fields = ("first_name", "last_name", "company", "email", "group__name")
 
 
 # This class is used for exporting
@@ -63,8 +62,7 @@ class UserResource(resources.ModelResource):
         column_name="Docusign Documents", attribute="all_docusign_templates"
     )
     work_permit_expiration_date = fields.Field(
-        column_name="Permit Expiration",
-        attribute=("work_permit_expiration_date")
+        column_name="Permit Expiration", attribute=("work_permit_expiration_date")
     )
     sin_expiration_date = fields.Field(
         column_name="SIN Expiration", attribute="sin_expiration_date"
@@ -166,13 +164,12 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
     # Removes “delete selected” from actions dropdown
     def get_actions(self, request):
         actions = super().get_actions(request)
-        if 'delete_selected' in actions:
-            del actions['delete_selected']
+        if "delete_selected" in actions:
+            del actions["delete_selected"]
         return actions
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
-        if db_field.name in ["sin_expiration_date",
-                             "work_permit_expiration_date"]:
+        if db_field.name in ["sin_expiration_date", "work_permit_expiration_date"]:
             kwargs["widget"] = TextInput(
                 attrs={"type": "date"}
             )  # ✅ Uses native date input, no calendar
@@ -219,8 +216,11 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
             return format_html('<span style="color:#999;">Unknown</span>')
         if obj.sin_expiration_date is None:
             return format_html('<span style="color:#0a7;">Valid</span>')
-        days = (obj.sin_expiration_date - obj.sin_expiration_date.today()).days \
-            if hasattr(obj.sin_expiration_date, "today") else None
+        days = (
+            (obj.sin_expiration_date - obj.sin_expiration_date.today()).days
+            if hasattr(obj.sin_expiration_date, "today")
+            else None
+        )
         if days is None:
             return format_html('<span style="color:#0a7;">Valid</span>')
         if days < 0:
@@ -228,13 +228,13 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         if days <= 30:
             return format_html('<span style="color:#d97d00;">Expiring</span>')
         return format_html('<span style="color:#0a7;">Valid</span>')
+
     sin_status.short_description = "SIN Status"
 
     # ✅ Smart search: if the admin search box contains a 9-digit SIN,
     # we hash it and include exact matches; if it’s 4 digits, we match last4.
     def get_search_results(self, request, queryset, search_term):
-        qs, use_distinct = super().get_search_results(request,
-                                                      queryset, search_term)
+        qs, use_distinct = super().get_search_results(request, queryset, search_term)
         digits = normalize_digits(search_term or "")
         try:
             if len(digits) == 9:
@@ -261,9 +261,16 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
 
     def full_name(self, obj):
         return f"{obj.first_name} {obj.last_name}".strip() or obj.username
+
     full_name.short_description = "Name"
-    search_fields = ("username", "email", "phone_number", "sin_last4",
-                     "first_name", "last_name")
+    search_fields = (
+        "username",
+        "email",
+        "phone_number",
+        "sin_last4",
+        "first_name",
+        "last_name",
+    )
     list_editable = (
         "sin_expiration_date",
         "work_permit_expiration_date",
@@ -413,8 +420,7 @@ class UserManagerAdmin(admin.ModelAdmin):
 
 @admin.register(UserConsent)
 class UserConsentAdmin(admin.ModelAdmin):
-    list_display = ("user", "consent_type", "is_granted",
-                    "granted_on", "revoked_on")
+    list_display = ("user", "consent_type", "is_granted", "granted_on", "revoked_on")
     list_filter = ("consent_type", "is_granted")
     search_fields = ("user__username",)
 
@@ -491,8 +497,13 @@ class CustomTaskResultAdmin(DefaultTaskResultAdmin):
 
     def short_result(self, obj):
         if obj.result:
-            return str(obj.result)[:75] + "..." if len(str(obj.result)) > 75 else obj.result
+            return (
+                str(obj.result)[:75] + "..."
+                if len(str(obj.result)) > 75
+                else obj.result
+            )
         return "No result"
+
     short_result.short_description = "Result (short)"
 
 
@@ -688,8 +699,7 @@ class TenantApiKeysAdmin(admin.ModelAdmin):
 
 @admin.register(DocuSignTemplate)
 class DocuSignTemplateAdmin(admin.ModelAdmin):
-    list_display = ("template_name", "employer",
-                    "is_new_hire_template", "created_at")
+    list_display = ("template_name", "employer", "is_new_hire_template", "created_at")
     search_fields = ("template_name",)
     list_filter = (
         "employer",
@@ -699,8 +709,7 @@ class DocuSignTemplateAdmin(admin.ModelAdmin):
 
 @admin.register(EmailTemplate)
 class EmailTemplateAdmin(admin.ModelAdmin):
-    list_display = ("name", "get_employers", "sendgrid_id",
-                    "include_in_report")
+    list_display = ("name", "get_employers", "sendgrid_id", "include_in_report")
     search_fields = ("name", "sendgrid_id", "employers__name")
     list_filter = ("employers",)
 
@@ -787,8 +796,7 @@ class EmployerAdmin(admin.ModelAdmin):
 
         if employer.is_active:
             self.message_user(
-                request, f"Employer {employer.name} is now active.",
-                messages.SUCCESS
+                request, f"Employer {employer.name} is now active.", messages.SUCCESS
             )
         else:
             self.message_user(
@@ -824,8 +832,7 @@ class NewHireInviteAdmin(admin.ModelAdmin):
     fieldsets = (
         (None, {"fields": ("name", "email", "role")}),
         ("Context", {"fields": ("employer", "invited_by", "used")}),
-        ("Invite Details", {"fields": ("token", "invite_link_display",
-                                       "created_at")}),
+        ("Invite Details", {"fields": ("token", "invite_link_display", "created_at")}),
     )
 
     actions = ["mark_as_used", "mark_as_unused"]
@@ -836,23 +843,30 @@ class NewHireInviteAdmin(admin.ModelAdmin):
             return "—"
         url = obj.get_invite_link()
         return format_html('<a href="{}" target="_blank">{}</a>', url, url)
+
     invite_link_display.short_description = "Invite Link"
 
     def invite_link_short(self, obj):
         if not obj.pk:
             return "—"
-        return format_html('<a class="button" href="{}" target="_blank">Open</a>', obj.get_invite_link())
+        return format_html(
+            '<a class="button" href="{}" target="_blank">Open</a>',
+            obj.get_invite_link(),
+        )
+
     invite_link_short.short_description = "Link"
 
     # ----- Actions -----
     def mark_as_used(self, request, queryset):
         count = queryset.update(used=True)
         self.message_user(request, f"Marked {count} invite(s) as used.")
+
     mark_as_used.short_description = "Mark selected invites as used"
 
     def mark_as_unused(self, request, queryset):
         count = queryset.update(used=False)
         self.message_user(request, f"Marked {count} invite(s) as unused.")
+
     mark_as_unused.short_description = "Mark selected invites as unused"
 
 
@@ -915,8 +929,7 @@ class SignedDocumentFileAdmin(admin.ModelAdmin):
         context = {
             "form": form,
         }
-        return render(request, "admin/signed_documents_upload_one.html",
-                      context)
+        return render(request, "admin/signed_documents_upload_one.html", context)
 
 
 @admin.register(StripePlan)
@@ -928,8 +941,7 @@ class StripePlanAdmin(admin.ModelAdmin):
 @admin.register(StripePayment)
 class StripePaymentAdmin(admin.ModelAdmin):
     list_display = ("employer", "amount", "is_paid", "payment_date")
-    search_fields = ("employer__name", "stripe_customer_id",
-                     "stripe_subscription_id")
+    search_fields = ("employer__name", "stripe_customer_id", "stripe_subscription_id")
     list_filter = ("is_paid",)
 
 
