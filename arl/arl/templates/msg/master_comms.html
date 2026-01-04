@@ -90,12 +90,20 @@
               <i class="material-symbols-outlined">chat</i>
             </a>
           {% endif %}
+          {% if can_view_email_logs %}
+          <a class="comms-nav-link {% if active_tab == 'email_log' %}active{% endif %}"
+            data-bs-toggle="tab" href="#email_log" role="tab">
+            <i class="material-symbols-outlined">history</i>
+          </a>
+          {% endif %}
         </nav>
       </div>
     </aside>
 
     <!-- ===== Mobile Top Nav ===== -->
-    <div id="commsNavMobile" class="d-flex d-lg-none justify-content-around border-bottom py-2">
+    <div id="commsNavMobile" class="d-flex d-lg-none justify-content-around border-bottom py-2"
+          role="tablist"
+          aria-orientation="horizontal">
       {% if can_send_email %}
         <a class="comms-nav-link {% if active_tab == 'email' %}active{% endif %}" data-bs-toggle="tab" href="#email" role="tab" data-title="Email">
           <i class="material-symbols-outlined">mail</i>
@@ -114,6 +122,12 @@
       {% if can_send_whatsapp %}
         <a class="comms-nav-link {% if active_tab == 'whatsapp' %}active{% endif %}" data-bs-toggle="tab" href="#whatsapp" role="tab" data-title="WhatsApp">
           <i class="material-symbols-outlined">chat</i>
+        </a>
+      {% endif %}
+      {% if can_view_email_logs %}
+        <a class="comms-nav-link {% if active_tab == 'email_log' %}active{% endif %}"
+          data-bs-toggle="tab" href="#email_log" role="tab">
+          <i class="material-symbols-outlined">history</i>
         </a>
       {% endif %}
     </div>
@@ -141,6 +155,11 @@
             {% include "msg/whatsapp_form.html" %}
           </div>
         {% endif %}
+        {% if can_view_email_logs %}
+          <div id="email_log" class="tab-pane fade {% if active_tab == 'email_log' %}show active{% endif %}">
+            {% include "msg/email_log.html" %}
+          </div>
+        {% endif %}
       </div>
     </section>
   </div>
@@ -148,89 +167,15 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-  // Handle active tab from server or URL hash
   const hash = window.location.hash;
-  const selector = hash && document.querySelector(`[data-bs-toggle="tab"][href="${hash}"]`)
-    ? `[data-bs-toggle="tab"][href="${hash}"]`
-    : `[data-bs-toggle="tab"][href="#{{ active_tab|default:'email' }}"]`;
-  const triggers = document.querySelectorAll(selector);
-  triggers.forEach(el => new bootstrap.Tab(el).show());
+  const defaultTab = "#{{ active_tab|default:'email' }}";
 
-  // Tooltips (desktop only)
-  const links = document.querySelectorAll('#commsNav a[data-title]');
-  links.forEach(el => {
-    new bootstrap.Tooltip(el, {
-      title: el.dataset.title,
-      placement: 'right',
-      trigger: 'hover focus'
-    });
-  });
-});
-</script>
+  const target = (hash && document.querySelector(`[data-bs-toggle="tab"][href="${hash}"]`))
+    ? hash
+    : defaultTab;
 
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-  // Target both side (desktop) and top (mobile) navs
-  const tipTargets = document.querySelectorAll('#commsNav a[data-title], #commsNavMobile a[data-title]');
-  const tipMap = new WeakMap();
-
-  // Helper: hide all
-  function hideAllTips() {
-    tipTargets.forEach(el => tipMap.get(el)?.hide());
-  }
-
-  tipTargets.forEach(el => {
-    // Remove native title to avoid browser tooltip
-    const titleText = el.getAttribute('data-title') || '';
-    el.removeAttribute('title');
-
-    // Choose placement: right for desktop sidebar, bottom for mobile top bar
-    const placement = el.closest('#commsNavMobile') ? 'bottom' : 'right';
-
-    const tt = new bootstrap.Tooltip(el, {
-      title: titleText,
-      placement,
-      trigger: 'manual',
-      container: 'body',
-      boundary: 'window',
-      delay: 0
-    });
-    tipMap.set(el, tt);
-
-    let mobileHideTimer = null;
-
-    // Desktop hover/focus
-    el.addEventListener('mouseenter', () => { if (!('ontouchstart' in window)) { hideAllTips(); tt.show(); }});
-    el.addEventListener('mouseleave', () => { if (!('ontouchstart' in window)) { tt.hide(); }});
-    el.addEventListener('focusin',   () => { if (!('ontouchstart' in window)) { hideAllTips(); tt.show(); }});
-    el.addEventListener('focusout',  () => { if (!('ontouchstart' in window)) { tt.hide(); }});
-
-    // Mobile tap behavior
-    el.addEventListener('touchstart', (e) => {
-      // prevent accidental double-trigger from also firing mouse events
-      e.stopPropagation();
-      hideAllTips();
-      tt.show();
-      clearTimeout(mobileHideTimer);
-      mobileHideTimer = setTimeout(() => tt.hide(), 1500);
-    }, {passive: true});
-
-    // On click: switch tab, then blur & hide to prevent sticking
-    el.addEventListener('click', () => {
-      setTimeout(() => { el.blur(); tt.hide(); }, 0);
-    });
-  });
-
-  // Hide all tooltips when a tab is shown (desktop or mobile)
-  document.addEventListener('shown.bs.tab', hideAllTips);
-
-  // Hide on scroll (useful on mobile)
-  window.addEventListener('scroll', hideAllTips, { passive: true });
-
-  // Optional: hide on any outside tap (mobile)
-  document.body.addEventListener('touchstart', (e) => {
-    if (![...tipTargets].some(el => el.contains(e.target))) hideAllTips();
-  }, {passive: true});
+  const el = document.querySelector(`[data-bs-toggle="tab"][href="${target}"]`);
+  if (el) new bootstrap.Tab(el).show();
 });
 </script>
 

@@ -1,0 +1,182 @@
+{# msg/email_log.html #}
+<style>
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 92px;        /* ← adjust if needed */
+    text-transform: lowercase;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+  }
+
+  @media (max-width: 576px) {
+  .status-badge {
+    min-width: 92px;
+    font-size: 0.75rem;
+  }
+}
+</style>
+
+<div class="d-flex align-items-center justify-content-between mb-2">
+  <div class="fw-semibold">Email Log</div>
+</div>
+
+<form method="get" class="mb-3">
+  <input type="hidden" name="tab" value="email_log">
+  <input type="hidden" name="log_page" value="1">
+
+  <div class="row g-2">
+    <div class="col-12 col-md-4">
+      <input class="form-control form-control-sm"
+             name="log_q"
+             value="{{ log_q }}"
+             placeholder="Search email, subject, message id, template…" />
+    </div>
+
+    <div class="col-6 col-md-2">
+      <select class="form-select form-select-sm" name="log_status">
+        <option value="">All statuses</option>
+        <option value="processed"  {% if log_status == "processed" %}selected{% endif %}>processed</option>
+        <option value="delivered"  {% if log_status == "delivered" %}selected{% endif %}>delivered</option>
+        <option value="deferred"   {% if log_status == "deferred" %}selected{% endif %}>deferred</option>
+        <option value="bounce"     {% if log_status == "bounce" %}selected{% endif %}>bounce</option>
+        <option value="dropped"    {% if log_status == "dropped" %}selected{% endif %}>dropped</option>
+        <option value="open"       {% if log_status == "open" %}selected{% endif %}>open</option>
+        <option value="click"      {% if log_status == "click" %}selected{% endif %}>click</option>
+        <option value="spamreport" {% if log_status == "spamreport" %}selected{% endif %}>spamreport</option>
+        </select>
+    </div>
+
+    <div class="col-6 col-md-3">
+      <input class="form-control form-control-sm"
+             name="log_template"
+             value="{{ log_template }}"
+             placeholder="Template id or name" />
+    </div>
+
+    <div class="col-12 col-md-3 d-flex gap-2">
+      <button class="btn btn-sm btn-outline-secondary" type="submit">Filter</button>
+      <a class="btn btn-sm btn-outline-secondary" href="?tab=email_log">Clear</a>
+    </div>
+  </div>
+</form>
+
+{# --- Mobile cards --- #}
+<div class="d-block d-md-none">
+  {% for e in email_log_page %}
+    <div class="border rounded p-2 mb-2 bg-white">
+      <div class="d-flex justify-content-between">
+        <div class="fw-semibold text-truncate" style="max-width:75%;">{{ e.email }}</div>
+        <span class="badge status-badge
+                {% if e.event in 'delivered open click' %}
+                    text-bg-success
+                {% elif e.event in 'processed deferred' %}
+                    text-bg-warning
+                {% elif e.event in 'bounce dropped spamreport' %}
+                    text-bg-danger
+                {% else %}
+                    text-bg-secondary
+                {% endif %}
+                ">
+                {{ e.event }}
+                </span>
+      </div>
+
+      {% if e.subject %}
+        <div class="small text-truncate">{{ e.subject }}</div>
+      {% endif %}
+
+      <div class="text-muted small">
+        {{ e.timestamp|date:"Y-m-d H:i:s" }}
+        • {{ e.sg_template_name|default:"-" }}
+      </div>
+
+      <div class="small text-muted text-truncate">
+        {{ e.sg_message_id }}
+      </div>
+    </div>
+  {% empty %}
+    <div class="text-muted">No email events found.</div>
+  {% endfor %}
+</div>
+
+{# --- Desktop table --- #}
+<div class="d-none d-md-block table-responsive">
+ <table class="table table-sm align-middle table-hover">
+    <thead class="table-light">
+      <tr>
+        <th style="min-width:170px;">Processed At</th>
+        <th style="min-width:80px;">Message ID</th>
+        <th style="min-width:220px;">Recipient</th>
+        <th style="min-width:60px;">Subject</th>
+        <th style="min-width:120px;">Status</th>
+        <th style="min-width:220px;">Template</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in email_log_page %}
+        <tr>
+          <td class="text-muted small">{{ e.timestamp|date:"Y-m-d H:i:s" }}</td>
+          <td class="small text-monospace">
+            <span title="{{ e.sg_message_id }}">
+                {{ e.sg_message_id|slice:":12" }}…
+            </span>
+            </td>
+          <td>{{ e.email }}</td>
+          <td class="text-truncate" style="max-width:380px;">{{ e.subject|default:"-" }}</td>
+          <td><span class="badge status-badge
+            {% if e.event in 'delivered open click' %}
+                text-bg-success
+            {% elif e.event in 'processed deferred' %}
+                text-bg-warning
+            {% elif e.event in 'bounce dropped spamreport' %}
+                text-bg-danger
+            {% else %}
+                text-bg-secondary
+            {% endif %}
+            ">
+            {{ e.event }}
+            </span>
+            </td>
+          <td class="small">
+            <div class="fw-semibold text-truncate" style="max-width:260px;">{{ e.sg_template_name|default:"-" }}</div>
+            <div class="text-muted text-truncate" style="max-width:260px;">{{ e.sg_template_id|default:"-" }}</div>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="text-muted">No email events found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if email_log_page.has_other_pages %}
+  <nav class="mt-3" aria-label="Email log pages">
+    <ul class="pagination pagination-sm justify-content-center">
+
+      {% if email_log_page.has_previous %}
+        <li class="page-item">
+          <a class="page-link"
+             href="?tab=email_log&log_page={{ email_log_page.previous_page_number }}&log_q={{ log_q|urlencode }}&log_status={{ log_status|urlencode }}&log_template={{ log_template|urlencode }}">
+            Previous
+          </a>
+        </li>
+      {% endif %}
+
+      <li class="page-item disabled">
+        <span class="page-link">Page {{ email_log_page.number }} of {{ email_log_page.paginator.num_pages }}</span>
+      </li>
+
+      {% if email_log_page.has_next %}
+        <li class="page-item">
+          <a class="page-link"
+             href="?tab=email_log&log_page={{ email_log_page.next_page_number }}&log_q={{ log_q|urlencode }}&log_status={{ log_status|urlencode }}&log_template={{ log_template|urlencode }}">
+            Next
+          </a>
+        </li>
+      {% endif %}
+    </ul>
+  </nav>
+{% endif %}

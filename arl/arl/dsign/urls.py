@@ -3,12 +3,19 @@ from django.urls import path
 from arl.dsign.views import (
     CreateEnvelopeView,
     bulk_upload_signed_documents_view,
+    company_doc_notes_cancel,
+    company_doc_notes_cancel_mobile,
+    company_doc_notes_edit,
+    company_doc_notes_edit_mobile,
+    company_doc_notes_save,
+    company_doc_notes_save_mobile,
     company_docs_search,
     create_new_document_page,
     documents_dashboard,
     docusign_close,
     docusign_webhook,
     edit_document_page,
+    employee_docs_panel,
     employee_docs_search,
     get_docusign_template,
     in_app_signing_dashboard,
@@ -19,7 +26,6 @@ from arl.dsign.views import (
     upload_company_documents_async,
     upload_employee_documents,
     waiting_for_others_view,
-    employee_docs_panel
 )
 
 urlpatterns = [
@@ -80,5 +86,39 @@ urlpatterns = [
         upload_company_documents_async,
         name="upload_company_documents_async",
     ),
-    path("documents/employee/<int:user_id>/panel/", employee_docs_panel, name="employee_docs_panel"),
+    path(
+        "documents/employee/<int:user_id>/panel/",
+        employee_docs_panel,
+        name="employee_docs_panel",
+    ),
+    path(
+        "docs/company/<int:doc_id>/notes/edit/",
+        company_doc_notes_edit,
+        name="company_doc_notes_edit",
+    ),
+    path(
+        "docs/company/<int:doc_id>/notes/save/",
+        company_doc_notes_save,
+        name="company_doc_notes_save",
+    ),
+    path(
+        "docs/company/<int:doc_id>/notes/mobile/edit/",
+        company_doc_notes_edit_mobile,
+        name="company_doc_notes_edit_mobile",
+    ),
+    path(
+        "docs/company/<int:doc_id>/notes/mobile/save/",
+        company_doc_notes_save_mobile,
+        name="company_doc_notes_save_mobile",
+    ),
+    path(
+        "docs/company/<int:doc_id>/notes/mobile/cancel/",
+        company_doc_notes_cancel_mobile,
+        name="company_doc_notes_cancel_mobile",
+    ),
+    path(
+        "docs/company/<int:doc_id>/notes/cancel/",
+        company_doc_notes_cancel,
+        name="company_doc_notes_cancel",
+    ),
 ]

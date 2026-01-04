@@ -11,6 +11,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import Group
+from django.core.paginator import Paginator
 from django.db.models import Count, Max, Q
 from django.forms import modelformset_factory
 from django.http import (
@@ -41,6 +42,7 @@ from arl.msg.helpers import (
     is_member_of_docusign_group,
     is_member_of_email_group,
     is_member_of_msg_group,
+    is_member_of_email_logs_group,
     prepare_recipient_data,
     prepare_sms_recipient_data,
     save_email_draft,
@@ -48,11 +50,11 @@ from arl.msg.helpers import (
     send_whats_app_carwash_sites_template,
 )
 from arl.msg.tasks import (
+    master_email_send_task,
     process_twilio_short_link_event,
     process_whatsapp_webhook,
     send_template_whatsapp_task,
     start_campaign_task,
-    master_email_send_task
 )
 from arl.setup.models import TenantApiKeys
 from arl.user.models import CustomUser, Employer, Store
@@ -69,11 +71,7 @@ from .forms import (
     TemplateFilterForm,
     TemplateWhatsAppForm,
 )
-from .models import (ComplianceFile,
-                     DraftEmail,
-                     ShortenedSMSLog,
-                     SMSReply
-                     )
+from .models import ComplianceFile, DraftEmail, EmailEvent, ShortenedSMSLog, SMSReply
 from .tasks import (
     fetch_twilio_sms_task,
     fetch_twilio_summary,
@@ -285,6 +283,38 @@ def render_message_to_sendgrid(message):
 @login_required
 @user_passes_test(is_member_of_comms_group)
 def communications(request):
+
+    employer = getattr(request.user, "employer", None)
+
+    log_q = (request.GET.get("log_q") or "").strip()
+    log_status = (request.GET.get("log_status") or "").strip()
+    log_template = (request.GET.get("log_template") or "").strip()
+    log_page = request.GET.get("log_page", 1)
+
+    email_log_qs = EmailEvent.objects.filter(employer=employer)
+
+    if log_q:
+        email_log_qs = email_log_qs.filter(
+            Q(email__icontains=log_q) |
+            Q(subject__icontains=log_q) |
+            Q(sg_message_id__icontains=log_q) |
+            Q(sg_event_id__icontains=log_q) |
+            Q(sg_template_name__icontains=log_q) |
+            Q(username__icontains=log_q)
+        )
+
+    if log_status:
+        email_log_qs = email_log_qs.filter(event=log_status)
+
+    if log_template:
+        email_log_qs = email_log_qs.filter(
+            Q(sg_template_id__icontains=log_template) |
+            Q(sg_template_name__icontains=log_template)
+        )
+
+    email_log_paginator = Paginator(email_log_qs, 50)
+    email_log_page = email_log_paginator.get_page(log_page)
+
     draft_id = request.GET.get("draft_id") or request.POST.get("draft_id")
     user = request.user
     active_tab = request.GET.get("tab", "email")
@@ -298,6 +328,8 @@ def communications(request):
         valid_tabs.append("sms")
     if is_member_of_docusign_group(user):
         valid_tabs.append("docusign")
+    if is_member_of_email_logs_group(user):
+        valid_tabs.append("email_log")
     # if is_member_of_whatsapp_group(user):
     #    valid_tabs.append("whatsapp")
 
@@ -343,7 +375,7 @@ def communications(request):
             )
             print(initial_data)
             print("Raw sendgrid_id from POST:", request.POST.get("sendgrid_id"))
-            
+
             logger.info("Lets check for valid")
             if not email_form.is_valid():
                 logger.warning(
@@ -353,7 +385,7 @@ def communications(request):
                     email_form.errors.as_json(),
                 )
                 messages.error(request, "Please correct the errors below.")
-                    
+
             if email_form.is_valid():
                 print("valid")
                 mode = email_form.cleaned_data["email_mode"]
@@ -366,7 +398,9 @@ def communications(request):
                 )
 
                 if not recipients:
-                    messages.error(request, "No recipients found. Please select a group or users.")
+                    messages.error(
+                        request, "No recipients found. Please select a group or users."
+                    )
                     return redirect("/comms/?tab=email")
 
                 if action == "save":
@@ -387,19 +421,24 @@ def communications(request):
                     message = render_message_to_sendgrid(raw_message)
                     print(message)
                     res = master_email_send_task.delay(
-                        recipients=recipients,                 # ensure JSON-serializable!
+                        recipients=recipients,  # ensure JSON-serializable!
                         sendgrid_id="d-4ac0497efd864e29b4471754a9c836eb",
-                        employer_id=user.employer.id,          # ensure int
-                        body=message,                          # str
-                        subject=subject,                       # str
-                        attachment_urls=attachment_urls,       # ensure list[str]
+                        employer_id=user.employer.id,  # ensure int
+                        body=message,  # str
+                        subject=subject,  # str
+                        attachment_urls=attachment_urls,  # ensure list[str]
                     )
                     print("queued master_email_send_task:", res.id)
-                    
+
                 else:
-                    sendgrid_template = email_form.cleaned_data["sendgrid_id"]   # <EmailTemplate ...>
+                    sendgrid_template = email_form.cleaned_data[
+                        "sendgrid_id"
+                    ]  # <EmailTemplate ...>
                     logger.info("Passing EmailTemplate: %s", sendgrid_template)
-                    logger.info("SendGrid template: %s", getattr(sendgrid_template, "sendgrid_id", sendgrid_template))
+                    logger.info(
+                        "SendGrid template: %s",
+                        getattr(sendgrid_template, "sendgrid_id", sendgrid_template),
+                    )
 
                     master_email_send_task.delay(
                         recipients=recipients,
@@ -494,7 +533,8 @@ def communications(request):
     selected_ids = (
         request.POST.getlist("selected_users") if request.method == "POST" else []
     )
-
+    log_status_choices = ["processed","delivered","deferred","bounce","dropped","open","click","spamreport"]
+    print(log_q)
     return render(
         request,
         "msg/master_comms.html",
@@ -504,16 +544,66 @@ def communications(request):
             "docusign_form": docusign_form,
             "whatsapp_form": whatsapp_form,
             "active_tab": active_tab,
+            "email_log_page": email_log_page,
+            "log_q": log_q,
+            "log_status": log_status,
+            "log_status_choices": log_status_choices,
+            "log_template": log_template,
             "can_send_email": is_member_of_email_group(user),
             "can_send_sms": is_member_of_msg_group(user),
             "can_send_docusign": is_member_of_docusign_group(user),
-           # "can_send_whatsapp": is_member_of_whatsapp_group(user),
+            "can_view_email_logs": is_member_of_email_logs_group(user),
+            # "can_send_whatsapp": is_member_of_whatsapp_group(user),
             "selected_ids": selected_ids,
             "draft_id": draft_id,
             "attachment_urls": attachment_urls,
             "drafts": DraftEmail.objects.filter(
                 user=user, employer=user.employer
             ).order_by("-created_at"),
+        },
+    )
+
+
+#  Log for emails in the comms section
+@login_required
+def email_log_view(request):
+    employer = getattr(request.user, "employer", None)
+    if not employer:
+        # or redirect
+        return render(request, "msg/email_log.html", {"page_obj": [], "q": ""})
+
+    q = (request.GET.get("q") or "").strip()
+    status = (request.GET.get("status") or "").strip()
+    template_id = (request.GET.get("template_id") or "").strip()
+
+    # Replace EmailEvent with your actual model
+    qs = EmailEvent.objects.filter(employer=employer).order_by("-processed_at")
+
+    if q:
+        qs = qs.filter(
+            Q(email__icontains=q)
+            | Q(subject__icontains=q)
+            | Q(sg_message_id__icontains=q)
+            | Q(sg_event_id__icontains=q)
+        )
+
+    if status:
+        qs = qs.filter(event=status)
+
+    if template_id:
+        qs = qs.filter(template_id=template_id)
+
+    paginator = Paginator(qs, 50)  # 50 rows like an activity feed
+    page_obj = paginator.get_page(request.GET.get("page", 1))
+
+    return render(
+        request,
+        "msg/email_log.html",
+        {
+            "page_obj": page_obj,
+            "q": q,
+            "status": status,
+            "template_id": template_id,
         },
     )
 
@@ -736,13 +826,17 @@ def email_event_summary_view(request):
 
     # Only proceed with task if form is valid and template_id is provided
     if form.is_valid() and form.cleaned_data.get("template_id"):
-        employer_id = request.user.employer.id if hasattr(request.user, "employer") else None
+        employer_id = (
+            request.user.employer.id if hasattr(request.user, "employer") else None
+        )
         template_id = form.cleaned_data["template_id"].sendgrid_id
         start_date = form.cleaned_data.get("date_from")
         end_date = form.cleaned_data.get("date_to")
         # print(start_date, end_date, employer_id)
         # Call the Celery task
-        result = generate_email_event_summary.delay(template_id, start_date, end_date, employer_id)
+        result = generate_email_event_summary.delay(
+            template_id, start_date, end_date, employer_id
+        )
         summary_table = result.get(timeout=10)  # Wait for task completion
 
     return render(

@@ -1,0 +1,24 @@
+<div id="company-notes-block-{{ d.id }}" onclick="event.stopPropagation()">
+  <form hx-post="{% url 'company_doc_notes_save' d.id %}"
+        hx-target="#company-notes-block-{{ d.id }}"
+        hx-swap="outerHTML"
+        class="mt-2">
+    {% csrf_token %}
+
+    <textarea name="notes" class="form-control form-control-sm" rows="3"
+              placeholder="Add a note to help you find this document later...">{{ d.notes }}</textarea>
+
+    <div class="mt-2 d-flex gap-2">
+      <button class="btn btn-sm btn-outline-secondary" type="submit">Save</button>
+
+      <button type="button"
+              class="btn btn-sm btn-outline-secondary"
+              hx-get="{% url 'company_doc_notes_cancel' d.id %}"
+              hx-target="#company-notes-block-{{ d.id }}"
+              hx-swap="outerHTML">
+        Cancel
+      </button>
+    </div>
+  </form>
+</div>
+</div>

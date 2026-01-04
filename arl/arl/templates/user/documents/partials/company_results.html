@@ -4,33 +4,40 @@
   
   {# --- Mobile list (xs only) --- #}
   <div class="d-block d-sm-none mt-2">
-    {% for d in company_results %}
-      <div class="docs-list-item">
-        <div class="docs-list-text">
-          <div class="line-1 text-truncate">
-            {{ d.document_title|default:d.file_name }}
-          </div>
-          <div class="line-2">
-            <span class="text-muted small">
-              ({{ d.file_name }}
-               {% if d.size_bytes %} • {{ d.size_bytes|filesizeformat }}
-               {% elif d.file_size_bytes %} • {{ d.file_size_bytes|filesizeformat }}
-               {% elif d.size %} • {{ d.size|filesizeformat }}{% endif %})
-            </span>
-          </div>
-          <div class="line-3">{{ d.uploaded_at|date:"Y-m-d H:i" }}</div>
+  {% for d in company_results %}
+    <div class="docs-list-item">
+      <div class="docs-list-text">
+        <div class="line-1 text-truncate">
+          {{ d.document_title|default:d.file_name }}
         </div>
-        <div class="docs-list-actions">
-          <a class="btn btn-sm btn-outline-primary"
-             href="{% url 'download_signed_document' doc_id=d.id %}">
-            Download
-          </a>
+
+        <div class="line-2">
+          <span class="text-muted small">
+            ({{ d.file_name }}
+             {% if d.size_bytes %} • {{ d.size_bytes|filesizeformat }}
+             {% elif d.file_size_bytes %} • {{ d.file_size_bytes|filesizeformat }}
+             {% elif d.size %} • {{ d.size|filesizeformat }}{% endif %})
+          </span>
         </div>
+
+        <div class="line-3">{{ d.uploaded_at|date:"Y-m-d H:i" }}</div>
+
+          <div id="company-notes-block-mobile-{{ d.id }}">
+            {% include "user/documents/partials/company_notes_display_mobile.html" with d=d %}
+          </div>
       </div>
-    {% empty %}
-      <div class="text-muted">No documents.</div>
-    {% endfor %}
-  </div>
+
+      <div class="docs-list-actions">
+        <a class="btn btn-sm btn-outline-primary"
+           href="{% url 'download_signed_document' doc_id=d.id %}">
+          Download
+        </a>
+      </div>
+    </div>
+  {% empty %}
+    <div class="text-muted">No documents.</div>
+  {% endfor %}
+</div>
 
   {# --- Desktop table (sm and up) --- #}
   <div class="d-none d-sm-block">
@@ -58,7 +65,9 @@
                    {% if d.size_bytes %} • {{ d.size_bytes|filesizeformat }}
                    {% elif d.file_size_bytes %} • {{ d.file_size_bytes|filesizeformat }}
                    {% elif d.size %} • {{ d.size|filesizeformat }}{% endif %})
-                  {% if d.notes %} — {{ d.notes }}{% endif %}
+               <div id="company-notes-block-{{ d.id }}">
+  {% include "user/documents/partials/company_notes_display.html" with d=d %}
+</div>
                 </div>
               </td>
               <td class="upload-date">{{ d.uploaded_at|date:"Y-m-d H:i" }}</td>

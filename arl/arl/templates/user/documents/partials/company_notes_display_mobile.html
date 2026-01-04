@@ -1,0 +1,42 @@
+{% if d.notes %}
+  <div class="line-4 text-muted small mt-1">
+
+    <div class="d-flex align-items-center gap-2">
+      <a class="link-secondary text-decoration-none"
+         data-bs-toggle="collapse"
+         href="#company-notes-mobile-{{ d.id }}"
+         role="button"
+         aria-expanded="{% if open_notes %}true{% else %}false{% endif %}"
+         aria-controls="company-notes-mobile-{{ d.id }}">
+        Notes <i class="bi bi-chevron-down ms-1 align-middle fs-6"></i>
+      </a>
+
+      <button type="button"
+              class="btn btn-sm btn-outline-secondary py-0"
+              onclick="event.stopPropagation()"
+              hx-get="{% url 'company_doc_notes_edit_mobile' d.id %}"
+              hx-target="#company-notes-block-mobile-{{ d.id }}"
+              hx-swap="outerHTML">
+        Edit
+      </button>
+    </div>
+
+    <div class="collapse mt-1 {% if open_notes %}show{% endif %}"
+         id="company-notes-mobile-{{ d.id }}">
+      <div class="border rounded bg-light p-2">
+        {{ d.notes|linebreaksbr }}
+      </div>
+    </div>
+
+  </div>
+{% else %}
+  <div class="line-4 text-muted small mt-1">
+    <button type="button"
+            class="btn btn-sm btn-outline-secondary py-0"
+            hx-get="{% url 'company_doc_notes_edit_mobile' d.id %}"
+            hx-target="#company-notes-block-mobile-{{ d.id }}"
+            hx-swap="outerHTML">
+      Add notes
+    </button>
+  </div>
+{% endif %}
