@@ -951,6 +951,15 @@ def is_member_of_comms_group(user):
     return is_member
 
 
+def is_member_of_email_logs_group(user):
+    is_member = user.groups.filter(name="EmailLOGS").exists()
+    if is_member:
+        logger.info(f"{user} is a member of 'EmailLOGS' group.")
+    else:
+        logger.info(f"{user} is not a member of 'EmailLOGS' group.")
+    return is_member
+    
+
 def custom_permission_denied(request, message=None):
     return render(request, "incident/403.html", {"message": message}, status=403)
 

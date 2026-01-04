@@ -12,7 +12,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.core.paginator import Paginator
 from django.db.models import Count, Max, Q
-from django.http import HttpResponseBadRequest, JsonResponse
+from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -1063,3 +1063,70 @@ def upload_company_documents_async(request):
     resp = JsonResponse({"ok": True, "doc_id": sdf.id}, status=202)
     resp["HX-Trigger"] = json.dumps({"companyUploadQueued": {"doc_id": sdf.id}})
     return resp
+
+    # ---   Notes edit section for Company Documents -- #
+
+
+@login_required
+def company_doc_notes_edit(request, doc_id):
+    employer = getattr(request.user, "employer", None)
+    doc = get_object_or_404(SignedDocumentFile, id=doc_id, employer=employer)
+
+    return render(
+        request, "user/documents/partials/company_notes_form.html", {"d": doc}
+    )
+
+
+@login_required
+def company_doc_notes_save(request, doc_id):
+    employer = getattr(request.user, "employer", None)
+    doc = get_object_or_404(SignedDocumentFile, id=doc_id, employer=employer)
+
+    if request.method == "POST":
+        doc.notes = request.POST.get("notes", "").strip()
+        doc.save(update_fields=["notes"])
+
+        return render(
+            request,
+            "user/documents/partials/company_notes_block.html",
+            {"d": doc, "open_notes": True},   # 👈 keep open after save
+        )
+
+    return HttpResponse(status=405)
+
+
+@login_required
+def company_doc_notes_edit_mobile(request, doc_id):
+    employer = getattr(request.user, "employer", None)
+    doc = get_object_or_404(SignedDocumentFile, id=doc_id, employer=employer)
+    return render(request, "user/documents/partials/company_notes_form_mobile.html", {"d": doc})
+
+
+@login_required
+def company_doc_notes_cancel(request, doc_id):
+    employer = getattr(request.user, "employer", None)
+    doc = get_object_or_404(SignedDocumentFile, id=doc_id, employer=employer)
+    return render(request, "user/documents/partials/company_notes_block.html", {"d": doc})
+
+
+@login_required
+def company_doc_notes_save_mobile(request, doc_id):
+    employer = getattr(request.user, "employer", None)
+    doc = get_object_or_404(SignedDocumentFile, id=doc_id, employer=employer)
+
+    if request.method == "POST":
+        doc.notes = request.POST.get("notes", "").strip()
+        doc.save(update_fields=["notes"])
+        return render(
+            request,
+            "user/documents/partials/company_notes_block_mobile.html",
+            {"d": doc, "open_notes": True},
+        )
+    return HttpResponse(status=405)
+
+
+@login_required
+def company_doc_notes_cancel_mobile(request, doc_id):
+    employer = getattr(request.user, "employer", None)
+    doc = get_object_or_404(SignedDocumentFile, id=doc_id, employer=employer)
+    return render(request, "user/documents/partials/company_notes_block_mobile.html", {"d": doc})
