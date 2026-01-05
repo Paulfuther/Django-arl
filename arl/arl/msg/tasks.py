@@ -39,7 +39,7 @@ from .helpers import (
     create_single_csv_email,
     send_bulk_sms,
     send_linkshortened_sms,
-    send_monthly_store_phonecall,
+    send_store_phonecall_reminder,
     send_sms_model,
     send_whats_app_template,
     send_whats_app_template_autoreply,
@@ -509,6 +509,8 @@ def lotto_theft_sms_link_task(self):
         logger.critical(msg)
         SmsLog.objects.create(level="CRITICAL", message=msg)
         return {"error": msg}
+
+
 # APPROVED
 # This task is APPROVED for multi tenant.
 # Tenatn api keys are geneated here and passed to the helper.
@@ -1102,12 +1104,18 @@ def start_campaign_task(selected_list_id):
 
 
 @app.task(name="monthly_store_calls")
-def monthly_store_calls_task():
+def monthly_store_calls_task(employer_id=None, limit=None):
+    """
+    Scheduled task (daily for now).
+    """
     try:
-        send_monthly_store_phonecall()
-        return "Monthly Phone Calls sent successfully"
+        return send_store_phonecall_reminder(
+            employer_id=employer_id,
+            limit=limit,
+        )
     except Exception as e:
-        return str(e)
+        logger.exception("monthly_store_calls_task failed")
+        return {"error": str(e)}
 
 
 @app.task(naem="get_twilio_messsage_summary")

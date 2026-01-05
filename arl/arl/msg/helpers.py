@@ -8,7 +8,6 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.db.models import Q
-from django.http import HttpResponse
 from django.shortcuts import render
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import (
@@ -21,13 +20,13 @@ from sendgrid.helpers.mail import (
     FileType,
     Mail,
     Personalization,
-    To
+    To,
 )
 from twilio.base.exceptions import TwilioException
 from twilio.rest import Client
-from arl.setup.models import TenantApiKeys
-from arl.user.models import CustomUser, Store, SMSOptOut
 
+from arl.setup.models import TenantApiKeys
+from arl.user.models import CustomUser, SMSOptOut, Store
 
 logger = get_task_logger(__name__)
 
@@ -150,7 +149,9 @@ def create_master_email(
             content = a.get("content", b"")
             filetype = a.get("type", "unknown")
 
-            size_kb = len(content) // 1024 if isinstance(content, (bytes, str)) else "N/A"
+            size_kb = (
+                len(content) // 1024 if isinstance(content, (bytes, str)) else "N/A"
+            )
             logger.info(f"• {filename} ({filetype}) - {size_kb} KB")
 
         # Handle attachments if provided
@@ -165,7 +166,9 @@ def create_master_email(
                     )
                     message.add_attachment(attachment_instance)
                 except Exception as e:
-                    logger.info(f"❌ Error adding attachment {att.get('filename', '')}: {e}")
+                    logger.info(
+                        f"❌ Error adding attachment {att.get('filename', '')}: {e}"
+                    )
 
         # Send the email via SendGrid
         sg = SendGridAPIClient(settings.SENDGRID_API_KEY)
@@ -273,10 +276,15 @@ def send_sms(phone_number, body):
     return None
 
 
-def send_linkshortened_sms(to_number, body, twilio_account_sid,
-                           twilio_auth_token, twilio_message_service_sid):
+def send_linkshortened_sms(
+    to_number, body, twilio_account_sid, twilio_auth_token, twilio_message_service_sid
+):
     try:
-        if not twilio_account_sid or not twilio_auth_token or not twilio_message_service_sid:
+        if (
+            not twilio_account_sid
+            or not twilio_auth_token
+            or not twilio_message_service_sid
+        ):
             logger.error("🚨 Missing Twilio credentials. Cannot send SMS.")
             return False
 
@@ -286,9 +294,10 @@ def send_linkshortened_sms(to_number, body, twilio_account_sid,
         message = client.messages.create(
             to=to_number,
             body=body,
-            messaging_service_sid=(twilio_message_service_sid
-                                   or settings.TWILIO_MESSAGE_SERVICE_SID),
-            shorten_urls=True
+            messaging_service_sid=(
+                twilio_message_service_sid or settings.TWILIO_MESSAGE_SERVICE_SID
+            ),
+            shorten_urls=True,
         )
         return f"✅ Message sent. SID: {message.sid}"
     except Exception as e:
@@ -368,17 +377,66 @@ def check_verification_token(phone, token):
     return result.status == "approved"
 
 
-def send_monthly_store_phonecall():
-    client = Client(account_sid, auth_token)
-    store_phone_numbers = Store.objects.values_list("phone_number", flat=True)
-    for phone_number in store_phone_numbers:
-        call = client.calls.create(
-            to=phone_number,
-            from_=settings.TWILIO_FROM,  # Replace with your Twilio phone number
-            url="https://handler.twilio.com/twiml/EH559f02f8d84080226304bfd390b8ceb9",
-        )
+# this is the code for a phone call
+# 🔒 Hard-coded for now (you’ll replace this later)
+TWIML_URL = "https://handler.twilio.com/twiml/EH2936e0f7fd92f59905898f2a3f844ce1"
 
-    return HttpResponse("Call initiated!")
+
+def send_store_phonecall_reminder(employer_id=None, limit=None):
+    """
+    Calls ACTIVE stores only.
+    Hard-coded TwiML URL.
+    Safe for daily scheduled execution.
+    """
+
+    client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+
+    stores = Store.objects.filter(is_active=True)
+
+    # Optional: scope to employer (recommended if multi-tenant)
+    if employer_id:
+        stores = stores.filter(employer_id=employer_id)
+
+    phone_numbers = (
+        stores.exclude(phone_number__isnull=True)
+        .exclude(phone_number__exact="")
+        .values_list("phone_number", flat=True)
+        .distinct()
+    )
+
+    if limit:
+        phone_numbers = phone_numbers[: int(limit)]
+
+    total = 0
+    succeeded = 0
+    failed = 0
+    errors = []
+
+    for phone_number in phone_numbers:
+        total += 1
+        try:
+            client.calls.create(
+                to=str(phone_number),
+                from_=settings.TWILIO_FROM,
+                url=TWIML_URL,
+            )
+            succeeded += 1
+        except Exception as e:
+            failed += 1
+            msg = f"{phone_number}: {e}"
+            errors.append(msg)
+            logger.exception("Store call failed: %s", msg)
+
+    summary = {
+        "employer_id": employer_id,
+        "total_numbers": total,
+        "succeeded": succeeded,
+        "failed": failed,
+        "errors": errors[:10],
+    }
+
+    logger.info("Daily store call summary: %s", summary)
+    return summary
 
 
 def send_docusign_email_with_attachment(to_emails, subject, body, file_path):
@@ -790,11 +848,13 @@ def collect_attachments(request, max_files=5):
             messages.error(request, f"{file.name} exceeds 10MB limit.")
             return None
 
-        attachments.append({
-            "file_name": file.name,
-            "file_type": file.content_type,
-            "file_content": base64.b64encode(file.read()).decode("utf-8"),
-        })
+        attachments.append(
+            {
+                "file_name": file.name,
+                "file_type": file.content_type,
+                "file_content": base64.b64encode(file.read()).decode("utf-8"),
+            }
+        )
 
     return attachments
 
@@ -834,10 +894,9 @@ def prepare_sms_recipient_data(user, selected_group, selected_users):
 
     # Preload SMS opt-out numbers for this employer
     opt_out_user_ids = set(
-        SMSOptOut.objects.filter(employer=employer)
-        .values_list("user_id", flat=True)
+        SMSOptOut.objects.filter(employer=employer).values_list("user_id", flat=True)
     )
-    
+
     skipped_no_phone = []
     skipped_opt_out = []
 
@@ -958,7 +1017,7 @@ def is_member_of_email_logs_group(user):
     else:
         logger.info(f"{user} is not a member of 'EmailLOGS' group.")
     return is_member
-    
+
 
 def custom_permission_denied(request, message=None):
     return render(request, "incident/403.html", {"message": message}, status=403)
@@ -974,6 +1033,7 @@ def get_uploaded_urls_from_request(request):
 
 def save_email_draft(user, cleaned_data, attachment_urls, draft_id=None):
     from django.shortcuts import get_object_or_404
+
     if draft_id:
         draft = get_object_or_404(DraftEmail, id=draft_id, user=user)
     else:
@@ -993,6 +1053,7 @@ def save_email_draft(user, cleaned_data, attachment_urls, draft_id=None):
 
 def send_quick_email(user, recipients, subject, message, attachment_urls):
     from .tasks import master_email_send_task
+
     master_email_send_task.delay(
         recipients=recipients,
         sendgrid_id="d-4ac0497efd864e29b4471754a9c836eb",  # Fallback SendGrid ID
@@ -1001,6 +1062,3 @@ def send_quick_email(user, recipients, subject, message, attachment_urls):
         subject=subject,
         attachment_urls=attachment_urls,
     )
-
-
-
