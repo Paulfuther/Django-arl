@@ -783,7 +783,7 @@ def documents_dashboard(request):
         SignedDocumentFile.objects.filter(employer=employer, user__isnull=False)
         .values("user")
         .annotate(last_upload=Max("uploaded_at"))
-        .order_by("-last_upload")[:5]
+        .order_by("-last_upload")[:30]
     )
 
     user_ids = [row["user"] for row in latest_per_user]
