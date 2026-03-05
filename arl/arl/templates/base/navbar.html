@@ -70,21 +70,7 @@
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
 
         {% if user.is_authenticated %}
-        <!-- HR -->
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'hr_dashboard' %}">
-            <i class="material-symbols-outlined">
-              group
-              </i> HR
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'documents_dashboard' %}">
-            <i class="material-symbols-outlined">
-              description
-              </i> Docs
-          </a>
-        </li>
+        
 
         <!-- Reports & Forms -->
         <li class="nav-item dropdown">
@@ -157,6 +143,21 @@
             <li><a class="dropdown-item" href="{% url 'email_event_summary' %}">Email Logs</a></li>
             <li><a class="dropdown-item" href="{% url 'employee_email_report' %}">Employee Email Report</a></li>
           </ul>
+        
+        <!-- HR -->
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'hr_dashboard' %}">
+            <i class="material-symbols-outlined">
+              group
+              </i> HR
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'documents_dashboard' %}">
+            <i class="material-symbols-outlined">
+              description
+              </i> Docs
+          </a>
         </li>
         {% endif %}
 
