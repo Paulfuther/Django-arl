@@ -767,6 +767,16 @@ def documents_dashboard(request):
     if not employer:
         return redirect("home")
 
+    # ✅ Restrict access to Managers & Employers only
+    if (
+        not employer
+        or not request.user.groups.filter(name__in=["Manager", "EMPLOYER"]).exists()
+    ):
+        messages.error(
+            request, "You must be an employer or manager to view documents."
+        )
+        return redirect("home")
+
     active_tab = request.GET.get("tab", "employee")  # employee|store|company
 
     # base data for upload selects
@@ -1089,7 +1099,7 @@ def company_doc_notes_save(request, doc_id):
         return render(
             request,
             "user/documents/partials/company_notes_block.html",
-            {"d": doc, "open_notes": True},   # 👈 keep open after save
+            {"d": doc, "open_notes": True},  # 👈 keep open after save
         )
 
     return HttpResponse(status=405)
@@ -1099,14 +1109,18 @@ def company_doc_notes_save(request, doc_id):
 def company_doc_notes_edit_mobile(request, doc_id):
     employer = getattr(request.user, "employer", None)
     doc = get_object_or_404(SignedDocumentFile, id=doc_id, employer=employer)
-    return render(request, "user/documents/partials/company_notes_form_mobile.html", {"d": doc})
+    return render(
+        request, "user/documents/partials/company_notes_form_mobile.html", {"d": doc}
+    )
 
 
 @login_required
 def company_doc_notes_cancel(request, doc_id):
     employer = getattr(request.user, "employer", None)
     doc = get_object_or_404(SignedDocumentFile, id=doc_id, employer=employer)
-    return render(request, "user/documents/partials/company_notes_block.html", {"d": doc})
+    return render(
+        request, "user/documents/partials/company_notes_block.html", {"d": doc}
+    )
 
 
 @login_required
@@ -1129,4 +1143,6 @@ def company_doc_notes_save_mobile(request, doc_id):
 def company_doc_notes_cancel_mobile(request, doc_id):
     employer = getattr(request.user, "employer", None)
     doc = get_object_or_404(SignedDocumentFile, id=doc_id, employer=employer)
-    return render(request, "user/documents/partials/company_notes_block_mobile.html", {"d": doc})
+    return render(
+        request, "user/documents/partials/company_notes_block_mobile.html", {"d": doc}
+    )

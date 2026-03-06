@@ -78,7 +78,15 @@
               </i> HR
           </a>
         </li>
-        
+
+        <!-- Documents -->
+        <li class="nav-item">
+          <a class="nav-link" href="{% url 'documents_dashboard' %}">
+            <i class="material-symbols-outlined">
+              description
+              </i> Docs
+          </a>
+        </li>
 
         <!-- Reports & Forms -->
         <li class="nav-item dropdown">
@@ -152,13 +160,7 @@
             <li><a class="dropdown-item" href="{% url 'employee_email_report' %}">Employee Email Report</a></li>
           </ul>
         </li>
-        <li class="nav-item">
-          <a class="nav-link" href="{% url 'documents_dashboard' %}">
-            <i class="material-symbols-outlined">
-              description
-              </i> Docs
-          </a>
-        </li>
+        
         {% endif %}
 
         <!-- Feature Flag: Quiz -->
