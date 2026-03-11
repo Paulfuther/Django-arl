@@ -131,3 +131,5 @@ class EmailEventAdmin(admin.ModelAdmin):
         return resp
 
     export_selected_to_xlsx.short_description = "Export selected EmailEvents to XLSX"
+
+

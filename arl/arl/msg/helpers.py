@@ -380,63 +380,67 @@ def check_verification_token(phone, token):
 # this is the code for a phone call
 # 🔒 Hard-coded for now (you’ll replace this later)
 TWIML_URL = "https://handler.twilio.com/twiml/EH2936e0f7fd92f59905898f2a3f844ce1"
+TWILIO_STATUS_CALLBACK_URL = "https://6364c26b8f51.ngrok-free.app/twilio/voice/status/"
 
 
 def send_store_phonecall_reminder(employer_id=None, limit=None):
-    """
-    Calls ACTIVE stores only.
-    Hard-coded TwiML URL.
-    Safe for daily scheduled execution.
-    """
-
     client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
 
-    stores = Store.objects.filter(is_active=True)
-
-    # Optional: scope to employer (recommended if multi-tenant)
+    stores = (
+        Store.objects.filter(is_active=True)
+        .exclude(phone_number__isnull=True)
+        .exclude(phone_number__exact="")
+    )
     if employer_id:
         stores = stores.filter(employer_id=employer_id)
-
-    phone_numbers = (
-        stores.exclude(phone_number__isnull=True)
-        .exclude(phone_number__exact="")
-        .values_list("phone_number", flat=True)
-        .distinct()
-    )
-
     if limit:
-        phone_numbers = phone_numbers[: int(limit)]
+        stores = stores[: int(limit)]
 
-    total = 0
-    succeeded = 0
-    failed = 0
-    errors = []
+    total = succeeded = failed = 0
 
-    for phone_number in phone_numbers:
+    for s in stores:
         total += 1
+
+        log = StoreCallEvent.objects.create(
+            employer=s.employer,
+            store=s,
+            to_number=str(s.phone_number),
+            from_number=settings.TWILIO_FROM,
+            campaign_name="POS Reboot Reminder",
+            twiml_url=TWIML_URL,
+            queued_ok=False,
+            status="attempting",
+        )
+
         try:
-            client.calls.create(
-                to=str(phone_number),
+            call = client.calls.create(
+                to=str(s.phone_number),
                 from_=settings.TWILIO_FROM,
                 url=TWIML_URL,
+                method="POST",
+                status_callback=TWILIO_STATUS_CALLBACK_URL,
+                status_callback_method="POST",
+                status_callback_event=["initiated", "ringing", "answered", "completed"],
             )
+
+            log.call_sid = call.sid
+            log.status = getattr(call, "status", "queued")  # usually queued
+            log.queued_ok = True
+            log.save(update_fields=["call_sid", "status", "queued_ok"])
+
             succeeded += 1
+
         except Exception as e:
+            log.status = "error"
+            log.error = str(e)
+            log.save(update_fields=["status", "error"])
+
             failed += 1
-            msg = f"{phone_number}: {e}"
-            errors.append(msg)
-            logger.exception("Store call failed: %s", msg)
+            logger.exception(
+                "Store call failed store_id=%s to=%s", s.id, s.phone_number
+            )
 
-    summary = {
-        "employer_id": employer_id,
-        "total_numbers": total,
-        "succeeded": succeeded,
-        "failed": failed,
-        "errors": errors[:10],
-    }
-
-    logger.info("Daily store call summary: %s", summary)
-    return summary
+    return {"total": total, "succeeded": succeeded, "failed": failed}
 
 
 def send_docusign_email_with_attachment(to_emails, subject, body, file_path):
@@ -1016,6 +1020,15 @@ def is_member_of_email_logs_group(user):
         logger.info(f"{user} is a member of 'EmailLOGS' group.")
     else:
         logger.info(f"{user} is not a member of 'EmailLOGS' group.")
+    return is_member
+
+
+def is_member_of_sms_logs_group(user):
+    is_member = user.groups.filter(name="SmsLOGS").exists()
+    if is_member:
+        logger.info(f"{user} is a member of 'SmsLOGS' group.")
+    else:
+        logger.info(f"{user} is not a member of 'SmsLOGS' group.")
     return is_member
 
 

@@ -1,11 +1,13 @@
+from uuid import uuid4
+
 from django.conf import settings
+from django.contrib.auth.models import Group
 from django.db import models
 from django.utils import timezone
 from django.utils.timezone import now
-from uuid import uuid4
 from arl.user.models import CustomUser, Employer
-from arl.bucket.helpers import upload_to_linode_object_storage, conn
-from django.contrib.auth.models import Group
+
+from arl.bucket.helpers import conn, upload_to_linode_object_storage
 
 
 class Twimlmessages(models.Model):
@@ -25,7 +27,9 @@ class BulkEmailSendgrid(models.Model):
 
 
 class EmailEvent(models.Model):
-    employer = models.ForeignKey(Employer, null=True, blank=True, on_delete=models.SET_NULL)
+    employer = models.ForeignKey(
+        Employer, null=True, blank=True, on_delete=models.SET_NULL
+    )
     user = models.ForeignKey(
         CustomUser, on_delete=models.CASCADE, null=True, blank=True
     )
@@ -59,7 +63,9 @@ class SmsLog(models.Model):
 
 
 class EmailLog(models.Model):
-    employer = models.ForeignKey("user.Employer", on_delete=models.CASCADE, related_name="email_logs")
+    employer = models.ForeignKey(
+        "user.Employer", on_delete=models.CASCADE, related_name="email_logs"
+    )
     sender_email = models.EmailField(help_text="The verified sender email used")
     template_id = models.CharField(
         max_length=100, help_text="SendGrid Template ID used"
@@ -71,7 +77,9 @@ class EmailLog(models.Model):
         choices=[("SUCCESS", "Success"), ("FAILED", "Failed")],
         default="SUCCESS",
     )
-    error_message = models.TextField(blank=True, null=True, help_text="Error details if failed")
+    error_message = models.TextField(
+        blank=True, null=True, help_text="Error details if failed"
+    )
 
     def __str__(self):
         return f"EmailLog {self.id} - {self.employer.name} - {self.sent_at.strftime('%Y-%m-%d %H:%M')}"
@@ -79,14 +87,12 @@ class EmailLog(models.Model):
 
 class EmailTemplate(models.Model):
     employers = models.ManyToManyField(
-        Employer,
-        blank=True,
-        related_name="email_templates"
+        Employer, blank=True, related_name="email_templates"
     )
     name = models.CharField(
         max_length=100,
         null=True,
-        help_text="The name of the email template (e.g., 'New Hire Onboarding')"
+        help_text="The name of the email template (e.g., 'New Hire Onboarding')",
     )  # ✅ Allow same name for multiple employers
     sendgrid_id = models.TextField()  # ✅ Store SendGrid Template ID
     include_in_report = models.BooleanField(default=False)  # ✅ For analytics
@@ -151,7 +157,9 @@ class Message(models.Model):
     username = models.CharField(max_length=100, blank=True, null=True)
     action_time = models.DateTimeField(default=timezone.now)
     template_used = models.BooleanField(default=False)
-    message_type = models.CharField(max_length=10, default='WhatsApp')  # 'WhatsApp' or 'SMS'
+    message_type = models.CharField(
+        max_length=10, default="WhatsApp"
+    )  # 'WhatsApp' or 'SMS'
 
     def __str__(self):
         return f"{self.message_type} message from {self.sender} to {self.receiver}, status {self.message_status}, at {self.action_time}"
@@ -188,10 +196,11 @@ class ComplianceFile(models.Model):
             bucket = conn.get_bucket(settings.LINODE_BUCKET_NAME)
             key = bucket.get_key(unique_key)
             if key:
-                key.set_acl('public-read')
+                key.set_acl("public-read")
 
             # ✅ Public URL (not presigned)
             from urllib.parse import quote
+
             self.presigned_url = f"https://{settings.LINODE_BUCKET_NAME}.{settings.LINODE_REGION}/{quote(unique_key)}"
 
             super().save(update_fields=["s3_key", "presigned_url"])
@@ -203,6 +212,9 @@ class ComplianceFile(models.Model):
         ordering = ["-uploaded_at"]
 
 
+# -- We are keeping this for now --
+# -- This decision was made March 11, 2026 -- 
+# -- It has been replaced by the new models --
 class ShortenedSMSLog(models.Model):
     EVENT_TYPES = [
         ("sent", "Sent"),
@@ -211,8 +223,9 @@ class ShortenedSMSLog(models.Model):
         ("failed", "Failed"),
     ]
 
-    employer = models.ForeignKey(Employer, null=True, blank=True,
-                                 on_delete=models.SET_NULL)
+    employer = models.ForeignKey(
+        Employer, null=True, blank=True, on_delete=models.SET_NULL
+    )
     sms_sid = models.CharField(max_length=64)
     to = models.CharField(max_length=20)
     from_number = models.CharField(max_length=20)
@@ -236,21 +249,181 @@ class ShortenedSMSLog(models.Model):
 class DraftEmail(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     employer = models.ForeignKey("user.Employer", on_delete=models.CASCADE)
-    mode = models.CharField(max_length=20, choices=[("text", "Text"), ("template", "Template")])
+    mode = models.CharField(
+        max_length=20, choices=[("text", "Text"), ("template", "Template")]
+    )
     subject = models.CharField(max_length=255, blank=True)
     message = models.TextField(blank=True)
-    sendgrid_template = models.ForeignKey(EmailTemplate, null=True, blank=True, on_delete=models.SET_NULL)
-    selected_group = models.ForeignKey(Group, null=True, blank=True, on_delete=models.SET_NULL)
-    selected_users = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="draft_recipients", blank=True)
+    sendgrid_template = models.ForeignKey(
+        EmailTemplate, null=True, blank=True, on_delete=models.SET_NULL
+    )
+    selected_group = models.ForeignKey(
+        Group, null=True, blank=True, on_delete=models.SET_NULL
+    )
+    selected_users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, related_name="draft_recipients", blank=True
+    )
     attachment_urls = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
 
-class SMSReply(models.Model):
-    employer = models.ForeignKey(Employer, on_delete=models.CASCADE)
-    from_number = models.CharField(max_length=20)
-    to_number = models.CharField(max_length=20)
-    body = models.TextField()
-    message_sid = models.CharField(max_length=64, blank=True, null=True)
-    received_at = models.DateTimeField(auto_now_add=True)
+# --- New Shortened SMS log models ---
+# --- Created Mar 11 2026 ---
+# --- This will eventually replace the SMSlog model from above ---
+
+
+class ShortenedSMSMessage(models.Model):
+    STATUS_QUEUED = "queued"
+    STATUS_SENT = "sent"
+    STATUS_DELIVERED = "delivered"
+    STATUS_CLICKED = "clicked"
+    STATUS_FAILED = "failed"
+    STATUS_UNDELIVERED = "undelivered"
+
+    STATUS_CHOICES = [
+        (STATUS_QUEUED, "Queued"),
+        (STATUS_SENT, "Sent"),
+        (STATUS_DELIVERED, "Delivered"),
+        (STATUS_CLICKED, "Clicked"),
+        (STATUS_FAILED, "Failed"),
+        (STATUS_UNDELIVERED, "Undelivered"),
+    ]
+
+    MESSAGE_TYPE_CHOICES = [
+        ("secure_link", "Secure Link"),
+        ("new_hire", "New Hire"),
+        ("quiz", "Quiz"),
+        ("document", "Document"),
+        ("notification", "Notification"),
+        ("incident", "Incident"),
+        ("other", "Other"),
+    ]
+
+    employer = models.ForeignKey(
+        Employer,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="shortened_sms_messages",
+    )
+    user = models.ForeignKey(
+        CustomUser,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="shortened_sms_messages",
+    )
+
+    sms_sid = models.CharField(max_length=64, unique=True, db_index=True)
+    to = models.CharField(max_length=20, db_index=True)
+    from_number = models.CharField(max_length=20, blank=True, null=True)
+
+    messaging_service_sid = models.CharField(max_length=64, blank=True, null=True)
+    account_sid = models.CharField(max_length=64, blank=True, null=True)
+
+    body = models.TextField(blank=True, null=True)
+    body_preview = models.CharField(max_length=255, blank=True, null=True)
+
+    link = models.URLField(max_length=1000, blank=True, null=True)
+    short_code = models.CharField(max_length=100, blank=True, null=True, db_index=True)
+
+    message_type = models.CharField(
+        max_length=50,
+        choices=MESSAGE_TYPE_CHOICES,
+        default="secure_link",
+        blank=True,
+        null=True,
+        db_index=True,
+    )
+
+    # optional context back into your app
+    context_model = models.CharField(max_length=100, blank=True, null=True)
+    context_id = models.PositiveIntegerField(blank=True, null=True)
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_SENT,
+        db_index=True,
+    )
+
+    click_count = models.PositiveIntegerField(default=0)
+
+    sent_at = models.DateTimeField(blank=True, null=True, db_index=True)
+    delivered_at = models.DateTimeField(blank=True, null=True)
+    clicked_at = models.DateTimeField(blank=True, null=True)
+    failed_at = models.DateTimeField(blank=True, null=True)
+
+    error_code = models.CharField(max_length=20, blank=True, null=True)
+    error_message = models.TextField(blank=True, null=True)
+
+    provider_payload = models.JSONField(blank=True, null=True)
+
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["employer", "created_at"]),
+            models.Index(fields=["user", "created_at"]),
+            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["to", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.sms_sid} - {self.to}"
+
+    @property
+    def was_clicked(self):
+        return self.click_count > 0
+
+    def save(self, *args, **kwargs):
+        if self.body and not self.body_preview:
+            self.body_preview = self.body[:255]
+        super().save(*args, **kwargs)
+
+
+class ShortenedSMSEvent(models.Model):
+    EVENT_SENT = "sent"
+    EVENT_DELIVERED = "delivered"
+    EVENT_CLICK = "click"
+    EVENT_FAILED = "failed"
+    EVENT_UNDELIVERED = "undelivered"
+
+    EVENT_TYPES = [
+        (EVENT_SENT, "Sent"),
+        (EVENT_DELIVERED, "Delivered"),
+        (EVENT_CLICK, "Clicked"),
+        (EVENT_FAILED, "Failed"),
+        (EVENT_UNDELIVERED, "Undelivered"),
+    ]
+
+    message = models.ForeignKey(
+        ShortenedSMSMessage,
+        on_delete=models.CASCADE,
+        related_name="events",
+    )
+
+    event_type = models.CharField(max_length=20, choices=EVENT_TYPES, db_index=True)
+    event_time = models.DateTimeField(default=timezone.now, db_index=True)
+
+    user_agent = models.TextField(blank=True, null=True)
+    error_code = models.CharField(max_length=20, blank=True, null=True)
+
+    payload = models.JSONField(blank=True, null=True)
+
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-event_time"]
+        indexes = [
+            models.Index(fields=["event_type", "event_time"]),
+            models.Index(fields=["message", "event_time"]),
+        ]
+
+    def __str__(self):
+        return f"{self.message.sms_sid} - {self.event_type}"
+
+# --- End ---

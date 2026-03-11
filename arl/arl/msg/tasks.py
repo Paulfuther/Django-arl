@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 import requests
-from celery import Task
+from celery import Task, shared_task
 from celery.utils.log import get_task_logger
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -17,6 +17,7 @@ from django.db.models import F, Func, IntegerField, OuterRef, Subquery
 from django.utils import timezone
 from django.utils.timezone import now
 from django_celery_results.models import TaskResult
+from arl.msg.models import ShortenedSMSEvent, ShortenedSMSMessage
 from twilio.rest import Client
 
 from arl.celery import app
@@ -25,22 +26,20 @@ from arl.msg.models import (
     EmailEvent,
     EmailLog,
     EmailTemplate,
-    Message,
-    ShortenedSMSLog,
-    SmsLog,
     Employer,
+    Message,
+    SmsLog,
+    
 )
 from arl.setup.models import TenantApiKeys
-from arl.user.models import SMSOptOut, EmployerSMSTask
-
 from .helpers import (
     client,
     create_master_email,
     create_single_csv_email,
     send_bulk_sms,
     send_linkshortened_sms,
-    send_store_phonecall_reminder,
     send_sms_model,
+    send_store_phonecall_reminder,
     send_whats_app_template,
     send_whats_app_template_autoreply,
     sync_contacts_with_sendgrid,
@@ -66,7 +65,9 @@ def master_email_send_task(
 ):
     logger.info(
         "[EmailTask] start sg_id=%s employer_id=%s recipients_count=%s",
-        sendgrid_id, employer_id, len(recipients or []),
+        sendgrid_id,
+        employer_id,
+        len(recipients or []),
     )
 
     """
@@ -144,12 +145,15 @@ def master_email_send_task(
             td = {
                 "name": name_str,
                 "body": body or "",
-                "senior_contact_name": getattr(employer, "senior_contact_name", "") or "",
+                "senior_contact_name": getattr(employer, "senior_contact_name", "")
+                or "",
                 "company_name": getattr(employer, "name", "") or "Company",
-                "subject": subject or f"New Message from {employer.name if employer else 'Our Company'}",
+                "subject": subject
+                or f"New Message from {employer.name if employer else 'Our Company'}",
             }
             ca = {
-                "subject": subject or f"New Message from {employer.name if employer else 'Our Company'}",
+                "subject": subject
+                or f"New Message from {employer.name if employer else 'Our Company'}",
             }
             logger.info("template data :", td, "custom args :", ca)
             # ensure attachments is a list of dicts
@@ -172,7 +176,9 @@ def master_email_send_task(
                 )
 
             except Exception as e:
-                logger.exception(f"🚨 Exception sending to {email} ,{e}")  # full traceback
+                logger.exception(
+                    f"🚨 Exception sending to {email} ,{e}"
+                )  # full traceback
                 failed_emails.append(email)
                 continue
 
@@ -585,7 +591,7 @@ def send_one_off_bulk_sms_task(group_id, message, user_id):
 # NEW: Send SMS to selected individual users (not group)
 @app.task(name="one_off_user_sms")
 def send_sms_to_selected_users_task(user_ids, message, sender_id):
-    message_body=message
+    message_body = message
     User = get_user_model()
     try:
         sender = User.objects.get(id=sender_id)
@@ -1000,7 +1006,9 @@ def filter_sendgrid_events(date_from=None, date_to=None, template_id=None):
 
 
 @app.task(name="email_event_summary")
-def generate_email_event_summary(template_id=None, start_date=None, end_date=None, employer_id=None):
+def generate_email_event_summary(
+    template_id=None, start_date=None, end_date=None, employer_id=None
+):
     # Filter events based on template_id if provided
     events = EmailEvent.objects.all()
     if employer_id:
@@ -1277,65 +1285,227 @@ def fetch_twilio_sms_task(user_id):
     return sms_data
 
 
-@app.task(name="twilio_shortened_link_webhook")
+# -- This is the new webhook for SMS shortened link logs --
+# -- This was created March 11, 2026 --
+
+
+def normalize_phone(phone):
+    """
+    Basic phone normalizer.
+    Keeps digits only and returns last 10 digits if possible.
+    You can replace this later with a stronger E.164 approach.
+    """
+    if not phone:
+        return None
+
+    digits = "".join(ch for ch in str(phone) if ch.isdigit())
+    if len(digits) >= 10:
+        return digits[-10:]
+    return digits
+
+
+def find_user_by_phone(phone):
+    """
+    Safer than icontains. Matches by last 10 digits.
+    If you later add a normalized phone field, swap this out.
+    """
+    normalized = normalize_phone(phone)
+    if not normalized:
+        return None
+
+    for user in CustomUser.objects.exclude(phone_number__isnull=True).exclude(
+        phone_number=""
+    ):
+        user_digits = normalize_phone(user.phone_number)
+        if user_digits == normalized:
+            return user
+    return None
+
+
+@shared_task(name="twilio_shortened_link_webhook")
 def process_twilio_short_link_event(data):
     employer = None
-    account_sid = data.get("AccountSid") or data.get("account_sid")
-
-    if account_sid:
-        api_key = TenantApiKeys.objects.filter(account_sid=account_sid).select_related("employer").first()
-        if api_key:
-            employer = api_key.employer
-
-    if not employer:
-        logger.warning(f"⚠️ No employer found for Account SID: {account_sid}")
 
     try:
+        account_sid = data.get("AccountSid") or data.get("account_sid")
         sms_sid = data.get("SmsSid") or data.get("sms_sid")
         to = data.get("To") or data.get("to")
         from_number = data.get("From") or data.get("from")
-        message_status = data.get("MessageStatus", "").lower()
+        body = data.get("Body") or data.get("body")
+        link = data.get("link")
+        user_agent = data.get("user_agent")
+        error_code = data.get("ErrorCode") or data.get("error_code")
         messaging_sid = data.get("MessagingServiceSid") or data.get(
             "messaging_service_sid"
         )
-        account_sid = data.get("AccountSid") or data.get("account_sid")
-        event_type = data.get("event_type", message_status)
-        link = data.get("link")
-        click_time = data.get("click_time") or now()
-        user_agent = data.get("user_agent")
-        error_code = data.get("ErrorCode") or data.get("error_code")
-        body = data.get("Body") or data.get("body")
-
-        user = (
-            CustomUser.objects.filter(phone_number__icontains=to).first()
-            if to
-            else None
+        message_status = (
+            (data.get("MessageStatus") or data.get("message_status") or "")
+            .lower()
+            .strip()
         )
+        incoming_event_type = (data.get("event_type") or "").lower().strip()
 
+        if not sms_sid:
+            logger.warning("⚠️ Missing SmsSid in webhook payload")
+            return
+
+        # Resolve employer from Twilio account SID
+        if account_sid:
+            api_key = (
+                TenantApiKeys.objects.filter(account_sid=account_sid)
+                .select_related("employer")
+                .first()
+            )
+            if api_key:
+                employer = api_key.employer
+
+        if not employer:
+            logger.warning(f"⚠️ No employer found for Account SID: {account_sid}")
+
+        # Resolve event type
+        # Prefer explicit event_type from your short-link system; otherwise use Twilio message status
+        event_type = incoming_event_type or message_status or "sent"
+
+        # Normalize some common Twilio statuses
+        if event_type in ["accepted", "queued", "sending"]:
+            normalized_event_type = "sent"
+        elif event_type == "delivered":
+            normalized_event_type = "delivered"
+        elif event_type == "undelivered":
+            normalized_event_type = "undelivered"
+        elif event_type in ["failed", "send_failed"]:
+            normalized_event_type = "failed"
+        elif event_type in ["click", "clicked"]:
+            normalized_event_type = "click"
+        else:
+            normalized_event_type = "sent"
+
+        # Resolve local user
+        user = find_user_by_phone(to) if to else None
+
+        # Handle carrier filtered messages
         if error_code == "30007" and user:
             if not hasattr(user, "sms_opt_out"):
                 SMSOptOut.objects.create(
-                    user=user, reason="Carrier filtered message (30007)"
+                    user=user,
+                    reason="Carrier filtered message (30007)",
                 )
 
-        ShortenedSMSLog.objects.create(
+        # Parent message row
+        message, created = ShortenedSMSMessage.objects.get_or_create(
             sms_sid=sms_sid,
-            to=to or "",
-            from_number=from_number or "",
-            messaging_service_sid=messaging_sid or "",
-            account_sid=account_sid or "",
-            event_type=event_type,
-            link=link,
-            click_time=click_time,
-            user_agent=user_agent or "",
-            user=user,
-            employer=employer,
-            error_code=error_code,
-            created_at=now(),
-            body=body or None,
+            defaults={
+                "employer": employer,
+                "user": user,
+                "to": to or "",
+                "from_number": from_number or "",
+                "messaging_service_sid": messaging_sid or "",
+                "account_sid": account_sid or "",
+                "body": body or None,
+                "link": link,
+                "status": "sent",
+                "sent_at": now(),
+                "provider_payload": data,
+            },
         )
 
-    except Exception:
-        import logging
+        changed = False
 
-        logging.getLogger("django").exception("❌ Error processing Twilio event")
+        # Backfill missing parent fields
+        if employer and not message.employer:
+            message.employer = employer
+            changed = True
+
+        if user and not message.user:
+            message.user = user
+            changed = True
+
+        if to and not message.to:
+            message.to = to
+            changed = True
+
+        if from_number and not message.from_number:
+            message.from_number = from_number
+            changed = True
+
+        if messaging_sid and not message.messaging_service_sid:
+            message.messaging_service_sid = messaging_sid
+            changed = True
+
+        if account_sid and not message.account_sid:
+            message.account_sid = account_sid
+            changed = True
+
+        if body and not message.body:
+            message.body = body
+            changed = True
+
+        if link and not message.link:
+            message.link = link
+            changed = True
+
+        if error_code:
+            message.error_code = error_code
+            changed = True
+
+        # Keep the most recent payload for debugging
+        message.provider_payload = data
+        changed = True
+
+        # Determine event timestamp
+        event_time = now()
+        if normalized_event_type == "click":
+            event_time = data.get("click_time") or now()
+
+        # Update parent message status/timestamps
+        if normalized_event_type == "sent":
+            if not message.sent_at:
+                message.sent_at = event_time
+            if message.status not in ["delivered", "clicked", "failed", "undelivered"]:
+                message.status = "sent"
+            changed = True
+
+        elif normalized_event_type == "delivered":
+            message.status = "delivered"
+            if not message.delivered_at:
+                message.delivered_at = event_time
+            changed = True
+
+        elif normalized_event_type == "click":
+            message.status = "clicked"
+            message.clicked_at = event_time
+            message.click_count = (message.click_count or 0) + 1
+            changed = True
+
+        elif normalized_event_type == "failed":
+            message.status = "failed"
+            message.failed_at = event_time
+            changed = True
+
+        elif normalized_event_type == "undelivered":
+            message.status = "undelivered"
+            message.failed_at = event_time
+            changed = True
+
+        if changed:
+            message.save()
+
+        # Optional: avoid exact duplicate event rows
+        existing_event = ShortenedSMSEvent.objects.filter(
+            message=message,
+            event_type=normalized_event_type,
+            event_time=event_time,
+        ).exists()
+
+        if not existing_event:
+            ShortenedSMSEvent.objects.create(
+                message=message,
+                event_type=normalized_event_type,
+                event_time=event_time,
+                user_agent=user_agent or "",
+                error_code=error_code,
+                payload=data,
+            )
+
+    except Exception:
+        logger.exception("❌ Error processing Twilio shortened link webhook")

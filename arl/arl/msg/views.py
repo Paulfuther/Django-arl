@@ -13,13 +13,9 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import Group
 from django.core.paginator import Paginator
 from django.db.models import Count, Max, Q
+from django.db.models.functions import TruncDate
 from django.forms import modelformset_factory
-from django.http import (
-    HttpResponse,
-    HttpResponseBadRequest,
-    HttpResponseNotFound,
-    JsonResponse,
-)
+from django.http import HttpResponse, HttpResponseNotFound, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.utils.html import escape
@@ -29,58 +25,41 @@ from django.views.generic import TemplateView
 from django.views.generic.edit import FormView
 from openai import OpenAI
 from PIL import Image
+from twilio.request_validator import RequestValidator
 from waffle.decorators import waffle_flag
 
 from arl.bucket.helpers import conn, upload_to_linode_object_storage
 from arl.dsign.forms import NameEmailForm
 from arl.dsign.tasks import create_docusign_envelope_task
-from arl.msg.helpers import (
-    client,
-    get_all_contact_lists,
-    get_uploaded_urls_from_request,
-    is_member_of_comms_group,
-    is_member_of_docusign_group,
-    is_member_of_email_group,
-    is_member_of_msg_group,
-    is_member_of_email_logs_group,
-    prepare_recipient_data,
-    prepare_sms_recipient_data,
-    save_email_draft,
-    send_linkshortened_sms,
-    send_whats_app_carwash_sites_template,
-)
-from arl.msg.tasks import (
-    master_email_send_task,
-    process_twilio_short_link_event,
-    process_whatsapp_webhook,
-    send_template_whatsapp_task,
-    start_campaign_task,
-)
+from arl.msg.helpers import (client, get_all_contact_lists,
+                             get_uploaded_urls_from_request,
+                             is_member_of_comms_group,
+                             is_member_of_docusign_group,
+                             is_member_of_email_group,
+                             is_member_of_email_logs_group,
+                             is_member_of_msg_group,
+                             is_member_of_sms_logs_group,
+                             prepare_recipient_data,
+                             prepare_sms_recipient_data, save_email_draft,
+                             send_linkshortened_sms,
+                             send_whats_app_carwash_sites_template)
+from arl.msg.tasks import (master_email_send_task,
+                           process_twilio_short_link_event,
+                           process_whatsapp_webhook,
+                           send_template_whatsapp_task, start_campaign_task)
 from arl.setup.models import TenantApiKeys
 from arl.user.models import CustomUser, Employer, Store
 
-from .forms import (
-    CampaignSetupForm,
-    EmailForm,
-    EmployeeSearchForm,
-    GroupSelectForm,
-    SendGridFilterForm,
-    SMSForm,
-    SMSLogFilterForm,
-    StoreTargetForm,
-    TemplateFilterForm,
-    TemplateWhatsAppForm,
-)
-from .models import ComplianceFile, DraftEmail, EmailEvent, ShortenedSMSLog, SMSReply
-from .tasks import (
-    fetch_twilio_sms_task,
-    fetch_twilio_summary,
-    filter_sendgrid_events,
-    generate_email_event_summary,
-    generate_employee_email_report_task,
-    process_sendgrid_webhook,
-    send_sms_to_selected_users_task,
-)
+from .forms import (CampaignSetupForm, EmailForm, EmployeeSearchForm,
+                    GroupSelectForm, SendGridFilterForm, SMSForm,
+                    SMSLogFilterForm, StoreTargetForm, TemplateFilterForm,
+                    TemplateWhatsAppForm)
+from .models import (ComplianceFile, DraftEmail, EmailEvent, ShortenedSMSLog,
+                     ShortenedSMSMessage)
+from .tasks import (fetch_twilio_sms_task, fetch_twilio_summary,
+                    filter_sendgrid_events, generate_email_event_summary,
+                    generate_employee_email_report_task,
+                    process_sendgrid_webhook, send_sms_to_selected_users_task)
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -283,24 +262,94 @@ def render_message_to_sendgrid(message):
 @login_required
 @user_passes_test(is_member_of_comms_group)
 def communications(request):
-
     employer = getattr(request.user, "employer", None)
 
+    active_tab = request.GET.get("tab", "email")
+
+    # -------------------------
+    # SMS LINK LOGS
+    # -------------------------
+    sms_log_q = (request.GET.get("sms_log_q") or "").strip()
+    sms_log_status = (request.GET.get("sms_log_status") or "").strip()
+    sms_log_clicked = (request.GET.get("sms_log_clicked") or "").strip()
+    sms_log_page_number = request.GET.get("sms_log_page", 1)
+
+    sms_logs = (
+        ShortenedSMSMessage.objects
+        .select_related("user", "employer")
+        .order_by("-created_at")
+    )
+
+    if employer:
+        sms_logs = sms_logs.filter(employer=employer)
+
+    if sms_log_q:
+        sms_logs = sms_logs.filter(
+            Q(to__icontains=sms_log_q)
+            | Q(body__icontains=sms_log_q)
+            | Q(body_preview__icontains=sms_log_q)
+            | Q(sms_sid__icontains=sms_log_q)
+            | Q(link__icontains=sms_log_q)
+            | Q(user__first_name__icontains=sms_log_q)
+            | Q(user__last_name__icontains=sms_log_q)
+        )
+
+    if sms_log_status:
+        sms_logs = sms_logs.filter(status=sms_log_status)
+
+    if sms_log_clicked == "yes":
+        sms_logs = sms_logs.filter(click_count__gt=0)
+    elif sms_log_clicked == "no":
+        sms_logs = sms_logs.filter(click_count=0)
+
+    sms_total = sms_logs.count()
+    sms_delivered = sms_logs.filter(status="delivered").count()
+    sms_clicked = sms_logs.filter(status="clicked").count()
+    sms_failed = sms_logs.filter(status__in=["failed", "undelivered"]).count()
+
+    sms_timeline = (
+        sms_logs
+        .annotate(day=TruncDate("created_at"))
+        .values("day")
+        .annotate(
+            sent_count=Count("id"),
+            delivered_count=Count("id", filter=Q(status="delivered")),
+            clicked_count=Count("id", filter=Q(status="clicked")),
+            failed_count=Count("id", filter=Q(status__in=["failed", "undelivered"])),
+        )
+        .order_by("day")
+    )
+
+    sms_timeline_labels = [
+        row["day"].strftime("%Y-%m-%d")
+        for row in sms_timeline
+        if row["day"]
+    ]
+    sms_timeline_sent = [row["sent_count"] for row in sms_timeline]
+    sms_timeline_delivered = [row["delivered_count"] for row in sms_timeline]
+    sms_timeline_clicked = [row["clicked_count"] for row in sms_timeline]
+    sms_timeline_failed = [row["failed_count"] for row in sms_timeline]
+
+    sms_log_paginator = Paginator(sms_logs, 25)
+    sms_log_page = sms_log_paginator.get_page(sms_log_page_number)
+    # -------------------------
+    # EMAIL LOGS
+    # -------------------------
     log_q = (request.GET.get("log_q") or "").strip()
     log_status = (request.GET.get("log_status") or "").strip()
     log_template = (request.GET.get("log_template") or "").strip()
-    log_page = request.GET.get("log_page", 1)
+    log_page_number = request.GET.get("log_page", 1)
 
-    email_log_qs = EmailEvent.objects.filter(employer=employer)
+    email_log_qs = EmailEvent.objects.filter(employer=employer).order_by("-timestamp")
 
     if log_q:
         email_log_qs = email_log_qs.filter(
-            Q(email__icontains=log_q) |
-            Q(subject__icontains=log_q) |
-            Q(sg_message_id__icontains=log_q) |
-            Q(sg_event_id__icontains=log_q) |
-            Q(sg_template_name__icontains=log_q) |
-            Q(username__icontains=log_q)
+            Q(email__icontains=log_q)
+            | Q(subject__icontains=log_q)
+            | Q(sg_message_id__icontains=log_q)
+            | Q(sg_event_id__icontains=log_q)
+            | Q(sg_template_name__icontains=log_q)
+            | Q(username__icontains=log_q)
         )
 
     if log_status:
@@ -308,12 +357,39 @@ def communications(request):
 
     if log_template:
         email_log_qs = email_log_qs.filter(
-            Q(sg_template_id__icontains=log_template) |
-            Q(sg_template_name__icontains=log_template)
+            Q(sg_template_id__icontains=log_template)
+            | Q(sg_template_name__icontains=log_template)
+        )   
+
+    email_timeline = (
+        email_log_qs
+        .annotate(day=TruncDate("timestamp"))
+        .values("day")
+        .annotate(
+            total_count=Count("id"),
+            delivered_count=Count("id", filter=Q(event="delivered")),
+            open_count=Count("id", filter=Q(event="open")),
+            click_count=Count("id", filter=Q(event="click")),
+            failed_count=Count("id", filter=Q(event__in=["bounce", "dropped", "spamreport"])),
         )
+        .order_by("day")
+    )
+
+    email_timeline_labels = [row["day"].strftime("%Y-%m-%d") for row in email_timeline if row["day"]]
+    email_timeline_total = [row["total_count"] for row in email_timeline]
+    email_timeline_delivered = [row["delivered_count"] for row in email_timeline]
+    email_timeline_open = [row["open_count"] for row in email_timeline]
+    email_timeline_click = [row["click_count"] for row in email_timeline]
+    email_timeline_failed = [row["failed_count"] for row in email_timeline]
+
+    email_total = email_log_qs.count()
+    email_delivered = email_log_qs.filter(event="delivered").count()
+    email_opened = email_log_qs.filter(event="open").count()
+    email_clicked = email_log_qs.filter(event="click").count()
+    email_failed = email_log_qs.filter(event__in=["bounce", "dropped", "spamreport"]).count()
 
     email_log_paginator = Paginator(email_log_qs, 50)
-    email_log_page = email_log_paginator.get_page(log_page)
+    email_log_page = email_log_paginator.get_page(log_page_number)
 
     draft_id = request.GET.get("draft_id") or request.POST.get("draft_id")
     user = request.user
@@ -330,6 +406,9 @@ def communications(request):
         valid_tabs.append("docusign")
     if is_member_of_email_logs_group(user):
         valid_tabs.append("email_log")
+    if is_member_of_sms_logs_group(user):
+        valid_tabs.append("sms_link_log")
+    
     # if is_member_of_whatsapp_group(user):
     #    valid_tabs.append("whatsapp")
 
@@ -533,7 +612,16 @@ def communications(request):
     selected_ids = (
         request.POST.getlist("selected_users") if request.method == "POST" else []
     )
-    log_status_choices = ["processed","delivered","deferred","bounce","dropped","open","click","spamreport"]
+    log_status_choices = [
+        "processed",
+        "delivered",
+        "deferred",
+        "bounce",
+        "dropped",
+        "open",
+        "click",
+        "spamreport",
+    ]
     print(log_q)
     return render(
         request,
@@ -544,15 +632,40 @@ def communications(request):
             "docusign_form": docusign_form,
             "whatsapp_form": whatsapp_form,
             "active_tab": active_tab,
+            "sms_log_q": sms_log_q,
+            "sms_log_status": sms_log_status,
+            "sms_log_clicked": sms_log_clicked,
+            "sms_log_page": sms_log_page,
+            "sms_total": sms_total,
+            "sms_delivered": sms_delivered,
+            "sms_clicked": sms_clicked,
+            "sms_failed": sms_failed,
+            "sms_timeline_labels": json.dumps(sms_timeline_labels),
+            "sms_timeline_sent": json.dumps(sms_timeline_sent),
+            "sms_timeline_delivered": json.dumps(sms_timeline_delivered),
+            "sms_timeline_clicked": json.dumps(sms_timeline_clicked),
+            "sms_timeline_failed": json.dumps(sms_timeline_failed),
             "email_log_page": email_log_page,
             "log_q": log_q,
             "log_status": log_status,
             "log_status_choices": log_status_choices,
             "log_template": log_template,
+            "email_total": email_total,
+            "email_delivered": email_delivered,
+            "email_opened": email_opened,
+            "email_clicked": email_clicked,
+            "email_failed": email_failed,
+            "email_timeline_labels": json.dumps(email_timeline_labels),
+            "email_timeline_total": json.dumps(email_timeline_total),
+            "email_timeline_delivered": json.dumps(email_timeline_delivered),
+            "email_timeline_open": json.dumps(email_timeline_open),
+            "email_timeline_click": json.dumps(email_timeline_click),
+            "email_timeline_failed": json.dumps(email_timeline_failed),
             "can_send_email": is_member_of_email_group(user),
             "can_send_sms": is_member_of_msg_group(user),
             "can_send_docusign": is_member_of_docusign_group(user),
             "can_view_email_logs": is_member_of_email_logs_group(user),
+            "can_view_sms_logs": is_member_of_sms_logs_group(user),
             # "can_send_whatsapp": is_member_of_whatsapp_group(user),
             "selected_ids": selected_ids,
             "draft_id": draft_id,
@@ -564,7 +677,7 @@ def communications(request):
     )
 
 
-#  Log for emails in the comms section
+#  -- Log for emails in the comms section --
 @login_required
 def email_log_view(request):
     employer = getattr(request.user, "employer", None)
@@ -1027,26 +1140,37 @@ def upload_attachment(request):
 
     return JsonResponse({"success": False, "error": "Invalid request"}, status=400)
 
+# -- This view was modified on March 11 2026 --
+# -- This supports the new webhook log for shortened links --
+
 
 @csrf_exempt
-@require_POST
-def twilio_short_link_webhook(request):
-    try:
-        if request.content_type == "application/json":
-            data = json.loads(request.body)
-        elif request.content_type == "application/x-www-form-urlencoded":
-            data = request.POST.dict()
-        else:
-            return HttpResponseBadRequest("Unsupported content type")
+def twilio_shortened_link_webhook(request):
+    """
+    Receives Twilio webhook events for shortened SMS links and
+    queues them for processing in Celery.
+    """
 
-        logger.info("✅ Queuing webhook data: %s", data)
+    if request.method != "POST":
+        return HttpResponse(status=405)
+
+    try:
+        # Twilio sends application/x-www-form-urlencoded
+        if request.content_type == "application/json":
+            data = json.loads(request.body.decode("utf-8"))
+        else:
+            data = request.POST.dict()
+
+        logger.info(f"📩 Twilio Short Link Webhook Received: {data}")
+
+        # Push to Celery
         process_twilio_short_link_event.delay(data)
 
-        return JsonResponse({"status": "queued"})
+        return HttpResponse("OK", status=200)
 
     except Exception:
-        logger.exception("❌ Webhook processing failed.")
-        return HttpResponseBadRequest("Internal Error")
+        logger.exception("❌ Twilio webhook processing error")
+        return HttpResponse(status=500)
 
 
 @require_GET
@@ -1126,27 +1250,30 @@ def generate_ai_content(request):
             return JsonResponse({"error": str(e)}, status=500)
 
 
+def _valid_twilio_signature(request) -> bool:
+    signature = request.headers.get("X-Twilio-Signature", "")
+    url = request.build_absolute_uri()
+    params = request.POST.dict()
+    validator = RequestValidator(settings.TWILIO_AUTH_TOKEN)
+    return validator.validate(url, params, signature)
+
+
 @csrf_exempt
-@require_POST
-def sms_reply_webhook(request):
-    to_number = request.POST.get("To")
-    from_number = request.POST.get("From")
-    body = request.POST.get("Body")
-    message_sid = request.POST.get("MessageSid")
+def twilio_voice_status_webhook(request):
+    validator = RequestValidator(settings.TWILIO_AUTH_TOKEN)
 
-    tenant = TenantApiKeys.objects.filter(phone_number=to_number).first()
-    if not tenant:
-        # Optional: Log or notify here
-        return HttpResponse("Tenant not found", status=204)
+    # IMPORTANT: use the exact URL Twilio requested
+    twilio_url = "https://6364c26b8f51.ngrok-free.app/twilio/voice/status/"
 
-    employer = tenant.employer
+    # POST params
+    post_vars = request.POST.dict()
 
-    SMSReply.objects.create(
-        employer=employer,
-        from_number=from_number,
-        to_number=to_number,
-        body=body,
-        message_sid=message_sid,
-    )
+    # Twilio signature header
+    signature = request.META.get("HTTP_X_TWILIO_SIGNATURE", "")
 
-    return HttpResponse(status=204)
+    if not validator.validate(twilio_url, post_vars, signature):
+        return HttpResponse("Invalid signature", status=403)
+
+    # ✅ Valid request
+    print("✅ VALID TWILIO STATUS:", post_vars)
+    return HttpResponse("ok", status=200)
