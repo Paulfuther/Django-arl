@@ -27,7 +27,7 @@ from arl.msg.models import (
     UserConsent,
     WhatsAppTemplate,
 )
-from arl.msg.tasks import EmployerSMSTask
+# from arl.msg.tasks import EmployerSMSTask
 # from arl.payroll.models import CalendarEvent, PayPeriod, StatutoryHoliday
 from arl.quiz.models import Answer, Question, Quiz, SaltLog
 from arl.setup.models import StripePayment, StripePlan, TenantApiKeys
@@ -656,16 +656,6 @@ class SMSOptOutAdmin(ExportActionMixin, admin.ModelAdmin):
 
     get_employer.admin_order_field = "employer__name"
     get_employer.short_description = "Employer"
-
-
-@admin.register(EmployerSMSTask)
-class EmployerSMSTaskAdmin(admin.ModelAdmin):
-    list_display = ("employer", "task_name", "is_enabled")
-    list_filter = ("task_name", "is_enabled")  # Filter by task and status
-    search_fields = ("employer__name", "task_name")  # Search by employer name
-    list_editable = (
-        "is_enabled",
-    )  # ✅ Allow enabling/disabling directly from the list view
 
 
 @admin.register(TenantApiKeys)

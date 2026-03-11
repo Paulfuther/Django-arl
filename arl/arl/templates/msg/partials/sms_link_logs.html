@@ -1,0 +1,573 @@
+<style>
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 92px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: .02em;
+    white-space: nowrap;
+  }
+
+  .text-break {
+    word-break: break-word;
+  }
+
+  .sms-timeline-wrap {
+    height: 280px;
+  }
+
+  @media (max-width: 576px) {
+    .status-badge {
+      font-size: 0.75rem;
+    }
+
+    .sms-timeline-wrap {
+      height: 220px;
+    }
+  }
+</style>
+
+<div class="d-flex align-items-center justify-content-between mb-2">
+  <div class="fw-semibold">SMS Link Log</div>
+</div>
+
+{#--   SMS Summary. --#}
+<div class="row g-2 mb-3">
+
+  <div class="col-6 col-md-3">
+    <div class="border rounded bg-white p-2 text-center">
+      <div class="small text-muted">Sent</div>
+      <div class="fw-semibold fs-5">{{ sms_total }}</div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="border rounded bg-white p-2 text-center">
+      <div class="small text-muted">Delivered</div>
+      <div class="fw-semibold fs-5 text-primary">{{ sms_delivered }}</div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="border rounded bg-white p-2 text-center">
+      <div class="small text-muted">Clicked</div>
+      <div class="fw-semibold fs-5 text-success">{{ sms_clicked }}</div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="border rounded bg-white p-2 text-center">
+      <div class="small text-muted">Failed</div>
+      <div class="fw-semibold fs-5 text-danger">{{ sms_failed }}</div>
+    </div>
+  </div>
+
+</div>
+{# end of sms summary #}
+
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body">
+    <div class="fw-semibold mb-2">SMS Activity Timeline</div>
+    <div class="sms-timeline-wrap">
+      <canvas id="smsTimelineChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<form method="get" class="mb-3">
+  <input type="hidden" name="tab" value="sms_link_log">
+  <input type="hidden" name="sms_log_page" value="1">
+
+  <div class="row g-2">
+    <div class="col-12 col-md-4">
+      <input class="form-control form-control-sm"
+             name="sms_log_q"
+             value="{{ sms_log_q }}"
+             placeholder="Search phone, body, SID, link…" />
+    </div>
+
+    <div class="col-6 col-md-2">
+      <select class="form-select form-select-sm" name="sms_log_status">
+        <option value="">All statuses</option>
+        <option value="queued" {% if sms_log_status == "queued" %}selected{% endif %}>queued</option>
+        <option value="sent" {% if sms_log_status == "sent" %}selected{% endif %}>sent</option>
+        <option value="delivered" {% if sms_log_status == "delivered" %}selected{% endif %}>delivered</option>
+        <option value="clicked" {% if sms_log_status == "clicked" %}selected{% endif %}>clicked</option>
+        <option value="failed" {% if sms_log_status == "failed" %}selected{% endif %}>failed</option>
+        <option value="undelivered" {% if sms_log_status == "undelivered" %}selected{% endif %}>undelivered</option>
+      </select>
+    </div>
+
+    <div class="col-6 col-md-2">
+      <select class="form-select form-select-sm" name="sms_log_clicked">
+        <option value="">Clicked?</option>
+        <option value="yes" {% if sms_log_clicked == "yes" %}selected{% endif %}>Yes</option>
+        <option value="no" {% if sms_log_clicked == "no" %}selected{% endif %}>No</option>
+      </select>
+    </div>
+
+    <div class="col-12 col-md-4 d-flex gap-2">
+      <button class="btn btn-sm btn-outline-secondary" type="submit">Filter</button>
+      <a class="btn btn-sm btn-outline-secondary" href="?tab=sms_link_log">Clear</a>
+    </div>
+  </div>
+</form>
+
+{# --- Mobile cards --- #}
+<div class="d-block d-md-none">
+    
+  {% for s in sms_log_page %}
+    <div class="border rounded p-2 mb-2 bg-white">
+      <div class="d-flex justify-content-between align-items-start">
+        <div class="fw-semibold text-truncate" style="max-width:70%;">{{ s.to }}</div>
+        <span class="badge status-badge
+          {% if s.status == 'clicked' %}
+            text-bg-success
+          {% elif s.status == 'delivered' %}
+            text-bg-primary
+          {% elif s.status == 'sent' or s.status == 'queued' %}
+            text-bg-warning
+          {% elif s.status == 'failed' or s.status == 'undelivered' %}
+            text-bg-danger
+          {% else %}
+            text-bg-secondary
+          {% endif %}
+        ">
+          {{ s.status }}
+        </span>
+      </div>
+
+      {% if s.user %}
+        <div class="small text-muted">
+          {{ s.user.first_name }} {{ s.user.last_name }}
+        </div>
+      {% endif %}
+
+      {% if s.body_preview %}
+        <div class="small text-truncate mt-1">{{ s.body_preview }}</div>
+      {% endif %}
+
+      <div class="text-muted small mt-1">
+        {{ s.sent_at|default:s.created_at|date:"Y-m-d H:i:s" }}
+        • Clicks: {{ s.click_count }}
+      </div>
+
+      <div class="small text-muted text-truncate" style="font-family:monospace;">
+        {{ s.sms_sid }}
+      </div>
+
+      {% if s.link %}
+        <div class="small text-truncate mt-1">
+          <a href="{{ s.link }}" target="_blank">{{ s.link|truncatechars:50 }}</a>
+        </div>
+      {% endif %}
+
+      <div class="mt-2">
+        <button class="btn btn-sm btn-outline-secondary"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#sms-mobile-details-{{ s.id }}"
+                aria-expanded="false"
+                aria-controls="sms-mobile-details-{{ s.id }}">
+          View
+        </button>
+      </div>
+
+      <div class="collapse mt-2" id="sms-mobile-details-{{ s.id }}">
+        <div class="border rounded bg-light p-2">
+
+          <div class="mb-2">
+            <div class="small text-muted">Full SMS SID</div>
+            <div class="small text-break" style="font-family:monospace;">{{ s.sms_sid }}</div>
+          </div>
+
+          <div class="row g-2 mb-2">
+            <div class="col-6">
+              <div class="small text-muted">From</div>
+              <div class="small">{{ s.from_number|default:"-" }}</div>
+            </div>
+            <div class="col-6">
+              <div class="small text-muted">Error Code</div>
+              <div class="small">{{ s.error_code|default:"-" }}</div>
+            </div>
+            <div class="col-6">
+              <div class="small text-muted">Delivered At</div>
+              <div class="small">
+                {% if s.delivered_at %}
+                  {{ s.delivered_at|date:"Y-m-d H:i:s" }}
+                {% else %}
+                  -
+                {% endif %}
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="small text-muted">Clicked At</div>
+              <div class="small">
+                {% if s.clicked_at %}
+                  {{ s.clicked_at|date:"Y-m-d H:i:s" }}
+                {% else %}
+                  -
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-2">
+            <div class="small text-muted">Full Message</div>
+            <div class="border rounded bg-white p-2 small">
+              {{ s.body|default:"-" }}
+            </div>
+          </div>
+
+          <div class="mb-2">
+            <div class="small text-muted">Full Link</div>
+            <div class="border rounded bg-white p-2 small text-break">
+              {% if s.link %}
+                <a href="{{ s.link }}" target="_blank">{{ s.link }}</a>
+              {% else %}
+                -
+              {% endif %}
+            </div>
+          </div>
+
+          <div>
+            <div class="small text-muted mb-1">Event History</div>
+            {% if s.events.all %}
+              <div class="small">
+                {% for ev in s.events.all %}
+                  <div class="border rounded bg-white p-2 mb-1">
+                    <div class="fw-semibold">{{ ev.event_type }}</div>
+                    <div class="text-muted">{{ ev.event_time|date:"Y-m-d H:i:s" }}</div>
+                    {% if ev.error_code %}
+                      <div>Error: {{ ev.error_code }}</div>
+                    {% endif %}
+                    {% if ev.user_agent %}
+                      <div class="text-break text-muted">{{ ev.user_agent }}</div>
+                    {% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="text-muted small">No event history found.</div>
+            {% endif %}
+          </div>
+
+        </div>
+      </div>
+    </div>
+  {% empty %}
+    <div class="text-muted">No SMS link events found.</div>
+  {% endfor %}
+</div>
+
+
+
+{# --- Desktop table --- #}
+<div class="d-none d-md-block table-responsive">
+  <table class="table table-sm align-middle table-hover">
+    <thead class="table-light">
+      <tr>
+        <th style="min-width:170px;">Sent At</th>
+        <th style="min-width:120px;">SMS SID</th>
+        <th style="min-width:160px;">Recipient</th>
+        <th style="min-width:200px;">Message</th>
+        <th style="min-width:120px;">Status</th>
+        <th style="min-width:80px;">Clicks</th>
+        <th style="min-width:200px;">Link</th>
+        <th style="min-width:90px;">Details</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sms_log_page %}
+        <tr>
+          <td class="text-muted small">
+            {{ s.sent_at|default:s.created_at|date:"Y-m-d H:i:s" }}
+          </td>
+
+          <td class="small" style="font-family:monospace;">
+            <span title="{{ s.sms_sid }}">
+              {{ s.sms_sid|slice:":12" }}…
+            </span>
+          </td>
+
+          <td>
+            <div>{{ s.to }}</div>
+            {% if s.user %}
+              <div class="small text-muted">
+                {{ s.user.first_name }} {{ s.user.last_name }}
+              </div>
+            {% endif %}
+          </td>
+
+          <td class="text-truncate" style="max-width:380px;">
+            {{ s.body_preview|default:"-" }}
+          </td>
+
+          <td>
+            <span class="badge status-badge
+              {% if s.status == 'clicked' %}
+                text-bg-success
+              {% elif s.status == 'delivered' %}
+                text-bg-primary
+              {% elif s.status == 'sent' or s.status == 'queued' %}
+                text-bg-warning
+              {% elif s.status == 'failed' or s.status == 'undelivered' %}
+                text-bg-danger
+              {% else %}
+                text-bg-secondary
+              {% endif %}
+            ">
+              {{ s.status }}
+            </span>
+          </td>
+
+          <td>
+            {% if s.click_count %}
+              <span class="badge text-bg-success">{{ s.click_count }}</span>
+            {% else %}
+              <span class="text-muted">0</span>
+            {% endif %}
+          </td>
+
+          <td class="small">
+            {% if s.link %}
+              <div class="text-truncate" style="max-width:260px;">
+                <a href="{{ s.link }}" target="_blank" title="{{ s.link }}">
+                  {{ s.link|truncatechars:45 }}
+                </a>
+              </div>
+            {% else %}
+              -
+            {% endif %}
+          </td>
+
+          <td>
+            <button class="btn btn-sm btn-outline-secondary"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#sms-details-{{ s.id }}"
+                    aria-expanded="false"
+                    aria-controls="sms-details-{{ s.id }}">
+              View
+            </button>
+          </td>
+        </tr>
+
+        <tr>
+          <td colspan="8" class="p-0 border-0">
+            <div class="collapse" id="sms-details-{{ s.id }}">
+              <div class="p-3 bg-light border-top border-bottom">
+
+                <div class="row g-3 mb-3">
+                  <div class="col-md-6">
+                    <div class="small text-muted">Full SMS SID</div>
+                    <div style="font-family:monospace;">{{ s.sms_sid }}</div>
+                  </div>
+
+                  <div class="col-md-6">
+                    <div class="small text-muted">From Number</div>
+                    <div>{{ s.from_number|default:"-" }}</div>
+                  </div>
+
+                  <div class="col-md-6">
+                    <div class="small text-muted">Messaging Service SID</div>
+                    <div class="text-break" style="font-family:monospace;">
+                      {{ s.messaging_service_sid|default:"-" }}
+                    </div>
+                  </div>
+
+                  <div class="col-md-6">
+                    <div class="small text-muted">Account SID</div>
+                    <div class="text-break" style="font-family:monospace;">
+                      {{ s.account_sid|default:"-" }}
+                    </div>
+                  </div>
+
+                  <div class="col-md-3">
+                    <div class="small text-muted">Sent At</div>
+                    <div>{{ s.sent_at|default:s.created_at|date:"Y-m-d H:i:s" }}</div>
+                  </div>
+
+                  <div class="col-md-3">
+                    <div class="small text-muted">Delivered At</div>
+                    <div>
+                      {% if s.delivered_at %}
+                        {{ s.delivered_at|date:"Y-m-d H:i:s" }}
+                      {% else %}
+                        -
+                      {% endif %}
+                    </div>
+                  </div>
+
+                  <div class="col-md-3">
+                    <div class="small text-muted">Clicked At</div>
+                    <div>
+                      {% if s.clicked_at %}
+                        {{ s.clicked_at|date:"Y-m-d H:i:s" }}
+                      {% else %}
+                        -
+                      {% endif %}
+                    </div>
+                  </div>
+
+                  <div class="col-md-3">
+                    <div class="small text-muted">Error Code</div>
+                    <div>{{ s.error_code|default:"-" }}</div>
+                  </div>
+                </div>
+
+                <div class="mb-3">
+                  <div class="small text-muted">Full Message</div>
+                  <div class="border rounded bg-white p-2">
+                    {{ s.body|default:"-" }}
+                  </div>
+                </div>
+
+                <div class="mb-3">
+                  <div class="small text-muted">Full Link</div>
+                  <div class="border rounded bg-white p-2 text-break">
+                    {% if s.link %}
+                      <a href="{{ s.link }}" target="_blank">{{ s.link }}</a>
+                    {% else %}
+                      -
+                    {% endif %}
+                  </div>
+                </div>
+
+                <div>
+                  <div class="small text-muted mb-2">Event History</div>
+
+                  {% if s.events.all %}
+                    <div class="table-responsive">
+                      <table class="table table-sm align-middle mb-0">
+                        <thead class="table-light">
+                          <tr>
+                            <th style="min-width:120px;">Event</th>
+                            <th style="min-width:170px;">Time</th>
+                            <th style="min-width:100px;">Error</th>
+                            <th>User Agent</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {% for ev in s.events.all %}
+                            <tr>
+                              <td>{{ ev.event_type }}</td>
+                              <td class="text-muted small">{{ ev.event_time|date:"Y-m-d H:i:s" }}</td>
+                              <td>{{ ev.error_code|default:"-" }}</td>
+                              <td class="small text-break">{{ ev.user_agent|default:"-" }}</td>
+                            </tr>
+                          {% endfor %}
+                        </tbody>
+                      </table>
+                    </div>
+                  {% else %}
+                    <div class="text-muted small">No event history found.</div>
+                  {% endif %}
+                </div>
+
+              </div>
+            </div>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="8" class="text-muted">No SMS link events found.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if sms_log_page.has_other_pages %}
+  <nav class="mt-3" aria-label="SMS log pages">
+    <ul class="pagination pagination-sm justify-content-center">
+
+      {% if sms_log_page.has_previous %}
+        <li class="page-item">
+          <a class="page-link"
+             href="?tab=sms_link_log&sms_log_page={{ sms_log_page.previous_page_number }}&sms_log_q={{ sms_log_q|urlencode }}&sms_log_status={{ sms_log_status|urlencode }}&sms_log_clicked={{ sms_log_clicked|urlencode }}">
+            Previous
+          </a>
+        </li>
+      {% endif %}
+
+      <li class="page-item disabled">
+        <span class="page-link">Page {{ sms_log_page.number }} of {{ sms_log_page.paginator.num_pages }}</span>
+      </li>
+
+      {% if sms_log_page.has_next %}
+        <li class="page-item">
+          <a class="page-link"
+             href="?tab=sms_link_log&sms_log_page={{ sms_log_page.next_page_number }}&sms_log_q={{ sms_log_q|urlencode }}&sms_log_status={{ sms_log_status|urlencode }}&sms_log_clicked={{ sms_log_clicked|urlencode }}">
+            Next
+          </a>
+        </li>
+      {% endif %}
+    </ul>
+  </nav>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  let smsTimelineChart = null;
+
+  function renderSmsTimelineChart() {
+    const canvas = document.getElementById("smsTimelineChart");
+    if (!canvas) return;
+    if (smsTimelineChart) return;
+
+    const labels = JSON.parse('{{ sms_timeline_labels|escapejs }}');
+    const sentData = JSON.parse('{{ sms_timeline_sent|escapejs }}');
+    const deliveredData = JSON.parse('{{ sms_timeline_delivered|escapejs }}');
+    const clickedData = JSON.parse('{{ sms_timeline_clicked|escapejs }}');
+    const failedData = JSON.parse('{{ sms_timeline_failed|escapejs }}');
+
+    smsTimelineChart = new Chart(canvas, {
+      type: "line",
+      data: {
+        labels: labels,
+        datasets: [
+          { label: "Sent", data: sentData, tension: 0.25 },
+          { label: "Delivered", data: deliveredData, tension: 0.25 },
+          { label: "Clicked", data: clickedData, tension: 0.25 },
+          { label: "Failed", data: failedData, tension: 0.25 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: "index",
+          intersect: false
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              precision: 0
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            position: "top"
+          }
+        }
+      }
+    });
+  }
+
+  const smsTab = document.querySelector('[href="#sms_link_log"]');
+  if (smsTab) {
+    smsTab.addEventListener("shown.bs.tab", function () {
+      renderSmsTimelineChart();
+    });
+  }
+
+  if (document.getElementById("sms_link_log")?.classList.contains("show")) {
+    renderSmsTimelineChart();
+  }
+});
+</script>

@@ -18,10 +18,69 @@
   }
 }
 </style>
+<style>
+  .email-timeline-wrap {
+    height: 280px;
+  }
 
+  @media (max-width: 576px) {
+    .email-timeline-wrap {
+      height: 220px;
+    }
+  }
+</style>
 <div class="d-flex align-items-center justify-content-between mb-2">
   <div class="fw-semibold">Email Log</div>
 </div>
+
+<div class="row g-2 mb-3">
+
+  <div class="col-6 col-md-2">
+    <div class="border rounded bg-white p-2 text-center">
+      <div class="small text-muted">Total</div>
+      <div class="fw-semibold fs-5">{{ email_total }}</div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-2">
+    <div class="border rounded bg-white p-2 text-center">
+      <div class="small text-muted">Delivered</div>
+      <div class="fw-semibold fs-5 text-primary">{{ email_delivered }}</div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-2">
+    <div class="border rounded bg-white p-2 text-center">
+      <div class="small text-muted">Opened</div>
+      <div class="fw-semibold fs-5 text-success">{{ email_opened }}</div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-2">
+    <div class="border rounded bg-white p-2 text-center">
+      <div class="small text-muted">Clicked</div>
+      <div class="fw-semibold fs-5 text-success">{{ email_clicked }}</div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-2">
+    <div class="border rounded bg-white p-2 text-center">
+      <div class="small text-muted">Failed</div>
+      <div class="fw-semibold fs-5 text-danger">{{ email_failed }}</div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+  <div class="card-body">
+    <div class="fw-semibold mb-2">Email Activity Timeline</div>
+    <div class="email-timeline-wrap">
+      <canvas id="emailTimelineChart"></canvas>
+    </div>
+  </div>
+</div>
+
+</div>
+
 
 <form method="get" class="mb-3">
   <input type="hidden" name="tab" value="email_log">
@@ -180,3 +239,67 @@
     </ul>
   </nav>
 {% endif %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  let emailTimelineChart = null;
+
+  function renderEmailTimelineChart() {
+    const canvas = document.getElementById("emailTimelineChart");
+    if (!canvas) return;
+    if (emailTimelineChart) return;
+
+    const labels = JSON.parse('{{ email_timeline_labels|escapejs }}');
+    const totalData = JSON.parse('{{ email_timeline_total|escapejs }}');
+    const deliveredData = JSON.parse('{{ email_timeline_delivered|escapejs }}');
+    const openData = JSON.parse('{{ email_timeline_open|escapejs }}');
+    const clickData = JSON.parse('{{ email_timeline_click|escapejs }}');
+    const failedData = JSON.parse('{{ email_timeline_failed|escapejs }}');
+
+    emailTimelineChart = new Chart(canvas, {
+      type: "line",
+      data: {
+        labels: labels,
+        datasets: [
+          { label: "Total", data: totalData, tension: 0.25 },
+          { label: "Delivered", data: deliveredData, tension: 0.25 },
+          { label: "Opened", data: openData, tension: 0.25 },
+          { label: "Clicked", data: clickData, tension: 0.25 },
+          { label: "Failed", data: failedData, tension: 0.25 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: "index",
+          intersect: false
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              precision: 0
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            position: "top"
+          }
+        }
+      }
+    });
+  }
+
+  const emailTab = document.querySelector('[href="#email_log"]');
+  if (emailTab) {
+    emailTab.addEventListener("shown.bs.tab", function () {
+      renderEmailTimelineChart();
+    });
+  }
+
+  if (document.getElementById("email_log")?.classList.contains("show")) {
+    renderEmailTimelineChart();
+  }
+});
+</script>

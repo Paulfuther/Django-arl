@@ -331,6 +331,8 @@ STRIPE_WEBHOOK_SECRET = "whsec_MLSUcBWyIC20anxyl7wSWarBqjyMCoSH"
 STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
 
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+# ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
+
 # STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY")
 # STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET")
 # STRIPE_PRICE_ID = os.environ.get("STRIPE_PRICE_ID")
@@ -349,6 +351,7 @@ MESSAGE_TAGS = {
 FERNET_PRIMARY_KEY = os.environ["FERNET_PRIMARY_KEY"]          # 32-byte urlsafe base64
 FERNET_OLD_KEYS = [k for k in os.environ.get("FERNET_OLD_KEYS", "").split(",") if k]
 SIN_HASH_SALT = os.environ["SIN_HASH_SALT"]
+
 
 # print("site url:", SITE_URL)
 # print("Twilio Message Service Sid :", MESSAGE_SERVICE_SID)

@@ -28,6 +28,7 @@ urlpatterns = [
             template_name="twilio/40ebffa97ba5035264526bdf252ca040.html"),
     ),
     path("", include("arl.stores.urls")),
+    #path("claude/", include("arl.claude_assistant.urls")),
 
 ] 
 

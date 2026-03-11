@@ -772,9 +772,7 @@ def documents_dashboard(request):
         not employer
         or not request.user.groups.filter(name__in=["Manager", "EMPLOYER"]).exists()
     ):
-        messages.error(
-            request, "You must be an employer or manager to view documents."
-        )
+        messages.error(request, "You must be an employer or manager to view documents.")
         return redirect("home")
 
     active_tab = request.GET.get("tab", "employee")  # employee|store|company
