@@ -43,6 +43,8 @@ attrs==23.1.0
     # via aiohttp
 billiard==4.1.0
     # via celery
+boto==2.49.0
+    # via -r requirements.in
 boto3==1.28.25
     # via -r requirements.in
 botocore==1.31.25
@@ -237,6 +239,8 @@ pdfkit==0.6.0
     # via
     #   -r requirements.in
     #   django-pdfkit
+phonenumbers==8.13.15
+    # via -r requirements.in
 pillow==12.1.1
     # via
     #   -r requirements.in
