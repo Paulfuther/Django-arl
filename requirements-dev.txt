@@ -411,7 +411,9 @@ python-dateutil==2.9.0.post0
     #   faker
     #   pandas
 python-dotenv==1.0.0
-    # via -r requirements-dev.in
+    # via
+    #   -r requirements-dev.in
+    #   -r requirements.in
 python-http-client==3.3.7
     # via
     #   django-sendgrid-v5
