@@ -9,8 +9,32 @@ from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 
 from arl.bucket.helpers import upload_to_linode_object_storage  # adjust if needed
+from arl.user.models import EmployerSMSTask
 
 from .models import ComplianceFile, EmailEvent
+
+
+@admin.register(EmployerSMSTask)
+class EmployerSMSTaskAdmin(admin.ModelAdmin):
+    list_display = (
+        "employer",
+        "task_name",
+        "is_enabled",
+    )
+
+    list_filter = (
+        "employer",
+        "is_enabled",
+    )
+
+    search_fields = (
+        "employer__name",
+        "task_name",
+    )
+
+    list_editable = ("is_enabled",)
+
+    ordering = ("employer", "task_name")
 
 
 @admin.register(ComplianceFile)
@@ -131,5 +155,3 @@ class EmailEventAdmin(admin.ModelAdmin):
         return resp
 
     export_selected_to_xlsx.short_description = "Export selected EmailEvents to XLSX"
-
-
