@@ -17,7 +17,6 @@ from django.db.models import F, Func, IntegerField, OuterRef, Subquery
 from django.utils import timezone
 from django.utils.timezone import now
 from django_celery_results.models import TaskResult
-from arl.msg.models import ShortenedSMSEvent, ShortenedSMSMessage
 from twilio.rest import Client
 
 from arl.celery import app
@@ -28,10 +27,13 @@ from arl.msg.models import (
     EmailTemplate,
     Employer,
     Message,
+    ShortenedSMSEvent,
+    ShortenedSMSMessage,
     SmsLog,
-    
 )
 from arl.setup.models import TenantApiKeys
+from arl.user.models import SMSOptOut, EmployerSMSTask
+
 from .helpers import (
     client,
     create_master_email,
