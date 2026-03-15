@@ -430,4 +430,6 @@ yarl==1.19.0
 
 # The following packages are considered to be unsafe in a requirements file:
 setuptools==82.0.1
-    # via docusign-esign
+    # via
+    #   -r requirements.in
+    #   docusign-esign
