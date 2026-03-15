@@ -56,6 +56,7 @@ celery==5.3.1
     #   -r requirements.in
     #   django-celery-beat
     #   django-celery-results
+    #   flower
 certifi==2025.1.31
     # via
     #   docusign-esign
@@ -162,6 +163,8 @@ et-xmlfile==1.1.0
     # via openpyxl
 exceptiongroup==1.1.2
     # via anyio
+flower==2.0.0
+    # via -r requirements.in
 freetype-py==2.3.0
     # via
     #   reportlab
@@ -183,6 +186,8 @@ httpx==0.28.1
     #   -r requirements.in
     #   anthropic
     #   openai
+humanize==4.15.0
+    # via flower
 idna==3.7
     # via
     #   -r requirements.in
@@ -242,6 +247,8 @@ pillow-heif==1.1.0
     # via -r requirements.in
 ply==3.11
     # via stone
+prometheus-client==0.24.1
+    # via flower
 prompt-toolkit==3.0.39
     # via click-repl
 propcache==0.3.1
@@ -302,6 +309,7 @@ python-http-client==3.3.7
 pytz==2023.3
     # via
     #   django-timezone-field
+    #   flower
     #   pandas
     #   twilio
 pyyaml==6.0
@@ -361,7 +369,9 @@ tinycss2==1.2.1
     #   cssselect2
     #   svglib
 tornado==6.5.5
-    # via -r requirements.in
+    # via
+    #   -r requirements.in
+    #   flower
 tqdm==4.66.5
     # via openai
 twilio==8.4.0

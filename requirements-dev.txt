@@ -200,7 +200,9 @@ filelock==3.25.2
 flake8==6.0.0
     # via -r requirements-dev.in
 flower==2.0.0
-    # via -r requirements-dev.in
+    # via
+    #   -r requirements-dev.in
+    #   -r requirements.in
 freetype-py==2.3.0
     # via
     #   reportlab
