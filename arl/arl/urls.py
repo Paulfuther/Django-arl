@@ -29,6 +29,7 @@ urlpatterns = [
     ),
     path("", include("arl.stores.urls")),
     #path("claude/", include("arl.claude_assistant.urls")),
+    path("documentflow/", include("arl.documentflow.urls")),
 
 ] 
 

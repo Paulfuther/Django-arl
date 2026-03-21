@@ -1,0 +1,76 @@
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+  <div>
+    <h4 class="mb-1">Employee Documents</h4>
+    <div class="text-muted small">
+      View and manage employee, store, and company documents in the main Documents area.
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body">
+    <div class="row g-3 align-items-center">
+      <div class="col-12 col-lg-8">
+        <h5 class="mb-2">Open Documents Center</h5>
+        <p class="text-muted mb-0">
+          Use the Documents section to search employee documents, upload files, and review company or store records.
+        </p>
+      </div>
+
+      <div class="col-12 col-lg-4 text-lg-end">
+        <a href="{% url 'documents_dashboard' %}?tab=employee"
+           class="btn btn-outline-primary mobile-btn">
+          <i class="fas fa-folder-open me-1"></i>
+          Open Employee Documents
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-md-4">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <h6 class="mb-2">Employee Documents</h6>
+        <p class="text-muted small mb-3">
+          Search and review documents attached to employees.
+        </p>
+        <a href="{% url 'documents_dashboard' %}?tab=employee"
+           class="btn btn-sm btn-outline-secondary">
+          Go to Employee Docs
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-4">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <h6 class="mb-2">Store Documents</h6>
+        <p class="text-muted small mb-3">
+          Open location-based document records and uploads.
+        </p>
+        <a href="{% url 'documents_dashboard' %}?tab=store"
+           class="btn btn-sm btn-outline-secondary">
+          Go to Store Docs
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-4">
+    <div class="card shadow-sm border-0 h-100">
+      <div class="card-body">
+        <h6 class="mb-2">Company Documents</h6>
+        <p class="text-muted small mb-3">
+          View documents stored at the company level.
+        </p>
+        <a href="{% url 'documents_dashboard' %}?tab=company"
+           class="btn btn-sm btn-outline-secondary">
+          Go to Company Docs
+        </a>
+      </div>
+    </div>
+  </div>
+</div>

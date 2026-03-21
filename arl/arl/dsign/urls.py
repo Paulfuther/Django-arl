@@ -23,6 +23,7 @@ from arl.dsign.views import (
     retrieve_docusign_envelope,
     set_new_hire_template,
     start_in_app_signing,
+    store_docs_search,
     upload_company_documents_async,
     upload_employee_documents,
     waiting_for_others_view,
@@ -81,6 +82,7 @@ urlpatterns = [
         "documents/search/employee/", employee_docs_search, name="employee_docs_search"
     ),
     path("documents/search/company/", company_docs_search, name="company_docs_search"),
+    path("documents/search/store", store_docs_search, name="store_docs_search"),
     path(
         "documents/company/upload/",
         upload_company_documents_async,

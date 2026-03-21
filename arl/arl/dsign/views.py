@@ -982,6 +982,33 @@ def company_docs_search(request):
     )
 
 
+@login_required
+def store_docs_search(request):
+    employer = getattr(request.user, "employer", None)
+    if not employer:
+        return HttpResponse("No employer found.", status=400)
+
+    q = (request.GET.get("q") or "").strip()
+
+    docs = SignedDocumentFile.objects.filter(
+        employer=employer,
+        store__isnull=False,
+    ).select_related("store", "user")
+
+    if q:
+        docs = docs.filter(store__number__icontains=q)
+    else:
+        docs = docs.none()
+
+    docs = docs.order_by("-uploaded_at")
+
+    return render(
+        request,
+        "user/documents/partials/store_results.html",
+        {"docs": docs, "q": q},
+    )
+
+
 MAX_BYTES = 100 * 1024 * 1024  # 100 MB
 
 

@@ -79,4 +79,5 @@ class SignedDocumentFile(models.Model):
         # Ensure either user OR store is set (but not both / not neither)
         if bool(self.user) == bool(self.store):
             raise ValidationError("Document must be linked to either a user or a store.")
-        
+
+

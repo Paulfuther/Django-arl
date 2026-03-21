@@ -1,0 +1,241 @@
+{% extends "base/base.html" %}
+{% block title %}HR Dashboard{% endblock %}
+{% block template %}
+
+{% include "base/navbar.html" %}
+{% load crispy_forms_tags %}
+
+<style>
+/* ===== Sidebar (desktop) ===== */
+#hrNav {
+  min-height: 100vh;
+  border-right: 1px solid #dee2e6;
+  background: #fff;
+  padding: .75rem .5rem;
+}
+.sidebar-legend {
+  font-size: .7rem;
+  letter-spacing: .05em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  color: #6c757d;
+  margin-bottom: 1rem;
+}
+.hr-nav-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: .5rem;
+  border-radius: .5rem;
+  color: inherit;
+  text-decoration: none;
+}
+.hr-nav-link .material-symbols-outlined {
+  font-size: 28px;
+  line-height: 1;
+}
+.hr-nav-link.active,
+.hr-nav-link:hover {
+  color: #0d6efd;
+  background: #f1f5ff;
+}
+
+/* ===== Mobile nav ===== */
+#hrNavMobile .hr-nav-link {
+  padding: .5rem;
+  border-radius: .5rem;
+  text-decoration: none;
+  color: inherit;
+}
+#hrNavMobile .hr-nav-link.active,
+#hrNavMobile .hr-nav-link:hover {
+  color: #0d6efd;
+  background: #f1f5ff;
+}
+
+/* ===== Shared HR content styling ===== */
+.mobile-btn { font-size: 14px; padding: 6px 12px; border-radius: 8px; }
+
+.card-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+@media (min-width: 768px) { .card-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 992px) { .card-grid { grid-template-columns: repeat(3, 1fr); } }
+
+.template-card, .invite-card, .user-card {
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: .5rem;
+  box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,.075);
+  padding: 1rem;
+}
+
+.template-meta { font-size: .85rem; color: #666; }
+
+.invite-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 1rem;
+  font-size: 14px;
+}
+
+.invite-actions {
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+}
+
+.invite-actions .btn {
+  font-size: 13px;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+@media (max-width: 576px) {
+  .invite-card { grid-template-columns: 1fr; }
+  .invite-actions { flex-direction: row; flex-wrap: wrap; margin-top: .75rem; }
+  .invite-actions .btn { flex: 1 1 auto; }
+}
+</style>
+
+<div class="container mb-2" style="height: 95vh;">
+  <div class="row justify-content-center pt-5 mt-5"></div>
+  <div class="row justify-content-center">
+
+    <!-- ===== Desktop Sidebar ===== -->
+    <aside class="d-none d-lg-block col-lg-1 px-0">
+      <div id="hrNav" class="d-flex flex-column align-items-center py-3">
+        <div class="sidebar-legend fw-semibold mb-3">
+          <div>HR</div><div>Center</div>
+        </div>
+
+        <nav class="nav flex-column align-items-center" role="tablist" aria-orientation="vertical">
+          <a class="hr-nav-link {% if active_tab == 'docusign' %}active{% endif %}"
+             data-bs-toggle="tab"
+             href="#docusign"
+             role="tab"
+             data-title="Templates">
+            <i class="material-symbols-outlined">draw</i>
+          </a>
+
+          <a class="hr-nav-link {% if active_tab == 'employees' %}active{% endif %}"
+             data-bs-toggle="tab"
+             href="#employees"
+             role="tab"
+             data-title="Invite">
+            <i class="material-symbols-outlined">person_add</i>
+          </a>
+
+          <a class="hr-nav-link {% if active_tab == 'user_roles' %}active{% endif %}"
+             data-bs-toggle="tab"
+             href="#user_roles"
+             role="tab"
+             data-title="Roles">
+            <i class="material-symbols-outlined">admin_panel_settings</i>
+          </a>
+
+          <a class="hr-nav-link {% if active_tab == 'employee_docs' %}active{% endif %}"
+             data-bs-toggle="tab"
+             href="#employee_docs"
+             role="tab"
+             data-title="Documents">
+            <i class="material-symbols-outlined">folder_open</i>
+          </a>
+
+          <a class="hr-nav-link {% if active_tab == 'document_audit' %}active{% endif %}"
+             data-bs-toggle="tab"
+             href="#document_audit"
+             role="tab"
+             data-title="Audit">
+            <i class="material-symbols-outlined">history</i>
+          </a>
+        </nav>
+      </div>
+    </aside>
+
+    <!-- ===== Mobile Top Nav ===== -->
+    <div id="hrNavMobile" class="d-flex d-lg-none justify-content-around border-bottom py-2"
+         role="tablist"
+         aria-orientation="horizontal">
+      <a class="hr-nav-link {% if active_tab == 'docusign' %}active{% endif %}"
+         data-bs-toggle="tab"
+         href="#docusign"
+         role="tab">
+        <i class="material-symbols-outlined">draw</i>
+      </a>
+
+      <a class="hr-nav-link {% if active_tab == 'employees' %}active{% endif %}"
+         data-bs-toggle="tab"
+         href="#employees"
+         role="tab">
+        <i class="material-symbols-outlined">person_add</i>
+      </a>
+
+      <a class="hr-nav-link {% if active_tab == 'user_roles' %}active{% endif %}"
+         data-bs-toggle="tab"
+         href="#user_roles"
+         role="tab">
+        <i class="material-symbols-outlined">admin_panel_settings</i>
+      </a>
+
+      <a class="hr-nav-link {% if active_tab == 'employee_docs' %}active{% endif %}"
+         data-bs-toggle="tab"
+         href="#employee_docs"
+         role="tab">
+        <i class="material-symbols-outlined">folder_open</i>
+      </a>
+
+      <a class="hr-nav-link {% if active_tab == 'document_audit' %}active{% endif %}"
+         data-bs-toggle="tab"
+         href="#document_audit"
+         role="tab">
+        <i class="material-symbols-outlined">history</i>
+      </a>
+    </div>
+
+    <!-- ===== Content ===== -->
+    <section class="col-12 col-lg-11">
+      <div class="tab-content mt-2" id="hrTabContent">
+
+        <div id="docusign" class="tab-pane fade {% if active_tab == 'docusign' %}show active{% endif %}">
+          {% include "user/hr/partials/docusign_templates.html" %}
+        </div>
+
+        <div id="employees" class="tab-pane fade {% if active_tab == 'employees' %}show active{% endif %}">
+          {% include "user/hr/partials/invite_employee.html" %}
+        </div>
+
+        <div id="user_roles" class="tab-pane fade {% if active_tab == 'user_roles' %}show active{% endif %}">
+          {% include "user/hr/partials/user_roles_shell.html" %}
+        </div>
+
+        <div id="employee_docs" class="tab-pane fade {% if active_tab == 'employee_docs' %}show active{% endif %}">
+          {% include "user/hr/partials/employee_docs.html" %}
+        </div>
+
+        <div id="document_audit" class="tab-pane fade {% if active_tab == 'document_audit' %}show active{% endif %}">
+          {% include "documentflow/partials/document_audit_log.html" %}
+        </div>
+
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  document.querySelectorAll('[data-bs-toggle="tab"]').forEach(function (tabEl) {
+    tabEl.addEventListener("shown.bs.tab", function (event) {
+      const href = event.target.getAttribute("href");
+      if (!href || !href.startsWith("#")) return;
+
+      const tabName = href.replace("#", "");
+      const url = new URL(window.location);
+
+      url.searchParams.set("tab", tabName);
+      window.history.replaceState({}, "", url);
+    });
+  });
+});
+</script>
+
+{% endblock %}
