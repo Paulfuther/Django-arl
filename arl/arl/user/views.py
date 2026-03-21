@@ -15,7 +15,7 @@ from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.models import Group
 from django.contrib.auth.views import LoginView
 from django.core.paginator import Paginator
-from django.db.models import Count, Prefetch, Q
+from django.db.models import Count, Q
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.http import (
@@ -40,6 +40,7 @@ from twilio.base.exceptions import TwilioException
 from twilio.rest import Client
 
 from arl.bucket.helpers import download_from_s3
+from arl.documentflow.services import build_document_audit
 from arl.dsign.models import DocuSignTemplate, SignedDocumentFile
 from arl.dsign.tasks import create_docusign_envelope_task
 from arl.msg.helpers import check_verification_token, request_verification_token
@@ -47,6 +48,7 @@ from arl.msg.models import EmailTemplate
 from arl.msg.tasks import send_sms_task
 from arl.setup.helpers import employer_hr_required
 from arl.setup.models import EmployerRequest
+from arl.user.services import set_user_sin
 
 from .forms import (
     CustomUserCreationForm,
@@ -62,7 +64,6 @@ from .tasks import (
     send_new_hire_invite_task,
     send_newhire_template_email_task,
 )
-from arl.user.services import set_user_sin
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -642,9 +643,6 @@ def setup_totp(request):
             device.confirmed = True
             device.save()
 
-            # ✅ Now log the user in
-            from django.contrib.auth import login
-
             login(request, user)
 
             request.session.pop("pre_2fa_user_id", None)
@@ -783,21 +781,17 @@ def landing_page(request):
     return render(request, "user/landing_page.html")
 
 
-@login_required
-def hr_dashboard(request):
-    """HR Dashboard: Invite new hires and manage DocuSign templates."""
-    employer = request.user.employer  # Get employer data
+# ------ HR dashboard -------- #
 
-    # ✅ Restrict access to Managers & Employers only
-    if (
-        not employer
-        or not request.user.groups.filter(name__in=["Manager", "EMPLOYER"]).exists()
-    ):
-        messages.error(
-            request, "You must be an employer or manager to invite new hires."
-        )
-        return redirect("home")
 
+def _user_can_access_hr_dashboard(user):
+    employer = getattr(user, "employer", None)
+    if not employer:
+        return False
+    return user.groups.filter(name__in=["Manager", "EMPLOYER"]).exists()
+
+
+def _get_hr_templates(employer):
     templates = DocuSignTemplate.objects.filter(employer=employer).order_by(
         "-is_new_hire_template", "template_name"
     )
@@ -805,86 +799,91 @@ def hr_dashboard(request):
         template.template_status = (
             "Ready to Send" if template.is_ready_to_send else "Incomplete"
         )
+    return templates
 
-    pending_invites = NewHireInvite.objects.filter(
-        employer=employer, used=False
-    )  # Fetch pending invites
 
-    if request.method == "POST":
-        form = NewHireInviteForm(
-            request.POST,
-            employer=employer,
-            invited_by=request.user,
+def _get_pending_invites(employer):
+    return NewHireInvite.objects.filter(employer=employer, used=False)
+
+
+def _handle_invite_post(request, employer):
+    form = NewHireInviteForm(
+        request.POST,
+        employer=employer,
+        invited_by=request.user,
+    )
+
+    if not form.is_valid():
+        request.session["form_errors"] = form.errors
+        request.session["form_data"] = request.POST
+        messages.error(request, "Please correct the errors in the form.")
+        return HttpResponseRedirect(reverse("hr_dashboard") + "?tab=employees")
+
+    email = form.cleaned_data["email"]
+    departed_name = form.cleaned_data.get("departed_name")
+    departed_email = form.cleaned_data.get("departed_email")
+
+    if CustomUser.objects.filter(email=email).exists():
+        messages.error(request, f"A user with email {email} already exists.")
+        return HttpResponseRedirect(reverse("hr_dashboard") + "?tab=employees")
+
+    if departed_name or departed_email:
+        notify_hr_about_departure.delay(
+            departed_name=departed_name,
+            departed_email=departed_email,
+            employer_id=request.user.employer_id,
         )
 
-        if form.is_valid():
-            email = form.cleaned_data["email"]
-            departed_name = form.cleaned_data.get("departed_name")
-            departed_email = form.cleaned_data.get("departed_email")
+    invite = form.save()
 
-            if CustomUser.objects.filter(email=email).exists():
-                messages.error(request, f"A user with email {email} already exists.")
-                return HttpResponseRedirect(reverse("hr_dashboard") + "?tab=employees")
+    logger.info(
+        "New hire invite created: invited_by=%s (%s), new_hire=%s (%s), employer=%s",
+        request.user.get_full_name() or request.user.username,
+        request.user.id,
+        invite.name,
+        invite.email,
+        employer.name,
+    )
 
-            if departed_name or departed_email:
-                notify_hr_about_departure.delay(
-                    departed_name=departed_name,
-                    departed_email=departed_email,
-                    employer_id=request.user.employer_id,
-                )
+    send_new_hire_invite_task.delay(
+        new_hire_email=invite.email,
+        new_hire_name=invite.name,
+        role=invite.role,
+        start_date="TBD",
+        employer_id=employer.id,
+    )
 
-            invite = form.save()
+    messages.success(request, f"Invite sent to {invite.name} {invite.email}")
+    return HttpResponseRedirect(reverse("hr_dashboard") + "?tab=employees")
 
-            # 🔥 Log who invited whom
-            logger.info(
-                "New hire invite created: invited_by=%s (%s), new_hire=%s (%s), employer=%s",
-                request.user.get_full_name() or request.user.username,
-                request.user.id,
-                invite.name,
-                invite.email,
-                employer.name,
-            )
 
-            send_new_hire_invite_task.delay(
-                new_hire_email=invite.email,
-                new_hire_name=invite.name,
-                role=invite.role,
-                start_date="TBD",
-                employer_id=employer.id,
-            )
-
-            messages.success(request, f"Invite sent to {invite.name}  {invite.email}")
-            return HttpResponseRedirect(reverse("hr_dashboard") + "?tab=employees")
-
-        else:
-            # Save the form in the session to repopulate it after redirect (optional)
-            request.session["form_errors"] = form.errors
-            request.session["form_data"] = request.POST
-            messages.error(request, "Please correct the errors in the form.")
-            return HttpResponseRedirect(reverse("hr_dashboard") + "?tab=employees")
-
-    # ✅ Handle GET request
+def _get_invite_form(request, employer):
     if "form_errors" in request.session:
         form = NewHireInviteForm(
-            data=request.session.get("form_data"), employer=employer
+            data=request.session.get("form_data"),
+            employer=employer,
         )
         form._errors = request.session.pop("form_errors")
         request.session.pop("form_data", None)
-    else:
-        form = NewHireInviteForm(employer=employer)
+        return form
 
-    # ✅ Check for DocuSign event
+    return NewHireInviteForm(employer=employer)
+
+
+def _get_active_tab_and_document_tab(request):
     event = request.GET.get("event")
     tab = request.GET.get("tab")
     document_tab = request.GET.get("document_tab", "employee")
+
     if event and not tab:
-        # ✅ If coming back from signing and no tab selected, default to "docusign"
         active_tab = "docusign"
     else:
-        active_tab = (
-            tab or "docusign"
-        )  # Default to docusign if nothing else is provided
+        active_tab = tab or "docusign"
 
+    return active_tab, document_tab, event
+
+
+def _handle_signing_event_messages(request, event):
     if event == "signing_complete":
         messages.success(request, "✅ Thanks for signing your document!")
     elif event == "decline":
@@ -892,67 +891,120 @@ def hr_dashboard(request):
     elif event == "cancel":
         messages.warning(request, "⚠️ You canceled signing the document.")
 
-    # ✅ Fetch employee documents (is_company_document = False)
-    employee_documents = SignedDocumentFile.objects.filter(
-        employer=employer, is_company_document=False
+
+def _get_company_documents(employer):
+    return SignedDocumentFile.objects.filter(
+        employer=employer,
+        is_company_document=True,
     )
 
-    # ✅ Fetch company documents (is_company_document = True)
-    company_documents = SignedDocumentFile.objects.filter(
-        employer=employer, is_company_document=True
-    )
 
-    # --- Employee Docs search ---
+def _get_employee_docs_search_context(employer, active_tab, request):
     doc_q = (request.GET.get("doc_q") or "").strip()
     employees = []
     employee_documents = []
 
-    if active_tab == "employee_docs":
-        if doc_q:
-            employees = (
-                CustomUser.objects.filter(
-                    employer=employer, is_active=True
-                )
-                .filter(
-                    Q(first_name__icontains=doc_q)
-                    | Q(last_name__icontains=doc_q)
-                    | Q(email__icontains=doc_q)
-                )
-                .annotate(doc_count=Count("signed_documents"))
-                .order_by("first_name", "last_name")
+    if active_tab == "employee_docs" and doc_q:
+        employees = (
+            CustomUser.objects.filter(employer=employer, is_active=True)
+            .filter(
+                Q(first_name__icontains=doc_q)
+                | Q(last_name__icontains=doc_q)
+                | Q(email__icontains=doc_q)
             )
+            .annotate(doc_count=Count("signed_documents"))
+            .order_by("first_name", "last_name")
+        )
 
-            # pull docs for only those employees
-            employee_documents = (
-                SignedDocumentFile.objects.filter(
-                    employer=employer,
-                    is_company_document=False,
-                    user__in=employees,
-                )
-                .select_related("user")
-                .order_by("-uploaded_at")
+        employee_documents = (
+            SignedDocumentFile.objects.filter(
+                employer=employer,
+                is_company_document=False,
+                user__in=employees,
             )
-        else:
-            # no query → show nothing
-            employees = []
-            employee_documents = []
+            .select_related("user")
+            .order_by("-uploaded_at")
+        )
 
-    return render(
-        request,
-        "user/hr_dashboard.html",
-        {
-            "form": form,
-            "templates": templates,
-            "pending_invites": pending_invites,
-            "active_tab": active_tab,
-            "document_tab": document_tab,
-            "employer": employer,
-            "employee_documents": employee_documents,
-            "company_documents": company_documents,
-            "employees": employees,
-            "doc_q": doc_q,
-        },
+    return {
+        "doc_q": doc_q,
+        "employees": employees,
+        "employee_documents": employee_documents,
+    }
+
+
+@login_required
+def hr_dashboard(request):
+    employer = getattr(request.user, "employer", None)
+
+    if not _user_can_access_hr_dashboard(request.user):
+        messages.error(
+            request, "You must be an employer or manager to invite new hires."
+        )
+        return redirect("home")
+
+    if request.method == "POST":
+        return _handle_invite_post(request, employer)
+
+    form = _get_invite_form(request, employer)
+    active_tab = "document_audit"
+    document_tab = "employee"
+    event = None
+    #active_tab, document_tab, event = _get_active_tab_and_document_tab(request)
+    _handle_signing_event_messages(request, event)
+
+    #print("ACTIVE TAB:", active_tab)
+    print("URL TAB:", request.GET.get("tab"))
+
+    templates = _get_hr_templates(employer)
+    pending_invites = _get_pending_invites(employer)
+    company_documents = _get_company_documents(employer)
+
+    employee_docs_context = _get_employee_docs_search_context(
+        employer=employer,
+        active_tab=active_tab,
+        request=request,
     )
+
+    initial_partial_map = {
+        "docusign": "user/hr/partials/docusign_templates.html",
+        "employees": "user/hr/partials/invite_employee.html",
+        "user_roles": "user/hr/partials/user_roles_shell.html",
+        "employee_docs": "user/hr/partials/employee_docs.html",
+        "document_audit": "documentflow/partials/document_audit_log.html",
+    }
+
+    initial_partial = initial_partial_map.get(
+        active_tab, initial_partial_map["docusign"]
+    )
+
+    context = {
+        "form": form,
+        "templates": templates,
+        "pending_invites": pending_invites,
+        "active_tab": active_tab,
+        "document_tab": document_tab,
+        "employer": employer,
+        "company_documents": company_documents,
+        "initial_partial": initial_partial,
+        **employee_docs_context,
+    }
+
+    audit_search = (request.GET.get("audit_q") or "").strip()
+    audit_incomplete_only = request.GET.get("audit_incomplete") == "1"
+
+    document_audit_context = build_document_audit(
+        employer=employer,
+        search_query=audit_search,
+        incomplete_only=audit_incomplete_only,
+    )
+    context.update(document_audit_context)
+    print("ACTIVE TAB FINAL:", active_tab)
+    print("ROWS FINAL:", len(context.get("rows", [])))
+    return render(request, "user/hr/hr_dashboard.html", context)
+
+
+# ------ End of HR dashbard ----- #
 
 
 @login_required
@@ -1000,13 +1052,18 @@ def employee_quick_search(request):
     q = (request.GET.get("q") or "").strip()
     results = []
     if employer and q:
-        results = (CustomUser.objects
-                   .filter(employer=employer, is_active=True)
-                   .filter(Q(first_name__icontains=q) |
-                           Q(last_name__icontains=q) |
-                           Q(email__icontains=q))
-                   .order_by('first_name', 'last_name')[:20])
-    return render(request, "user/hr/partials/employee_quick_search.html", {"results": results})
+        results = (
+            CustomUser.objects.filter(employer=employer, is_active=True)
+            .filter(
+                Q(first_name__icontains=q)
+                | Q(last_name__icontains=q)
+                | Q(email__icontains=q)
+            )
+            .order_by("first_name", "last_name")[:20]
+        )
+    return render(
+        request, "user/hr/partials/employee_quick_search.html", {"results": results}
+    )
 
 
 @login_required
@@ -1208,5 +1265,3 @@ def update_user_roles(request, user_id):
         )
 
     return HttpResponseBadRequest("Invalid request")
-
-

@@ -1,0 +1,63 @@
+{% if messages and active_tab == 'docusign' %}
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+  <a href="{% url 'create_new_document_page' %}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary mobile-btn">
+    <i class="fas fa-plus"></i> Create New Document
+  </a>
+</div>
+
+<div class="card-grid mt-3">
+  {% for template in templates %}
+    <div class="template-card">
+      <div style="font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem; word-break: break-word;">
+        {{ template.template_name }}
+        {% if template.is_new_hire_template %}
+          <span class="ms-2">&#x2705;</span>
+        {% endif %}
+      </div>
+
+      <p class="template-meta">
+        <strong>Created At:</strong> {{ template.created_at }}
+        {% if template.template_status == "Ready to Send" %}
+          <span class="badge bg-success">{{ template.template_status }}</span>
+        {% else %}
+          <span class="badge bg-warning text-dark">{{ template.template_status }}</span>
+        {% endif %}
+      </p>
+
+      <div class="template-actions">
+        <a href="{% url 'edit_document_page' template.template_id %}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-primary mobile-btn">
+          Edit
+        </a>
+      </div>
+
+      <form method="post" action="{% url 'set_new_hire_template' template.id %}" class="mt-2">
+        {% csrf_token %}
+
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" name="is_new_hire_template" onchange="this.form.submit()" {% if template.is_new_hire_template %}checked{% endif %}>
+          <label class="form-check-label">Mark as New Hire File</label>
+        </div>
+
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="is_in_app_signing_template" onchange="this.form.submit()" {% if template.is_in_app_signing_template %}checked{% endif %}>
+          <label class="form-check-label">In-App Signing Template</label>
+        </div>
+
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" name="is_company_document" onchange="this.form.submit()" {% if template.is_company_document %}checked{% endif %}>
+          <label class="form-check-label">Mark as Company Document</label>
+        </div>
+      </form>
+    </div>
+  {% empty %}
+    <p>No templates found.</p>
+  {% endfor %}
+</div>

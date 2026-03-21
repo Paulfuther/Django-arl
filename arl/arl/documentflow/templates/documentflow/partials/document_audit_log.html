@@ -1,0 +1,222 @@
+<div class="mb-4">
+  <h4 class="mb-1">Document Audit</h4>
+  <div class="text-muted small">
+    {% if flow %}{{ flow.name }}{% else %}No active default flow configured{% endif %}
+  </div>
+</div>
+
+{% if not flow %}
+  <div class="alert alert-warning">
+    No active default document flow has been configured for this employer yet.
+  </div>
+{% else %}
+
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+      <form method="get" class="row g-2 align-items-end">
+        <input type="hidden" name="tab" value="document_audit">
+
+        <div class="col-12 col-md-6">
+          <label class="form-label small text-muted mb-1">Search employee</label>
+          <input
+            type="text"
+            name="audit_q"
+            value="{{ audit_search }}"
+            class="form-control"
+            placeholder="Search by name or email">
+        </div>
+
+        <div class="col-12 col-md-3">
+          <div class="form-check mt-4">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              name="audit_incomplete"
+              value="1"
+              id="audit_incomplete"
+              {% if audit_incomplete_only %}checked{% endif %}>
+            <label class="form-check-label" for="audit_incomplete">
+              Incomplete only
+            </label>
+          </div>
+        </div>
+
+        <div class="col-12 col-md-3 d-flex gap-2">
+          <button type="submit" class="btn btn-outline-primary w-100">Filter</button>
+          <a href="{% url 'hr_dashboard' %}?tab=document_audit" class="btn btn-outline-secondary w-100">Reset</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+{% for row in rows %}
+  <div class="card shadow-sm border-0 mb-3 audit-card {% if not row.is_complete %}audit-card-warning{% endif %}">
+    <div class="card-body">
+
+      <div class="audit-header">
+        <div class="audit-employee">
+          <h5 class="mb-1 audit-name">
+            {{ row.employee.get_full_name|default:row.employee.username }}
+          </h5>
+
+          <div class="text-muted small audit-meta">
+            <span>Joined {{ row.employee.date_joined|date:"F j, Y" }}</span>
+            {% if row.employee.store %}
+              <span>• Store {{ row.employee.store.number }}</span>
+            {% endif %}
+            {% if row.employee.email %}
+              <span>• {{ row.employee.email }}</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="audit-summary">
+          <div class="audit-fraction">
+            {{ row.completed_count }}/{{ row.total_count }}
+            <span class="audit-fraction-label ms-1">complete</span>
+          </div>
+        </div>
+      </div>  {# <-- closes audit-header #}
+
+      <div class="audit-doc-row mt-3">
+        {% for cell in row.cells %}
+          {% if cell.is_signed %}
+            <span class="audit-doc-pill is-signed">
+              {{ cell.step.display_name }} ✓
+            </span>
+          {% else %}
+            <span class="audit-doc-pill is-missing">
+              {{ cell.step.display_name }} ✕
+            </span>
+          {% endif %}
+        {% endfor %}
+      </div>
+
+      {% if row.total_count > 0 %}
+        {% widthratio row.completed_count row.total_count 100 as progress %}
+        <div class="w-100 mt-3">
+          <div class="progress audit-progress">
+            <div
+              class="progress-bar"
+              style="width: {{ progress }}%; background: {% if row.is_complete %}#198754{% else %}#0d6efd{% endif %};">
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+    </div>
+  </div>
+{% empty %}
+  <div class="alert alert-info">
+    No employees found.
+  </div>
+{% endfor %}
+
+{% endif %}
+
+<style>
+  .audit-card {
+    border-radius: 1rem;
+  }
+
+  .audit-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .audit-employee {
+    flex: 1 1 320px;
+    min-width: 0;
+  }
+
+  .audit-name {
+    word-break: break-word;
+    font-weight: 600;
+  }
+
+  .audit-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+  }
+
+  .audit-summary {
+    flex: 0 0 auto;
+    text-align: right;
+    min-width: 72px;
+  }
+
+  .audit-doc-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+  }
+
+  .audit-doc-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: .45rem .8rem;
+    border-radius: 999px;
+    font-size: .85rem;
+    font-weight: 500;
+    border: 1px solid transparent;
+    line-height: 1.2;
+  }
+
+  .audit-doc-pill.is-signed {
+    background: #d1e7dd;
+    color: #0f5132;
+    border-color: #badbcc;
+  }
+
+  .audit-doc-pill.is-missing {
+    background: #f8d7da;
+    color: #842029;
+    border-color: #f5c2c7;
+  }
+
+  .audit-progress {
+    height: 6px;
+    background: #e9ecef;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .audit-fraction {
+  font-size: 1rem;
+  font-weight: 700;
+  }
+
+  .audit-fraction-label {
+    font-size: 0.75rem;
+    color: #6c757d;
+    font-weight: 400;
+  }
+  .audit-card-warning {
+    border-left: 4px solid #dc3545;
+    background: linear-gradient(to right, #fff3f4 0%, #ffffff 20%);
+  }
+
+  .audit-card {
+    transition: all 0.15s ease;
+  }
+
+  .audit-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0.25rem 0.5rem rgba(0,0,0,.08);
+  }
+
+  @media (max-width: 576px) {
+    .audit-summary {
+      text-align: left;
+      min-width: auto;
+    }
+
+    .audit-header {
+      gap: .75rem;
+    }
+  }
+</style>

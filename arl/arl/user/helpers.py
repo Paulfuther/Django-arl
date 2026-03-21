@@ -68,3 +68,4 @@ def send_new_hire_invite(new_hire_email, new_hire_name, role, start_date, employ
     except Exception as e:
         print(f"🚨 Error sending new hire invite: {e}")
         return False
+

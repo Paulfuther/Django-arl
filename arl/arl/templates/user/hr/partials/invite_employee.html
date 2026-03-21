@@ -1,0 +1,45 @@
+{% load crispy_forms_tags %}
+
+<h4 class="mb-3">Invite a New Hire</h4>
+
+{% if messages and active_tab == 'employees' %}
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<div class="card shadow-sm p-3 p-md-4 mb-4">
+  <form method="post">
+    {% csrf_token %}
+    {{ form|crispy }}
+    <button type="submit" class="btn btn-outline-primary mobile-btn mt-3">Invite</button>
+  </form>
+</div>
+
+<h4 class="mb-3">Pending Invitations</h4>
+
+{% if pending_invites %}
+  <div class="invite-grid">
+    {% for invite in pending_invites %}
+      <div class="invite-card">
+        <div class="invite-info">
+          <strong>{{ invite.name }}</strong><br>
+          <span>{{ invite.email }}</span><br>
+          <span class="text-muted">{{ invite.get_role_display }}</span><br>
+          <span class="text-muted">Sent: {{ invite.created_at|date:"Y-m-d H:i" }}</span>
+        </div>
+
+        <div class="invite-actions">
+          <a href="{{ invite.get_invite_link }}" target="_blank" class="btn btn-sm btn-outline-primary">Copy Link</a>
+          <a href="{% url 'resend_invite' invite.id %}" class="btn btn-sm btn-warning">Resend</a>
+          <a href="{% url 'cancel_invite' invite.id %}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to cancel this invite?');">Cancel</a>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="text-muted">No pending invitations.</p>
+{% endif %}
