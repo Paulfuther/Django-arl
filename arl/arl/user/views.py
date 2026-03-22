@@ -969,7 +969,7 @@ def hr_dashboard(request):
     initial_partial_map = {
         "docusign": "user/hr/partials/docusign_templates.html",
         "employees": "user/hr/partials/invite_employee.html",
-        "user_roles": "user/hr/partials/user_roles_shell.html",
+        "user_roles": "user/hr/partials/user_roles.html",
         "employee_docs": "user/hr/partials/employee_docs.html",
         "document_audit": "documentflow/partials/document_audit_log.html",
     }
@@ -1244,22 +1244,29 @@ def search_user_roles(request):
 @login_required
 @employer_hr_required
 def update_user_roles(request, user_id):
-    user = get_object_or_404(User, pk=user_id)
+    user = get_object_or_404(
+        User,
+        pk=user_id,
+        employer=request.user.employer  # 🔒 ensure same employer
+    )
 
     if request.method == "POST":
         selected_group_ids = request.POST.getlist("groups")
         selected_groups = Group.objects.filter(id__in=selected_group_ids)
 
+        # 🔁 replace groups (checked = in, unchecked = removed)
         user.groups.set(selected_groups)
 
-        all_groups = Group.objects.all()
-        users = User.objects.filter(employer=request.user.employer)
+        # Optional but safe
+        user.refresh_from_db()
+
+        all_groups = Group.objects.all()  # you can scope this later if needed
 
         return render(
             request,
-            "user/hr/partials/user_role_list.html",
+            "user/hr/partials/user_role_card.html",
             {
-                "users": users,
+                "user": user,              # ✅ THIS is the key fix
                 "all_groups": all_groups,
             },
         )
