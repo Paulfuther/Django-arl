@@ -7,7 +7,7 @@
     <form 
   method="post"
   hx-post="{% url 'update_user_roles' user.id %}" 
-  hx-target="#user-role-table" 
+  hx-target="#user-role-results" 
   hx-swap="innerHTML"
 >
   {% csrf_token %}

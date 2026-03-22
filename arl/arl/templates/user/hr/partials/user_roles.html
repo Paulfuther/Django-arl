@@ -1,0 +1,32 @@
+<h4 class="mb-3">User Roles</h4>
+
+<div class="card shadow-sm border-0 mb-4">
+  <div class="card-body">
+    <form
+      method="get"
+      hx-get="{% url 'search_user_roles' %}"
+      hx-target="#user-role-results"
+      hx-swap="innerHTML"
+      class="row g-2 align-items-end"
+    >
+      <div class="col-12 col-md-8">
+        <label class="form-label small text-muted mb-1">Search users</label>
+        <input
+          type="text"
+          name="query"
+          class="form-control"
+          placeholder="Search by name or email">
+      </div>
+
+      <div class="col-12 col-md-4 d-flex gap-2">
+        <button type="submit" class="btn btn-outline-primary w-100">
+          Search
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="user-role-results">
+  {% include "user/hr/partials/user_role_list.html" %}
+</div>
