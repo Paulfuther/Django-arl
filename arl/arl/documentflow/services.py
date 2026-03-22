@@ -96,6 +96,13 @@ def build_document_audit(employer, search_query="", incomplete_only=False):
             "is_complete": is_complete,
         })
 
+    rows = sorted(
+            rows,
+            key=lambda r: (
+                r["is_complete"],
+                -(r["employee"].date_joined.timestamp() if r["employee"].date_joined else 0),
+            ),
+        )
     print("flow.  ", flow)
     print("steps.  ", steps)
 
