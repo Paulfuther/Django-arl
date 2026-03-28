@@ -5,140 +5,247 @@
 {% load crispy_forms_tags %}
 
 <div class="container py-4">
-    <div class="row justify-content-center mt-5">
+    <div class="row justify-content-center mt-4 mt-lg-5">
         <div class="col-lg-8">
 
-            <div class="card shadow-sm">
-                <div class="card-body">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4 p-lg-5">
 
-                    <h3 class="mb-2">Apply for Employment</h3>
-                    <p class="text-muted mb-4">
-                        Complete the form below. You may also upload your resume.
-                    </p>
+                    <div class="mb-4">
+                        <h3 class="mb-2">Apply for Employment</h3>
+                        <p class="text-muted mb-0">
+                            Complete the form below to apply. You may also upload your resume.
+                        </p>
+                    </div>
 
-                    <form method="post" enctype="multipart/form-data">
-                        {% csrf_token %}
-                        <input type="hidden" name="source" value="{{ source }}">
+                    
 
-                        <!-- Name -->
-                        <div class="row mb-3 align-items-center">
-                            <div class="col-5">
-                                <label class="form-label mb-0">First Name</label>
+                    <form method="post" enctype="multipart/form-data" novalidate>
+                            {% csrf_token %}
+                            <input type="hidden" name="source" value="{{ source }}">
+                            <div class="d-none" aria-hidden="true">
+                                {{ form.spam_check }}
                             </div>
-                            <div class="col-7">
-                                {{ form.first_name }}
+                        <div class="border rounded-3 p-3 p-lg-4 mb-4">
+                            <h6 class="text-muted mb-3">Basic Information</h6>
+
+                            <div class="row mb-3 align-items-center">
+                                <div class="col-md-4">
+                                    <label class="form-label mb-md-0" for="{{ form.first_name.id_for_label }}">First Name</label>
+                                </div>
+                                <div class="col-md-8">
+                                    {{ form.first_name }}
+                                    {% if form.first_name.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {% for error in form.first_name.errors %}
+                                                <div>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="row mb-3 align-items-center">
+                                <div class="col-md-4">
+                                    <label class="form-label mb-md-0" for="{{ form.last_name.id_for_label }}">Last Name</label>
+                                </div>
+                                <div class="col-md-8">
+                                    {{ form.last_name }}
+                                    {% if form.last_name.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {% for error in form.last_name.errors %}
+                                                <div>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="row mb-3 align-items-center">
+                                <div class="col-md-4">
+                                    <label class="form-label mb-md-0" for="{{ form.email.id_for_label }}">Email</label>
+                                </div>
+                                <div class="col-md-8">
+                                    {{ form.email }}
+                                    {% if form.email.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {% for error in form.email.errors %}
+                                                <div>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="row mb-3 align-items-center">
+                                <div class="col-md-4">
+                                    <label class="form-label mb-md-0" for="{{ form.phone_number.id_for_label }}">Phone Number</label>
+                                </div>
+                                <div class="col-md-8">
+                                    {{ form.phone_number }}
+                                    <div class="form-text">Enter a valid Canada or US phone number.</div>
+                                    {% if form.phone_number.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {% for error in form.phone_number.errors %}
+                                                <div>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="row mb-0 align-items-center">
+                                <div class="col-md-4">
+                                    <label class="form-label mb-md-0" for="{{ form.city.id_for_label }}">City</label>
+                                </div>
+                                <div class="col-md-8">
+                                    {{ form.city }}
+                                    {% if form.city.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {% for error in form.city.errors %}
+                                                <div>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
                             </div>
                         </div>
 
-                        <div class="row mb-3 align-items-center">
-                            <div class="col-5">
-                                <label class="form-label mb-0">Last Name</label>
+                        <div class="border rounded-3 p-3 p-lg-4 mb-4">
+                            <h6 class="text-muted mb-3">Position Details</h6>
+
+                            <div class="row mb-3 align-items-center">
+                                <div class="col-md-4">
+                                    <label class="form-label mb-md-0" for="{{ form.position_interest.id_for_label }}">Position Interest</label>
+                                </div>
+                                <div class="col-md-8">
+                                    {{ form.position_interest }}
+                                    {% if form.position_interest.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {% for error in form.position_interest.errors %}
+                                                <div>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
                             </div>
-                            <div class="col-7">
-                                {{ form.last_name }}
+
+                            <div class="row mb-3 align-items-center">
+                                <div class="col-md-4">
+                                    <label class="form-label mb-md-0" for="{{ form.employment_type.id_for_label }}">Employment Type</label>
+                                </div>
+                                <div class="col-md-8">
+                                    {{ form.employment_type }}
+                                    {% if form.employment_type.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {% for error in form.employment_type.errors %}
+                                                <div>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="row mb-0 align-items-start">
+                                <div class="col-md-4">
+                                    <label class="form-label mb-md-0" for="{{ form.availability.id_for_label }}">Availability</label>
+                                </div>
+                                <div class="col-md-8">
+                                    {{ form.availability }}
+                                    {% if form.availability.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {% for error in form.availability.errors %}
+                                                <div>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
                             </div>
                         </div>
 
-                        <!-- Contact -->
-                        <div class="row mb-3 align-items-center">
-                            <div class="col-5">
-                                <label class="form-label mb-0">Email</label>
+                        <div class="border rounded-3 p-3 p-lg-4 mb-4">
+                            <h6 class="text-muted mb-3">Additional Information</h6>
+
+                            <div class="row mb-3 align-items-start">
+                                <div class="col-md-4">
+                                    <label class="form-label mb-md-0">Transportation</label>
+                                </div>
+                                <div class="col-md-8">
+                                    <div class="form-check">
+                                        {{ form.has_transportation }}
+                                        <label class="form-check-label" for="{{ form.has_transportation.id_for_label }}">
+                                            I have reliable transportation
+                                        </label>
+                                    </div>
+                                    {% if form.has_transportation.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {% for error in form.has_transportation.errors %}
+                                                <div>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
                             </div>
-                            <div class="col-7">
-                                {{ form.email }}
+
+                            <div class="row mb-3 align-items-start">
+                                <div class="col-md-4">
+                                    <label class="form-label mb-md-0">Work Eligibility</label>
+                                </div>
+                                <div class="col-md-8">
+                                    <div class="form-check">
+                                        {{ form.eligible_to_work_in_canada }}
+                                        <label class="form-check-label" for="{{ form.eligible_to_work_in_canada.id_for_label }}">
+                                            I am eligible to work in Canada
+                                        </label>
+                                    </div>
+                                    {% if form.eligible_to_work_in_canada.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {% for error in form.eligible_to_work_in_canada.errors %}
+                                                <div>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="row mb-3 align-items-center">
+                                <div class="col-md-4">
+                                    <label class="form-label mb-md-0" for="{{ form.linkedin_profile.id_for_label }}">LinkedIn Profile</label>
+                                </div>
+                                <div class="col-md-8">
+                                    {{ form.linkedin_profile }}
+                                    {% if form.linkedin_profile.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {% for error in form.linkedin_profile.errors %}
+                                                <div>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="row mb-0 align-items-center">
+                                <div class="col-md-4">
+                                    <label class="form-label mb-md-0" for="{{ form.resume.id_for_label }}">Resume</label>
+                                </div>
+                                <div class="col-md-8">
+                                    {{ form.resume }}
+                                    {% if form.resume.help_text %}
+                                        <div class="form-text">{{ form.resume.help_text }}</div>
+                                    {% endif %}
+                                    {% if form.resume.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {% for error in form.resume.errors %}
+                                                <div>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
                             </div>
                         </div>
 
-                        <div class="row mb-3 align-items-center">
-                            <div class="col-5">
-                                <label class="form-label mb-0">Phone Number</label>
-                            </div>
-                            <div class="col-7">
-                                {{ form.phone_number }}
-                            </div>
-                        </div>
-
-                        <!-- Location -->
-                        <div class="row mb-3 align-items-center">
-                            <div class="col-5">
-                                <label class="form-label mb-0">City</label>
-                            </div>
-                            <div class="col-7">
-                                {{ form.city }}
-                            </div>
-                        </div>
-
-                        <!-- Job -->
-                        <div class="row mb-3 align-items-center">
-                            <div class="col-5">
-                                <label class="form-label mb-0">Position Interest</label>
-                            </div>
-                            <div class="col-7">
-                                {{ form.position_interest }}
-                            </div>
-                        </div>
-
-                        <div class="row mb-3 align-items-center">
-                            <div class="col-5">
-                                <label class="form-label mb-0">Employment Type</label>
-                            </div>
-                            <div class="col-7">
-                                {{ form.employment_type }}
-                            </div>
-                        </div>
-
-                        <!-- Availability -->
-                        <div class="row mb-3 align-items-start">
-                            <div class="col-5">
-                                <label class="form-label mb-0">Availability</label>
-                            </div>
-                            <div class="col-7">
-                                {{ form.availability }}
-                            </div>
-                        </div>
-
-                        <!-- Checkboxes -->
-                        <div class="row mb-3 align-items-center">
-                            <div class="col-5">
-                                <label class="form-label mb-0">Transportation</label>
-                            </div>
-                            <div class="col-7">
-                                {{ form.has_transportation }} <small class="text-muted">I have reliable transportation</small>
-                            </div>
-                        </div>
-
-                        <div class="row mb-3 align-items-center">
-                            <div class="col-5">
-                                <label class="form-label mb-0">Work Eligibility</label>
-                            </div>
-                            <div class="col-7">
-                                {{ form.eligible_to_work_in_canada }} <small class="text-muted">I am eligible to work in Canada</small>
-                            </div>
-                        </div>
-
-                        <!-- LinkedIn -->
-                        <div class="row mb-3 align-items-center">
-                            <div class="col-5">
-                                <label class="form-label mb-0">LinkedIn Profile</label>
-                            </div>
-                            <div class="col-7">
-                                {{ form.linkedin_profile }}
-                            </div>
-                        </div>
-
-                        <!-- Resume -->
-                        <div class="row mb-4 align-items-center">
-                            <div class="col-5">
-                                <label class="form-label mb-0">Resume</label>
-                            </div>
-                            <div class="col-7">
-                                {{ form.resume }}
-                            </div>
-                        </div>
-
-                        <!-- Submit -->
-                        <div class="text-end">
-                            <button type="submit" class ="btn btn-sm btn-outline-primary">
+                        <div class="d-flex justify-content-end pt-2">
+                            <button type="submit" class="btn btn-sm btn-outline-primary">
                                 Submit Application
                             </button>
                         </div>
@@ -152,4 +259,94 @@
     </div>
 </div>
 
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const form = document.querySelector("form");
+    const phoneInput = document.querySelector("input[name='phone_number']");
+    const submitButton = form ? form.querySelector("button[type='submit']") : null;
+
+    if (!form || !phoneInput || !submitButton) return;
+
+    let feedback = document.createElement("div");
+    feedback.className = "small mt-1";
+    phoneInput.parentNode.appendChild(feedback);
+
+    function setInvalid(message) {
+        phoneInput.classList.add("is-invalid");
+        phoneInput.classList.remove("is-valid");
+        feedback.className = "small mt-1 text-danger";
+        feedback.textContent = message;
+    }
+
+    function setValid(message) {
+        phoneInput.classList.remove("is-invalid");
+        phoneInput.classList.add("is-valid");
+        feedback.className = "small mt-1 text-success";
+        feedback.textContent = message;
+    }
+
+    function verifyPhone() {
+        const value = phoneInput.value.trim();
+
+        if (!value) {
+            setInvalid("Phone number is required.");
+            return Promise.resolve(false);
+        }
+
+        return fetch("{% url 'recruit:verify_phone' %}?phone_number=" + encodeURIComponent(value))
+            .then(response => response.json())
+            .then((data) => {
+                if (data.valid) {
+                    phoneInput.value = data.national_format;
+                    setValid("Phone number verified.");
+                    return true;
+                } else {
+                    setInvalid(data.error || "Invalid phone number.");
+                    return false;
+                }
+            })
+            .catch(() => {
+                setInvalid("Could not verify phone number.");
+                return false;
+            });
+    }
+
+    phoneInput.addEventListener("blur", function () {
+        verifyPhone();
+    });
+
+    phoneInput.addEventListener("input", function () {
+        phoneInput.classList.remove("is-valid", "is-invalid");
+        feedback.textContent = "";
+        feedback.className = "small mt-1";
+    });
+
+    form.addEventListener("submit", async function (e) {
+        const ok = await verifyPhone();
+        if (!ok) {
+            e.preventDefault();
+            phoneInput.focus();
+        }
+    });
+});
+</script>
+
+<script>
+    setTimeout(function () {
+        document.querySelectorAll(".alert").forEach(function (alert) {
+            if (typeof bootstrap !== "undefined") {
+                let bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            } else {
+                alert.classList.remove("show");
+                setTimeout(function () {
+                    alert.remove();
+                }, 500);
+            }
+        });
+    }, 4000);
+</script>
 {% endblock %}
+
+
+

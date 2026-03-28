@@ -2,9 +2,42 @@
 
 {% block template %}
 {% include "base/navbar.html" %}
-{% load crispy_forms_tags %}
-<div class="container py-5 text-center mt-5">
-    <h2>Thank You</h2>
-    <p>Your application has been submitted successfully.</p>
+
+<div class="container py-5">
+    <div class="row justify-content-center mt-4 mt-lg-5">
+        <div class="col-lg-7">
+
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4 p-lg-5 text-center">
+
+                    <div class="mb-3">
+                        <div class="display-6 text-success">✓</div>
+                    </div>
+
+                    <h3 class="mb-2">Application Submitted</h3>
+                    <p class="text-muted mb-4">
+                        Thank you for applying. Your application has been received successfully.
+                    </p>
+
+                    <div class="border rounded-3 p-3 p-lg-4 bg-light mb-4">
+                        <p class="mb-2">
+                            Our team will review your information and resume.
+                        </p>
+                        <p class="mb-0 text-muted">
+                            If your experience matches our current hiring needs, someone will follow up with you.
+                        </p>
+                    </div>
+
+                    <div class="d-flex justify-content-center gap-2 flex-wrap">
+                       
+                        
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
 </div>
+
 {% endblock %}
