@@ -131,6 +131,7 @@ INSTALLED_APPS = [
     'arl.utils',
     'arl.stores',
     'arl.documentflow',
+    'arl.recruit',
 ]
 
 PHONENUMBER_DEFAULT_REGION = 'CA'

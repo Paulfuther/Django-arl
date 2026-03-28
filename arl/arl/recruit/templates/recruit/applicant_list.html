@@ -1,0 +1,171 @@
+{% extends "base/base.html" %}
+
+{% block template %}
+{% include "base/navbar.html" %}
+
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mt-5 mb-4">
+        <h4 class="mb-0">Applicants</h4>
+    </div>
+<div class="row g-2 mb-4">
+
+    <div class="col-6 col-lg-3">
+        <div class="card shadow-sm text-center">
+            <div class="card-body py-2">
+                <div class="fw-bold">{{ applicants|length }}</div>
+                <div class="small text-muted">Total</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-lg-3">
+        <div class="card shadow-sm text-center">
+            <div class="card-body py-2">
+                <div class="fw-bold">
+                    {{ applicants|dictsort:"status"|length }}
+                </div>
+                <div class="small text-muted">Active</div>
+            </div>
+        </div>
+    </div>
+
+</div>
+    {% if applicants %}
+        <!-- Mobile cards -->
+        <div class="d-block d-lg-none">
+            {% for applicant in applicants %}
+                <div class="card shadow-sm mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h5 class="mb-1">
+                                    {{ applicant.first_name }} {{ applicant.last_name }}
+                                </h5>
+                                <div class="text-muted small">
+                                    {{ applicant.created_at|date:"Y-m-d H:i" }}
+                                </div>
+                            </div>
+                            <span class="badge bg-secondary">
+                                {{ applicant.get_status_display }}
+                            </span>
+                        </div>
+
+                        <div class="mb-2">
+                            <strong>Email:</strong> {{ applicant.email }}
+                        </div>
+
+                        <div class="mb-2">
+                            <strong>Phone:</strong> {{ applicant.phone_number }}
+                        </div>
+
+                        <div class="mb-2">
+                            <strong>Source:</strong> {{ applicant.get_source_display }}
+                        </div>
+
+                        {% if applicant.city %}
+                            <div class="mb-2">
+                                <strong>City:</strong> {{ applicant.city }}
+                            </div>
+                        {% endif %}
+
+                        {% if applicant.position_interest %}
+                            <div class="mb-2">
+                                <strong>Position:</strong> {{ applicant.position_interest }}
+                            </div>
+                        {% endif %}
+
+                        <div class="pt-2 border-top mt-3">
+                            {% if applicant.resume_object_key %}
+                                <div class="d-flex flex-wrap gap-2">
+                                    <a href="{{ applicant.get_signed_resume_view_url }}"
+                                       target="_blank"
+                                       class="btn btn-sm btn-outline-primary">
+                                        View Resume
+                                    </a>
+
+                                    <a href="{{ applicant.get_signed_resume_download_url }}"
+                                       class="btn btn-sm btn-outline-secondary">
+                                        Download Resume
+                                    </a>
+                                </div>
+                            {% else %}
+                                <span class="text-muted">No Resume</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- Desktop table -->
+        <div class="card shadow-sm d-none d-lg-block">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th>Source</th>
+                                <th>Status</th>
+                                <th>Resume</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for applicant in applicants %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-semibold">
+                                            {{ applicant.first_name }} {{ applicant.last_name }}
+                                        </div>
+                                        {% if applicant.position_interest %}
+                                            <div class="small text-muted">
+                                                {{ applicant.position_interest }}
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ applicant.email }}</td>
+                                    <td>{{ applicant.phone_number }}</td>
+                                    <td>{{ applicant.get_source_display }}</td>
+                                    <td>
+                                        <span class="badge bg-secondary">
+                                            {{ applicant.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if applicant.resume_object_key %}
+                                            <div class="d-flex flex-wrap gap-2">
+                                                <a href="{{ applicant.get_signed_resume_view_url }}"
+                                                   target="_blank"
+                                                   class="btn btn-sm btn-outline-primary">
+                                                    View
+                                                </a>
+                                                <a href="{{ applicant.get_signed_resume_download_url }}"
+                                                   class="btn btn-sm btn-outline-secondary">
+                                                    Download
+                                                </a>
+                                            </div>
+                                        {% else %}
+                                            <span class="text-muted">No Resume</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ applicant.created_at|date:"Y-m-d H:i" }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <div class="card shadow-sm">
+            <div class="card-body text-center text-muted py-4">
+                No applicants found.
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+{% endblock %}
