@@ -9,8 +9,8 @@ from .views import (
 app_name = "recruit"
 
 urlpatterns = [
-    path("apply/", recruit_apply_view, name="apply"),
-    path("thank-you/", recruit_thank_you_view, name="thank_you"),
-    path("applicants/", recruit_applicant_list_view, name="applicant_list"),
+    #path("apply/", recruit_apply_view, name="apply"),
+    #path("thank-you/", recruit_thank_you_view, name="thank_you"),
+    #path("applicants/", recruit_applicant_list_view, name="applicant_list"),
     path("verify-phone/", recruit_phone_verify_view, name="verify_phone"),
 ]
