@@ -22,7 +22,10 @@ from .models import RecruitApplicant
 logger = logging.getLogger(__name__)
 
 
+@login_required
 def recruit_apply_view(request):
+   
+    return redirect("home")
     source = request.GET.get("src") or request.POST.get("source") or "direct"
 
     if request.method == "POST":
@@ -86,12 +89,15 @@ def recruit_apply_view(request):
     return render(request, "recruit/apply.html", context)
 
 
+@login_required
 def recruit_thank_you_view(request):
+    return redirect("home")
     return render(request, "recruit/thank_you.html")
 
 
 @login_required
 def recruit_applicant_list_view(request):
+    return redirect("home")
     applicants = RecruitApplicant.objects.all()
     return render(
         request,
