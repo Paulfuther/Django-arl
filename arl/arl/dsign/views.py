@@ -78,6 +78,8 @@ class CreateEnvelopeView(UserPassesTestMixin, View):
             template_name = template.template_name if template else "Unknown Template"
 
             envelope_args = {
+                "user_id": recipient.id,
+                "employer_id": recipient.employer_id,
                 "signer_email": recipient.email,
                 "signer_name": recipient.get_full_name(),
                 "template_id": ds_template,

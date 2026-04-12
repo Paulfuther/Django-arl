@@ -340,6 +340,7 @@ def send_bulk_tobacco_sms_link(self, *args, **kwargs):
         return {"error": critical_msg}
 
 
+# -- this task is for scheduled periodic tasks
 @app.task(
     name="tobacoo_sms_with_shortened_link",
     bind=True,

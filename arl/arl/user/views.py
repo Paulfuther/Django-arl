@@ -55,6 +55,7 @@ from .forms import (
     NewHireInviteForm,
     TwoFactorAuthenticationForm,
 )
+from arl.documentflow.models import DocumentFlow
 from .helpers import send_new_hire_invite
 from .models import CustomUser, Employer, EmployerSettings, NewHireInvite
 from .tasks import (
@@ -238,20 +239,38 @@ def handle_new_hire_registration(sender, instance, created, **kwargs):
                 f"🚨 No EmployerSettings found for {employer.name}. Defaulting to False."
             )
 
-        # ✅ Retrieve the DocuSign Template
+        # ✅ Retrieve onboarding flow + first DocuSign step
+        document_flow = None
+        first_step = None
         docusign_template = None
         template_id = None
 
         if send_new_hire_file:
-            docusign_template = DocuSignTemplate.objects.filter(
-                employer=employer, is_new_hire_template=True
-            ).first()
+            document_flow = (
+                DocumentFlow.objects.filter(
+                    employer=employer,
+                    is_active=True,
+                    is_default=True,
+                )
+                .prefetch_related("steps__template")
+                .first()
+            )
 
-            if docusign_template:
-                template_id = docusign_template.template_id
-                print(f"📄 New Hire Template Found: {docusign_template.template_name}")
+            if not document_flow:
+                print(f"⚠️ No active default document flow found for {employer.name}.")
             else:
-                print("⚠️ No DocuSign template marked as 'new hire' found.")
+                first_step = document_flow.steps.filter(is_active=True).order_by("step_order").first()
+
+                if not first_step:
+                    print(f"⚠️ No active steps found in flow '{document_flow.name}'.")
+                elif not first_step.template:
+                    print(f"⚠️ First step in flow '{document_flow.name}' has no template.")
+                else:
+                    docusign_template = first_step.template
+                    template_id = docusign_template.template_id
+                    print(f"📄 Document Flow Found: {document_flow.name}")
+                    print(f"📄 First Step: {first_step.display_name}")
+                    print(f"📄 Template Found: {docusign_template.template_name}")
 
         print("Docusign Template id:", template_id)
 
@@ -333,11 +352,15 @@ def handle_new_hire_registration(sender, instance, created, **kwargs):
         # ✅ If DocuSign is enabled, add DocuSign + SMS to chain
         if send_new_hire_file and template_id:
             docusign_tasks = chain(
-                create_docusign_envelope_task.s(
+                create_docusign_envelope_task.si(
                     {
+                        "user_id": instance.id,
+                        "employer_id": instance.employer_id,
                         "signer_email": instance.email,
                         "signer_name": instance.username,
                         "template_id": template_id,  # ✅ Use employer-specific template
+                        "flow_id": document_flow.id if document_flow else None,
+                        "flow_step_id": first_step.id if first_step else None,
                     }
                 ).set(immutable=True),
                 send_sms_task.s(

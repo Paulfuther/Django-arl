@@ -72,28 +72,52 @@
 
         <div class="audit-summary">
           <div class="audit-fraction">
-            {{ row.completed_count }}/{{ row.total_count }}
+            {{ row.completed_count }}/{{ row.total_required }}
             <span class="audit-fraction-label ms-1">complete</span>
           </div>
+
+          <div class="mt-1">
+            {% if row.overall_status == "completed" %}
+              <span class="badge bg-success">Complete</span>
+            {% elif row.overall_status == "in_progress" %}
+              <span class="badge bg-warning text-dark">In Progress</span>
+            {% elif row.overall_status == "not_sent" %}
+              <span class="badge bg-secondary">Not Sent</span>
+            {% else %}
+              <span class="badge bg-secondary">No Docs</span>
+            {% endif %}
+          </div>
         </div>
-      </div>  {# <-- closes audit-header #}
+      </div>
 
       <div class="audit-doc-row mt-3">
-        {% for cell in row.cells %}
-          {% if cell.is_signed %}
+        {% for item in row.step_results %}
+          {% if item.status == "completed" %}
             <span class="audit-doc-pill is-signed">
-              {{ cell.step.display_name }} ✓
+              {{ item.step.display_name }} ✓
+            </span>
+          {% elif item.status == "sent" %}
+            <span class="audit-doc-pill is-sent">
+              {{ item.step.display_name }} ↗
+            </span>
+          {% elif item.status == "delivered" %}
+            <span class="audit-doc-pill is-delivered">
+              {{ item.step.display_name }} •
+            </span>
+          {% elif item.status == "declined" or item.status == "voided" %}
+            <span class="audit-doc-pill is-missing">
+              {{ item.step.display_name }} !
             </span>
           {% else %}
             <span class="audit-doc-pill is-missing">
-              {{ cell.step.display_name }} ✕
+              {{ item.step.display_name }} ✕
             </span>
           {% endif %}
         {% endfor %}
       </div>
 
-      {% if row.total_count > 0 %}
-        {% widthratio row.completed_count row.total_count 100 as progress %}
+      {% if row.total_required > 0 %}
+        {% widthratio row.completed_count row.total_required 100 as progress %}
         <div class="w-100 mt-3">
           <div class="progress audit-progress">
             <div
@@ -111,7 +135,6 @@
     No employees found.
   </div>
 {% endfor %}
-
 {% endif %}
 
 <style>
@@ -218,5 +241,18 @@
     .audit-header {
       gap: .75rem;
     }
+  }
+</style>
+<style>
+  .audit-doc-pill.is-sent {
+    background: #cfe2ff;
+    color: #084298;
+    border-color: #b6d4fe;
+  }
+
+  .audit-doc-pill.is-delivered {
+    background: #fff3cd;
+    color: #664d03;
+    border-color: #ffecb5;
   }
 </style>
