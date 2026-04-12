@@ -11,13 +11,15 @@ from io import BytesIO
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Q
+from django.utils import timezone
 from docusign_esign import ApiClient, EnvelopesApi
 from docusign_esign.client.api_exception import ApiException
 
 from arl.bucket.helpers import upload_to_linode_object_storage
 from arl.celery import app
+from arl.documentflow.models import SentDocuSignEnvelope
 from arl.dsign.models import (
     DocuSignTemplate,
     ProcessedDocsignDocument,
@@ -27,7 +29,7 @@ from arl.msg.models import SmsLog
 from arl.msg.tasks import send_bulk_sms
 from arl.setup.models import Employer, TenantApiKeys
 from arl.user.models import CustomUser, EmployerSMSTask
-from django.db import transaction
+
 from .helpers import (
     create_docusign_envelope,
     create_docusign_envelope_new_hire_quiz,
@@ -502,7 +504,9 @@ def process_docusign_webhook(payload):
 
         if event_type == "envelope-sent":
             handle_envelope_sent(
-                recipient_email, template_name
+                envelope_id=envelope_id,
+                recipient_email=recipient_email,
+                template_name=template_name,
             )  # 🚀 Pass extracted template_name
             return {"status": "envelope-sent task triggered"}
 
@@ -555,14 +559,16 @@ def handle_template_saved(template_id, user_email):
         return {"error": "User not found"}
 
 
-def handle_envelope_sent(recipient_email, template_name):
+# ✅ Handles Envelope Sent
+def handle_envelope_sent(envelope_id, recipient_email, template_name):
     """Handles document sent events and notifies HR via SMS."""
     try:
-        if not recipient_email or not template_name:
+        if not envelope_id or not recipient_email or not template_name:
             logger.error(
-                f"❌ Missing recipient_email or template_name: {recipient_email}, {template_name}"
+                f"❌ Missing envelope_id, recipient_email, or template_name: "
+                f"{envelope_id}, {recipient_email}, {template_name}"
             )
-            return {"error": "Missing recipient email or template name"}
+            return {"error": "Missing envelope ID, recipient email, or template name"}
 
         # ✅ Fetch user to determine employer
         user = (
@@ -578,6 +584,19 @@ def handle_envelope_sent(recipient_email, template_name):
         if not employer:
             logger.error(f"❌ Employer not found for user {user.email}.")
             return {"error": "Employer not found"}
+
+        # ✅ Update sent tracking row if it exists
+        updated = SentDocuSignEnvelope.objects.filter(envelope_id=envelope_id).update(
+            status="sent"
+        )
+
+        if updated:
+            logger.info(f"📌 Updated SentDocuSignEnvelope for envelope {envelope_id}")
+        else:
+            logger.warning(
+                f"⚠️ No SentDocuSignEnvelope found for envelope {envelope_id}. "
+                f"Tracking row may not have been created at send time."
+            )
 
         # ✅ Notify HR
         notify_hr.delay(
@@ -599,7 +618,9 @@ def handle_envelope_sent(recipient_email, template_name):
 
 
 # ✅ Handles "recipient-completed" event
-def handle_recipient_completed(envelope_id, recipient_email, template_id, template_name):
+def handle_recipient_completed(
+    envelope_id, recipient_email, template_id, template_name
+):
     """Handles recipient completion events by saving the signed document."""
     try:
         # ✅ Fetch the template first
@@ -633,8 +654,9 @@ def handle_recipient_completed(envelope_id, recipient_email, template_id, templa
             fetch_and_upload_signed_documents.delay(
                 envelope_id,
                 user.id if user else None,
-                employer.id, template_name,
-                is_company_document=True
+                employer.id,
+                template_name,
+                is_company_document=True,
             )
 
             return {"status": "success", "document_id": processed_doc.id}
@@ -647,6 +669,7 @@ def handle_recipient_completed(envelope_id, recipient_email, template_id, templa
                 .first()
             )
             print("user :", user)
+
             if not user:
                 logger.error(f"❌ User with email {recipient_email} not found.")
                 return {"error": "User not found"}
@@ -656,6 +679,16 @@ def handle_recipient_completed(envelope_id, recipient_email, template_id, templa
                 logger.error(f"❌ Employer not found for user {user.email}.")
                 return {"error": "Employer not found"}
 
+            sent_envelope = (
+                SentDocuSignEnvelope.objects.select_related("flow", "flow_step", "user", "template")
+                .filter(envelope_id=envelope_id)
+                .first()
+            )
+
+            if not sent_envelope:
+                logger.error(f"❌ SentDocuSignEnvelope with envelope_id {envelope_id} not found.")
+                return {"error": "Sent envelope tracking row not found"}
+
             try:
                 processed_doc = ProcessedDocsignDocument.objects.create(
                     envelope_id=envelope_id,
@@ -663,7 +696,14 @@ def handle_recipient_completed(envelope_id, recipient_email, template_id, templa
                     user=user,
                     employer=employer,
                 )
+
+                # ✅ Mark current flow step complete
+                sent_envelope.status = "completed"
+                sent_envelope.completed_at = timezone.now()
+                sent_envelope.save(update_fields=["status", "completed_at"])
+
                 logger.info(f"✅ Saved signed document: {processed_doc}")
+
             except IntegrityError as e:
                 logger.error(f"❌ Error saving signed document: {str(e)}")
                 return {"error": "Database integrity error"}
@@ -681,12 +721,54 @@ def handle_recipient_completed(envelope_id, recipient_email, template_id, templa
                 event_type="completed",
             )
 
+            # ✅ Find next step in the flow
+            next_step = None
+
+            if sent_envelope.flow and sent_envelope.flow_step:
+                next_step = (
+                    sent_envelope.flow.steps.filter(
+                        is_active=True,
+                        step_order__gt=sent_envelope.flow_step.step_order,
+                    )
+                    .order_by("step_order")
+                    .first()
+                )
+
+            if next_step and not next_step.template:
+                logger.error(f"❌ Next flow step {next_step.id} has no template.")
+                next_step = None
+
+            if next_step:
+                already_sent = SentDocuSignEnvelope.objects.filter(
+                    user=user,
+                    flow=sent_envelope.flow,
+                    flow_step=next_step,
+                ).exists()
+
+                if not already_sent:
+                    logger.info(
+                        f"📄 Sending next document flow step for user {user.email}: "
+                        f"{next_step.display_name} (step_order={next_step.step_order})"
+                    )
+
+                    create_docusign_envelope_task.delay(
+                        {
+                            "user_id": user.id,
+                            "employer_id": employer.id,
+                            "signer_email": user.email,
+                            "signer_name": user.get_full_name() or user.username,
+                            "template_id": next_step.template.template_id,
+                            "flow_id": sent_envelope.flow.id,
+                            "flow_step_id": next_step.id,
+                        }
+                    )
+
             return {"status": "success", "document_id": processed_doc.id}
 
     except Exception as e:
         logger.error(f"❌ Error in handle_recipient_completed: {str(e)}")
         return {"error": str(e)}
-    
+
 
 # ✅ Sends SMS notifications to HR using the correct Twilio API keys
 @app.task(name="notify_hr_task")
@@ -825,26 +907,32 @@ def upload_signed_document_to_linode(document_id):
 
 @app.task(name="create_docusign_envelope")
 def create_docusign_envelope_task(envelope_args):
-    print("envelope args in task :", envelope_args)
-    try:
-        signer_name = envelope_args.get("signer_name")
-        print(signer_name)
-        create_docusign_envelope(envelope_args)
+    logger.info(f"RAW ENVELOPE ARGS IN TASK: {envelope_args}")
+    signer_name = envelope_args.get("signer_name")
 
-        logger.info(
-            f"Docusign envelope New Hire File for {signer_name} created successfully"
+    try:
+        result = create_docusign_envelope(envelope_args)
+
+        if result.get("success"):
+            logger.info(
+                f"Docusign envelope {result['envelope_id']} for {signer_name} created successfully"
+            )
+            return result
+
+        logger.error(
+            f"Error creating Docusign envelope for {signer_name}: {result.get('error')}"
         )
-        return f"Docusign envelope New Hire File for {signer_name} created successfully"
+        return result
 
     except Exception as e:
         logger.error(
-            f"Error creating Docusign envelope New Hire File for "
-            f"{signer_name}: {str(e)}"
+            f"Error creating Docusign envelope New Hire File for {signer_name}: {str(e)}"
         )
-        return (
-            f"Error creating Docusign envelope New Hire File for "
-            f"{signer_name}: {str(e)}"
-        )
+        return {
+            "success": False,
+            "error": str(e),
+            "signer_name": signer_name,
+        }
 
 
 @app.task(name="send_new_hire_quiz")
@@ -870,12 +958,8 @@ def send_new_hire_quiz(envelope_args):
 # This is the FINAL version of the task to upload to linode.
 @app.task(name="fetch_and_upload_signed_documents")
 def fetch_and_upload_signed_documents(
-    envelope_id,
-    user_id,
-    employer_id,
-    template_name,
-        is_company_document=False):
-
+    envelope_id, user_id, employer_id, template_name, is_company_document=False
+):
     try:
         employer = Employer.objects.get(id=employer_id)
         user = None
@@ -912,14 +996,16 @@ def fetch_and_upload_signed_documents(
 
         zip_buffer = BytesIO(zip_bytes)
         folder_name = f"{uuid.uuid4().hex[:8]}"
-        
 
         # ✅ Determine the upload path based on document type
         if is_company_document:
-            upload_path_prefix = f"DOCUMENTS/{employer.name.replace(' ', '_')}/company/{folder_name}/"
+            upload_path_prefix = (
+                f"DOCUMENTS/{employer.name.replace(' ', '_')}/company/{folder_name}/"
+            )
         else:
-            upload_path_prefix = f"DOCUMENTS/{employer.name.replace(' ', '_')}/{folder_name}/"
-
+            upload_path_prefix = (
+                f"DOCUMENTS/{employer.name.replace(' ', '_')}/{folder_name}/"
+            )
 
         with zipfile.ZipFile(zip_buffer, "r") as zip_ref:
             for file_name in zip_ref.namelist():
@@ -964,7 +1050,9 @@ def validate_template_signature_tabs_task(template_id):
 
 @app.task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=3)
 def process_company_document_task(self, sdf_id: str, tmp_path: str, object_key: str):
-    logger.info("[CompanyDocTask] Start sdf_id=%s key=%s tmp=%s", sdf_id, object_key, tmp_path)
+    logger.info(
+        "[CompanyDocTask] Start sdf_id=%s key=%s tmp=%s", sdf_id, object_key, tmp_path
+    )
     try:
         with open(tmp_path, "rb") as f:
             upload_to_linode_object_storage(f, object_key)
@@ -979,7 +1067,9 @@ def process_company_document_task(self, sdf_id: str, tmp_path: str, object_key: 
             SignedDocumentFile.objects.filter(id=sdf_id).delete()
             logger.warning("[CompanyDocTask] Deleted SDF id=%s after failure", sdf_id)
         except Exception:
-            logger.exception("[CompanyDocTask] Could not delete SDF id=%s after failure", sdf_id)
+            logger.exception(
+                "[CompanyDocTask] Could not delete SDF id=%s after failure", sdf_id
+            )
         raise
     finally:
         try:

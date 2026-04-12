@@ -4,29 +4,23 @@ import uuid
 import zipfile
 from datetime import datetime, timedelta
 from io import BytesIO
-import time
+from arl.documentflow.models import DocumentFlow, DocumentFlowStep, SentDocuSignEnvelope
 import requests
 from django.conf import settings
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
-from docusign_esign import (
-    ApiClient,
-    EnvelopeDefinition,
-    EnvelopesApi,
-    RecipientEmailNotification,
-    RecipientViewRequest,
-    SignerAttachment,
-    TemplateRole,
-    TemplatesApi,
-)
+from docusign_esign import (ApiClient, EnvelopeDefinition, EnvelopesApi,
+                            RecipientEmailNotification, RecipientViewRequest,
+                            SignerAttachment, TemplateRole, TemplatesApi)
 from docusign_esign.client.api_exception import ApiException
 from docusign_esign.models.envelope import Envelope
 
 from arl.bucket.helpers import upload_to_linode_object_storage
 from arl.dbox.helpers import upload_to_dropbox, upload_to_dropbox_quiz
+from arl.documentflow.models import SentDocuSignEnvelope
 from arl.dsign.models import DocuSignTemplate
 from arl.msg.helpers import send_docusign_email_with_attachment
-from arl.user.models import CustomUser
+from arl.user.models import CustomUser, Employer
 
 logging.basicConfig(level=logging.INFO)
 
@@ -169,13 +163,56 @@ def create_docusign_envelope(envelope_args):
             settings.DOCUSIGN_ACCOUNT_ID, envelope_definition=envelope_definition
         )
         envelope_id = results.envelope_id
-        logger.info(
-            f"Docusign envelope {envelope_id} created successfully for {envelope_args['signer_name']}"
+
+        # -- Get envelope id for tracking --
+        user = CustomUser.objects.filter(id=envelope_args.get("user_id")).first()
+        employer = Employer.objects.filter(id=envelope_args.get("employer_id")).first()
+        flow = DocumentFlow.objects.filter(id=envelope_args.get("flow_id")).first()
+        flow_step = DocumentFlowStep.objects.filter(id=envelope_args.get("flow_step_id")).first()
+
+        # -- add a guard
+        if not employer:
+            raise ValueError(
+                f"Could not determine employer for envelope tracking. "
+                f"user_id={envelope_args.get('user_id')}, "
+                f"employer_id={envelope_args.get('employer_id')}, "
+                f"template_id={envelope_args.get('template_id')}"
+            )
+
+        SentDocuSignEnvelope.objects.create(
+            employer=employer,
+            user=user,
+            template=template if isinstance(template, DocuSignTemplate) else None,
+            flow=flow,
+            flow_step=flow_step,
+            template_name=template_name,
+            envelope_id=envelope_id,
+            status="sent",
         )
-        return f"Docusign envelope {envelope_id} created successfully for {envelope_args['signer_name']}"
+        # -----------------------------------
+
+        logger.info(
+            f"Created SentDocuSignEnvelope | envelope_id={envelope_id} | "
+            f"user_id={user.id if user else 'None'} | "
+            f"flow_id={flow.id if flow else 'None'} | "
+            f"flow_step_id={flow_step.id if flow_step else 'None'} | "
+            f"template_name={template_name}"
+        )
+
+        return {
+            "success": True,
+            "envelope_id": envelope_id,
+            "template_name": template_name,
+            "signer_name": envelope_args["signer_name"],
+        }
+
     except Exception as e:
-        logger.error(f"Error creating Docusign envelope: {str(e)}")
-        return f"Error creating Docusign envelope: {str(e)}"
+        logger.exception(f"Error creating Docusign envelope: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "signer_name": envelope_args.get("signer_name"),
+        }
 
 
 def get_docusign_template_name_from_template(template_id):
@@ -820,7 +857,7 @@ def validate_signature_roles(template_id):
                 full_url = f"{base_path}{tab_path}"
                 headers = {
                     "Authorization": f"Bearer {access_token}",
-                    "Accept": "application/json"
+                    "Accept": "application/json",
                 }
 
                 response = api_client.rest_client.GET(full_url, headers=headers)
@@ -835,9 +872,13 @@ def validate_signature_roles(template_id):
                     print(f"❌ Role {signer.role_name} has no Sign Here tabs.")
                     missing_roles.append(signer.role_name)
                 else:
-                    print(f"✅ Role {signer.role_name} has {len(sign_tabs)} Sign Here tab(s).")
+                    print(
+                        f"✅ Role {signer.role_name} has {len(sign_tabs)} Sign Here tab(s)."
+                    )
 
-                print(f"🔍 Tab types for {signer.role_name}: {list(response_data.keys())}")
+                print(
+                    f"🔍 Tab types for {signer.role_name}: {list(response_data.keys())}"
+                )
 
             except Exception as e:
                 print(f"❌ Error checking tabs for role {signer.role_name}: {e}")
@@ -872,7 +913,9 @@ def create_envelope_for_in_app_signing(user, template_id, employer):
                 email=user.email,
                 name=f"{user.first_name} {user.last_name}",
                 role_name="GSA",
-                client_user_id=str(user.id),  # Match the role you defined in your DocuSign template
+                client_user_id=str(
+                    user.id
+                ),  # Match the role you defined in your DocuSign template
             )
         ],
         status="sent",
@@ -890,7 +933,7 @@ def get_recipient_view_url(user, envelope_id, return_url):
     access_token = get_access_token().access_token
     base_path = settings.DOCUSIGN_BASE_PATH
     api_client = create_api_client(base_path, access_token)
-    
+
     envelopes_api = EnvelopesApi(api_client)
 
     recipient_view_request = RecipientViewRequest(
@@ -920,9 +963,9 @@ def get_template_signature_validation(template_id):
         tabs = templates_api.list_tabs(
             account_id=settings.DOCUSIGN_ACCOUNT_ID,
             template_id=template_id,
-            recipient_id="1"  # assuming recipient 1 = GSA
+            recipient_id="1",  # assuming recipient 1 = GSA
         )
-        #print("tabs :", tabs)
+        # print("tabs :", tabs)
         has_sign_here = bool(tabs.sign_here_tabs)
         print(f"Has Sign Here Tabs? {has_sign_here}")
         return {
