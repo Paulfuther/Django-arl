@@ -1,0 +1,210 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+  <h1>Onboarding Repair Dashboard</h1>
+  <p>This updates local tracking only. It does not send anything to DocuSign.</p>
+
+  <form method="get" style="margin-bottom: 1rem; display: flex; gap: 1rem; flex-wrap: wrap; align-items: end;">
+    <div>
+      {{ filter_form.employer.label_tag }}<br>
+      {{ filter_form.employer }}
+    </div>
+    <div>
+      {{ filter_form.flow.label_tag }}<br>
+      {{ filter_form.flow }}
+    </div>
+    <div>
+      {{ filter_form.q.label_tag }}<br>
+      {{ filter_form.q }}
+    </div>
+    <div style="padding-bottom: .35rem;">
+      {{ filter_form.incomplete_only }} {{ filter_form.incomplete_only.label_tag }}
+    </div>
+    <div>
+      <button type="submit" class="button">Filter</button>
+    </div>
+  </form>
+
+  {% if flow %}
+    <h2 style="margin-bottom: 1rem;">{{ flow.name }}</h2>
+
+    <form method="post">
+      {% csrf_token %}
+      {% if filter_form.employer.value %}
+        <input type="hidden" name="employer" value="{{ filter_form.employer.value }}">
+      {% endif %}
+      {% if flow %}
+        <input type="hidden" name="flow_id" value="{{ flow.id }}">
+      {% endif %}
+      <input type="hidden" name="q" value="{{ search|default:'' }}">
+      {% if incomplete_only %}
+        <input type="hidden" name="incomplete_only" value="on">
+      {% endif %}
+
+      <table class="adminlist repair-table">
+        <thead>
+          <tr>
+            <th>Apply</th>
+            <th>Name</th>
+            <th>Email</th>
+            {% for step in steps %}
+              <th>{{ step.template.template_name }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr>
+              <td style="vertical-align: top;">
+                {{ row.form.apply }}
+                {{ row.form.user_id }}
+              </td>
+
+              <td style="vertical-align: top;">
+                {{ row.user.get_full_name|default:row.user.username }}
+              </td>
+
+              <td style="vertical-align: top;">
+                {{ row.user.email }}
+              </td>
+
+              {% for step_row in row.step_rows %}
+                <td class="repair-step-cell">
+                  <div class="repair-status-group">
+                    <span class="repair-label">Envelope</span>
+                    <span class="repair-badge repair-badge--{{ step_row.current_status|slugify }}">
+                      {{ step_row.current_status }}
+                    </span>
+                  </div>
+
+                  {% if step_row.gsa_rec %}
+                    <div class="repair-status-group">
+                      <span class="repair-label">Employee</span>
+                      <span class="repair-badge repair-badge--{{ step_row.gsa_rec.status|slugify }}">
+                        {{ step_row.gsa_rec.name }} — {{ step_row.gsa_rec.status }}
+                      </span>
+                    </div>
+                  {% endif %}
+
+                  {% if step_row.mgr_rec %}
+                    <div class="repair-status-group">
+                      <span class="repair-label">Manager</span>
+                      <span class="repair-badge repair-badge--{{ step_row.mgr_rec.status|slugify }}">
+                        {{ step_row.mgr_rec.name }} — {{ step_row.mgr_rec.status }}
+                      </span>
+                    </div>
+                  {% endif %}
+
+                  <div class="repair-form-block">
+                    <label>Employee status</label><br>
+                    {{ step_row.employee_status_field }}
+                  </div>
+
+                  <div class="repair-form-block">
+                    <label>Manager status</label><br>
+                    {{ step_row.manager_status_field }}
+                  </div>
+
+                  <div class="repair-form-block">
+                    <label>Manager name</label><br>
+                    {{ step_row.manager_name_field }}
+                  </div>
+
+                  <div class="repair-form-block">
+                    <label>Manager email</label><br>
+                    {{ step_row.manager_email_field }}
+                  </div>
+                </td>
+              {% endfor %}
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="{{ steps|length|add:3 }}">No employees found.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div class="submit-row" style="margin-top: 1rem;">
+        <input type="submit" value="Apply Selected Repairs" class="default">
+      </div>
+    </form>
+  {% else %}
+    <p>Select an employer and flow to begin.</p>
+  {% endif %}
+
+  <style>
+    .repair-table td,
+    .repair-table th {
+      vertical-align: top;
+    }
+
+    .repair-step-cell {
+      min-width: 300px;
+    }
+
+    .repair-status-group {
+      margin-bottom: .45rem;
+    }
+
+    .repair-label {
+      display: block;
+      font-size: 11px;
+      color: #666;
+      margin-bottom: 2px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .repair-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.3;
+      border: 1px solid transparent;
+    }
+
+    .repair-badge--completed {
+      background: #d1e7dd;
+      color: #0f5132;
+      border-color: #badbcc;
+    }
+
+    .repair-badge--sent,
+    .repair-badge--created,
+    .repair-badge--delivered {
+      background: #cfe2ff;
+      color: #084298;
+      border-color: #b6d4fe;
+    }
+
+    .repair-badge--not-sent,
+    .repair-badge--not_set,
+    .repair-badge--not-set,
+    .repair-badge--voided,
+    .repair-badge--declined {
+      background: #f8d7da;
+      color: #842029;
+      border-color: #f5c2c7;
+    }
+
+    .repair-form-block {
+      margin-top: .6rem;
+    }
+
+    .repair-form-block label {
+      font-size: 12px;
+      color: #555;
+      font-weight: 600;
+    }
+
+    .repair-form-block input,
+    .repair-form-block select {
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+  </style>
+{% endblock %}
