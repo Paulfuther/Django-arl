@@ -111,3 +111,50 @@ class SentDocuSignEnvelope(models.Model):
 
     def __str__(self):
         return f"{self.template_name or self.template} - {self.user} - {self.status}"
+
+
+class SentDocuSignRecipient(models.Model):
+    STATUS_CHOICES = [
+        ("created", "Created"),
+        ("sent", "Sent"),
+        ("delivered", "Delivered"),
+        ("completed", "Completed"),
+        ("declined", "Declined"),
+        ("voided", "Voided"),
+    ]
+
+    sent_envelope = models.ForeignKey(
+        "documentflow.SentDocuSignEnvelope",
+        on_delete=models.CASCADE,
+        related_name="recipients",
+    )
+
+    recipient_id = models.CharField(max_length=50, blank=True)
+    recipient_id_guid = models.CharField(max_length=255, blank=True)
+
+    role_name = models.CharField(max_length=100, blank=True)
+    name = models.CharField(max_length=255, blank=True)
+    email = models.EmailField()
+
+    routing_order = models.PositiveIntegerField(default=1)
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="created",
+    )
+
+    sent_at = models.DateTimeField(null=True, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["routing_order", "id"]
+        unique_together = [("sent_envelope", "recipient_id")]
+
+    def __str__(self):
+        label = self.role_name or self.email
+        return f"{label} - {self.status}"
