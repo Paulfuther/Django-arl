@@ -90,29 +90,29 @@
         </div>
       </div>
 
-      <div class="audit-doc-row mt-3">
-        {% for item in row.step_results %}
-          {% if item.status == "completed" %}
-            <span class="audit-doc-pill is-signed">
-              {{ item.step.display_name }} ✓
-            </span>
-          {% elif item.status == "sent" %}
-            <span class="audit-doc-pill is-sent">
-              {{ item.step.display_name }} ↗
-            </span>
-          {% elif item.status == "delivered" %}
-            <span class="audit-doc-pill is-delivered">
-              {{ item.step.display_name }} •
-            </span>
-          {% elif item.status == "declined" or item.status == "voided" %}
-            <span class="audit-doc-pill is-missing">
-              {{ item.step.display_name }} !
-            </span>
-          {% else %}
-            <span class="audit-doc-pill is-missing">
-              {{ item.step.display_name }} ✕
-            </span>
-          {% endif %}
+      <div class="audit-steps mt-3">
+        {% for step in row.steps %}
+          <div class="audit-step-item">
+            <div class="audit-step-title">
+              {{ step.step_name }}
+            </div>
+
+            <div class="audit-step-pills">
+              {% if step.recipient_pills %}
+                {% for rec in step.recipient_pills %}
+                  <span class="audit-doc-pill is-{{ rec.pill_class }}">
+                    {{ rec.name }}
+                    {% if rec.role_name %} ({{ rec.role_name }}){% endif %}
+                    — {{ rec.label }}
+                  </span>
+                {% endfor %}
+              {% else %}
+                <span class="audit-doc-pill is-{{ step.pill_class }}">
+                  {{ step.label }}
+                </span>
+              {% endif %}
+            </div>
+          </div>
         {% endfor %}
       </div>
 
@@ -138,121 +138,162 @@
 {% endif %}
 
 <style>
-  .audit-card {
-    border-radius: 1rem;
-  }
 
-  .audit-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 1rem;
-    flex-wrap: wrap;
-  }
+.audit-card {
+  border-radius: 1rem;
+  transition: all 0.15s ease;
+}
 
-  .audit-employee {
-    flex: 1 1 320px;
+.audit-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0.25rem 0.5rem rgba(0,0,0,.08);
+}
+
+.audit-card-warning {
+  border-left: 4px solid #dc3545;
+  background: linear-gradient(to right, #fff3f4 0%, #ffffff 20%);
+}
+
+.audit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.audit-employee {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.audit-name {
+  word-break: break-word;
+  font-weight: 600;
+}
+
+.audit-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+}
+
+.audit-summary {
+  flex: 0 0 auto;
+  text-align: right;
+  min-width: 72px;
+}
+
+.audit-fraction {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.audit-fraction-label {
+  font-size: 0.75rem;
+  color: #6c757d;
+  font-weight: 400;
+}
+
+/* ✅ step cards side by side */
+.audit-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .85rem;
+  align-items: stretch;
+}
+
+.audit-step-item {
+  flex: 1 1 320px;
+  min-width: 280px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: .65rem;
+  padding: .75rem;
+  border: 1px solid #eef0f2;
+  border-radius: .85rem;
+  background: #fcfcfd;
+}
+
+.audit-step-title {
+  min-width: 0;
+  font-size: .92rem;
+  font-weight: 600;
+  color: #212529;
+  line-height: 1.25;
+}
+
+.audit-step-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem;
+  min-width: 0;
+}
+
+.audit-doc-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: .45rem .8rem;
+  border-radius: 999px;
+  font-size: .85rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.audit-doc-pill.is-success {
+  background: #d1e7dd;
+  color: #0f5132;
+  border-color: #badbcc;
+}
+
+.audit-doc-pill.is-danger {
+  background: #f8d7da;
+  color: #842029;
+  border-color: #f5c2c7;
+}
+
+.audit-doc-pill.is-primary {
+  background: #cfe2ff;
+  color: #084298;
+  border-color: #b6d4fe;
+}
+
+.audit-doc-pill.is-warning {
+  background: #fff3cd;
+  color: #664d03;
+  border-color: #ffecb5;
+}
+
+.audit-doc-pill.is-dark {
+  background: #e2e3e5;
+  color: #41464b;
+  border-color: #d3d6d8;
+}
+
+.audit-progress {
+  height: 6px;
+  background: #e9ecef;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+@media (max-width: 576px) {
+  .audit-step-item {
+    flex: 1 1 100%;
     min-width: 0;
   }
 
-  .audit-name {
-    word-break: break-word;
-    font-weight: 600;
-  }
-
-  .audit-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .35rem;
-  }
-
   .audit-summary {
-    flex: 0 0 auto;
-    text-align: right;
-    min-width: 72px;
+    text-align: left;
+    min-width: auto;
   }
 
-  .audit-doc-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .5rem;
+  .audit-header {
+    gap: .75rem;
   }
-
-  .audit-doc-pill {
-    display: inline-flex;
-    align-items: center;
-    padding: .45rem .8rem;
-    border-radius: 999px;
-    font-size: .85rem;
-    font-weight: 500;
-    border: 1px solid transparent;
-    line-height: 1.2;
-  }
-
-  .audit-doc-pill.is-signed {
-    background: #d1e7dd;
-    color: #0f5132;
-    border-color: #badbcc;
-  }
-
-  .audit-doc-pill.is-missing {
-    background: #f8d7da;
-    color: #842029;
-    border-color: #f5c2c7;
-  }
-
-  .audit-progress {
-    height: 6px;
-    background: #e9ecef;
-    border-radius: 999px;
-    overflow: hidden;
-  }
-
-  .audit-fraction {
-  font-size: 1rem;
-  font-weight: 700;
-  }
-
-  .audit-fraction-label {
-    font-size: 0.75rem;
-    color: #6c757d;
-    font-weight: 400;
-  }
-  .audit-card-warning {
-    border-left: 4px solid #dc3545;
-    background: linear-gradient(to right, #fff3f4 0%, #ffffff 20%);
-  }
-
-  .audit-card {
-    transition: all 0.15s ease;
-  }
-
-  .audit-card:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 0.25rem 0.5rem rgba(0,0,0,.08);
-  }
-
-  @media (max-width: 576px) {
-    .audit-summary {
-      text-align: left;
-      min-width: auto;
-    }
-
-    .audit-header {
-      gap: .75rem;
-    }
-  }
+}
 </style>
-<style>
-  .audit-doc-pill.is-sent {
-    background: #cfe2ff;
-    color: #084298;
-    border-color: #b6d4fe;
-  }
 
-  .audit-doc-pill.is-delivered {
-    background: #fff3cd;
-    color: #664d03;
-    border-color: #ffecb5;
-  }
-</style>

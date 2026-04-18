@@ -1,27 +1,91 @@
-from collections import defaultdict
-
-from django.db.models import Q
-
-from arl.documentflow.models import DocumentFlow, SentDocuSignEnvelope
-from arl.dsign.models import ProcessedDocsignDocument, SignedDocumentFile
+from django.db.models import Prefetch, Q
+from arl.documentflow.models import (
+    DocumentFlow,
+    SentDocuSignEnvelope,
+    SentDocuSignRecipient,
+)
 from arl.user.models import CustomUser
+import logging
+logger = logging.getLogger(__name__)
 
 
 def normalize_template_name(value):
     return (value or "").strip().lower()
 
 
+def get_recipient_pill_class(status):
+    status = (status or "").lower()
+
+    if status == "completed":
+        return "success"  # green
+    if status == "delivered":
+        return "warning"  # yellow
+    if status in {"created", "sent"}:
+        return "primary"  # blue
+    if status in {"declined", "voided"}:
+        return "dark"
+    return "danger"  # red
+
+
+def get_recipient_pill_label(status):
+    status = (status or "").lower()
+
+    if status == "completed":
+        return "Complete"
+    if status == "delivered":
+        return "Opened"
+    if status == "sent":
+        return "Sent"
+    if status == "created":
+        return "Queued"
+    if status == "declined":
+        return "Declined"
+    if status == "voided":
+        return "Voided"
+    return "Not Sent"
+
+
+def get_step_pill_class(status):
+    status = (status or "").lower()
+
+    if status == "completed":
+        return "success"
+    if status == "delivered":
+        return "warning"
+    if status in {"created", "sent"}:
+        return "primary"
+    return "danger"
+
+
+def get_step_pill_label(status):
+    status = (status or "").lower()
+    if status == "completed":
+        return "Complete"
+    if status == "delivered":
+        return "Opened"
+    if status == "sent":
+        return "Sent"
+    if status == "created":
+        return "Queued"
+    if status == "declined":
+        return "Declined"
+    if status == "voided":
+        return "Voided"
+    return "Not Sent"
+
+
 def build_document_audit(employer, search_query="", incomplete_only=False):
     flow = (
-        DocumentFlow.objects.filter(employer=employer, is_active=True, is_default=True)
+        DocumentFlow.objects
+        .filter(employer=employer, is_active=True, is_default=True)
         .prefetch_related("steps__template")
         .first()
     )
 
     employees = (
-        CustomUser.objects.filter(employer=employer, is_active=True)
+        CustomUser.objects
+        .filter(employer=employer, is_active=True)
         .select_related("store")
-        .order_by("-date_joined")
     )
 
     search_query = (search_query or "").strip()
@@ -32,194 +96,175 @@ def build_document_audit(employer, search_query="", incomplete_only=False):
             | Q(email__icontains=search_query)
         )
 
+    employees = employees.order_by("-date_joined")
+
     if not flow:
         return {
             "flow": None,
-            "steps": [],
             "rows": [],
             "audit_search": search_query,
             "audit_incomplete_only": incomplete_only,
         }
 
-    steps = list(
+    # Always start from the actual configured flow steps
+    flow_steps = list(
         flow.steps.filter(is_active=True)
         .select_related("template")
         .order_by("step_order", "id")
     )
 
-    employee_ids = list(employees.values_list("id", flat=True))
-
-    signed_docs = (
-        SignedDocumentFile.objects.filter(employer=employer, user_id__in=employee_ids)
-        .select_related("user")
-        .only(
-            "id",
-            "user_id",
-            "template_name",
-            "document_title",
-            "uploaded_at",
-            "file_name",
-        )
-        .order_by("-uploaded_at")
+    logger.info(
+        "AUDIT FLOW STEPS: %s",
+        [
+            (
+                s.id,
+                s.step_order,
+                getattr(s, "display_name", None),
+                getattr(s.template, "template_name", None) if s.template else None,
+            )
+            for s in flow_steps
+        ]
     )
 
-    processed_docs = (
-        ProcessedDocsignDocument.objects.filter(
-            employer=employer, user_id__in=employee_ids
-        )
-        .only("id", "user_id", "template_name", "envelope_id")
-        .order_by("-id")
-    )
-
+    # Get all envelopes for these employees in this flow
     sent_envelopes = (
-        SentDocuSignEnvelope.objects.filter(
-            employer=employer,
-            user_id__in=employee_ids,
+        SentDocuSignEnvelope.objects
+        .filter(
+            user__in=employees,
             flow=flow,
         )
-        .select_related("flow_step", "template", "user")
-        .order_by("-sent_at")
+        .select_related("flow_step", "template", "user", "employer")
+        .prefetch_related(
+            Prefetch(
+                "recipients",
+                queryset=SentDocuSignRecipient.objects.order_by("routing_order", "id"),
+            )
+        )
+        .order_by("completed_at", "id")
     )
 
-    docs_by_user = defaultdict(list)
-    for doc in signed_docs:
-        docs_by_user[doc.user_id].append(doc)
-
-    processed_by_user = defaultdict(list)
-    for doc in processed_docs:
-        processed_by_user[doc.user_id].append(doc)
-
-    envelopes_by_user_step = {}
+    # Keep the newest envelope per (user, flow_step)
+    sent_map = {}
     for env in sent_envelopes:
-        if env.flow_step_id:
-            key = (env.user_id, env.flow_step_id)
-            if key not in envelopes_by_user_step:
-                envelopes_by_user_step[key] = env
+        if env.user_id and env.flow_step_id:
+            sent_map[(env.user_id, env.flow_step_id)] = env
 
     rows = []
 
     for employee in employees:
-        employee_docs = docs_by_user.get(employee.id, [])
-        employee_processed = processed_by_user.get(employee.id, [])
-
         step_results = []
         completed_count = 0
+        total_required = len(flow_steps)
 
-        for step in steps:
-            template = getattr(step, "template", None)
-            required_name = normalize_template_name(
-                getattr(template, "template_name", None)
-                or getattr(template, "name", None)
-                or step.label
-                or ""
+        for step in flow_steps:
+            template_name = step.template.template_name if step.template else ""
+            template_id = step.template.template_id if step.template else ""
+
+            step_name = (
+                getattr(step, "display_name", None)
+                or getattr(step, "name", None)
+                or template_name
+                or f"Step {step.step_order}"
             )
 
-            matched_doc = None
-            matched_processed = None
-            matched_env = envelopes_by_user_step.get((employee.id, step.id))
+            sent_envelope = sent_map.get((employee.id, step.id))
 
-            if required_name:
-                for doc in employee_docs:
-                    template_name = normalize_template_name(doc.template_name)
-                    document_title = normalize_template_name(doc.document_title)
-                    file_name = normalize_template_name(doc.file_name)
+            if sent_envelope:
+                envelope_status = (sent_envelope.status or "").lower()
 
-                    if (
-                        template_name == required_name
-                        or document_title == required_name
-                        or required_name in file_name
-                    ):
-                        matched_doc = doc
-                        break
+                recipient_pills = []
+                for recipient in sent_envelope.recipients.all():
+                    recipient_pills.append(
+                        {
+                            "name": recipient.name or recipient.email,
+                            "email": recipient.email,
+                            "role_name": recipient.role_name,
+                            "routing_order": recipient.routing_order,
+                            "status": recipient.status,
+                            "label": get_recipient_pill_label(recipient.status),
+                            "pill_class": get_recipient_pill_class(recipient.status),
+                            "sent_at": recipient.sent_at,
+                            "delivered_at": recipient.delivered_at,
+                            "completed_at": recipient.completed_at,
+                        }
+                    )
+                
+                logger.info(
+                    "AUDIT RECIPIENTS | employee=%s | step=%s | recipients=%s",
+                    employee.email,
+                    step_name,
+                    [
+                        (r.name, r.role_name, r.status)
+                        for r in sent_envelope.recipients.all()
+                    ],
+                )
 
-                if not matched_doc:
-                    for proc in employee_processed:
-                        proc_template_name = normalize_template_name(proc.template_name)
-                        if proc_template_name == required_name:
-                            matched_processed = proc
-                            break
+                is_complete = envelope_status == "completed"
+                if is_complete:
+                    completed_count += 1
 
-            # Status priority
-            if matched_doc:
-                status = "completed"
-                completed_at = matched_doc.uploaded_at
-            elif matched_env and matched_env.status == "completed":
-                status = "completed"
-                completed_at = matched_env.completed_at
-            elif matched_processed:
-                status = "completed"
-                completed_at = None
-            elif matched_env:
-                status = matched_env.status or "sent"
-                completed_at = None
+                step_results.append(
+                    {
+                        "step_id": step.id,
+                        "step_order": step.step_order,
+                        "step_name": step_name,
+                        "template_name": template_name,
+                        "template_id": template_id,
+                        "status": envelope_status,
+                        "label": get_step_pill_label(envelope_status),
+                        "pill_class": get_step_pill_class(envelope_status),
+                        "recipient_pills": recipient_pills,
+                        "sent_envelope_id": sent_envelope.id,
+                        "envelope_id": sent_envelope.envelope_id,
+                        "is_complete": is_complete,
+                    }
+                )
             else:
-                status = "not_sent"
-                completed_at = None
+                step_results.append(
+                    {
+                        "step_id": step.id,
+                        "step_order": step.step_order,
+                        "step_name": step_name,
+                        "template_name": template_name,
+                        "template_id": template_id,
+                        "status": "not_sent",
+                        "label": "Not Sent",
+                        "pill_class": "danger",
+                        "recipient_pills": [],
+                        "sent_envelope_id": None,
+                        "envelope_id": None,
+                        "is_complete": False,
+                    }
+                )
 
-            if status == "completed":
-                completed_count += 1
-
-            step_results.append(
-                {
-                    "step": step,
-                    "template": template,
-                    "required_name": required_name,
-                    "status": status,
-                    "is_complete": status == "completed",
-                    "matched_doc": matched_doc,
-                    "matched_processed": matched_processed,
-                    "matched_env": matched_env,
-                    "completed_at": completed_at,
-                }
-            )
-
-        total_required = len(steps)
-        is_fully_complete = total_required > 0 and completed_count == total_required
-
-        if total_required == 0:
-            overall_status = "no_docs"
-        elif is_fully_complete:
+        if completed_count == total_required and total_required > 0:
             overall_status = "completed"
-        elif completed_count > 0:
-            overall_status = "in_progress"
-        elif any(
-            item["status"] in ["sent", "delivered", "declined", "voided"]
-            for item in step_results
+        elif completed_count == 0 and all(
+            step["status"] == "not_sent" for step in step_results
         ):
-            overall_status = "in_progress"
-        else:
             overall_status = "not_sent"
+        else:
+            overall_status = "in_progress"
 
-        row = {
-            "employee": employee,
-            "store": getattr(employee, "store", None),
-            "step_results": step_results,
-            "completed_count": completed_count,
-            "total_required": total_required,
-            "is_complete": is_fully_complete,
-            "is_incomplete": not is_fully_complete,
-            "overall_status": overall_status,
-        }
+        is_complete = completed_count == total_required and total_required > 0
 
-        if incomplete_only and is_fully_complete:
+        if incomplete_only and is_complete:
             continue
 
-        rows.append(row)
-    print(
-        "flow: ",
-        flow,
-        "steps :",
-        steps,
-        "rows : ",
-        rows,
-        "audit_search :",
-        search_query,
-        "audit_incomplete_only :",
-        incomplete_only,
-    )
+        rows.append(
+            {
+                "employee": employee,
+                "step_results": step_results,   # keep old template name for compatibility
+                "steps": step_results,          # also provide new name
+                "completed_count": completed_count,
+                "total_required": total_required,
+                "overall_status": overall_status,
+                "is_complete": is_complete,
+            }
+        )
+
     return {
         "flow": flow,
-        "steps": steps,
         "rows": rows,
         "audit_search": search_query,
         "audit_incomplete_only": incomplete_only,

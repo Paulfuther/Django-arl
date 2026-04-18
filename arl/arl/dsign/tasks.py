@@ -14,12 +14,14 @@ from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
+from arl.documentflow.models import SentDocuSignEnvelope, SentDocuSignRecipient
 from docusign_esign import ApiClient, EnvelopesApi
 from docusign_esign.client.api_exception import ApiException
 
 from arl.bucket.helpers import upload_to_linode_object_storage
 from arl.celery import app
-from arl.documentflow.models import SentDocuSignEnvelope
+
 from arl.dsign.models import (
     DocuSignTemplate,
     ProcessedDocsignDocument,
@@ -464,56 +466,91 @@ def extract_recipient_email(payload):
     return recipient_email
 
 
+# ============ Webhook for Docusign =======================
 @app.task(name="docusign_webhook")
 def process_docusign_webhook(payload):
-    """Handles DocuSign Webhook events for sent, signed, and template saved documents."""
+    """Handles DocuSign webhook events for sent, delivered, recipient-completed, and templateSaved."""
     try:
         event_type = payload.get("event")
-        envelope_id = payload.get("data", {}).get("envelopeId", "")
+        data = payload.get("data", {}) or {}
+        envelope_id = data.get("envelopeId", "")
+        envelope_summary = data.get("envelopeSummary", {}) or {}
+        signers = envelope_summary.get("recipients", {}).get("signers", []) or []
+
         template_id = get_template_id(payload)
         template_name = get_docusign_template_name_from_template(template_id)
-        logger.info(f"📄 Template Name: {template_name}")
 
-        envelope_summary = payload.get("data", {}).get("envelopeSummary", {})
-        signers = envelope_summary.get("recipients", {}).get("signers", [])
+        logger.info(
+            f"📨 DocuSign webhook received | event={event_type} | envelope_id={envelope_id} | template_id={template_id} | template_name={template_name}"
+        )
 
-        if not signers:
-            logger.error("❌ No signers found in the payload.")
-            return {"error": "No signers found"}
-
-        recipient_email = signers[0].get("email", "")
-
-        print("recipeitn email :", recipient_email)
-        # ✅ Fallback to sender email if recipient is empty
-        if not recipient_email:
-            recipient_email = payload.get("data", {}).get("sender", {}).get("email", "")
-
-        if not envelope_id or not recipient_email:
-            logger.error(
-                f"❌ Missing envelope ID or recipient email: {envelope_id}, {recipient_email}"
-            )
-            return {"error": "Invalid payload"}
-
-        # ✅ Handle "templateSaved" event
+        # templateSaved is separate
         if event_type == "templateSaved":
             template_id = payload.get("templateId")
-            user_email = payload.get("userEmail")  # The user who created the template
+            user_email = payload.get("userEmail")
             if template_id and user_email:
                 handle_template_saved_task.delay(template_id, user_email)
                 return {"status": "template saved task triggered"}
 
+            logger.error("❌ Missing templateId or userEmail in templateSaved event.")
+            return {"error": "Missing templateId or userEmail"}
+
+        if not envelope_id:
+            logger.error("❌ Missing envelope_id in DocuSign webhook payload.")
+            return {"error": "Missing envelope_id"}
+
+        sent_envelope = (
+            SentDocuSignEnvelope.objects.select_related(
+                "flow", "flow_step", "user", "template", "employer"
+            )
+            .filter(envelope_id=envelope_id)
+            .first()
+        )
+
+        if sent_envelope and signers:
+            sync_sent_envelope_recipients(sent_envelope, payload)
+        elif not sent_envelope:
+            logger.warning(
+                f"⚠️ No SentDocuSignEnvelope found for envelope {envelope_id}"
+            )
+        else:
+            logger.warning(
+                f"⚠️ No signers found in payload for envelope {envelope_id}"
+            )
+
+        # legacy fallback only if absolutely needed
+        recipient_email = ""
+        if signers:
+            recipient_email = signers[0].get("email", "") or ""
+
+        if not recipient_email:
+            recipient_email = (
+                envelope_summary.get("sender", {}).get("email", "") or ""
+            )
+
         if event_type == "envelope-sent":
-            handle_envelope_sent(
+            return handle_envelope_sent(
                 envelope_id=envelope_id,
                 recipient_email=recipient_email,
                 template_name=template_name,
-            )  # 🚀 Pass extracted template_name
-            return {"status": "envelope-sent task triggered"}
+            )
 
-        # ✅ Handle "recipient-completed" event
+        if event_type == "envelope-delivered":
+            return handle_envelope_delivered(
+                envelope_id=envelope_id,
+                recipient_email=recipient_email,
+                template_name=template_name,
+            )
+
         if event_type == "recipient-completed":
+            triggering_recipient_id = str(data.get("recipientId") or "").strip()
             return handle_recipient_completed(
-                envelope_id, recipient_email, template_id, template_name
+                envelope_id=envelope_id,
+                recipient_email=recipient_email,  # temporary for compatibility
+                template_id=template_id,
+                template_name=template_name,
+                payload=payload,
+                triggering_recipient_id=triggering_recipient_id,
             )
 
         logger.info(f"ℹ️ Unhandled DocuSign event type: {event_type}")
@@ -523,7 +560,7 @@ def process_docusign_webhook(payload):
         logger.error("❌ Invalid JSON payload")
         return {"error": "Invalid JSON payload"}
     except Exception as e:
-        logger.error(f"❌ Error processing DocuSign webhook: {str(e)}")
+        logger.exception("❌ Error processing DocuSign webhook")
         return {"error": str(e)}
 
 
@@ -563,210 +600,229 @@ def handle_template_saved(template_id, user_email):
 def handle_envelope_sent(envelope_id, recipient_email, template_name):
     """Handles document sent events and notifies HR via SMS."""
     try:
-        if not envelope_id or not recipient_email or not template_name:
+        if not envelope_id or not template_name:
             logger.error(
-                f"❌ Missing envelope_id, recipient_email, or template_name: "
-                f"{envelope_id}, {recipient_email}, {template_name}"
+                f"❌ Missing envelope_id or template_name: {envelope_id}, {template_name}"
             )
-            return {"error": "Missing envelope ID, recipient email, or template name"}
+            return {"error": "Missing envelope ID or template name"}
 
-        # ✅ Fetch user to determine employer
-        user = (
-            CustomUser.objects.filter(email=recipient_email)
-            .select_related("employer")
+        sent_envelope = (
+            SentDocuSignEnvelope.objects.select_related("user", "employer")
+            .filter(envelope_id=envelope_id)
             .first()
         )
-        if not user:
-            logger.error(f"❌ User with email {recipient_email} not found.")
-            return {"error": "User not found"}
 
-        employer = user.employer
-        if not employer:
-            logger.error(f"❌ Employer not found for user {user.email}.")
-            return {"error": "Employer not found"}
-
-        # ✅ Update sent tracking row if it exists
-        updated = SentDocuSignEnvelope.objects.filter(envelope_id=envelope_id).update(
-            status="sent"
-        )
-
-        if updated:
-            logger.info(f"📌 Updated SentDocuSignEnvelope for envelope {envelope_id}")
-        else:
+        if not sent_envelope:
             logger.warning(
                 f"⚠️ No SentDocuSignEnvelope found for envelope {envelope_id}. "
                 f"Tracking row may not have been created at send time."
             )
+            return {"error": "Tracking row not found"}
 
-        # ✅ Notify HR
+        user = sent_envelope.user
+        employer = sent_envelope.employer or getattr(user, "employer", None)
+
+        if not employer:
+            logger.error(f"❌ Employer not found for envelope {envelope_id}.")
+            return {"error": "Employer not found"}
+
+        sent_envelope.status = "sent"
+        sent_envelope.save(update_fields=["status"])
+
+        display_name = user.get_full_name() if user else recipient_email
+        display_email = user.email if user else recipient_email
+
         notify_hr.delay(
             template_name,
-            user.get_full_name(),
-            recipient_email,
+            display_name,
+            display_email,
             employer.id,
             event_type="sent",
         )
 
         logger.info(
-            f"📨 Sent HR notification for envelope sent: {template_name} to {recipient_email}"
+            f"📨 Sent HR notification for envelope sent: {template_name} to {display_email}"
         )
         return {"status": "HR notified"}
 
     except Exception as e:
-        logger.error(f"❌ Error in handle_envelope_sent: {str(e)}")
+        logger.exception(f"❌ Error in handle_envelope_sent for {envelope_id}")
         return {"error": str(e)}
 
 
 # ✅ Handles "recipient-completed" event
 def handle_recipient_completed(
-    envelope_id, recipient_email, template_id, template_name
+    envelope_id,
+    recipient_email,
+    template_id,
+    template_name,
+    payload=None,
+    triggering_recipient_id=None,
 ):
-    """Handles recipient completion events by saving the signed document."""
+    """Handles recipient completion events and only finalizes the flow step when the whole envelope is completed."""
     try:
-        # ✅ Fetch the template first
+        payload = payload or {}
+        data = payload.get("data", {}) or {}
+        envelope_summary = data.get("envelopeSummary", {}) or {}
+        envelope_status = (envelope_summary.get("status") or "").lower().strip()
+
         template = DocuSignTemplate.objects.filter(template_id=template_id).first()
         if not template:
             logger.error(f"❌ DocuSignTemplate with ID {template_id} not found.")
             return {"error": "Template not found"}
 
-        employer = template.employer
-        user = (
-            CustomUser.objects.filter(email=recipient_email)
-            .select_related("employer")
+        sent_envelope = (
+            SentDocuSignEnvelope.objects.select_related(
+                "flow", "flow_step", "user", "template", "employer"
+            )
+            .filter(envelope_id=envelope_id)
             .first()
         )
 
-        if template.is_company_document:
-            # 🏢 This is a COMPANY DOCUMENT
-            try:
-                processed_doc = ProcessedDocsignDocument.objects.create(
-                    envelope_id=envelope_id,
-                    template_name=template_name,
-                    user=user,
-                    employer=employer,
-                    is_company_document=True,  # ✅ (if you add this field later)
-                )
-                logger.info(f"✅ Saved company signed document: {processed_doc}")
-            except IntegrityError as e:
-                logger.error(f"❌ Error saving company document: {str(e)}")
-                return {"error": "Database integrity error"}
-
-            fetch_and_upload_signed_documents.delay(
-                envelope_id,
-                user.id if user else None,
-                employer.id,
-                template_name,
-                is_company_document=True,
+        if not sent_envelope:
+            logger.error(
+                f"❌ SentDocuSignEnvelope with envelope_id {envelope_id} not found."
             )
+            return {"error": "Sent envelope tracking row not found"}
+
+        # Sync recipient rows again here for safety
+        if payload:
+            sync_sent_envelope_recipients(sent_envelope, payload)
+
+        # If the whole envelope is not complete yet, do NOT finish the flow step.
+        if envelope_status != "completed":
+            logger.info(
+                f"ℹ️ recipient-completed received for envelope {envelope_id}, "
+                f"but envelope status is still '{envelope_status}'. "
+                f"Recipient pill updated; flow step will not be completed yet."
+            )
+
+            if sent_envelope.status != "completed":
+                sent_envelope.status = "sent"
+                sent_envelope.save(update_fields=["status"])
+
+            return {
+                "status": "recipient updated only",
+                "envelope_status": envelope_status,
+                "triggering_recipient_id": triggering_recipient_id,
+            }
+
+        # Whole envelope is complete here
+        user = sent_envelope.user
+        employer = sent_envelope.employer or template.employer
+
+        if template.is_company_document:
+            processed_doc, created = ProcessedDocsignDocument.objects.get_or_create(
+                envelope_id=envelope_id,
+                defaults={
+                    "template_name": template_name,
+                    "user": user,
+                    "employer": employer,
+                    "is_company_document": True,
+                },
+            )
+
+            sent_envelope.status = "completed"
+            completed_dt = envelope_summary.get("completedDateTime")
+            sent_envelope.completed_at = (
+                parse_datetime(completed_dt) if completed_dt else timezone.now()
+            )
+            sent_envelope.save(update_fields=["status", "completed_at"])
+
+            if created:
+                logger.info(f"✅ Saved company signed document: {processed_doc}")
+                fetch_and_upload_signed_documents.delay(
+                    envelope_id,
+                    user.id if user else None,
+                    employer.id,
+                    template_name,
+                    is_company_document=True,
+                )
 
             return {"status": "success", "document_id": processed_doc.id}
 
-        else:
-            # 👤 This is an EMPLOYEE DOCUMENT
-            user = (
-                CustomUser.objects.filter(email=recipient_email)
-                .select_related("employer")
-                .first()
+        # Employee document
+        if not user:
+            logger.error(
+                f"❌ SentDocuSignEnvelope {envelope_id} has no linked user."
             )
-            print("user :", user)
+            return {"error": "No linked user on sent envelope"}
 
-            if not user:
-                logger.error(f"❌ User with email {recipient_email} not found.")
-                return {"error": "User not found"}
+        processed_doc, created = ProcessedDocsignDocument.objects.get_or_create(
+            envelope_id=envelope_id,
+            defaults={
+                "template_name": template_name,
+                "user": user,
+                "employer": employer,
+            },
+        )
 
-            employer = user.employer
-            if not employer:
-                logger.error(f"❌ Employer not found for user {user.email}.")
-                return {"error": "Employer not found"}
+        completed_dt = envelope_summary.get("completedDateTime")
+        sent_envelope.status = "completed"
+        sent_envelope.completed_at = (
+            parse_datetime(completed_dt) if completed_dt else timezone.now()
+        )
+        sent_envelope.save(update_fields=["status", "completed_at"])
 
-            sent_envelope = (
-                SentDocuSignEnvelope.objects.select_related("flow", "flow_step", "user", "template")
-                .filter(envelope_id=envelope_id)
-                .first()
-            )
-
-            if not sent_envelope:
-                logger.error(f"❌ SentDocuSignEnvelope with envelope_id {envelope_id} not found.")
-                return {"error": "Sent envelope tracking row not found"}
-
-            try:
-                processed_doc = ProcessedDocsignDocument.objects.create(
-                    envelope_id=envelope_id,
-                    template_name=template_name,
-                    user=user,
-                    employer=employer,
-                )
-
-                # ✅ Mark current flow step complete
-                sent_envelope.status = "completed"
-                sent_envelope.completed_at = timezone.now()
-                sent_envelope.save(update_fields=["status", "completed_at"])
-
-                logger.info(f"✅ Saved signed document: {processed_doc}")
-
-            except IntegrityError as e:
-                logger.error(f"❌ Error saving signed document: {str(e)}")
-                return {"error": "Database integrity error"}
+        if created:
+            logger.info(f"✅ Saved signed document: {processed_doc}")
 
             fetch_and_upload_signed_documents.delay(
                 envelope_id, user.id, employer.id, template_name
             )
 
-            # ✅ Notify HR (only for employee docs)
             notify_hr.delay(
                 template_name,
                 user.get_full_name(),
-                recipient_email,
+                user.email,
                 employer.id,
                 event_type="completed",
             )
 
-            # ✅ Find next step in the flow
+        next_step = None
+        if sent_envelope.flow and sent_envelope.flow_step:
+            next_step = (
+                sent_envelope.flow.steps.filter(
+                    is_active=True,
+                    step_order__gt=sent_envelope.flow_step.step_order,
+                )
+                .order_by("step_order")
+                .first()
+            )
+
+        if next_step and not next_step.template:
+            logger.error(f"❌ Next flow step {next_step.id} has no template.")
             next_step = None
 
-            if sent_envelope.flow and sent_envelope.flow_step:
-                next_step = (
-                    sent_envelope.flow.steps.filter(
-                        is_active=True,
-                        step_order__gt=sent_envelope.flow_step.step_order,
-                    )
-                    .order_by("step_order")
-                    .first()
+        if next_step:
+            already_sent = SentDocuSignEnvelope.objects.filter(
+                user=user,
+                flow=sent_envelope.flow,
+                flow_step=next_step,
+            ).exists()
+
+            if not already_sent:
+                logger.info(
+                    f"📄 Sending next document flow step for user {user.email}: "
+                    f"{next_step.display_name} (step_order={next_step.step_order})"
                 )
 
-            if next_step and not next_step.template:
-                logger.error(f"❌ Next flow step {next_step.id} has no template.")
-                next_step = None
+                create_docusign_envelope_task.delay(
+                    {
+                        "user_id": user.id,
+                        "employer_id": employer.id,
+                        "signer_email": user.email,
+                        "signer_name": user.get_full_name() or user.username,
+                        "template_id": next_step.template.template_id,
+                        "flow_id": sent_envelope.flow.id,
+                        "flow_step_id": next_step.id,
+                    }
+                )
 
-            if next_step:
-                already_sent = SentDocuSignEnvelope.objects.filter(
-                    user=user,
-                    flow=sent_envelope.flow,
-                    flow_step=next_step,
-                ).exists()
-
-                if not already_sent:
-                    logger.info(
-                        f"📄 Sending next document flow step for user {user.email}: "
-                        f"{next_step.display_name} (step_order={next_step.step_order})"
-                    )
-
-                    create_docusign_envelope_task.delay(
-                        {
-                            "user_id": user.id,
-                            "employer_id": employer.id,
-                            "signer_email": user.email,
-                            "signer_name": user.get_full_name() or user.username,
-                            "template_id": next_step.template.template_id,
-                            "flow_id": sent_envelope.flow.id,
-                            "flow_step_id": next_step.id,
-                        }
-                    )
-
-            return {"status": "success", "document_id": processed_doc.id}
+        return {"status": "success", "document_id": processed_doc.id}
 
     except Exception as e:
-        logger.error(f"❌ Error in handle_recipient_completed: {str(e)}")
+        logger.exception(f"❌ Error in handle_recipient_completed for {envelope_id}")
         return {"error": str(e)}
 
 
@@ -899,6 +955,80 @@ def upload_signed_document_to_linode(document_id):
 
     except ProcessedDocsignDocument.DoesNotExist:
         logger.error(f"❌ Document {document_id} not found.")
+
+
+def handle_envelope_delivered(envelope_id, recipient_email, template_name):
+    """Handles DocuSign delivered/opened events."""
+    try:
+        sent_envelope = SentDocuSignEnvelope.objects.filter(
+            envelope_id=envelope_id
+        ).first()
+
+        if not sent_envelope:
+            logger.warning(
+                f"⚠️ No SentDocuSignEnvelope found for envelope {envelope_id}"
+            )
+            return {"error": "Tracking row not found"}
+
+        if sent_envelope.status not in ["completed", "delivered"]:
+            sent_envelope.status = "delivered"
+            sent_envelope.save(update_fields=["status", "updated_at"])
+
+        logger.info(
+            f"✅ Marked envelope {envelope_id} as delivered for {recipient_email} ({template_name})"
+        )
+        return {"status": "updated"}
+
+    except Exception as e:
+        logger.exception(f"❌ Error in handle_envelope_delivered for {envelope_id}")
+        return {"error": str(e)}
+
+
+def sync_sent_envelope_recipients(sent_envelope, payload):
+    envelope_summary = payload.get("data", {}).get("envelopeSummary", {}) or {}
+    signers = envelope_summary.get("recipients", {}).get("signers", []) or []
+
+    if not signers:
+        logger.warning(
+            f"⚠️ No signers found while syncing recipients for envelope {sent_envelope.envelope_id}"
+        )
+        return
+
+    for signer in signers:
+        recipient_id = str(signer.get("recipientId") or "").strip()
+        if not recipient_id:
+            logger.warning(
+                f"⚠️ Missing recipientId for signer in envelope {sent_envelope.envelope_id}"
+            )
+            continue
+
+        status = (signer.get("status") or "created").lower().strip()
+
+        SentDocuSignRecipient.objects.update_or_create(
+            sent_envelope=sent_envelope,
+            recipient_id=recipient_id,
+            defaults={
+                "recipient_id_guid": signer.get("recipientIdGuid", "") or "",
+                "role_name": signer.get("roleName", "") or "",
+                "name": signer.get("name", "") or "",
+                "email": signer.get("email", "") or "",
+                "routing_order": int(signer.get("routingOrder") or 1),
+                "status": status,
+                "sent_at": parse_datetime(signer.get("sentDateTime"))
+                if signer.get("sentDateTime")
+                else None,
+                "delivered_at": parse_datetime(signer.get("deliveredDateTime"))
+                if signer.get("deliveredDateTime")
+                else None,
+                "completed_at": parse_datetime(signer.get("signedDateTime"))
+                if signer.get("signedDateTime")
+                else None,
+            },
+        )
+
+    logger.info(
+        f"✅ Synced {len(signers)} recipient rows for envelope {sent_envelope.envelope_id}"
+    )
 
 
 # ========================================================
