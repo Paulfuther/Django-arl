@@ -148,6 +148,13 @@
              data-title="Audit">
             <i class="material-symbols-outlined">history</i>
           </a>
+          <a class="hr-nav-link {% if active_tab == 'immigration_audit' %}active{% endif %}"
+            data-bs-toggle="tab"
+            href="#immigration_audit"
+            role="tab"
+            data-title="Immigration">
+            <i class="material-symbols-outlined">badge</i>
+          </a>
         </nav>
       </div>
     </aside>
@@ -190,6 +197,12 @@
          role="tab">
         <i class="material-symbols-outlined">history</i>
       </a>
+      <a class="hr-nav-link {% if active_tab == 'immigration_audit' %}active{% endif %}"
+        data-bs-toggle="tab"
+        href="#immigration_audit"
+        role="tab">
+        <i class="material-symbols-outlined">badge</i>
+      </a>
     </div>
 
     <!-- ===== Content ===== -->
@@ -214,6 +227,10 @@
 
         <div id="document_audit" class="tab-pane fade {% if active_tab == 'document_audit' %}show active{% endif %}">
           {% include "documentflow/partials/document_audit_log.html" %}
+        </div>
+
+        <div id="immigration_audit" class="tab-pane fade {% if active_tab == 'immigration_audit' %}show active{% endif %}">
+          {% include "user/hr/partials/immigration_audit.html" %}
         </div>
 
       </div>
