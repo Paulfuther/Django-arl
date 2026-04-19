@@ -4,9 +4,10 @@ from django.db.models import Q
 
 def _get_sin_value(user):
     """
-    Returns digits only from the legacy SIN field, or "".
+    Returns digits only from decrypted SIN.
+    Legacy raw `sin` field is ignored.
     """
-    raw = getattr(user, "sin", "") or ""
+    raw = user.sin_plain or ""
     return "".join(ch for ch in str(raw) if ch.isdigit())
 
 
@@ -18,8 +19,6 @@ def _days_until(target_date):
 
 def _sin_status(user):
     sin_value = _get_sin_value(user)
-    sin_expiry = getattr(user, "sin_expiration_date", None)
-    days_left = _days_until(sin_expiry)
 
     if not sin_value:
         return {
@@ -27,43 +26,48 @@ def _sin_status(user):
             "label": "Missing SIN",
             "pill_class": "danger",
             "is_temporary": False,
+            "expiry": None,
+            "days_left": None,
+        }
+
+    # Permanent SIN: no expiry tracking
+    if not sin_value.startswith("9"):
+        return {
+            "code": "permanent",
+            "label": "Permanent SIN",
+            "pill_class": "success",
+            "is_temporary": False,
+            "expiry": None,
+            "days_left": None,
+        }
+
+    # Temporary SIN: expiry tracking applies
+    sin_expiry = getattr(user, "sin_expiration_date", None)
+    days_left = _days_until(sin_expiry)
+
+    if not sin_expiry:
+        return {
+            "code": "missing_expiry",
+            "label": "Temporary SIN",
+            "pill_class": "warning",
+            "is_temporary": True,
             "expiry": sin_expiry,
             "days_left": days_left,
         }
 
-    if sin_value.startswith("9"):
-        if not sin_expiry:
-            return {
-                "code": "missing_expiry",
-                "label": "Temporary SIN",
-                "pill_class": "warning",
-                "is_temporary": True,
-                "expiry": sin_expiry,
-                "days_left": days_left,
-            }
-
-        if days_left is not None and days_left < 0:
-            return {
-                "code": "expired",
-                "label": "Temporary SIN Expired",
-                "pill_class": "danger",
-                "is_temporary": True,
-                "expiry": sin_expiry,
-                "days_left": days_left,
-            }
-
-        if days_left is not None and days_left <= 120:
-            return {
-                "code": "expiring_soon",
-                "label": "Temporary SIN",
-                "pill_class": "warning",
-                "is_temporary": True,
-                "expiry": sin_expiry,
-                "days_left": days_left,
-            }
-
+    if days_left is not None and days_left < 0:
         return {
-            "code": "temporary",
+            "code": "expired",
+            "label": "Temporary SIN Expired",
+            "pill_class": "danger",
+            "is_temporary": True,
+            "expiry": sin_expiry,
+            "days_left": days_left,
+        }
+
+    if days_left is not None and days_left <= 120:
+        return {
+            "code": "expiring_soon",
             "label": "Temporary SIN",
             "pill_class": "warning",
             "is_temporary": True,
@@ -72,10 +76,10 @@ def _sin_status(user):
         }
 
     return {
-        "code": "permanent",
-        "label": "Permanent SIN",
-        "pill_class": "success",
-        "is_temporary": False,
+        "code": "temporary",
+        "label": "Temporary SIN",
+        "pill_class": "warning",
+        "is_temporary": True,
         "expiry": sin_expiry,
         "days_left": days_left,
     }
@@ -169,7 +173,7 @@ def build_immigration_audit(employer, search_query="", flagged_only=False):
     employees = (
         employer.customuser_set.filter(is_active=True)
         .select_related("store")
-        .order_by("first_name", "last_name", "email")
+        .order_by("-date_joined")
     )
 
     search_query = (search_query or "").strip()
