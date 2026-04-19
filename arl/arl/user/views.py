@@ -49,7 +49,7 @@ from arl.msg.tasks import send_sms_task
 from arl.setup.helpers import employer_hr_required
 from arl.setup.models import EmployerRequest
 from arl.user.services import set_user_sin
-
+from arl.documentflow.services_immigration import build_immigration_audit
 from .forms import (
     CustomUserCreationForm,
     NewHireInviteForm,
@@ -970,13 +970,25 @@ def hr_dashboard(request):
         return _handle_invite_post(request, employer)
 
     form = _get_invite_form(request, employer)
-    active_tab = "document_audit"
+
     document_tab = "employee"
     event = None
-    #active_tab, document_tab, event = _get_active_tab_and_document_tab(request)
+
+    VALID_TABS = {
+        "docusign",
+        "employees",
+        "user_roles",
+        "employee_docs",
+        "document_audit",
+        "immigration_audit",
+    }
+
+    active_tab = request.GET.get("tab", "document_audit")
+    if active_tab not in VALID_TABS:
+        active_tab = "document_audit"
+
     _handle_signing_event_messages(request, event)
 
-    #print("ACTIVE TAB:", active_tab)
     print("URL TAB:", request.GET.get("tab"))
 
     templates = _get_hr_templates(employer)
@@ -995,10 +1007,11 @@ def hr_dashboard(request):
         "user_roles": "user/hr/partials/user_roles.html",
         "employee_docs": "user/hr/partials/employee_docs.html",
         "document_audit": "documentflow/partials/document_audit_log.html",
+        "immigration_audit": "user/hr/partials/immigration_audit.html",
     }
 
     initial_partial = initial_partial_map.get(
-        active_tab, initial_partial_map["docusign"]
+        active_tab, initial_partial_map["document_audit"]
     )
 
     context = {
@@ -1013,6 +1026,16 @@ def hr_dashboard(request):
         **employee_docs_context,
     }
 
+    immigration_search = request.GET.get("imm_q", "")
+    immigration_flagged_only = request.GET.get("imm_flagged") == "1"
+
+    immigration_context = build_immigration_audit(
+        employer=employer,
+        search_query=immigration_search,
+        flagged_only=immigration_flagged_only,
+    )
+    context.update(immigration_context)
+
     audit_search = (request.GET.get("audit_q") or "").strip()
     audit_incomplete_only = request.GET.get("audit_incomplete") == "1"
 
@@ -1022,8 +1045,8 @@ def hr_dashboard(request):
         incomplete_only=audit_incomplete_only,
     )
     context.update(document_audit_context)
-    print("ACTIVE TAB FINAL:", active_tab)
-    print("ROWS FINAL:", len(context.get("rows", [])))
+
+    # print("ACTIVE TAB FINAL:", active_tab)
     return render(request, "user/hr/hr_dashboard.html", context)
 
 

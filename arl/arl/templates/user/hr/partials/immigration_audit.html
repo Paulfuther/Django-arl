@@ -1,0 +1,250 @@
+{% for row in immigration_rows %}
+  <div class="card shadow-sm border-0 mb-3 immigration-card {% if row.is_flagged %}immigration-card-warning{% endif %}">
+    <div class="card-body">
+
+      <div class="immigration-header">
+        <div class="immigration-employee">
+          <h5 class="mb-1 immigration-name">
+            {{ row.employee.get_full_name|default:row.employee.username }}
+          </h5>
+
+          <div class="text-muted small immigration-meta">
+            
+            {% if row.employee.email %}
+              <span> {{ row.employee.email }}</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="immigration-summary">
+          <span class="imm-pill is-{{ row.overall_status.pill_class }}">
+            {{ row.overall_status.label }}
+          </span>
+        </div>
+      </div>
+
+      <div class="immigration-details mt-3">
+        <div class="immigration-detail-row">
+          <span class="immigration-detail-label">SIN Status</span>
+          <span class="imm-pill is-{{ row.sin_info.pill_class }}">
+            {{ row.sin_info.label }}
+          </span>
+        </div>
+
+            <div class="immigration-detail-row">
+                <span class="immigration-detail-label">SIN Expiry</span>
+                <span class="immigration-detail-value">
+                    {% if row.sin_expiry %}
+                    {{ row.sin_expiry|date:"F j, Y" }}
+                    {% else %}
+                    —
+                    {% endif %}
+                </span>
+                </div>
+
+                <div class="immigration-detail-row">
+                <span class="immigration-detail-label">SIN Days Remaining</span>
+                <span class="immigration-detail-value">
+                    {% if row.sin_days != None %}
+                    {% if row.sin_days < 0 %}
+                        {{ row.sin_days|add:"0"|cut:"-" }} overdue
+                    {% else %}
+                        {{ row.sin_days }}
+                    {% endif %}
+                    {% else %}
+                    —
+                    {% endif %}
+                </span>
+                </div>
+
+
+
+        <div class="immigration-detail-row">
+          <span class="immigration-detail-label">Permit Status</span>
+          <span class="imm-pill is-{{ row.permit_info.pill_class }}">
+            {{ row.permit_info.label }}
+          </span>
+        </div>
+
+        <div class="immigration-detail-row">
+          <span class="immigration-detail-label">Permit Expiry</span>
+          <span class="immigration-detail-value">
+            {% if row.permit_expiry %}
+              {{ row.permit_expiry|date:"F j, Y" }}
+            {% else %}
+              —
+            {% endif %}
+          </span>
+        </div>
+
+        <div class="immigration-detail-row">
+          <span class="immigration-detail-label">Days Remaining</span>
+          <span class="immigration-detail-value">
+            {% if row.permit_days != None %}
+              {% if row.permit_days < 0 %}
+                {{ row.permit_days|add:"0"|cut:"-" }} overdue
+              {% else %}
+                {{ row.permit_days }}
+              {% endif %}
+            {% else %}
+              —
+            {% endif %}
+          </span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+{% empty %}
+  <div class="alert alert-info">
+    No employees found.
+  </div>
+{% endfor %}
+
+<style>
+ .immigration-card {
+  border-radius: 1rem;
+  transition: all 0.15s ease;
+}
+
+.immigration-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.08);
+}
+
+.immigration-card-warning {
+  border-left: 4px solid #dc3545;
+  background: linear-gradient(to right, #fff3f4 0%, #ffffff 20%);
+}
+
+.immigration-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;   /* 👈 was flex-start */
+  gap: .5rem;
+  flex-wrap: nowrap;     /* 👈 prevents dropping */
+}
+
+.immigration-employee {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.immigration-name {
+  word-break: break-word;
+  font-weight: 600;
+}
+
+.immigration-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.immigration-summary {
+  flex: 0 0 auto;
+}
+
+.immigration-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.immigration-detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.immigration-detail-label {
+  font-size: 0.82rem;
+  color: #6c757d;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.immigration-detail-value {
+  font-size: 0.95rem;
+  color: #212529;
+  font-weight: 500;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.imm-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 150px;              /* 👈 fixed width */
+  height: 28px;              /* 👈 fixed height */
+
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+
+  text-align: center;
+  white-space: nowrap;
+}
+
+.imm-pill.is-success {
+  background: #d1e7dd;
+  color: #0f5132;
+  border-color: #badbcc;
+}
+
+.imm-pill.is-warning {
+  background: #fff3cd;
+  color: #664d03;
+  border-color: #ffecb5;
+}
+
+.imm-pill.is-danger {
+  background: #f8d7da;
+  color: #842029;
+  border-color: #f5c2c7;
+}
+
+.imm-pill.is-dark {
+  background: #e2e3e5;
+  color: #41464b;
+  border-color: #d3d6d8;
+}
+
+@media (max-width: 576px) {
+  .immigration-header {
+    align-items: flex-start;  /* allows vertical breathing */
+  }
+
+  .immigration-summary {
+    flex-shrink: 0;           /* 👈 prevents it from wrapping */
+  }
+
+  .immigration-employee {
+    min-width: 0;             /* 👈 allows text truncation instead */
+  }
+
+
+  .immigration-detail-row {
+    align-items: center;
+  }
+
+  .immigration-detail-label {
+    font-size: 0.76rem;
+  }
+
+  .immigration-detail-value {
+    font-size: 0.88rem;
+  }
+
+  .imm-pill {
+    width: 130px;
+    height: 26px;
+    font-size: 0.68rem;
+  }
+}
+</style>
