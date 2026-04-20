@@ -1040,7 +1040,7 @@ def hr_dashboard(request):
         **employee_docs_context,
     }
 
-    if active_tab == "immigration_audit" and can_view_immigration:
+    if can_view_immigration:
         immigration_search = request.GET.get("imm_q", "")
         immigration_flagged_only = request.GET.get("imm_flagged") == "1"
 
@@ -1051,17 +1051,16 @@ def hr_dashboard(request):
         )
         context.update(immigration_context)
 
-    if active_tab == "document_audit":
-        audit_search = (request.GET.get("audit_q") or "").strip()
-        audit_incomplete_only = request.GET.get("audit_incomplete") == "1"
+    audit_search = (request.GET.get("audit_q") or "").strip()
+    audit_incomplete_only = request.GET.get("audit_incomplete") == "1"
 
-        document_audit_context = build_document_audit(
-            employer=employer,
-            search_query=audit_search,
-            incomplete_only=audit_incomplete_only,
-        )
-        context.update(document_audit_context)
-        # print("ACTIVE TAB FINAL:", active_tab)
+    document_audit_context = build_document_audit(
+        employer=employer,
+        search_query=audit_search,
+        incomplete_only=audit_incomplete_only,
+    )
+    context.update(document_audit_context)
+
     return render(request, "user/hr/hr_dashboard.html", context)
 
 
