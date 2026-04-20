@@ -22,6 +22,7 @@ from django.http import (
     Http404,
     HttpResponse,
     HttpResponseBadRequest,
+    HttpResponseForbidden,
     HttpResponseRedirect,
     JsonResponse,
 )
@@ -40,7 +41,9 @@ from twilio.base.exceptions import TwilioException
 from twilio.rest import Client
 
 from arl.bucket.helpers import download_from_s3
+from arl.documentflow.models import DocumentFlow
 from arl.documentflow.services import build_document_audit
+from arl.documentflow.services_immigration import build_immigration_audit
 from arl.dsign.models import DocuSignTemplate, SignedDocumentFile
 from arl.dsign.tasks import create_docusign_envelope_task
 from arl.msg.helpers import check_verification_token, request_verification_token
@@ -49,13 +52,12 @@ from arl.msg.tasks import send_sms_task
 from arl.setup.helpers import employer_hr_required
 from arl.setup.models import EmployerRequest
 from arl.user.services import set_user_sin
-from arl.documentflow.services_immigration import build_immigration_audit
+
 from .forms import (
     CustomUserCreationForm,
     NewHireInviteForm,
     TwoFactorAuthenticationForm,
 )
-from arl.documentflow.models import DocumentFlow
 from .helpers import send_new_hire_invite
 from .models import CustomUser, Employer, EmployerSettings, NewHireInvite
 from .tasks import (
@@ -259,12 +261,18 @@ def handle_new_hire_registration(sender, instance, created, **kwargs):
             if not document_flow:
                 print(f"⚠️ No active default document flow found for {employer.name}.")
             else:
-                first_step = document_flow.steps.filter(is_active=True).order_by("step_order").first()
+                first_step = (
+                    document_flow.steps.filter(is_active=True)
+                    .order_by("step_order")
+                    .first()
+                )
 
                 if not first_step:
                     print(f"⚠️ No active steps found in flow '{document_flow.name}'.")
                 elif not first_step.template:
-                    print(f"⚠️ First step in flow '{document_flow.name}' has no template.")
+                    print(
+                        f"⚠️ First step in flow '{document_flow.name}' has no template."
+                    )
                 else:
                     docusign_template = first_step.template
                     template_id = docusign_template.template_id
@@ -815,10 +823,7 @@ def _user_can_access_hr_dashboard(user):
 
 
 def _user_can_access_immigration(user):
-    return (
-        user.is_superuser
-        or user.groups.filter(name="immigration_audit").exists()
-    )
+    return user.is_superuser or user.groups.filter(name="immigration_audit").exists()
 
 
 def _get_hr_templates(employer):
@@ -964,6 +969,32 @@ def _get_employee_docs_search_context(employer, active_tab, request):
 
 
 @login_required
+def immigration_audit_partial(request):
+    employer = getattr(request.user, "employer", None)
+
+    if not _user_can_access_hr_dashboard(request.user):
+        return HttpResponseForbidden("Not allowed.")
+
+    if not _user_can_access_immigration(request.user):
+        return HttpResponseForbidden("Not allowed.")
+
+    immigration_search = request.GET.get("imm_q", "")
+    immigration_flagged_only = request.GET.get("imm_flagged") == "1"
+
+    immigration_context = build_immigration_audit(
+        employer=employer,
+        search_query=immigration_search,
+        flagged_only=immigration_flagged_only,
+    )
+
+    return render(
+        request,
+        "user/hr/partials/immigration_audit.html",
+        immigration_context,
+    )
+
+
+@login_required
 def hr_dashboard(request):
     employer = getattr(request.user, "employer", None)
 
@@ -994,13 +1025,14 @@ def hr_dashboard(request):
     if active_tab not in VALID_TABS:
         active_tab = "document_audit"
 
+    # ===== can view immigration =====
     can_view_immigration = _user_can_access_immigration(request.user)
     if active_tab == "immigration_audit" and not can_view_immigration:
         active_tab = "document_audit"
 
-    _handle_signing_event_messages(request, event)
+    # ===============================
 
-    print("URL TAB:", request.GET.get("tab"))
+    _handle_signing_event_messages(request, event)
 
     templates = _get_hr_templates(employer)
     pending_invites = _get_pending_invites(employer)
@@ -1039,17 +1071,6 @@ def hr_dashboard(request):
         "can_view_immigration": can_view_immigration,
         **employee_docs_context,
     }
-
-    if can_view_immigration:
-        immigration_search = request.GET.get("imm_q", "")
-        immigration_flagged_only = request.GET.get("imm_flagged") == "1"
-
-        immigration_context = build_immigration_audit(
-            employer=employer,
-            search_query=immigration_search,
-            flagged_only=immigration_flagged_only,
-        )
-        context.update(immigration_context)
 
     audit_search = (request.GET.get("audit_q") or "").strip()
     audit_incomplete_only = request.GET.get("audit_incomplete") == "1"
@@ -1307,7 +1328,7 @@ def update_user_roles(request, user_id):
     user = get_object_or_404(
         User,
         pk=user_id,
-        employer=request.user.employer  # 🔒 ensure same employer
+        employer=request.user.employer,  # 🔒 ensure same employer
     )
 
     if request.method == "POST":
@@ -1326,7 +1347,7 @@ def update_user_roles(request, user_id):
             request,
             "user/hr/partials/user_role_card.html",
             {
-                "user": user,              # ✅ THIS is the key fix
+                "user": user,  # ✅ THIS is the key fix
                 "all_groups": all_groups,
             },
         )

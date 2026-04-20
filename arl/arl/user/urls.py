@@ -13,7 +13,8 @@ from .views import (CheckPhoneNumberUniqueView, RegisterView,
                     fetch_signed_docs_by_user, search_user_roles,
                     update_user_roles, setup_totp, verify_totp,
                     employee_docs_search,
-                    employee_quick_search)
+                    employee_quick_search,
+                    immigration_audit_partial)
 from django.views.generic import TemplateView
 
 
@@ -81,4 +82,6 @@ urlpatterns = [
     path("hr/update-user-role/<int:user_id>/", update_user_roles, name="update_user_roles"),
     path("hr/employee-docs/search/", employee_docs_search, name="employee_docs_search"),
     path("hr/employee-quick-search/", employee_quick_search, name="employee_quick_search"),
+    path("hr/immigration-audit/", immigration_audit_partial, name="immigration_audit_partial",
+),
 ]
