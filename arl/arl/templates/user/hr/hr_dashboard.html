@@ -203,7 +203,8 @@
       <a class="hr-nav-link {% if active_tab == 'immigration_audit' %}active{% endif %}"
         data-bs-toggle="tab"
         href="#immigration_audit"
-        role="tab">
+        role="tab"
+        data-title="Immigration">
         <i class="material-symbols-outlined">badge</i>
       </a>
       {% endif %}
@@ -233,9 +234,19 @@
           {% include "documentflow/partials/document_audit_log.html" %}
         </div>
 
-        <div id="immigration_audit" class="tab-pane fade {% if active_tab == 'immigration_audit' %}show active{% endif %}">
-          {% include "user/hr/partials/immigration_audit.html" %}
+          {% if can_view_immigration %}
+        <div id="immigration_audit"
+            class="tab-pane fade {% if active_tab == 'immigration_audit' %}show active{% endif %}"
+            {% if active_tab == "immigration_audit" %}
+              hx-get="{% url 'immigration_audit_partial' %}"
+              hx-trigger="load"
+              hx-target="this"
+              hx-swap="innerHTML"
+              data-loaded="true"
+            {% endif %}>
+          <div class="p-3 text-muted small">Loading immigration audit...</div>
         </div>
+        {% endif %}
 
       </div>
     </section>
@@ -258,5 +269,32 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 </script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  document.querySelectorAll('[data-bs-toggle="tab"]').forEach(function (tabEl) {
+    tabEl.addEventListener("shown.bs.tab", function (event) {
+      const href = event.target.getAttribute("href");
+      if (!href || !href.startsWith("#")) return;
 
+      const tabName = href.replace("#", "");
+      const url = new URL(window.location);
+
+      url.searchParams.set("tab", tabName);
+      window.history.replaceState({}, "", url);
+
+      if (tabName === "immigration_audit") {
+        const pane = document.querySelector("#immigration_audit");
+        if (pane && !pane.dataset.loaded) {
+          pane.setAttribute("hx-get", "{% url 'immigration_audit_partial' %}");
+          pane.setAttribute("hx-trigger", "load");
+          pane.setAttribute("hx-target", "this");
+          pane.setAttribute("hx-swap", "innerHTML");
+          pane.dataset.loaded = "true";
+          htmx.process(pane);
+        }
+      }
+    });
+  });
+});
+</script>
 {% endblock %}
