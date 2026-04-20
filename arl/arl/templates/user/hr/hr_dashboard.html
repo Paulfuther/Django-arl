@@ -148,6 +148,7 @@
              data-title="Audit">
             <i class="material-symbols-outlined">history</i>
           </a>
+          {% if can_view_immigration %}
           <a class="hr-nav-link {% if active_tab == 'immigration_audit' %}active{% endif %}"
             data-bs-toggle="tab"
             href="#immigration_audit"
@@ -155,6 +156,7 @@
             data-title="Immigration">
             <i class="material-symbols-outlined">badge</i>
           </a>
+          {% endif %}
         </nav>
       </div>
     </aside>
@@ -197,12 +199,14 @@
          role="tab">
         <i class="material-symbols-outlined">history</i>
       </a>
+      {% if can_view_immigration %}
       <a class="hr-nav-link {% if active_tab == 'immigration_audit' %}active{% endif %}"
         data-bs-toggle="tab"
         href="#immigration_audit"
         role="tab">
         <i class="material-symbols-outlined">badge</i>
       </a>
+      {% endif %}
     </div>
 
     <!-- ===== Content ===== -->

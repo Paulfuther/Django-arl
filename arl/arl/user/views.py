@@ -814,6 +814,13 @@ def _user_can_access_hr_dashboard(user):
     return user.groups.filter(name__in=["Manager", "EMPLOYER"]).exists()
 
 
+def _user_can_access_immigration(user):
+    return (
+        user.is_superuser
+        or user.groups.filter(name="immigration_audit").exists()
+    )
+
+
 def _get_hr_templates(employer):
     templates = DocuSignTemplate.objects.filter(employer=employer).order_by(
         "-is_new_hire_template", "template_name"
@@ -1026,16 +1033,23 @@ def hr_dashboard(request):
         **employee_docs_context,
     }
 
-    immigration_search = request.GET.get("imm_q", "")
-    immigration_flagged_only = request.GET.get("imm_flagged") == "1"
+    can_view_immigration = _user_can_access_immigration(request.user)
 
-    immigration_context = build_immigration_audit(
-        employer=employer,
-        search_query=immigration_search,
-        flagged_only=immigration_flagged_only,
-    )
-    context.update(immigration_context)
+    if active_tab == "immigration_audit" and not can_view_immigration:
+        active_tab = "document_audit"
+    if can_view_immigration:
+        immigration_search = request.GET.get("imm_q", "")
+        immigration_flagged_only = request.GET.get("imm_flagged") == "1"
 
+        immigration_context = build_immigration_audit(
+            employer=request.user.employer,
+            search_query=immigration_search,
+            flagged_only=immigration_flagged_only,
+        )
+
+        context.update(immigration_context)
+
+    context["can_view_immigration"] = can_view_immigration
     audit_search = (request.GET.get("audit_q") or "").strip()
     audit_incomplete_only = request.GET.get("audit_incomplete") == "1"
 
