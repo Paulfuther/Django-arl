@@ -994,6 +994,10 @@ def hr_dashboard(request):
     if active_tab not in VALID_TABS:
         active_tab = "document_audit"
 
+    can_view_immigration = _user_can_access_immigration(request.user)
+    if active_tab == "immigration_audit" and not can_view_immigration:
+        active_tab = "document_audit"
+
     _handle_signing_event_messages(request, event)
 
     print("URL TAB:", request.GET.get("tab"))
@@ -1002,11 +1006,13 @@ def hr_dashboard(request):
     pending_invites = _get_pending_invites(employer)
     company_documents = _get_company_documents(employer)
 
-    employee_docs_context = _get_employee_docs_search_context(
-        employer=employer,
-        active_tab=active_tab,
-        request=request,
-    )
+    employee_docs_context = {}
+    if active_tab == "employee_docs":
+        employee_docs_context = _get_employee_docs_search_context(
+            employer=employer,
+            active_tab=active_tab,
+            request=request,
+        )
 
     initial_partial_map = {
         "docusign": "user/hr/partials/docusign_templates.html",
@@ -1030,37 +1036,32 @@ def hr_dashboard(request):
         "employer": employer,
         "company_documents": company_documents,
         "initial_partial": initial_partial,
+        "can_view_immigration": can_view_immigration,
         **employee_docs_context,
     }
 
-    can_view_immigration = _user_can_access_immigration(request.user)
-
-    if active_tab == "immigration_audit" and not can_view_immigration:
-        active_tab = "document_audit"
-    if can_view_immigration:
+    if active_tab == "immigration_audit" and can_view_immigration:
         immigration_search = request.GET.get("imm_q", "")
         immigration_flagged_only = request.GET.get("imm_flagged") == "1"
 
         immigration_context = build_immigration_audit(
-            employer=request.user.employer,
+            employer=employer,
             search_query=immigration_search,
             flagged_only=immigration_flagged_only,
         )
-
         context.update(immigration_context)
 
-    context["can_view_immigration"] = can_view_immigration
-    audit_search = (request.GET.get("audit_q") or "").strip()
-    audit_incomplete_only = request.GET.get("audit_incomplete") == "1"
+    if active_tab == "document_audit":
+        audit_search = (request.GET.get("audit_q") or "").strip()
+        audit_incomplete_only = request.GET.get("audit_incomplete") == "1"
 
-    document_audit_context = build_document_audit(
-        employer=employer,
-        search_query=audit_search,
-        incomplete_only=audit_incomplete_only,
-    )
-    context.update(document_audit_context)
-
-    # print("ACTIVE TAB FINAL:", active_tab)
+        document_audit_context = build_document_audit(
+            employer=employer,
+            search_query=audit_search,
+            incomplete_only=audit_incomplete_only,
+        )
+        context.update(document_audit_context)
+        # print("ACTIVE TAB FINAL:", active_tab)
     return render(request, "user/hr/hr_dashboard.html", context)
 
 
