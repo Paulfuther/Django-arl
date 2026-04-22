@@ -1,3 +1,75 @@
+<div class="mb-4">
+  <h4 class="mb-1">Immigration Audit</h4>
+  
+</div>
+
+
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+<form
+  class="row g-2 align-items-end"
+  hx-get="{% url 'immigration_audit_partial' %}"
+  hx-target="#immigration_audit"
+  hx-swap="innerHTML"
+  hx-include="this"
+  class="row g-2 align-items-end">
+
+  <input type="hidden" name="tab" value="immigration_audit">
+
+  <div class="col-12 col-md-6">
+    <label class="form-label small text-muted mb-1">Search employee</label>
+    <input
+        type="text"
+        name="imm_q"
+        value="{{ immigration_search }}"
+        class="form-control"
+        placeholder="Search by name or email"
+        hx-get="{% url 'immigration_audit_partial' %}"
+        hx-trigger="keyup changed delay:300ms"
+        hx-target="#immigration_audit"
+        hx-swap="innerHTML">
+        <!-- 👇 PUT IT HERE -->
+      <div id="immigration-loading" class="small text-muted mt-1 d-none">
+      <span class="spinner-border spinner-border-sm me-1"></span>
+      Searching...
+    </div>
+        </div>
+
+  <div class="col-12 col-md-3">
+    <div class="form-check mt-4">
+      <input
+      class="form-check-input"
+      type="checkbox"
+      name="imm_flagged"
+      value="1"
+      id="imm_flagged"
+      {% if immigration_flagged_only %}checked{% endif %}
+      hx-get="{% url 'immigration_audit_partial' %}"
+      hx-trigger="change"
+      hx-target="#immigration_audit"
+      hx-swap="innerHTML">
+          <label class="form-check-label" for="imm_flagged">
+        Issues only
+      </label>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-3 d-flex gap-2">
+    
+    <button
+      type="button"
+      class="btn btn-outline-secondary w-100"
+      hx-get="{% url 'immigration_audit_partial' %}"
+      hx-target="#immigration_audit"
+      hx-swap="innerHTML">
+      Reset
+    </button>
+  </div>
+</form>
+</div>
+</div>
+
+
 {% for row in immigration_rows %}
   <div class="card shadow-sm border-0 mb-3 immigration-card {% if row.is_flagged %}immigration-card-warning{% endif %}">
     <div class="card-body">
