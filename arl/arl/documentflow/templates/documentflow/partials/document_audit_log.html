@@ -123,18 +123,7 @@
                         {% endfor %}
                       </div>
 
-      {% if row.total_required > 0 %}
-        {% widthratio row.completed_count row.total_required 100 as progress %}
-        <div class="w-100 mt-3">
-          <div class="progress audit-progress">
-            <div
-              class="progress-bar {% if row.is_complete %}complete{% else %}incomplete{% endif %}"
-              style="width: {{ progress }}%;">
-            </div>
-          </div>
-        </div>
-      {% endif %}
-
+     
     </div>
   </div>
 {% empty %}
@@ -262,8 +251,8 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 80px;
-  height: 20px;
+  width: 150px;
+  height: 28px;
   border-radius: 999px;
   font-size: 0.65rem;
   font-weight: 700;
@@ -351,8 +340,8 @@
   }
 
   .audit-doc-pill {
-    width: 72px;
-    height: 18px;
+    width: 130px;
+    height: 26px;
     font-size: 0.56rem;
   }
 
