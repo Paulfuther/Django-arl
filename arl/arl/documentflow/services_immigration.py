@@ -216,6 +216,22 @@ def build_immigration_audit(employer, search_query="", flagged_only=False):
 
         rows.append(row)
 
+    # 🔥 ADD THIS BLOCK RIGHT HERE
+        PRIORITY_MAP = {
+            "urgent": 0,
+            "expiring_soon": 1,
+            "needs_review": 2,
+            "compliant": 3,
+        }
+
+        rows.sort(
+            key=lambda r: (
+                PRIORITY_MAP.get(r["overall_status"]["code"], 99),
+                r["permit_days"] if r["permit_days"] is not None else 9999,
+                -(r["employee"].date_joined.timestamp() if r["employee"].date_joined else 0),
+            )
+        )
+
     return {
         "immigration_rows": rows,
         "immigration_search": search_query,
