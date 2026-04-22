@@ -171,8 +171,11 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         return actions
 
     def formfield_for_dbfield(self, db_field, request, **kwargs):
-        if db_field.name in ["sin_expiration_date",
-                             "work_permit_expiration_date"]:
+        if db_field.name in [
+            "sin_expiration_date",
+            "work_permit_expiration_date",
+            "work_permit_extension_date",
+        ]:
             kwargs["widget"] = TextInput(
                 attrs={"type": "date"}
             )  # ✅ Uses native date input, no calendar
@@ -194,6 +197,8 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         "get_consent",
         "sin_expiration_date",
         "work_permit_expiration_date",
+        "work_permit_extension_requested",
+        "work_permit_extension_date",
         "all_docusign_templates",
         "last_login",
         "get_groups",
@@ -267,6 +272,8 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
     list_editable = (
         "sin_expiration_date",
         "work_permit_expiration_date",
+        "work_permit_extension_requested",
+        "work_permit_extension_date",
         "phone_number",
     )
     list_per_page = 15
@@ -368,16 +375,31 @@ class CustomUserAdmin(ExportActionMixin, UserAdmin):
         ),
     )
 
+    fieldsets.append(
+        (
+            "Work Permit Extension",
+            {
+                "fields": (
+                    "work_permit_extension_requested",
+                    "work_permit_extension_date",
+                )
+            },
+        )
+    )
+
     def save_model(self, request, obj, form, change):
         """Ensure phone_number is not overwritten when updating other fields."""
         if "phone_number" in form.cleaned_data and form.cleaned_data["phone_number"]:
-            obj.phone_number = form.cleaned_data[
-                "phone_number"
-            ]  # ✅ Update if provided
+            obj.phone_number = form.cleaned_data["phone_number"]
         else:
-            obj.phone_number = CustomUser.objects.get(
-                pk=obj.pk
-            ).phone_number  # ✅ Keep existing phone number
+            obj.phone_number = CustomUser.objects.get(pk=obj.pk).phone_number
+
+        if obj.work_permit_extension_requested and not obj.work_permit_extension_date:
+            messages.error(
+                request,
+                "Work permit extension date is required when extension requested is checked.",
+            )
+            return
 
         super().save_model(request, obj, form, change)
 

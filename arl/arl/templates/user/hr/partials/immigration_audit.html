@@ -138,6 +138,19 @@
           </span>
         </div>
 
+        {% if row.extension_requested %}
+  <div class="immigration-detail-row">
+    <span class="immigration-detail-label">Extension Filed</span>
+    <span class="immigration-detail-value">
+      {% if row.extension_date %}
+        {{ row.extension_date|date:"F j, Y" }}
+      {% else %}
+        Filed (no date)
+      {% endif %}
+    </span>
+  </div>
+{% endif %}
+
         <div class="immigration-detail-row">
           <span class="immigration-detail-label">Permit Expiry</span>
           <span class="immigration-detail-value">
@@ -285,6 +298,12 @@
   background: #e2e3e5;
   color: #41464b;
   border-color: #d3d6d8;
+}
+
+.imm-pill.is-primary {
+  background: #cfe2ff;
+  color: #084298;
+  border-color: #b6d4fe;
 }
 
 @media (max-width: 576px) {

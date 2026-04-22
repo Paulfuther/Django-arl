@@ -89,6 +89,18 @@ def _permit_status(user, sin_info):
     expiry = getattr(user, "work_permit_expiration_date", None)
     days_left = _days_until(expiry)
 
+    # 🔥 NEW: extension overrides expiry
+    if user.work_permit_extension_requested:
+        return {
+            "code": "extension_pending",
+            "label": "Extension Pending",
+            "pill_class": "primary",
+            "expiry": expiry,
+            "days_left": days_left,
+        }
+
+    # existing logic continues below
+
     if not sin_info["is_temporary"]:
         return {
             "code": "not_required",
@@ -162,6 +174,12 @@ def _overall_status(sin_info, permit_info):
             "pill_class": "warning",
         }
 
+    if permit_info["code"] == "extension_pending":
+        return {
+            "code": "extension_pending",
+            "label": "Extension Pending",
+            "pill_class": "primary",
+        }
     return {
         "code": "compliant",
         "label": "Compliant",
@@ -207,6 +225,8 @@ def build_immigration_audit(employer, search_query="", flagged_only=False):
             "permit_expiry": permit_expiry,
             "permit_days": permit_days,
             "permit_info": permit_info,
+            "extension_requested": employee.work_permit_extension_requested,
+            "extension_date": employee.work_permit_extension_date,
             "overall_status": overall,
             "is_flagged": overall.get("code") != "compliant",
         }
@@ -220,8 +240,9 @@ def build_immigration_audit(employer, search_query="", flagged_only=False):
         PRIORITY_MAP = {
             "urgent": 0,
             "expiring_soon": 1,
-            "needs_review": 2,
-            "compliant": 3,
+            "extension_pending": 2,   # 👈 NEW
+            "needs_review": 3,
+            "compliant": 4,
         }
 
         rows.sort(
