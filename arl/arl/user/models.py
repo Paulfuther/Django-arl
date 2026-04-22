@@ -97,6 +97,15 @@ class CustomUser(AbstractUser):
         ],
         null=True,
     )
+    # Work Permit Extension Tracking
+    work_permit_extension_requested = models.BooleanField(default=False)
+
+    work_permit_extension_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Date extension was submitted to IRCC"
+    )
+
     # NEW encrypted fields
     sin_encrypted = models.TextField(null=True, blank=True)
     sin_last4 = models.CharField(max_length=4, null=True, blank=True,
