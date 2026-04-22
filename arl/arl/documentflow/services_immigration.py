@@ -30,24 +30,43 @@ def _sin_status(user):
             "days_left": None,
         }
 
-    # Permanent SIN: no expiry tracking
-    if not sin_value.startswith("9"):
-        return {
-            "code": "permanent",
-            "label": "Permanent SIN",
-            "pill_class": "success",
-            "is_temporary": False,
-            "expiry": None,
-            "days_left": None,
-        }
+    # TEMPORARY SIN (starts with 9)
+    if sin_value.startswith("9"):
+        sin_expiry = getattr(user, "sin_expiration_date", None)
+        days_left = _days_until(sin_expiry)
 
-    # Temporary SIN: expiry tracking applies
-    sin_expiry = getattr(user, "sin_expiration_date", None)
-    days_left = _days_until(sin_expiry)
+        if not sin_expiry:
+            return {
+                "code": "missing_expiry",
+                "label": "Temporary SIN",
+                "pill_class": "warning",
+                "is_temporary": True,
+                "expiry": sin_expiry,
+                "days_left": days_left,
+            }
 
-    if not sin_expiry:
+        if days_left is not None and days_left < 0:
+            return {
+                "code": "expired",
+                "label": "Temporary SIN Expired",
+                "pill_class": "danger",
+                "is_temporary": True,
+                "expiry": sin_expiry,
+                "days_left": days_left,
+            }
+
+        if days_left is not None and days_left <= 120:
+            return {
+                "code": "expiring_soon",
+                "label": "Temporary SIN",
+                "pill_class": "warning",
+                "is_temporary": True,
+                "expiry": sin_expiry,
+                "days_left": days_left,
+            }
+
         return {
-            "code": "missing_expiry",
+            "code": "temporary",
             "label": "Temporary SIN",
             "pill_class": "warning",
             "is_temporary": True,
@@ -55,33 +74,14 @@ def _sin_status(user):
             "days_left": days_left,
         }
 
-    if days_left is not None and days_left < 0:
-        return {
-            "code": "expired",
-            "label": "Temporary SIN Expired",
-            "pill_class": "danger",
-            "is_temporary": True,
-            "expiry": sin_expiry,
-            "days_left": days_left,
-        }
-
-    if days_left is not None and days_left <= 120:
-        return {
-            "code": "expiring_soon",
-            "label": "Temporary SIN",
-            "pill_class": "warning",
-            "is_temporary": True,
-            "expiry": sin_expiry,
-            "days_left": days_left,
-        }
-
+    # PERMANENT SIN (everything else)
     return {
-        "code": "temporary",
-        "label": "Temporary SIN",
-        "pill_class": "warning",
-        "is_temporary": True,
-        "expiry": sin_expiry,
-        "days_left": days_left,
+        "code": "permanent",
+        "label": "Permanent SIN",
+        "pill_class": "success",
+        "is_temporary": False,
+        "expiry": None,
+        "days_left": None,
     }
 
 
