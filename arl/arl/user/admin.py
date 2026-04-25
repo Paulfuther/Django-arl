@@ -883,6 +883,14 @@ class SignedDocumentFileAdmin(admin.ModelAdmin):
     list_display = ("file_name", "user", "employer", "uploaded_at")
     change_list_template = "admin/signed_documents_changelist.html"
 
+    search_fields = (
+        "file_name",
+        "document_title",
+        "user__email",
+        "user__first_name",
+        "user__last_name",
+    )
+
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [

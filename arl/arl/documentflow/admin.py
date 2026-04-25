@@ -1,13 +1,15 @@
 from django.contrib import admin, messages
+from django.db.models import Q
 from django.shortcuts import redirect
 from django.template.response import TemplateResponse
 from django.urls import path, reverse
-from django.db.models import Q
 
 from arl.user.models import CustomUser
-from .forms import OnboardingRepairFilterForm, BulkDynamicRepairRowForm
+
 from .admin_repair import repair_flow_step
-from .models import DocumentFlow, SentDocuSignEnvelope, DocumentFlowStep
+from .forms import BulkDynamicRepairRowForm, OnboardingRepairFilterForm
+from .models import (DocumentFlow, DocumentFlowStep, ImmigrationStatusEvent,
+                     SentDocuSignEnvelope)
 
 
 class DocumentFlowStepInline(admin.TabularInline):
@@ -306,3 +308,51 @@ class DocumentFlowAdmin(admin.ModelAdmin):
             "admin/documentflow/onboarding_repair_dashboard.html",
             context,
         )
+
+
+@admin.register(ImmigrationStatusEvent)
+class ImmigrationStatusEventAdmin(admin.ModelAdmin):
+    list_display = (
+        "user",
+        "employer",
+        "status_type",
+        "reference_number",
+        "effective_date",
+        "expiry_date",
+        "is_active",
+        "created_by",
+        "created_at",
+    )
+
+    list_filter = (
+        "status_type",
+        "is_active",
+        "employer",
+        "effective_date",
+        "expiry_date",
+        "created_at",
+    )
+
+    search_fields = (
+        "user__first_name",
+        "user__last_name",
+        "user__email",
+        "reference_number",
+        "notes",
+        "document_file__file_name",
+        "document_file__document_title",
+    )
+
+    readonly_fields = (
+        "created_at",
+    )
+
+    autocomplete_fields = (
+        "user",
+        "employer",
+        "document_file",
+        "created_by",
+    )
+
+    ordering = ("-created_at",)
+    list_per_page = 25

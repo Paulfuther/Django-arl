@@ -1,4 +1,5 @@
 from django.db import models
+from .constants import IMMIGRATION_STATUS_CHOICES
 
 
 # Create your models here.
@@ -158,3 +159,58 @@ class SentDocuSignRecipient(models.Model):
     def __str__(self):
         label = self.role_name or self.email
         return f"{label} - {self.status}"
+
+
+# arl/documentflow/models.py
+
+class ImmigrationStatusEvent(models.Model):
+    user = models.ForeignKey(
+        "user.CustomUser",
+        on_delete=models.CASCADE,
+        related_name="immigration_status_events",
+    )
+
+    employer = models.ForeignKey(
+        "user.Employer",
+        on_delete=models.CASCADE,
+        related_name="immigration_status_events",
+    )
+
+    status_type = models.CharField(
+        max_length=50,
+        choices=IMMIGRATION_STATUS_CHOICES
+    )
+
+    label = models.CharField(max_length=100, blank=True)
+    effective_date = models.DateField(null=True, blank=True)
+    expiry_date = models.DateField(null=True, blank=True)
+    notes = models.TextField(blank=True)
+    reference_number = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Application number, file number, or reference ID"
+    )
+    document_file = models.ForeignKey(
+        "dsign.SignedDocumentFile",  # adjust app label if needed
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="immigration_status_events",
+    )
+
+    is_active = models.BooleanField(default=True)
+
+    created_by = models.ForeignKey(
+        "user.CustomUser",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_immigration_status_events",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self):
+        return f"{self.user} - {self.get_status_type_display()}"

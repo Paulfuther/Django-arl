@@ -205,9 +205,37 @@ def build_immigration_audit(employer, search_query="", flagged_only=False):
     rows = []
 
     for employee in employees:
+        latest_event = (
+            employee.immigration_status_events
+            .filter(is_active=True)
+            .order_by("-effective_date", "-created_at")
+            .first()
+        )
+
+        permit_event = (
+            employee.immigration_status_events
+            .filter(
+                is_active=True,
+                status_type__in=[
+                    "work_permit_extension",
+                    "maintained_status",
+                    "pgwp_application",
+                    "restoration_application",
+                    "new_work_permit",
+                ],
+            )
+            .order_by("-created_at")
+            .first()
+        )
+
+        immigration_events = (
+            employee.immigration_status_events
+            .filter(is_active=True)
+            .select_related("document_file", "created_by")
+            .order_by("-effective_date", "-created_at")
+        )
         sin_expiry = employee.sin_expiration_date
         sin_days = _days_until(sin_expiry)
-
         sin_info = _sin_status(employee)
 
         permit_expiry = employee.work_permit_expiration_date
@@ -229,6 +257,9 @@ def build_immigration_audit(employer, search_query="", flagged_only=False):
             "extension_date": employee.work_permit_extension_date,
             "overall_status": overall,
             "is_flagged": overall.get("code") != "compliant",
+            "latest_immigration_event": latest_event,
+            "permit_event": permit_event,
+            "immigration_events": immigration_events,
         }
 
         if flagged_only and not row["is_flagged"]:
@@ -236,22 +267,21 @@ def build_immigration_audit(employer, search_query="", flagged_only=False):
 
         rows.append(row)
 
-    # 🔥 ADD THIS BLOCK RIGHT HERE
-        PRIORITY_MAP = {
-            "urgent": 0,
-            "expiring_soon": 1,
-            "extension_pending": 2,   # 👈 NEW
-            "needs_review": 3,
-            "compliant": 4,
-        }
+    PRIORITY_MAP = {
+        "urgent": 0,
+        "expiring_soon": 1,
+        "extension_pending": 2,
+        "needs_review": 3,
+        "compliant": 4,
+    }
 
-        rows.sort(
-            key=lambda r: (
-                PRIORITY_MAP.get(r["overall_status"]["code"], 99),
-                r["permit_days"] if r["permit_days"] is not None else 9999,
-                -(r["employee"].date_joined.timestamp() if r["employee"].date_joined else 0),
-            )
+    rows.sort(
+        key=lambda r: (
+            PRIORITY_MAP.get(r["overall_status"]["code"], 99),
+            r["permit_days"] if r["permit_days"] is not None else 9999,
+            -(r["employee"].date_joined.timestamp() if r["employee"].date_joined else 0),
         )
+    )
 
     return {
         "immigration_rows": rows,

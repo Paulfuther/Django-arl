@@ -1,193 +1,269 @@
 <div class="mb-4">
   <h4 class="mb-1">Immigration Audit</h4>
-  
 </div>
-
 
 <div class="card shadow-sm border-0 mb-4">
-    <div class="card-body">
-<form
-  class="row g-2 align-items-end"
-  hx-get="{% url 'immigration_audit_partial' %}"
-  hx-target="#immigration_audit"
-  hx-swap="innerHTML"
-  hx-include="this"
-  class="row g-2 align-items-end">
+  <div class="card-body">
 
-  <input type="hidden" name="tab" value="immigration_audit">
+    <form
+      class="row g-2 align-items-end"
+      hx-get="{% url 'immigration_audit_partial' %}"
+      hx-target="#immigration_audit"
+      hx-swap="innerHTML"
+      hx-include="this">
 
-  <div class="col-12 col-md-6">
-    <label class="form-label small text-muted mb-1">Search employee</label>
-    <input
-        type="text"
-        name="imm_q"
-        value="{{ immigration_search }}"
-        class="form-control"
-        placeholder="Search by name or email"
-        hx-get="{% url 'immigration_audit_partial' %}"
-        hx-trigger="keyup changed delay:300ms"
-        hx-target="#immigration_audit"
-        hx-swap="innerHTML">
-        <!-- 👇 PUT IT HERE -->
-      <div id="immigration-loading" class="small text-muted mt-1 d-none">
-      <span class="spinner-border spinner-border-sm me-1"></span>
-      Searching...
-    </div>
+      <input type="hidden" name="tab" value="immigration_audit">
+
+      <!-- Search -->
+      <div class="col-12 col-md-6">
+        <label class="form-label small text-muted mb-1">Search employee</label>
+        <input
+          type="text"
+          name="imm_q"
+          value="{{ immigration_search }}"
+          class="form-control"
+          placeholder="Search by name or email"
+          hx-get="{% url 'immigration_audit_partial' %}"
+          hx-trigger="keyup changed delay:300ms"
+          hx-target="#immigration_audit"
+          hx-swap="innerHTML">
+
+        <div id="immigration-loading" class="small text-muted mt-1 d-none">
+          <span class="spinner-border spinner-border-sm me-1"></span>
+          Searching...
         </div>
+      </div>
 
-  <div class="col-12 col-md-3">
-    <div class="form-check mt-4">
-      <input
-      class="form-check-input"
-      type="checkbox"
-      name="imm_flagged"
-      value="1"
-      id="imm_flagged"
-      {% if immigration_flagged_only %}checked{% endif %}
-      hx-get="{% url 'immigration_audit_partial' %}"
-      hx-trigger="change"
-      hx-target="#immigration_audit"
-      hx-swap="innerHTML">
+      <!-- Flagged only -->
+      <div class="col-12 col-md-3">
+        <div class="form-check mt-4">
+          <input
+            class="form-check-input"
+            type="checkbox"
+            name="imm_flagged"
+            value="1"
+            id="imm_flagged"
+            {% if immigration_flagged_only %}checked{% endif %}
+            hx-get="{% url 'immigration_audit_partial' %}"
+            hx-trigger="change"
+            hx-target="#immigration_audit"
+            hx-swap="innerHTML">
           <label class="form-check-label" for="imm_flagged">
-        Issues only
-      </label>
-    </div>
-  </div>
+            Issues only
+          </label>
+        </div>
+      </div>
 
-  <div class="col-12 col-md-3 d-flex gap-2">
-    
-    <button
-      type="button"
-      class="btn btn-outline-secondary w-100"
-      hx-get="{% url 'immigration_audit_partial' %}"
-      hx-target="#immigration_audit"
-      hx-swap="innerHTML">
-      Reset
-    </button>
+      <!-- Reset -->
+      <div class="col-12 col-md-3 d-flex gap-2">
+        <button
+          type="button"
+          class="btn btn-outline-secondary w-100"
+          hx-get="{% url 'immigration_audit_partial' %}"
+          hx-target="#immigration_audit"
+          hx-swap="innerHTML">
+          Reset
+        </button>
+      </div>
+
+    </form>
   </div>
-</form>
-</div>
 </div>
 
 
 {% for row in immigration_rows %}
-  <div class="card shadow-sm border-0 mb-3 immigration-card {% if row.is_flagged %}immigration-card-warning{% endif %}">
-    <div class="card-body">
+<div class="card shadow-sm border-0 mb-3 immigration-card {% if row.is_flagged %}immigration-card-warning{% endif %}">
+  <div class="card-body">
 
-      <div class="immigration-header">
-        <div class="immigration-employee">
-          <h5 class="mb-1 immigration-name">
-            {{ row.employee.get_full_name|default:row.employee.username }}
-          </h5>
+    <!-- Header -->
+    <div class="immigration-header">
+      <div class="immigration-employee">
+        <h5 class="mb-1 immigration-name">
+          {{ row.employee.get_full_name|default:row.employee.username }}
+        </h5>
 
-          <div class="text-muted small immigration-meta">
-            
-            {% if row.employee.email %}
-              <span> {{ row.employee.email }}</span>
-            {% endif %}
-          </div>
-        </div>
-
-        <div class="immigration-summary">
-          <span class="imm-pill is-{{ row.overall_status.pill_class }}">
-            {{ row.overall_status.label }}
-          </span>
+        <div class="text-muted small immigration-meta">
+          {% if row.employee.email %}
+            <span>{{ row.employee.email }}</span>
+          {% endif %}
         </div>
       </div>
 
-      <div class="immigration-details mt-3">
-        <div class="immigration-detail-row">
-          <span class="immigration-detail-label">SIN Status</span>
-          <span class="imm-pill is-{{ row.sin_info.pill_class }}">
-            {{ row.sin_info.label }}
-          </span>
-        </div>
+      <div class="immigration-summary">
+        <span class="imm-pill is-{{ row.overall_status.pill_class }}">
+          {{ row.overall_status.label }}
+        </span>
+      </div>
+    </div>
 
-            <div class="immigration-detail-row">
-                <span class="immigration-detail-label">SIN Expiry</span>
-                <span class="immigration-detail-value">
-                    {% if row.sin_expiry %}
-                    {{ row.sin_expiry|date:"F j, Y" }}
-                    {% else %}
-                    —
-                    {% endif %}
-                </span>
+    <!-- DETAILS -->
+    <div class="immigration-details mt-3">
+
+      <!-- Latest update -->
+      {% if row.latest_immigration_event %}
+          <div class="immigration-detail-row">
+            <span class="immigration-detail-label">Latest Update</span>
+
+            <span class="immigration-detail-value text-end">
+              <div>{{ row.latest_immigration_event.get_status_type_display }}</div>
+
+              {% if row.latest_immigration_event.effective_date %}
+                <div class="immigration-subtext">
+                  {{ row.latest_immigration_event.effective_date|date:"F j, Y" }}
                 </div>
-
-                <div class="immigration-detail-row">
-                <span class="immigration-detail-label">SIN Days Remaining</span>
-                <span class="immigration-detail-value">
-                    {% if row.sin_days != None %}
-                    {% if row.sin_days < 0 %}
-                        {{ row.sin_days|add:"0"|cut:"-" }} overdue
-                    {% else %}
-                        {{ row.sin_days }}
-                    {% endif %}
-                    {% else %}
-                    —
-                    {% endif %}
-                </span>
-                </div>
-
-
-
-        <div class="immigration-detail-row">
-          <span class="immigration-detail-label">Permit Status</span>
-          <span class="imm-pill is-{{ row.permit_info.pill_class }}">
-            {{ row.permit_info.label }}
-          </span>
-        </div>
-
-        {% if row.extension_requested %}
-  <div class="immigration-detail-row">
-    <span class="immigration-detail-label">Extension Filed</span>
-    <span class="immigration-detail-value">
-      {% if row.extension_date %}
-        {{ row.extension_date|date:"F j, Y" }}
-      {% else %}
-        Filed (no date)
-      {% endif %}
-    </span>
-  </div>
-{% endif %}
-
-        <div class="immigration-detail-row">
-          <span class="immigration-detail-label">Permit Expiry</span>
-          <span class="immigration-detail-value">
-            {% if row.permit_expiry %}
-              {{ row.permit_expiry|date:"F j, Y" }}
-            {% else %}
-              —
-            {% endif %}
-          </span>
-        </div>
-
-        <div class="immigration-detail-row">
-          <span class="immigration-detail-label">Days Remaining</span>
-          <span class="immigration-detail-value">
-            {% if row.permit_days != None %}
-              {% if row.permit_days < 0 %}
-                {{ row.permit_days|add:"0"|cut:"-" }} overdue
-              {% else %}
-                {{ row.permit_days }}
               {% endif %}
-            {% else %}
-              —
+            </span>
+          </div>
+          {% endif %}
+
+          {% if row.latest_immigration_event.reference_number %}
+          <div class="immigration-detail-row">
+            <span class="immigration-detail-label">Reference</span>
+            <span class="immigration-detail-value">
+              {{ row.latest_immigration_event.reference_number }}
+            </span>
+          </div>
+          {% endif %}
+
+          {% if row.latest_immigration_event.document_file %}
+            <div class="immigration-detail-row">
+              <span class="immigration-detail-label">Document</span>
+
+              <span class="immigration-detail-value">
+                <a
+                  href="{% url 'download_signed_document' row.latest_immigration_event.document_file.id %}"
+                  target="_blank"
+                  class="btn btn-sm btn-outline-secondary imm-btn">
+                  View
+                </a>
+              </span>
+            </div>
             {% endif %}
+            <!----   Get a history of immigration events -->
+            {% if row.immigration_events %}
+              <div class="immigration-history mt-2">
+                <div class="immigration-detail-label mb-1">Immigration History</div>
+
+                {% for event in row.immigration_events %}
+                  <div class="immigration-history-item">
+                
+                      <div class="imm-history-text">
+                <div class="imm-history-title">
+                  {{ event.get_status_type_display }}
+                </div>
+                {% if event.effective_date %}
+                  <div class="immigration-subtext">
+                    {{ event.effective_date|date:"M j, Y" }}
+                  </div>
+                {% endif %}
+              </div>
+                                  
+
+                    {% if event.document_file %}
+                      <a href="{% url 'download_signed_document' event.document_file.id %}"
+                        target="_blank"
+                        class="btn btn-sm btn-outline-secondary imm-btn">
+                        View
+                      </a>
+                    {% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+
+      <!-- SIN -->
+      <div class="immigration-detail-row">
+        <span class="immigration-detail-label">SIN Status</span>
+        <span class="imm-pill is-{{ row.sin_info.pill_class }}">
+          {{ row.sin_info.label }}
+        </span>
+      </div>
+
+      <div class="immigration-detail-row">
+        <span class="immigration-detail-label">SIN Expiry</span>
+        <span class="immigration-detail-value">
+          {% if row.sin_expiry %}
+            {{ row.sin_expiry|date:"F j, Y" }}
+          {% else %}—{% endif %}
+        </span>
+      </div>
+
+      <div class="immigration-detail-row">
+        <span class="immigration-detail-label">SIN Days Remaining</span>
+        <span class="immigration-detail-value">
+          {% if row.sin_days != None %}
+            {% if row.sin_days < 0 %}
+              {{ row.sin_days|add:"0"|cut:"-" }} overdue
+            {% else %}
+              {{ row.sin_days }}
+            {% endif %}
+          {% else %}—{% endif %}
+        </span>
+      </div>
+
+      <!-- PERMIT -->
+      <div class="immigration-detail-row">
+        <span class="immigration-detail-label">Permit Status</span>
+        <span class="imm-pill is-{{ row.permit_info.pill_class }}">
+          {{ row.permit_info.label }}
+        </span>
+      </div>
+
+      {% if row.extension_requested %}
+        <div class="immigration-detail-row">
+          <span class="immigration-detail-label">Extension Filed</span>
+
+          <span class="immigration-detail-value text-end">
+
+            <div>Filed</div>
+
+            {% if row.extension_date %}
+              <div class="immigration-subtext">
+                {{ row.extension_date|date:"F j, Y" }}
+              </div>
+            {% else %}
+              <div class="immigration-subtext">
+                No date recorded
+              </div>
+            {% endif %}
+
           </span>
         </div>
+        {% endif %}
+
+      <div class="immigration-detail-row">
+        <span class="immigration-detail-label">Permit Expiry</span>
+        <span class="immigration-detail-value">
+          {% if row.permit_expiry %}
+            {{ row.permit_expiry|date:"F j, Y" }}
+          {% else %}—{% endif %}
+        </span>
+      </div>
+
+      <div class="immigration-detail-row">
+        <span class="immigration-detail-label">Days Remaining</span>
+        <span class="immigration-detail-value">
+          {% if row.permit_days != None %}
+            {% if row.permit_days < 0 %}
+              {{ row.permit_days|add:"0"|cut:"-" }} overdue
+            {% else %}
+              {{ row.permit_days }}
+            {% endif %}
+          {% else %}—{% endif %}
+        </span>
       </div>
 
     </div>
   </div>
-{% empty %}
-  <div class="alert alert-info">
-    No employees found.
-  </div>
-{% endfor %}
+</div>
 
+{% empty %}
+<div class="alert alert-info">
+  No employees found.
+</div>
+{% endfor %}
 <style>
- .immigration-card {
+.immigration-card {
   border-radius: 1rem;
   transition: all 0.15s ease;
 }
@@ -205,9 +281,9 @@
 .immigration-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;   /* 👈 was flex-start */
-  gap: .5rem;
-  flex-wrap: nowrap;     /* 👈 prevents dropping */
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: nowrap;
 }
 
 .immigration-employee {
@@ -259,21 +335,61 @@
   white-space: nowrap;
 }
 
-.imm-pill {
+.immigration-latest-row {
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.65rem;
+  background: #f8f9fa;
+}
+
+.immigration-subtext {
+  font-size: 0.78rem;
+  color: #6c757d;
+  margin-top: 2px;
+}
+
+.immigration-history {
+  border-top: 1px solid #eef0f2;
+  padding-top: 0.65rem;
+}
+
+.immigration-history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0;
+}
+
+.imm-history-text {
+  min-width: 0;
+}
+
+.imm-history-title {
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.imm-pill,
+.imm-btn {
+  width: 150px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-
-  width: 150px;              /* 👈 fixed width */
-  height: 28px;              /* 👈 fixed height */
-
   border-radius: 999px;
-  font-size: 0.72rem;
   font-weight: 700;
-  border: 1px solid transparent;
-
-  text-align: center;
   white-space: nowrap;
+}
+
+.imm-pill {
+  font-size: 0.72rem;
+  border: 1px solid transparent;
+  text-align: center;
+}
+
+.imm-btn {
+  font-size: 0.65rem;
+  padding: 0;
 }
 
 .imm-pill.is-success {
@@ -308,17 +424,16 @@
 
 @media (max-width: 576px) {
   .immigration-header {
-    align-items: flex-start;  /* allows vertical breathing */
+    align-items: flex-start;
   }
 
   .immigration-summary {
-    flex-shrink: 0;           /* 👈 prevents it from wrapping */
+    flex-shrink: 0;
   }
 
   .immigration-employee {
-    min-width: 0;             /* 👈 allows text truncation instead */
+    min-width: 0;
   }
-
 
   .immigration-detail-row {
     align-items: center;
@@ -332,10 +447,31 @@
     font-size: 0.88rem;
   }
 
-  .imm-pill {
+  .imm-pill,
+  .imm-btn {
     width: 130px;
     height: 26px;
+  }
+
+  .imm-pill {
     font-size: 0.68rem;
+  }
+
+  .imm-btn {
+    font-size: 0.56rem;
+  }
+
+  .immigration-history-item {
+    align-items: center;
+  }
+
+  .imm-history-text {
+    max-width: calc(100% - 145px);
+  }
+
+  .immigration-history-item .imm-btn {
+    flex: 0 0 130px;
+    margin-left: auto;
   }
 }
 </style>
