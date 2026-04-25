@@ -41,6 +41,13 @@ IMMIGRATION_STATUS_TYPES = {
         "category": "internal",
         "overrides_permit": False,
     },
+    "work_authorization_letter_applied": {
+        "label": "Work Authorization Letter Applied",
+        "description": "Employee has applied for a work authorization letter allowing them to work while awaiting decision",
+        "pill_class": "primary",
+        "category": "Work Permit",
+        "overrides_permit": True,
+    },
     "other": {
         "label": "Other",
         "pill_class": "secondary",
