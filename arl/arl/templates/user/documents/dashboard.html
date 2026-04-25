@@ -269,6 +269,51 @@
                       <label class="form-label">Notes (optional)</label>
                       <textarea name="notes" rows="2" class="form-control"></textarea>
                     </div>
+
+                      <div class="col-12 col-md-6">
+                        <label class="form-label">Immigration Update (optional)</label>
+
+                        <select name="immigration_status_type"
+                                id="immigration-status-type"
+                                class="form-select"
+                                onchange="updateImmigrationStatusHelp(this)">
+                          
+
+                          {% regroup IMMIGRATION_STATUS_TYPES.items by 1.category as status_groups %}
+
+                          {% for group in status_groups %}
+                            <optgroup label="{{ group.grouper }}">
+                              {% for code, meta in group.list %}
+                                <option value="{{ code }}"
+                                        data-description="{{ meta.description|escape }}">
+                                  {{ meta.label }}
+                                </option>
+                              {% endfor %}
+                            </optgroup>
+                          {% endfor %}
+                        </select>
+
+                        <small id="immigration-status-help" class="text-muted">
+                          Select this only if the document changes or explains immigration status.
+                        </small>
+                      </div>
+
+
+
+                      <div class="col-12 col-md-6">
+                              <label class="form-label">Reference Number (optional)</label>
+                              <input type="text"
+                                    name="immigration_reference_number"
+                                    class="form-control"
+                                    placeholder="IRCC file #, application #, etc.">
+                      </div>
+
+                      <div class="col-12 col-md-6">
+                          <label class="form-label">Effective Date (optional)</label>
+                          <input type="date" name="immigration_effective_date" class="form-control">
+                      </div>
+
+
                     <div class="col-12">
                       <label class="form-label">File</label>
                       <input type="file" name="file" class="form-control"
@@ -506,59 +551,48 @@
 document.addEventListener("DOMContentLoaded", function () {
   // ---- Choose initial tab from hash or server active_tab
   const defaultHash = `#tab-{{ active_tab|default:'employee' }}`;
-  const desired = (location.hash && document.querySelector(`[data-bs-toggle="tab"][href="${location.hash}"]`))
-                  ? location.hash : defaultHash;
+  const desired = (
+    location.hash &&
+    document.querySelector(`[data-bs-toggle="tab"][href="${location.hash}"]`)
+  ) ? location.hash : defaultHash;
 
   // Try to find a trigger in either nav (desktop or mobile)
-  const initialTrigger = document.querySelector(`#docNav a[href="${desired}"], #docNavMobile a[href="${desired}"]`);
-  if (initialTrigger) new bootstrap.Tab(initialTrigger).show();
+  const initialTrigger = document.querySelector(
+    `#docNav a[href="${desired}"], #docNavMobile a[href="${desired}"]`
+  );
+
+  if (initialTrigger) {
+    bootstrap.Tab.getOrCreateInstance(initialTrigger).show();
+  }
 
   // ---- Keep desktop & mobile navs visually in sync when a tab is shown
   document.querySelectorAll('[data-bs-toggle="tab"]').forEach(link => {
     link.addEventListener('shown.bs.tab', (e) => {
-      const targetHref = e.target.getAttribute('href');  // like "#tab-store"
-      // Update hash (so a refresh keeps you on this tab)
+      const targetHref = e.target.getAttribute('href');
+
       history.replaceState(null, '', targetHref);
 
-      // Toggle .active on all matching links in both navs
-      document.querySelectorAll(`#docNav a[href="${targetHref}"], #docNavMobile a[href="${targetHref}"]`)
+      document
+        .querySelectorAll(`#docNav a[href="${targetHref}"], #docNavMobile a[href="${targetHref}"]`)
         .forEach(a => a.classList.add('active'));
-      document.querySelectorAll(`#docNav a:not([href="${targetHref}"]), #docNavMobile a:not([href="${targetHref}"])`)
+
+      document
+        .querySelectorAll(`#docNav a:not([href="${targetHref}"]), #docNavMobile a:not([href="${targetHref}"])`)
         .forEach(a => a.classList.remove('active'));
     });
   });
-
-  // ---- Tooltips: desktop sidebar only (avoid sticky tooltips on touch)
-  const desktopLinks = document.querySelectorAll('#docNav a[data-title]');
-  const ttMap = new WeakMap();
-
-  desktopLinks.forEach(el => {
-    const titleText = el.getAttribute('data-title') || '';
-    if (el.hasAttribute('title')) el.removeAttribute('title');
-
-    const tt = new bootstrap.Tooltip(el, {
-      title: titleText,
-      placement: 'right',
-      trigger: 'manual',
-      container: 'body',
-      boundary: 'window'
-    });
-    ttMap.set(el, tt);
-
-    // Show/hide on hover/focus
-    el.addEventListener('mouseenter', () => tt.show());
-    el.addEventListener('focusin',   () => tt.show());
-    el.addEventListener('mouseleave', () => tt.hide());
-    el.addEventListener('focusout',   () => tt.hide());
-
-    // On click: let tab switch, then blur + hide to prevent stickiness
-    el.addEventListener('click', () => setTimeout(() => { el.blur(); tt.hide(); }, 0));
-  });
-
-  // When any tab is shown, hide any visible desktop tooltips
-  document.getElementById('docNav')?.addEventListener('shown.bs.tab', () => {
-    desktopLinks.forEach(el => ttMap.get(el)?.hide());
-  });
 });
+</script>
+
+<script>
+function updateImmigrationStatusHelp(selectEl) {
+  const selected = selectEl.options[selectEl.selectedIndex];
+  const description = selected.getAttribute("data-description");
+
+  const help = document.getElementById("immigration-status-help");
+  if (!help) return;
+
+  help.textContent = description || "Select this only if the document changes or explains immigration status.";
+}
 </script>
 {% endblock %}

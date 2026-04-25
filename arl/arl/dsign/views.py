@@ -36,7 +36,7 @@ from arl.dsign.helpers import (
 from arl.dsign.tasks import get_outstanding_docs, list_all_docusign_envelopes_task
 from arl.user.models import CustomUser  # adjust import paths
 from arl.user.models import Store  # adjust if different
-
+from arl.documentflow.models import ImmigrationStatusEvent
 from .forms import EmployeeDocUploadForm, NameEmailForm
 from .helpers import get_docusign_edit_url
 from .models import DocuSignTemplate, SignedDocumentFile
@@ -46,6 +46,7 @@ from .tasks import (
     process_docusign_webhook,
     validate_template_signature_tabs_task,
 )
+from arl.documentflow.constants import IMMIGRATION_STATUS_TYPES
 
 register_heif_opener()
 
@@ -533,6 +534,14 @@ def upload_employee_documents(request):
     fileobj = request.FILES.get("file")
     print("file obj :", fileobj)
 
+    # Detect immigration status updates in the docuents
+    immigration_status_type = (request.POST.get("immigration_status_type") or "").strip()
+    immigration_effective_date = request.POST.get("immigration_effective_date") or None
+    immigration_expiry_date = request.POST.get("immigration_expiry_date") or None
+    immigration_reference_number = (
+        request.POST.get("immigration_reference_number") or ""
+    ).strip()
+
     # Basic validations
     if not user_id or not title or not fileobj:
         messages.error(request, "Employee, title, and file are required.")
@@ -639,16 +648,30 @@ def upload_employee_documents(request):
         if isinstance(upload_buf, BytesIO):
             upload_buf.close()
 
-    SignedDocumentFile.objects.create(
+    uploaded_doc = SignedDocumentFile.objects.create(
         user=employee,
         employer=employer,
         envelope_id=uuid.uuid4().hex[:10],
         file_name=filename,
         file_path=object_key,
-        document_title=title,  # make sure migration added this
-        notes=notes,  # and this
+        document_title=title,
+        notes=notes,
         is_company_document=False,
     )
+
+    if immigration_status_type:
+        ImmigrationStatusEvent.objects.create(
+            user=employee,
+            employer=employer,
+            status_type=immigration_status_type,
+            effective_date=immigration_effective_date,
+            expiry_date=immigration_expiry_date,
+            reference_number=immigration_reference_number,
+            notes=notes,
+            document_file=uploaded_doc,
+            created_by=request.user,
+            is_active=True,
+        )
 
     messages.success(
         request, f"Uploaded '{title}' for {employee.get_full_name() or employee.email}."
@@ -860,6 +883,7 @@ def documents_dashboard(request):
         request,
         "user/documents/dashboard.html",
         {
+            "IMMIGRATION_STATUS_TYPES": IMMIGRATION_STATUS_TYPES,
             "active_tab": active_tab,
             "employees": employees,
             "stores": stores,
