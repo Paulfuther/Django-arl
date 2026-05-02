@@ -147,6 +147,30 @@ def _permit_status(user, sin_info):
 
 
 def _overall_status(sin_info, permit_info):
+    # Extension / maintained-status path overrides SIN expiry.
+    # A temporary SIN may expire while the employee remains work-authorized.
+    if permit_info["code"] == "extension_pending":
+        return {
+            "code": "extension_pending",
+            "label": "Extension Pending",
+            "pill_class": "primary",
+        }
+
+    # Valid permit should also prevent expired SIN from becoming "urgent".
+    if permit_info["code"] == "valid" and sin_info["is_temporary"]:
+        if sin_info["code"] in {"expired", "expiring_soon", "missing_expiry"}:
+            return {
+                "code": "compliant_sin_update_needed",
+                "label": "Compliant - SIN Update Needed",
+                "pill_class": "warning",
+            }
+
+        return {
+            "code": "compliant",
+            "label": "Compliant",
+            "pill_class": "success",
+        }
+
     if sin_info["code"] in {"missing", "expired", "missing_expiry", "expiring_soon"}:
         if sin_info["code"] in {"expired", "missing_expiry"}:
             return {
@@ -174,12 +198,6 @@ def _overall_status(sin_info, permit_info):
             "pill_class": "warning",
         }
 
-    if permit_info["code"] == "extension_pending":
-        return {
-            "code": "extension_pending",
-            "label": "Extension Pending",
-            "pill_class": "primary",
-        }
     return {
         "code": "compliant",
         "label": "Compliant",
