@@ -1338,6 +1338,7 @@ def process_twilio_short_link_event(data):
         link = data.get("link")
         user_agent = data.get("user_agent")
         error_code = data.get("ErrorCode") or data.get("error_code")
+        error_code = str(error_code).strip() if error_code else ""
         messaging_sid = data.get("MessagingServiceSid") or data.get(
             "messaging_service_sid"
         )
@@ -1388,11 +1389,27 @@ def process_twilio_short_link_event(data):
 
         # Handle carrier filtered messages
         if error_code == "30007" and user:
-            if not hasattr(user, "sms_opt_out"):
-                SMSOptOut.objects.create(
-                    user=user,
-                    reason="Carrier filtered message (30007)",
-                )
+            SMSOptOut.objects.get_or_create(
+                user=user,
+                defaults={
+                    "reason": "Carrier filtered message (30007)",
+                },
+            )
+
+        # Handle STOP / opt-out failures
+        if error_code == "21610" and user:
+            SMSOptOut.objects.get_or_create(
+                user=user,
+                defaults={
+                    "reason": "User opted out / STOP response detected by Twilio (21610)",
+                },
+            )
+
+            logger.warning(
+                f"🚫 SMS opt-out detected for user={user.id}, phone={to}, sms_sid={sms_sid}"
+            )
+
+            normalized_event_type = "failed"
 
         # Parent message row
         message, created = ShortenedSMSMessage.objects.get_or_create(
@@ -1406,7 +1423,7 @@ def process_twilio_short_link_event(data):
                 "account_sid": account_sid or "",
                 "body": body or None,
                 "link": link,
-                "status": "sent",
+                "status": "failed" if normalized_event_type == "failed" else "sent",
                 "sent_at": now(),
                 "provider_payload": data,
             },
