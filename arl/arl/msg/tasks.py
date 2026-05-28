@@ -32,7 +32,7 @@ from arl.msg.models import (
     SmsLog,
 )
 from arl.setup.models import TenantApiKeys
-from arl.user.models import SMSOptOut, EmployerSMSTask
+from arl.user.models import SMSOptOut, EmployerSMSTask, NewHireInvite
 
 from .helpers import (
     client,
@@ -932,11 +932,21 @@ def process_sendgrid_webhook(payload):
             # Find the associated user
             user = None
             employer = None
-            try:
-                user = CustomUser.objects.get(email=email)
-                employer = user.employer  # Get employer from user if exists
-            except CustomUser.DoesNotExist:
-                logger.warning(f"User with email {email} not found.")
+            user = CustomUser.objects.filter(email__iexact=email).first()
+            employer = None
+            username = "unknown"
+
+            if user:
+                employer = user.employer
+                username = user.username
+            else:
+                invite = NewHireInvite.objects.filter(email__iexact=email).first()
+
+                if invite:
+                    employer = invite.employer
+                    username = f"Invite: {email}"
+                else:
+                    logger.warning(f"User or invite with email {email} not found.")
 
             # Save the email event
             EmailEvent.objects.create(
@@ -951,7 +961,7 @@ def process_sendgrid_webhook(payload):
                 timestamp=timestamp,
                 url=url,
                 user=user,
-                username=user.username if user else "unknown",
+                username=username,
                 useragent=useragent,
                 employer=employer,
             )
