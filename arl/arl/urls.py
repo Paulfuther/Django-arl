@@ -31,6 +31,7 @@ urlpatterns = [
     #path("claude/", include("arl.claude_assistant.urls")),
     path("documentflow/", include("arl.documentflow.urls")),
     path("recruit/", include("arl.recruit.urls")),
+    path("sales-targets/", include("arl.sales_targets.urls")),
 
 ] 
 
