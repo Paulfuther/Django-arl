@@ -4,6 +4,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 from django.http import HttpResponse
 from openpyxl.styles import Alignment
+from openpyxl.styles import Font, Alignment
+
 
 def export_sales_target_management_report(modeladmin, request, queryset):
     wb = Workbook()
@@ -54,8 +56,6 @@ def export_sales_target_management_report(modeladmin, request, queryset):
             .order_by("store_id", "category__name")
         )
 
-        
-
         for line in lines:
 
             # Insert a blank row when the store changes
@@ -73,6 +73,22 @@ def export_sales_target_management_report(modeladmin, request, queryset):
                 round(float(line.required_daily_sales)),
                 line.status,
             ])
+
+            row = ws.max_row
+
+            # Projected Variance (Column G = 7)
+            variance_cell = ws.cell(row=row, column=7)
+
+            if line.projected_variance > 0:
+                variance_cell.font = Font(color="008000", bold=True)
+            elif line.projected_variance < 0:
+                variance_cell.font = Font(color="FF0000", bold=True)
+
+            # Required Daily Sales (Column H = 8)
+            ws.cell(row=row, column=8).number_format = "#,##0"
+
+            # Status (Column I = 9)
+            ws.cell(row=row, column=9).alignment = Alignment(horizontal="center")
 
             previous_store = line.store_id
 
@@ -96,7 +112,6 @@ def export_sales_target_management_report(modeladmin, request, queryset):
 
     wb.save(response)
     return response
-
 
 
 class SalesTargetLineInline(admin.TabularInline):
@@ -147,8 +162,15 @@ class SalesTargetLineAdmin(admin.ModelAdmin):
         "status",
         "formatted_projected_sales",
         "formatted_projected_variance",
-        "formatted_required_daily_sales",
+        "required_daily_sales_display",
     )
+
+    def required_daily_sales_display(self, obj):
+
+        return int(obj.required_daily_sales)
+
+    required_daily_sales_display.short_description = "Required Daily Sales"
+
     list_filter = ("period", "store", "category")
     search_fields = (
         "period__name",
@@ -176,8 +198,3 @@ class SalesTargetLineAdmin(admin.ModelAdmin):
     def formatted_projected_variance(self, obj):
         return f"{obj.projected_variance:,.2f}"
     formatted_projected_variance.short_description = "Projected Variance"
-
-
-    def formatted_required_daily_sales(self, obj):
-        return f"{obj.required_daily_sales:,.2f}"
-    formatted_required_daily_sales.short_description = "Required Daily Sales"
