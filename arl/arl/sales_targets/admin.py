@@ -1,11 +1,12 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from .models import SalesTargetCategory, SalesTargetPeriod, SalesTargetLine
 from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment
-from django.http import HttpResponse
-from openpyxl.styles import Alignment
 from openpyxl.styles import Font, Alignment
-
+from django.http import HttpResponse
+from django.shortcuts import redirect, render
+from django.urls import path
+from django.utils.html import format_html
+from django.urls import reverse
 
 def export_sales_target_management_report(modeladmin, request, queryset):
     wb = Workbook()
@@ -63,7 +64,7 @@ def export_sales_target_management_report(modeladmin, request, queryset):
                 ws.append([])
 
             ws.append([
-                str(line.store),
+                line.store.number,
                 line.category.name,
                 round(float(line.target_amount)),
                 round(float(line.current_sales)),
@@ -88,7 +89,31 @@ def export_sales_target_management_report(modeladmin, request, queryset):
             ws.cell(row=row, column=8).number_format = "#,##0"
 
             # Status (Column I = 9)
-            ws.cell(row=row, column=9).alignment = Alignment(horizontal="center")
+            status_cell = ws.cell(row=row, column=9)
+
+            # Keep status on one line
+            status_cell.alignment = Alignment(
+                horizontal="left",
+                vertical="center",
+                wrap_text=False,
+            )
+
+            # Replace emoji circles with consistent-width circles
+            if "Ahead" in line.status:
+                status_cell.value = "● Ahead"
+                status_cell.font = Font(color="008000", bold=True)
+
+            elif "On Track" in line.status:
+                status_cell.value = "● On Track"
+                status_cell.font = Font(color="C9A000", bold=True)
+
+            elif "Behind" in line.status:
+                status_cell.value = "● Behind"
+                status_cell.font = Font(color="C00000", bold=True)
+
+            else:
+                status_cell.value = "○ Not Started"
+                status_cell.font = Font(color="808080", bold=True)
 
             previous_store = line.store_id
 
@@ -117,30 +142,91 @@ def export_sales_target_management_report(modeladmin, request, queryset):
 class SalesTargetLineInline(admin.TabularInline):
     model = SalesTargetLine
     extra = 1
-    fields = ("store", "category", "target_amount")
-    autocomplete_fields = ("store", "category")
-
-
+    fields = (
+        "store",
+        "category",
+        "target_amount",
+        "current_sales",
+    )
+    
+    readonly_fields = ()
+    can_delete = False
 
 
 @admin.register(SalesTargetPeriod)
 class SalesTargetPeriodAdmin(admin.ModelAdmin):
     list_display = (
         "name",
-        "employer",
         "start_date",
         "end_date",
-        "total_target_amount",
+        "update_sales_link",
     )
-    list_filter = ("employer", "start_date", "end_date")
-    search_fields = ("name", "employer__name")
+
     inlines = [SalesTargetLineInline]
-    actions = [export_sales_target_management_report]
+    actions = [
+        export_sales_target_management_report,
+    ]
+    def update_sales_link(self, obj):
+        url = reverse(
+            "admin:sales_target_update_current_sales",
+            args=[obj.id],
+        )
+        return format_html(
+            '<a class="button" href="{}">Update Current Sales</a>',
+            url,
+        )
 
-    def total_target_amount(self, obj):
-        return sum(line.target_amount for line in obj.target_lines.all())
+    update_sales_link.short_description = "Current Sales"
 
-    total_target_amount.short_description = "Total Target"
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "<int:period_id>/update-current-sales/",
+                self.admin_site.admin_view(self.update_current_sales_view),
+                name="sales_target_update_current_sales",
+            ),
+        ]
+        return custom_urls + urls
+
+    def update_current_sales_view(self, request, period_id):
+        period = SalesTargetPeriod.objects.get(id=period_id)
+
+        lines = SalesTargetLine.objects.filter(
+            period=period
+        ).select_related(
+            "store",
+            "category",
+        ).order_by(
+            "store__number",
+            "category__name",
+        )
+
+        if request.method == "POST":
+            for line in lines:
+                value = request.POST.get(f"current_sales_{line.id}", "0").strip()
+
+                if value == "":
+                    value = "0"
+
+                line.current_sales = value
+                line.save(update_fields=["current_sales"])
+
+            messages.success(request, "Current sales updated successfully.")
+            return redirect("..")
+
+        context = {
+            **self.admin_site.each_context(request),
+            "period": period,
+            "lines": lines,
+            "title": f"Update Current Sales - {period.name}",
+        }
+
+        return render(
+            request,
+            "admin/sales_targets/update_current_sales.html",
+            context,
+        )
 
 
 @admin.register(SalesTargetCategory)
@@ -154,7 +240,7 @@ class SalesTargetCategoryAdmin(admin.ModelAdmin):
 class SalesTargetLineAdmin(admin.ModelAdmin):
     list_display = (
         "period",
-        "store",
+        "store_number",
         "category",
         "target_amount",
         "current_sales",
@@ -164,6 +250,13 @@ class SalesTargetLineAdmin(admin.ModelAdmin):
         "formatted_projected_variance",
         "required_daily_sales_display",
     )
+    def store_number(self, obj):
+
+        return obj.store.number
+
+    store_number.short_description = "Store"
+
+    store_number.admin_order_field = "store__number"
 
     def required_daily_sales_display(self, obj):
 
