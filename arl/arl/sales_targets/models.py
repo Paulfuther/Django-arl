@@ -1,7 +1,8 @@
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from decimal import Decimal
+from decimal import Decimal, ROUND_DOWN, ROUND_UP
+
 
 
 class SalesTargetCategory(models.Model):
@@ -151,32 +152,28 @@ class SalesTargetLine(models.Model):
     def remaining_sales_needed(self):
         return max(self.target_amount - self.current_sales, Decimal("0"))
 
-
     @property
     def required_daily_sales(self):
         if self.remaining_days == 0:
-            return Decimal("0")
+            return 1
 
-        return self.remaining_sales_needed / Decimal(self.remaining_days)
+        return int(
+            (
+                self.remaining_sales_needed / Decimal(self.remaining_days)
+            ).quantize(Decimal("1"), rounding=ROUND_UP)
+        )
 
     @property
     def status(self):
-        """
-        Compare % of target achieved to % of time elapsed.
-        """
-
         if self.percent_time_elapsed == 0:
             return "⚪ Not Started"
 
-        performance = float(self.percent_to_target)
-        expected = float(self.percent_time_elapsed)
+        variance = self.projected_sales - self.target_amount
 
-        difference = performance - expected
-
-        if difference >= 5:
+        if variance > 0:
             return "🟢 Ahead"
 
-        if difference >= -5:
+        if variance >= -(self.target_amount * Decimal("0.05")):
             return "🟡 On Track"
 
         return "🔴 Behind"
