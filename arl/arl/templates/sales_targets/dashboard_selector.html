@@ -1,0 +1,56 @@
+{% extends "../base/base.html" %}
+{% block title %}Sales Target Dashboard{% endblock %}
+
+{% block template %}
+{% include "../base/navbar.html" %}
+{% load crispy_forms_tags %}
+
+<style>
+    .page-container {
+        max-width: 1300px;
+        margin: 0 auto;
+    }
+</style>
+
+<div class="page-container py-4">
+
+    <h2 class="mb-4 mt-5">Sales Target Dashboard</h2>
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+
+            <form method="post">
+                {% csrf_token %}
+
+                <div class="mb-3">
+                    <label for="period_id" class="form-label fw-bold">
+                        Select Campaign
+                    </label>
+
+                    <select name="period_id"
+                            id="period_id"
+                            class="form-select"
+                            required>
+                        <option value="">Choose a campaign...</option>
+
+                        {% for period in periods %}
+                            <option value="{{ period.id }}">
+                                {{ period.name }} — {{ period.start_date }} to {{ period.end_date }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <button type="submit"
+                        class="btn btn-outline-secondary">
+                    View Dashboard
+                </button>
+
+            </form>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
