@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container py-4">
+
+  <h1 class="mb-3">Sales Target Campaigns</h1>
+
+  <form method="get" class="card card-body mb-4">
+    <label for="period" class="form-label fw-bold">Select Campaign</label>
+
+    <div class="d-flex gap-2">
+      <select name="period" id="period" class="form-select">
+        <option value="">Choose a campaign...</option>
+
+        {% for period in periods %}
+          <option value="{{ period.id }}"
+            {% if selected_period and selected_period.id == period.id %}selected{% endif %}
+          >
+            {{ period.name }} — {{ period.start_date }} to {{ period.end_date }}
+          </option>
+        {% endfor %}
+      </select>
+
+      <button type="submit" class="btn btn-outline-secondary">
+        View
+      </button>
+    </div>
+  </form>
+
+  {% if selected_period %}
+
+    <h2 class="mb-3">{{ selected_period.name }}</h2>
+
+    <table class="table table-striped table-bordered align-middle">
+      <thead>
+        <tr>
+          <th>Store</th>
+          <th>Category</th>
+          <th>Target</th>
+          <th>Current Sales</th>
+          <th>% To Target</th>
+          <th>Projected Sales</th>
+          <th>Projected Variance</th>
+          <th>Required Daily Sales</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {% for line in target_lines %}
+          <tr>
+            <td>{{ line.store.store_number }}</td>
+            <td>{{ line.category.name }}</td>
+            <td>{{ line.target_amount }}</td>
+            <td>{{ line.current_sales }}</td>
+            <td>{{ line.percent_to_target }}%</td>
+            <td>{{ line.projected_sales }}</td>
+            <td>{{ line.projected_variance }}</td>
+            <td>{{ line.required_daily_sales }}</td>
+            <td>{{ line.status }}</td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="9" class="text-center text-muted">
+              No target lines found for this campaign.
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+  {% endif %}
+
+</div>
+
+{% endblock %}
