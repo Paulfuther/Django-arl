@@ -180,11 +180,11 @@ WSGI_APPLICATION = "arl.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "dsign",
-        "USER": "postgres",
-        "PASSWORD": "Paulee12!@",
-        "HOST": "localhost",
-        'PORT': '5433',
+        "NAME": os.environ.get("NAME"),
+        "USER": os.environ.get("USER"),
+        "PASSWORD": os.environ.get("PASSWORD"),
+        "HOST": os.environ.get("HOST"),
+        'PORT': os.environ.get("PORT"),
     }
 }
 
