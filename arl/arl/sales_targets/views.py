@@ -1,12 +1,15 @@
+import json
 from collections import defaultdict
 from decimal import Decimal
-import json
-from openai import OpenAI
+
 from django.conf import settings
+from django.db.models import Max
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from openai import OpenAI
 from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment, PatternFill
+from openpyxl.styles import Alignment, Font, PatternFill
+
 from .models import SalesTargetLine, SalesTargetPeriod
 
 
@@ -15,26 +18,71 @@ def index(request):
 
 
 def build_morning_summary(period):
-    lines = period.target_lines.select_related(
-        "store", "category"
-    )
+    lines = period.target_lines.select_related("store", "category")
 
+    # Top 10 worst issues overall
     behind_lines = sorted(
         [line for line in lines if line.projected_variance < 0],
-        key=lambda line: line.projected_variance
+        key=lambda line: line.projected_variance,
     )[:10]
 
+    # Display those top 10 grouped by store
+    behind_lines = sorted(behind_lines, key=lambda line: line.store.number)
+
     message = f"Morning Sales Target Update - {period.name}\n\n"
-    message += "Top Opportunities:\n"
+    message += "Top 10 Opportunities:\n"
+
+    current_store = None
 
     for line in behind_lines:
+        if current_store != line.store.number:
+            current_store = line.store.number
+            message += f"\nStore {current_store}\n"
+
         message += (
-            f"- Store {line.store.number} - {line.category.name}: "
+            f"  - {line.category.name}: "
             f"${round(abs(line.projected_variance)):,} behind. "
             f"Needs ${round(line.required_daily_sales):,}/day.\n"
         )
 
     return message
+
+
+def build_today_focus(period):
+    lines = period.target_lines.select_related("store", "category")
+
+    top_issues = sorted(
+        [line for line in lines if line.projected_variance < 0],
+        key=lambda line: line.projected_variance,
+    )[:10]
+
+    by_store = defaultdict(list)
+
+    for line in top_issues:
+        by_store[line.store.number].append(line.category.name)
+
+    focus = []
+
+    for store_number, categories in sorted(by_store.items()):
+        if len(categories) == 1:
+            focus.append(f"Store {store_number} needs attention in {categories[0]}.")
+        else:
+            focus.append(
+                f"Store {store_number} needs attention in {', '.join(categories[:-1])} and {categories[-1]}."
+            )
+
+    return focus
+
+
+def build_biggest_win(period):
+    lines = period.target_lines.select_related("store", "category")
+
+    ahead_lines = [line for line in lines if line.projected_variance > 0]
+
+    if not ahead_lines:
+        return None
+
+    return max(ahead_lines, key=lambda line: line.projected_variance)
 
 
 def sales_target_dashboard(request, period_id):
@@ -107,10 +155,14 @@ def sales_target_dashboard(request, period_id):
         )
 
     needs_attention = sorted(needs_attention, key=lambda x: x["variance"])[:10]
-
     category_summary = sorted(category_summary, key=lambda x: x["variance"])
-
     morning_summary = build_morning_summary(period)
+    today_focus = build_today_focus(period)
+    biggest_win = build_biggest_win(period)
+
+    last_updated = period.target_lines.aggregate(
+        Max("updated_at")
+    )["updated_at__max"]
 
     context = {
         "period": period,
@@ -121,6 +173,9 @@ def sales_target_dashboard(request, period_id):
         "needs_attention": needs_attention,
         "category_summary": category_summary,
         "morning_summary": morning_summary,
+        "today_focus": today_focus,
+        "biggest_win": biggest_win,
+        "last_updated": last_updated,
     }
 
     return render(
@@ -188,9 +243,9 @@ def export_sales_target_summary_dashboard(request, period_id):
         fill_type="solid",
     )
 
-    lines = period.target_lines.select_related(
-        "store", "category", "period"
-    ).order_by("store_id", "category__name")
+    lines = period.target_lines.select_related("store", "category", "period").order_by(
+        "store_id", "category__name"
+    )
 
     total_target = sum(line.target_amount for line in lines)
     total_current = sum(line.current_sales for line in lines)
@@ -222,13 +277,15 @@ def export_sales_target_summary_dashboard(request, period_id):
     ws.append(["Current Opportunities"])
     ws[ws.max_row][0].font = Font(bold=True)
 
-    ws.append([
-        "Store",
-        "Category",
-        "Projected Variance",
-        "Required Daily Sales",
-        "Status",
-    ])
+    ws.append(
+        [
+            "Store",
+            "Category",
+            "Projected Variance",
+            "Required Daily Sales",
+            "Status",
+        ]
+    )
 
     attention_lines = sorted(
         [line for line in lines if line.projected_variance < 0],
@@ -236,27 +293,31 @@ def export_sales_target_summary_dashboard(request, period_id):
     )[:10]
 
     for line in attention_lines:
-        ws.append([
-            line.store.number,
-            line.category.name,
-            round(float(line.projected_variance)),
-            round(float(line.required_daily_sales)),
-            line.status,
-        ])
+        ws.append(
+            [
+                line.store.number,
+                line.category.name,
+                round(float(line.projected_variance)),
+                round(float(line.required_daily_sales)),
+                line.status,
+            ]
+        )
 
     ws.append([])
 
     ws.append(["Category Summary"])
     ws[ws.max_row][0].font = Font(bold=True)
 
-    ws.append([
-        "Category",
-        "Target",
-        "Current Sales",
-        "Projected Sales",
-        "Projected Variance",
-        "Status",
-    ])
+    ws.append(
+        [
+            "Category",
+            "Target",
+            "Current Sales",
+            "Projected Sales",
+            "Projected Variance",
+            "Status",
+        ]
+    )
 
     category_totals = {}
 
@@ -284,14 +345,16 @@ def export_sales_target_summary_dashboard(request, period_id):
         else:
             status = "● Behind"
 
-        ws.append([
-            category,
-            round(float(totals["target"])),
-            round(float(totals["current"])),
-            round(float(totals["projected"])),
-            round(float(variance)),
-            status,
-        ])
+        ws.append(
+            [
+                category,
+                round(float(totals["target"])),
+                round(float(totals["current"])),
+                round(float(totals["projected"])),
+                round(float(variance)),
+                status,
+            ]
+        )
 
         row = ws.max_row
         variance_cell = ws.cell(row=row, column=5)
@@ -325,8 +388,8 @@ def export_sales_target_summary_dashboard(request, period_id):
     wb.save(response)
     return response
 
-def export_sales_target_management_dashboard(request, period_id):
 
+def export_sales_target_management_dashboard(request, period_id):
     period = get_object_or_404(SalesTargetPeriod, id=period_id)
 
     wb = Workbook()
@@ -368,25 +431,27 @@ def export_sales_target_management_dashboard(request, period_id):
 
     previous_store = None
 
-    lines = period.target_lines.select_related(
-        "store", "category", "period"
-    ).order_by("store_id", "category__name")
+    lines = period.target_lines.select_related("store", "category", "period").order_by(
+        "store_id", "category__name"
+    )
 
     for line in lines:
         if previous_store is not None and previous_store != line.store_id:
             ws.append([])
 
-        ws.append([
-            line.store.number,
-            line.category.name,
-            round(float(line.target_amount)),
-            round(float(line.current_sales)),
-            round(float(line.percent_to_target)),
-            round(float(line.projected_sales)),
-            round(float(line.projected_variance)),
-            round(float(line.required_daily_sales)),
-            line.status,
-        ])
+        ws.append(
+            [
+                line.store.number,
+                line.category.name,
+                round(float(line.target_amount)),
+                round(float(line.current_sales)),
+                round(float(line.percent_to_target)),
+                round(float(line.projected_sales)),
+                round(float(line.projected_variance)),
+                round(float(line.required_daily_sales)),
+                line.status,
+            ]
+        )
 
         row = ws.max_row
 
@@ -447,9 +512,6 @@ def export_sales_target_management_dashboard(request, period_id):
     return response
 
 
-
-
-
 def generate_ai_sales_coaching(period):
     client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
@@ -458,16 +520,18 @@ def generate_ai_sales_coaching(period):
     sales_data = []
 
     for line in lines:
-        sales_data.append({
-            "store": line.store.number,
-            "category": line.category.name,
-            "target": round(float(line.target_amount)),
-            "current_sales": round(float(line.current_sales)),
-            "projected_sales": round(float(line.projected_sales)),
-            "projected_variance": round(float(line.projected_variance)),
-            "required_daily_sales": round(float(line.required_daily_sales)),
-            "status": line.status,
-        })
+        sales_data.append(
+            {
+                "store": line.store.number,
+                "category": line.category.name,
+                "target": round(float(line.target_amount)),
+                "current_sales": round(float(line.current_sales)),
+                "projected_sales": round(float(line.projected_sales)),
+                "projected_variance": round(float(line.projected_variance)),
+                "required_daily_sales": round(float(line.required_daily_sales)),
+                "status": line.status,
+            }
+        )
 
     prompt = f"""
         You are a retail sales performance coach.
@@ -502,12 +566,17 @@ def generate_ai_sales_coaching(period):
 
     return response.output_text
 
+
 def ai_sales_coaching_dashboard(request, period_id):
     period = get_object_or_404(SalesTargetPeriod, id=period_id)
 
     ai_coaching = generate_ai_sales_coaching(period)
 
-    return render(request, "sales_targets/ai_sales_coaching.html", {
-        "period": period,
-        "ai_coaching": ai_coaching,
-    })
+    return render(
+        request,
+        "sales_targets/ai_sales_coaching.html",
+        {
+            "period": period,
+            "ai_coaching": ai_coaching,
+        },
+    )

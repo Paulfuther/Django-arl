@@ -6,18 +6,37 @@
 
 <style>
   .page-container {
-    max-width: 1300px;
+    max-width: 1180px;
     margin: 0 auto;
-  }
+    padding-top: 6rem;   /* same offset below fixed navbar */
+}
+
 
   .dashboard-title {
-    font-weight: 500;
+    font-weight: 600;
+    font-size: 1.45rem;
+  }
+
+  .dashboard-meta {
+    font-size: .9rem;
+    color: #6c757d;
   }
 
   .summary-card,
   .section-card {
-    border: 0;
-    border-radius: 0.75rem;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: .5rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,.075);
+  }
+
+  .summary-card .card-body {
+    padding: .85rem 1rem;
+  }
+
+  .summary-card h3 {
+    font-size: 1.35rem;
+    font-weight: 700;
   }
 
   .section-card {
@@ -28,21 +47,41 @@
     background: #fff;
     border-bottom: 1px solid #dee2e6;
     font-weight: 700;
+    padding: .65rem 1rem;
+  }
+
+  .section-card .card-body {
+    padding: .85rem 1rem;
+  }
+
+  .morning-summary {
+    font-size: .9rem;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: .5rem;
+    padding: .75rem;
+    white-space: pre-wrap;
   }
 
   .attention-card {
-    border-left: 5px solid #dc3545;
+    border-left: 4px solid #dc3545;
   }
 
   .small-table {
-    font-size: 0.92rem;
+    font-size: .88rem;
+  }
+
+  .small-table th,
+  .small-table td {
+    padding: .45rem .6rem;
+    vertical-align: middle;
   }
 
   .mobile-row-card {
     border: 1px solid #dee2e6;
-    border-radius: 0.75rem;
-    padding: 1rem;
-    margin-bottom: 1rem;
+    border-radius: .5rem;
+    padding: .85rem;
+    margin-bottom: .75rem;
     background: #fff;
   }
 
@@ -50,7 +89,8 @@
     display: flex;
     justify-content: space-between;
     gap: 1rem;
-    margin-bottom: 0.35rem;
+    margin-bottom: .25rem;
+    font-size: .9rem;
   }
 
   .mobile-row-label {
@@ -64,53 +104,72 @@
     }
 
     .dashboard-title {
-      font-size: 1.35rem;
+      font-size: 1.25rem;
     }
 
     .summary-card h3 {
-      font-size: 1.35rem;
-    }
-
-    .card-body {
-      padding: 1rem;
+      font-size: 1.2rem;
     }
   }
 </style>
 
-<div class="page-container py-4 mt-5">
+<div class="page-container">
 
-  <div class="mb-4">
-    <h2 class="dashboard-title mb-1">Sales Target Dashboard</h2>
-    <div class="text-muted">
-      {{ period.name }} · {{ period.start_date }} to {{ period.end_date }}
+
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
+     
+    <div>
+      <legend class=" mb-1">Sales Target Dashboard</legend>
+      <div class="dashboard-meta">
+        {{ period.name }} · {{ period.start_date }} to {{ period.end_date }}
+      </div>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2">
+      <a href="{% url 'sales_targets:export_sales_target_summary_dashboard' period.id %}"
+         class="btn btn-sm btn-outline-secondary">
+        Export Summary
+      </a>
+
+      <a href="{% url 'sales_targets:export_sales_target_management_dashboard' period.id %}"
+         class="btn btn-sm btn-outline-secondary">
+        Export Management
+      </a>
+
+      <a href="{% url 'sales_targets:sales_target_dashboard_selector' %}"
+         class="btn btn-sm btn-outline-secondary">
+        Change Campaign
+      </a>
     </div>
   </div>
 
-  <div class="d-grid d-md-flex gap-2 mb-4">
-    <a href="{% url 'sales_targets:export_sales_target_summary_dashboard' period.id %}"
-       class="btn btn-outline-secondary">
-      Export Summary
-    </a>
-
-    <a href="{% url 'sales_targets:export_sales_target_management_dashboard' period.id %}"
-       class="btn btn-outline-secondary">
-      Export Management
-    </a>
-
-    <a href="{% url 'sales_targets:sales_target_dashboard_selector' %}"
-       class="btn btn-outline-secondary">
-      Change Campaign
-    </a>
-  </div>
-
   <!----------------- Morning Summary ----------------->
-<div class="card section-card shadow-sm mb-4">
-  <div class="card-header section-header">
-    Morning Summary
-  </div>
+<div class="accordion mb-3" id="morningSummaryAccordion">
+  <div class="accordion-item">
 
-  <div class="card-body">
-    <pre class="mb-0" style="white-space: pre-wrap;">{{ morning_summary }}</pre>
+    <h2 class="accordion-header" id="headingMorning">
+      <button class="accordion-button collapsed"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#collapseMorning"
+              aria-expanded="false"
+              aria-controls="collapseMorning">
+
+        Morning Summary
+      </button>
+    </h2>
+
+    <div id="collapseMorning"
+         class="accordion-collapse collapse"
+         aria-labelledby="headingMorning"
+         data-bs-parent="#morningSummaryAccordion">
+
+      <div class="accordion-body">
+        <pre class="morning-summary mb-0">{{ morning_summary }}</pre>
+      </div>
+
+    </div>
+
   </div>
 </div>
 <!----------------------------------------------------->
@@ -120,9 +179,9 @@
 
 <!----------------------------------------------------->
 
-  <div class="row g-3 mb-4">
+  <div class="row g-3 mb-3">
     <div class="col-md-3">
-      <div class="card summary-card shadow-sm">
+      <div class="card summary-card">
         <div class="card-body">
           <div class="text-muted small">Total Target</div>
           <h3 class="mb-0">${{ total_target|floatformat:0 }}</h3>
@@ -131,7 +190,7 @@
     </div>
 
     <div class="col-md-3">
-      <div class="card summary-card shadow-sm">
+      <div class="card summary-card">
         <div class="card-body">
           <div class="text-muted small">Current Sales</div>
           <h3 class="mb-0">${{ total_current|floatformat:0 }}</h3>
@@ -140,7 +199,7 @@
     </div>
 
     <div class="col-md-3">
-      <div class="card summary-card shadow-sm">
+      <div class="card summary-card">
         <div class="card-body">
           <div class="text-muted small">Projected Sales</div>
           <h3 class="mb-0">${{ total_projected|floatformat:0 }}</h3>
@@ -149,7 +208,7 @@
     </div>
 
     <div class="col-md-3">
-      <div class="card summary-card shadow-sm">
+      <div class="card summary-card">
         <div class="card-body">
           <div class="text-muted small">Projected Variance</div>
           <h3 class="mb-0 {% if projected_variance < 0 %}text-danger{% else %}text-success{% endif %}">
@@ -160,7 +219,76 @@
     </div>
   </div>
 
-  <div class="card section-card shadow-sm mb-4 attention-card">
+  <!--------------------- Focus     ------------------------>
+
+  <div class="row g-3 mb-3">
+
+  <div class="col-md-4">
+    <div class="card section-card h-100">
+      <div class="card-body">
+        <div class="text-muted small mb-2">Today's Focus</div>
+
+        {% if today_focus %}
+          <ul class="mb-0 ps-3 small">
+            {% for item in today_focus %}
+              <li class="mb-1">{{ item }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <div class="small text-success fw-semibold">
+            Nothing urgent today. Nice.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card section-card h-100">
+      <div class="card-body">
+        <div class="text-muted small mb-2">Biggest Win</div>
+
+        {% if biggest_win %}
+          <div class="fw-semibold">
+            Store {{ biggest_win.store.number }}
+          </div>
+          <div class="small text-muted">
+            {{ biggest_win.category.name }}
+          </div>
+          <div class="mt-2 text-success fw-bold">
+            ${{ biggest_win.projected_variance|floatformat:0 }} ahead
+          </div>
+        {% else %}
+          <div class="small text-muted">
+            No categories are ahead yet.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card section-card h-100">
+      <div class="card-body">
+        <div class="text-muted small mb-2">Last Updated</div>
+
+        <div class="fw-semibold">
+          {{ last_updated|date:"M j, Y" }}
+        </div>
+
+        <div class="small text-muted">
+          {{ last_updated|time:"g:i A" }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!------------------------------------------------------------>
+
+
+  <div class="card section-card mb-3 attention-card">
     <div class="card-header section-header text-danger">
       Needs Attention
     </div>
@@ -231,7 +359,7 @@
     </div>
   </div>
 
-  <div class="card section-card shadow-sm">
+  <div class="card section-card">
     <div class="card-header section-header">
       Category Summary
     </div>

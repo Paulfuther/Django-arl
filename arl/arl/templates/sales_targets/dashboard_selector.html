@@ -6,31 +6,48 @@
 {% load crispy_forms_tags %}
 
 <style>
-    .page-container {
-        max-width: 1300px;
-        margin: 0 auto;
-    }
+.page-container {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding-top: 6rem;   /* same offset below fixed navbar */
+}
+
+.dashboard-title {
+    font-weight: 600;
+    font-size: 1.5rem;
+}
+
+.card {
+    border-radius: .5rem;
+}
 </style>
 
-<div class="page-container py-4">
+<div class="page-container">
+    
 
-    <h2 class="mb-4 mt-5">Sales Target Dashboard</h2>
+    <div class="mb-4">
+        <legend class="mb-1">Sales Target Dashboard</legend>
+        <div class="text-muted">
+            Select a campaign to view the dashboard.
+        </div>
+    </div>
 
-    <div class="card shadow-sm">
-        <div class="card-body">
+    <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
 
             <form method="post">
                 {% csrf_token %}
 
                 <div class="mb-3">
-                    <label for="period_id" class="form-label fw-bold">
-                        Select Campaign
+                    <label for="period_id" class="form-label fw-semibold">
+                        Campaign
                     </label>
 
-                    <select name="period_id"
-                            id="period_id"
-                            class="form-select"
-                            required>
+                    <select
+                        name="period_id"
+                        id="period_id"
+                        class="form-select"
+                        required>
                         <option value="">Choose a campaign...</option>
 
                         {% for period in periods %}
@@ -41,10 +58,12 @@
                     </select>
                 </div>
 
-                <button type="submit"
-                        class="btn btn-outline-secondary">
-                    View Dashboard
-                </button>
+                <div class="mt-4">
+                    <button type="submit"
+                            class="btn btn-outline-secondary">
+                        Open Dashboard
+                    </button>
+                </div>
 
             </form>
 

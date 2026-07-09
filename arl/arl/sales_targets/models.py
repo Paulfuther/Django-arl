@@ -74,10 +74,8 @@ class SalesTargetLine(models.Model):
         default=0
     )
 
-    last_updated = models.DateField(
-        null=True,
-        blank=True
-    )
+    updated_at = models.DateTimeField(auto_now=True)
+    
     class Meta:
         unique_together = ("period", "store", "category")
         ordering = ["store_id", "category__name"]
