@@ -22,6 +22,14 @@
     color: #6c757d;
   }
 
+  .store-header th {
+    background: #f8f9fa !important;
+    font-size: .95rem;
+    font-weight: 600;
+    border-top: 2px solid #dee2e6;
+    color: #495057;
+}
+
   .summary-card,
   .section-card {
     background: #fff;
@@ -172,6 +180,99 @@
 
   </div>
 </div>
+
+<!------------------- Targets Actual ------------------>
+<div class="accordion mb-3" id="storeTargetsAccordion">
+  <div class="accordion-item">
+
+    <h2 class="accordion-header" id="headingStoreTargets">
+      <button class="accordion-button collapsed"
+              type="button"
+              data-bs-toggle="collapse"
+              data-bs-target="#collapseStoreTargets"
+              aria-expanded="false"
+              aria-controls="collapseStoreTargets">
+        Targets & Sales by Store
+      </button>
+    </h2>
+
+    <div id="collapseStoreTargets"
+         class="accordion-collapse collapse"
+         aria-labelledby="headingStoreTargets"
+         data-bs-parent="#storeTargetsAccordion">
+
+      <div class="accordion-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 small-table">
+            <thead class="table-light">
+              <tr>
+                
+                <th>Category</th>
+                <th class="text-end">Target</th>
+                <th class="text-end">Current Sales</th>
+                <th class="text-end">% To Target</th>
+                <th class="text-end">Projected</th>
+                <th class="text-end">Variance</th>
+                <th class="text-end">Required Daily</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+
+            <tbody>
+
+{% for line in target_lines %}
+
+    {% ifchanged line.store.number %}
+        <tr class="store-header">
+            <th colspan="8" class="fw-semibold py-2">
+                Store {{ line.store.number }}
+            </th>
+        </tr>
+    {% endifchanged %}
+
+    <tr>
+        <td>{{ line.category.name }}</td>
+
+        <td class="text-end">
+            ${{ line.target_amount|floatformat:0 }}
+        </td>
+
+        <td class="text-end">
+            ${{ line.current_sales|floatformat:0 }}
+        </td>
+
+        <td class="text-end">
+            {{ line.percent_to_target|floatformat:0 }}%
+        </td>
+
+        <td class="text-end">
+            ${{ line.projected_sales|floatformat:0 }}
+        </td>
+
+        <td class="text-end {% if line.projected_variance < 0 %}text-danger{% else %}text-success{% endif %} fw-bold">
+            ${{ line.projected_variance|floatformat:0 }}
+        </td>
+
+        <td class="text-end">
+            ${{ line.required_daily_sales }}
+        </td>
+
+        <td>
+            {{ line.status }}
+        </td>
+    </tr>
+
+{% endfor %}
+
+</tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <!----------------------------------------------------->
 
 <!-------------------- AI Coaching -------------------->

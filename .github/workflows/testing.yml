@@ -19,7 +19,17 @@ jobs:
       TWILIO_AUTH_TOKEN: ${{ secrets.TWILIO_AUTH_TOKEN }}
       SECRET_ENCRYPTION_KEY: ${{ secrets.SECRET_ENCRYPTION_KEY }}
       FERNET_PRIMARY_KEY: ${{ secrets.FERNET_PRIMARY_KEY }}
-      SIN_HASH_SALT: ${{ secrets.SIN_HASH_SALE }}
+      SIN_HASH_SALT: ${{ secrets.SIN_HASH_SALT }}
+
+      DB_NAME: ${{ secrets.DB_NAME }}
+
+      DB_USER: ${{ secrets.DB_USER }}
+
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+
+      DB_HOST: ${{ secrets.DB_HOST }}
+
+      DB_PORT: ${{ secrets.DB_PORT }}
 
     steps:
       - name: Checkout code
