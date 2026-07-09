@@ -159,10 +159,16 @@ def sales_target_dashboard(request, period_id):
     morning_summary = build_morning_summary(period)
     today_focus = build_today_focus(period)
     biggest_win = build_biggest_win(period)
-
     last_updated = period.target_lines.aggregate(
         Max("updated_at")
     )["updated_at__max"]
+    target_lines = period.target_lines.select_related(
+        "store",
+        "category"
+    ).order_by(
+        "store__number",
+        "category__name"
+    )
 
     context = {
         "period": period,
@@ -176,6 +182,7 @@ def sales_target_dashboard(request, period_id):
         "today_focus": today_focus,
         "biggest_win": biggest_win,
         "last_updated": last_updated,
+        "target_lines": target_lines,
     }
 
     return render(
