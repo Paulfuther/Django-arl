@@ -157,3 +157,5 @@ GitHub.sublime-settings
 
 # cladue
 arl/arl/claude_assistant
+
+arl/settings/local_settings.py
