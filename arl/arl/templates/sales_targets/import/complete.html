@@ -1,0 +1,119 @@
+{% extends "../../base/base.html" %}
+{% block title %}Sales Target Upload{% endblock %}
+
+{% block template %}
+{% include "../../base/navbar.html" %}
+
+<style>
+  .page-container {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding-top: 6rem;   /* same offset below fixed navbar */
+}
+</style>
+
+<div class="page-container">
+
+    <div class="card shadow-sm">
+        <div class="card-body p-4">
+
+            <h1 class="h4 text-success mb-2">
+                Sales Import Complete
+            </h1>
+
+            <p class="text-muted mb-4">
+                The staged sales values were successfully
+                written to the database.
+            </p>
+
+            <div class="row g-3 mb-4">
+
+                <div class="col-md-4">
+                    <div class="border rounded p-3 h-100">
+                        <div class="text-muted small">
+                            Stores imported
+                        </div>
+
+                        <div class="fs-4 fw-semibold">
+                            {{ files|length }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="border rounded p-3 h-100">
+                        <div class="text-muted small">
+                            Records updated
+                        </div>
+
+                        <div class="fs-4 fw-semibold">
+                            {{ total_rows }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="border rounded p-3 h-100">
+                        <div class="text-muted small">
+                            Imported at
+                        </div>
+
+                        <div class="fw-semibold">
+                            {{ batch.imported_at }}
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="table-responsive mb-4">
+                <table class="table table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Store</th>
+                            <th>Filename</th>
+                            <th>Period</th>
+                            <th class="text-end">
+                                Values
+                            </th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for staged_file in files %}
+                            <tr>
+                                <td>
+                                    {{ staged_file.store_number }}
+                                </td>
+
+                                <td>
+                                    {{ staged_file.original_filename }}
+                                </td>
+
+                                <td>
+                                    {{ staged_file.from_date }}
+                                    to
+                                    {{ staged_file.to_date }}
+                                </td>
+
+                                <td class="text-end">
+                                    {{ staged_file.rows.count }}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <a
+                href="{% url 'sales_targets:sales_import_upload' %}"
+                class="btn btn-outline-secondary"
+            >
+                Import Another Sales Period
+            </a>
+
+        </div>
+    </div>
+
+</div>
+{% endblock %}

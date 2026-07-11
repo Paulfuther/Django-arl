@@ -9,9 +9,25 @@ from django.shortcuts import get_object_or_404, redirect, render
 from openai import OpenAI
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
-
+from .models import (
+    SalesImportBatch,
+    SalesTargetPeriod,
+)
 from .models import SalesTargetLine, SalesTargetPeriod
+# arl/sales_targets/views.py
 
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.http import Http404
+from django.shortcuts import get_object_or_404, redirect, render
+
+from .models import SalesImportBatch
+from .services.sales_importer import (
+    MAX_SALES_FILES,
+    commit_sales_import,
+    create_preview_batch,
+    validate_batch,
+)
 
 def index(request):
     return HttpResponse("Sales targets app is working.")
@@ -586,4 +602,234 @@ def ai_sales_coaching_dashboard(request, period_id):
             "period": period,
             "ai_coaching": ai_coaching,
         },
+    )
+
+
+
+
+
+def get_user_batch_or_404(request, batch_id):
+    batch = get_object_or_404(
+        SalesImportBatch,
+        id=batch_id,
+        employer=request.user.employer,
+    )
+
+    if (
+        batch.uploaded_by_id
+        and batch.uploaded_by_id != request.user.id
+    ):
+        raise Http404
+
+    return batch
+
+
+@login_required
+def sales_import_upload(request):
+    periods = (
+        SalesTargetPeriod.objects
+        .filter(
+            employer=request.user.employer,
+        )
+        .order_by(
+            "-start_date",
+            "name",
+        )
+    )
+
+    if request.method == "POST":
+        uploaded_files = request.FILES.getlist(
+            "sales_files"
+        )
+
+        period_id = request.POST.get(
+            "target_period"
+        )
+
+        if not period_id:
+            messages.error(
+                request,
+                "Please select a sales target period.",
+            )
+
+            return redirect(
+                "sales_targets:sales_import_upload"
+            )
+
+        target_period = get_object_or_404(
+            SalesTargetPeriod,
+            id=period_id,
+            employer=request.user.employer,
+        )
+
+        try:
+            batch = create_preview_batch(
+                employer=request.user.employer,
+                uploaded_by=request.user,
+                uploaded_files=uploaded_files,
+                target_period=target_period,
+            )
+
+        except ValueError as exc:
+            messages.error(
+                request,
+                str(exc),
+            )
+
+            return redirect(
+                "sales_targets:sales_import_upload"
+            )
+
+        return redirect(
+            "sales_targets:sales_import_preview",
+            batch_id=batch.id,
+        )
+
+    return render(
+        request,
+        "sales_targets/import/upload.html",
+        {
+            "max_sales_files": MAX_SALES_FILES,
+            "periods": periods,
+        },
+    )
+
+@login_required
+def sales_import_preview(request, batch_id):
+    batch = get_user_batch_or_404(
+        request,
+        batch_id,
+    )
+
+    files = (
+        batch.files
+        .prefetch_related("rows__target_category")
+        .all()
+    )
+
+    is_valid, validation_error = validate_batch(batch)
+
+    total_rows = sum(
+        staged_file.rows.filter(
+            error_message="",
+            is_valid=True,
+        ).count()
+        for staged_file in files
+    )
+
+    skipped_rows = sum(
+        staged_file.rows.filter(
+            error_message__startswith="Skipped:",
+        ).count()
+        for staged_file in files
+    )
+
+    return render(
+        request,
+        "sales_targets/import/preview.html",
+        {
+            "batch": batch,
+            "files": files,
+            "is_valid": is_valid,
+            "validation_error": validation_error,
+            "total_rows": total_rows,
+            "store_count": len(files),
+            "skipped_rows": skipped_rows,
+        },
+    )
+
+
+@login_required
+def sales_import_confirm(request, batch_id):
+    if request.method != "POST":
+        return redirect(
+            "sales_targets:sales_import_preview",
+            batch_id=batch_id,
+        )
+
+    batch = get_user_batch_or_404(
+        request,
+        batch_id,
+    )
+
+    try:
+        updated_count = commit_sales_import(batch)
+
+    except ValueError as exc:
+        messages.error(request, str(exc))
+
+        return redirect(
+            "sales_targets:sales_import_preview",
+            batch_id=batch.id,
+        )
+
+    messages.success(
+        request,
+        f"Successfully updated {updated_count} sales records.",
+    )
+
+    return redirect(
+        "sales_targets:sales_import_complete",
+        batch_id=batch.id,
+    )
+
+
+@login_required
+def sales_import_complete(request, batch_id):
+    batch = get_user_batch_or_404(
+        request,
+        batch_id,
+    )
+
+    files = batch.files.prefetch_related("rows").all()
+
+    total_rows = sum(
+        staged_file.rows.count()
+        for staged_file in files
+    )
+
+    return render(
+        request,
+        "sales_targets/import/complete.html",
+        {
+            "batch": batch,
+            "files": files,
+            "total_rows": total_rows,
+        },
+    )
+
+
+@login_required
+def sales_import_cancel(request, batch_id):
+    if request.method != "POST":
+        return redirect(
+            "sales_targets:sales_import_preview",
+            batch_id=batch_id,
+        )
+
+    batch = get_user_batch_or_404(
+        request,
+        batch_id,
+    )
+
+    if batch.status != SalesImportBatch.STATUS_PREVIEW:
+        messages.error(
+            request,
+            "Only preview batches can be cancelled.",
+        )
+
+        return redirect(
+            "sales_targets:sales_import_preview",
+            batch_id=batch.id,
+        )
+
+    batch.delete()
+
+    messages.info(
+        request,
+        "Import cancelled. No sales values were changed.",
+    )
+
+    return redirect(
+        "sales_targets:sales_import_upload"
     )

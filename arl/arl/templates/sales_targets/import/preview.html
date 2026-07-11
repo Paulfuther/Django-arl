@@ -1,0 +1,298 @@
+{% extends "../../base/base.html" %}
+{% block title %}Sales Target Upload{% endblock %}
+
+{% block template %}
+{% include "../../base/navbar.html" %}
+
+<style>
+  .page-container {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding-top: 6rem;   /* same offset below fixed navbar */
+}
+</style>
+
+<div class="page-container ">
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body py-3">
+        <div>
+            <strong>Selected campaign:</strong>
+            {{ batch.target_period.name }}
+        </div>
+
+        <div class="text-muted small mt-1">
+            {{ batch.target_period.start_date }}
+            to
+            {{ batch.target_period.end_date }}
+        </div>
+    </div>
+</div>
+
+<div class="text-muted small">
+    {{ total_rows }} sales values ready
+</div>
+
+{% if skipped_rows %}
+    <div class="text-muted small">
+        {{ skipped_rows }} categor{{ skipped_rows|pluralize:"y,ies" }}
+        skipped
+    </div>
+{% endif %}
+
+    <div
+        class="d-flex flex-wrap justify-content-between
+               align-items-start gap-3 mb-4"
+    >
+        <div>
+            <h1 class="h4 mb-1">
+                Sales Import Preview
+            </h1>
+
+            <p class="text-muted mb-0">
+                Review all stores before updating the database.
+            </p>
+        </div>
+
+        <div class="text-end">
+            <div>
+                <strong>{{ store_count }}</strong>
+                store{{ store_count|pluralize }}
+            </div>
+
+            <div class="text-muted small">
+                {{ total_rows }} sales values staged
+            </div>
+        </div>
+    </div>
+
+    {% if report_from_date and report_to_date %}
+        <div class="card shadow-sm mb-4">
+            <div class="card-body py-3">
+                <strong>Reporting period:</strong>
+                {{ report_from_date }}
+                to
+                {{ report_to_date }}
+            </div>
+        </div>
+    {% endif %}
+
+    {% if is_valid %}
+        <div class="alert alert-success">
+            <strong>Ready to import.</strong>
+            All files, stores, categories, periods, and
+            target lines passed validation.
+        </div>
+    {% else %}
+        <div class="alert alert-danger">
+            <strong>Import cannot continue.</strong>
+            {{ validation_error }}
+        </div>
+    {% endif %}
+
+    {% for staged_file in files %}
+        <div class="card shadow-sm mb-4">
+
+            <div
+                class="card-header d-flex flex-wrap
+                       justify-content-between
+                       align-items-start gap-3"
+            >
+                <div>
+                    <div class="fw-semibold">
+                        {% if staged_file.store_number %}
+                            Store {{ staged_file.store_number }}
+                        {% else %}
+                            Store could not be determined
+                        {% endif %}
+                    </div>
+
+                    <div class="small text-muted">
+                        {{ staged_file.original_filename }}
+                    </div>
+                </div>
+
+                <div class="text-end">
+                    {% if staged_file.from_date %}
+                        <div class="small mb-1">
+                            {{ staged_file.from_date }}
+                            to
+                            {{ staged_file.to_date }}
+                        </div>
+                    {% endif %}
+
+                    {% if staged_file.is_valid %}
+                        <span class="badge text-bg-success">
+                            Ready
+                        </span>
+                    {% else %}
+                        <span class="badge text-bg-danger">
+                            Error
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if staged_file.error_message %}
+                <div class="card-body pb-0">
+                    <div class="alert alert-danger mb-0">
+                        {{ staged_file.error_message }}
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if staged_file.rows.all %}
+                <div class="table-responsive">
+    <table
+        class="table table-striped
+               table-hover align-middle mb-0"
+    >
+        <thead>
+            <tr>
+                <th>Code</th>
+                <th>Category</th>
+                <th class="text-end">Current DB</th>
+                <th class="text-end">Spreadsheet</th>
+                <th class="text-end">Difference</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for row in staged_file.rows.all %}
+                <tr>
+                    <td>
+                        <code>{{ row.category_code }}</code>
+                    </td>
+
+                    <td>{{ row.category_name }}</td>
+
+                    <td class="text-end">
+                        {{ row.current_sales|floatformat:2 }}
+                    </td>
+
+                    <td class="text-end fw-semibold">
+                        {{ row.imported_sales|floatformat:2 }}
+                    </td>
+
+                    <td
+                        class="
+                            text-end
+                            {% if row.difference > 0 %}
+                                text-success
+                            {% elif row.difference < 0 %}
+                                text-danger
+                            {% endif %}
+                        "
+                    >
+                        {% if row.difference > 0 %}+{% endif %}
+                        {{ row.difference|floatformat:2 }}
+                    </td>
+
+                    <td>
+                        {% if row.is_skipped %}
+                        <span class="badge text-bg-secondary">
+                            Skipped
+                        </span>
+                    {% elif row.is_valid %}
+                        <span class="badge text-bg-success">
+                            Ready
+                        </span>
+                    {% else %}
+                        <span class="badge text-bg-danger">
+                            Error
+                        </span>
+                    {% endif %}
+                    </td>
+                </tr>
+
+                {% if row.error_message %}
+                    <tr>
+                        <td
+                            colspan="6"
+                            class="
+                                small
+                                {% if row.is_skipped %}
+                                    text-muted
+                                {% else %}
+                                    text-danger
+                                {% endif %}
+                            "
+                        >
+                            {{ row.error_message }}
+                        </td>
+                    </tr>
+                {% endif %}
+            {% empty %}
+                <tr>
+                    <td
+                        colspan="6"
+                        class="text-muted text-center py-4"
+                    >
+                        No category rows were staged for this spreadsheet.
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+            {% endif %}
+
+        </div>
+    {% endfor %}
+
+    <div class="d-flex flex-wrap gap-2 mb-5">
+
+        {% if is_valid and batch.status == "preview" %}
+            <form
+                method="post"
+                action="{% url 'sales_targets:sales_import_confirm' batch.id %}"
+            >
+                {% csrf_token %}
+
+                <button
+                    type="submit"
+                    class="btn btn-outline-success"
+                    onclick="
+                        return confirm(
+                            'Update all staged sales values?'
+                        );
+                    "
+                >
+                    Import {{ total_rows }} Sales Values
+                </button>
+            </form>
+        {% endif %}
+
+        {% if batch.status == "preview" %}
+            <form
+                method="post"
+                action="{% url 'sales_targets:sales_import_cancel' batch.id %}"
+            >
+                {% csrf_token %}
+
+                <button
+                    type="submit"
+                    class="btn btn-outline-danger"
+                    onclick="
+                        return confirm(
+                            'Cancel this import? No sales data has been changed.'
+                        );
+                    "
+                >
+                    Cancel Import
+                </button>
+            </form>
+        {% endif %}
+
+        <a
+            href="{% url 'sales_targets:sales_import_upload' %}"
+            class="btn btn-outline-secondary"
+        >
+            Upload Different Files
+        </a>
+
+    </div>
+
+</div>
+{% endblock %}
