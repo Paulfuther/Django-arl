@@ -17,9 +17,23 @@ from ..models import (
     SalesTargetPeriod,
 )
 
-print("LOADED SALES IMPORTER:", __file__)
+# print("LOADED SALES IMPORTER:", __file__)
 
-MAX_SALES_FILES = 9
+MAX_SALES_FILES = 15
+
+
+def validate_report_title(worksheet):
+    """
+    Confirm this is a D365 Category Sales Report.
+    """
+
+    title = normalize_text(worksheet["A1"].value).lower()
+
+    if title != "category sales report":
+        raise ValueError(
+            "This does not appear to be a Category Sales Report. "
+            f"Cell A1 contained: {worksheet['A1'].value!r}"
+        )
 
 
 def normalize_text(value):
@@ -395,7 +409,7 @@ def parse_and_stage_file(
     It only prepares the preview.
     """
 
-    #print("PARSE FUNCTION CALLED:", uploaded_file.name)
+    # print("PARSE FUNCTION CALLED:", uploaded_file.name)
 
     staged_file = SalesImportFile.objects.create(
         batch=batch,
@@ -422,10 +436,10 @@ def parse_and_stage_file(
             for category in import_categories
         }
 
-        #print(
+        # print(
         #    "CATEGORY CODES:",
         #    list(categories_by_code.keys()),
-        #)
+        # )
 
         # -----------------------------------------
         # Open workbook
@@ -437,6 +451,7 @@ def parse_and_stage_file(
         )
 
         worksheet = workbook.active
+        validate_report_title(worksheet)
 
         # -----------------------------------------
         # Read and save store number
@@ -444,10 +459,10 @@ def parse_and_stage_file(
 
         store_number = find_store_number(worksheet)
 
-        #print(
+        # print(
         #    "STORE NUMBER RETURNED:",
         #    store_number,
-        #)
+        # )
 
         staged_file.store_number = store_number
 
@@ -630,16 +645,14 @@ def parse_and_stage_file(
         )
 
     except Exception as exc:
-        import traceback
+        # traceback.print_exc()
 
-        traceback.print_exc()
+        error_text = str(exc)
 
-        error_text = f"{type(exc).__name__}: {str(exc)}"
-
-        #print(
+        # print(
         #    "SALES IMPORT ERROR:",
         #    error_text,
-        #)
+        # )
 
         staged_file.is_valid = False
         staged_file.error_message = error_text
