@@ -1,27 +1,49 @@
-from django.db import models
-from django.core.exceptions import ValidationError
-from django.utils import timezone
-from decimal import Decimal, ROUND_DOWN, ROUND_UP
+import uuid
+from decimal import ROUND_UP, Decimal
 
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.db import models
+from django.db.models import Q
+from django.utils import timezone
 
 
 class SalesTargetCategory(models.Model):
     employer = models.ForeignKey(
-        "user.Employer",
+        "user.Employer",  # Change if your Employer model is elsewhere
         on_delete=models.CASCADE,
         related_name="sales_target_categories",
     )
+
     name = models.CharField(max_length=100)
+
+    d365_category_code = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        help_text=("Category code from the D365 Category Sales Report. Example: 2310"),
+    )
+
     is_active = models.BooleanField(default=True)
 
     class Meta:
-        unique_together = ("employer", "name")
-        ordering = ["employer", "name"]
-        verbose_name = "Sales Target Category"
-        verbose_name_plural = "Sales Target Categories"
+        ordering = ["name"]
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "employer",
+                    "d365_category_code",
+                ],
+                condition=(
+                    Q(d365_category_code__isnull=False) & ~Q(d365_category_code="")
+                ),
+                name="unique_d365_code_per_employer",
+            ),
+        ]
 
     def __str__(self):
-        return f"{self.employer} - {self.name}"
+        return self.name
 
 
 class SalesTargetPeriod(models.Model):
@@ -68,14 +90,10 @@ class SalesTargetLine(models.Model):
     )
     target_amount = models.DecimalField(max_digits=12, decimal_places=2)
 
-    current_sales = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        default=0
-    )
+    current_sales = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
     updated_at = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         unique_together = ("period", "store", "category")
         ordering = ["store_id", "category__name"]
@@ -97,7 +115,6 @@ class SalesTargetLine(models.Model):
     def total_days(self):
         return max((self.period.end_date - self.period.start_date).days + 1, 1)
 
-
     @property
     def elapsed_days(self):
         today = timezone.localdate()
@@ -110,11 +127,9 @@ class SalesTargetLine(models.Model):
 
         return (today - self.period.start_date).days + 1
 
-
     @property
     def remaining_days(self):
         return max(self.total_days - self.elapsed_days, 0)
-
 
     @property
     def percent_time_elapsed(self):
@@ -123,14 +138,12 @@ class SalesTargetLine(models.Model):
 
         return Decimal(self.elapsed_days) / Decimal(self.total_days) * Decimal("100")
 
-
     @property
     def percent_to_target(self):
         if not self.target_amount:
             return Decimal("0")
 
         return self.current_sales / self.target_amount * Decimal("100")
-
 
     @property
     def projected_sales(self):
@@ -140,11 +153,9 @@ class SalesTargetLine(models.Model):
         daily_average = self.current_sales / Decimal(self.elapsed_days)
         return daily_average * Decimal(self.total_days)
 
-
     @property
     def projected_variance(self):
         return self.projected_sales - self.target_amount
-
 
     @property
     def remaining_sales_needed(self):
@@ -156,9 +167,9 @@ class SalesTargetLine(models.Model):
             return 1
 
         return int(
-            (
-                self.remaining_sales_needed / Decimal(self.remaining_days)
-            ).quantize(Decimal("1"), rounding=ROUND_UP)
+            (self.remaining_sales_needed / Decimal(self.remaining_days)).quantize(
+                Decimal("1"), rounding=ROUND_UP
+            )
         )
 
     @property
@@ -175,3 +186,154 @@ class SalesTargetLine(models.Model):
             return "🟡 On Track"
 
         return "🔴 Behind"
+
+
+class SalesImportBatch(models.Model):
+    STATUS_PREVIEW = "preview"
+    STATUS_IMPORTED = "imported"
+    STATUS_CANCELLED = "cancelled"
+    STATUS_FAILED = "failed"
+
+    STATUS_CHOICES = [
+        (STATUS_PREVIEW, "Preview"),
+        (STATUS_IMPORTED, "Imported"),
+        (STATUS_CANCELLED, "Cancelled"),
+        (STATUS_FAILED, "Failed"),
+    ]
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+    )
+
+    employer = models.ForeignKey(
+        "user.employer",  # Change if needed
+        on_delete=models.CASCADE,
+        related_name="sales_import_batches",
+    )
+    target_period = models.ForeignKey(
+        SalesTargetPeriod,
+        on_delete=models.PROTECT,
+        related_name="import_batches",
+    )
+
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="sales_import_batches",
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_PREVIEW,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    imported_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"Sales import {self.id} - {self.status}"
+
+
+class SalesImportFile(models.Model):
+    batch = models.ForeignKey(
+        SalesImportBatch,
+        on_delete=models.CASCADE,
+        related_name="files",
+    )
+
+    original_filename = models.CharField(max_length=255)
+
+    store_number = models.CharField(
+        max_length=50,
+        blank=True,
+    )
+
+    from_date = models.DateField(
+        null=True,
+        blank=True,
+    )
+
+    to_date = models.DateField(
+        null=True,
+        blank=True,
+    )
+
+    is_valid = models.BooleanField(default=False)
+
+    error_message = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = [
+            "store_number",
+            "original_filename",
+        ]
+
+    def __str__(self):
+        if self.store_number:
+            return f"{self.store_number} - {self.original_filename}"
+
+        return self.original_filename
+
+
+class SalesImportRow(models.Model):
+    staged_file = models.ForeignKey(
+        SalesImportFile,
+        on_delete=models.CASCADE,
+        related_name="rows",
+    )
+
+    target_category = models.ForeignKey(
+        SalesTargetCategory,
+        on_delete=models.PROTECT,
+        related_name="staged_import_rows",
+    )
+
+    category_code = models.CharField(max_length=20)
+    category_name = models.CharField(max_length=100)
+
+    imported_sales = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+    )
+
+    current_sales = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=0,
+    )
+
+    difference = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=0,
+    )
+
+    is_valid = models.BooleanField(default=False)
+    error_message = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["category_name"]
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "staged_file",
+                    "target_category",
+                ],
+                name="unique_category_per_staged_sales_file",
+            ),
+        ]
+
+    @property
+    def is_skipped(self):
+        return self.error_message.startswith("Skipped:")
+
+    def __str__(self):
+        return f"{self.staged_file.store_number} - {self.category_name}"
