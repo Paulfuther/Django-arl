@@ -471,36 +471,83 @@ def export_sales_target_summary_dashboard(request, period_id):
 
 
 def export_sales_target_management_dashboard(request, period_id):
-    period = get_object_or_404(SalesTargetPeriod, id=period_id)
+    period = get_object_or_404(
+        SalesTargetPeriod,
+        id=period_id,
+    )
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Management Report"
 
+    lines = (
+        period.target_lines
+        .select_related(
+            "store",
+            "category",
+            "period",
+        )
+        .order_by(
+            "store_id",
+            "category__name",
+        )
+    )
+
+    measurement_types = {
+        line.category.measurement_type
+        for line in lines
+    }
+
+    is_unit_campaign = (
+        len(measurement_types) == 1
+        and "units" in measurement_types
+    )
+
     # Report title
     ws.append(["Sales Target Management Report"])
-    ws["A1"].font = Font(size=16, bold=True)
+    ws["A1"].font = Font(
+        size=16,
+        bold=True,
+    )
 
     # Period information
     ws.append([f"Period: {period.name}"])
     ws["A2"].font = Font(bold=True)
 
-    ws.append([f"Dates: {period.start_date} to {period.end_date}"])
+    ws.append(
+        [
+            f"Dates: {period.start_date} "
+            f"to {period.end_date}"
+        ]
+    )
     ws["A3"].font = Font(bold=True)
 
     ws.append([])
 
-    headers = [
-        "Store",
-        "Category",
-        "Target Amount",
-        "Current Sales",
-        "% To Target",
-        "Projected Sales",
-        "Projected Variance",
-        "Required Daily Sales",
-        "Status",
-    ]
+    if is_unit_campaign:
+        headers = [
+            "Store",
+            "Category",
+            "Target Units",
+            "Current Units",
+            "% To Target",
+            "Projected Units",
+            "Projected Variance",
+            "Required Units Per Day",
+            "Status",
+        ]
+    else:
+        headers = [
+            "Store",
+            "Category",
+            "Target Amount",
+            "Current Sales",
+            "% To Target",
+            "Projected Sales",
+            "Projected Variance",
+            "Required Daily Sales",
+            "Status",
+        ]
 
     ws.append(headers)
 
@@ -508,16 +555,17 @@ def export_sales_target_management_dashboard(request, period_id):
 
     for cell in ws[header_row]:
         cell.font = Font(bold=True)
-        cell.alignment = Alignment(horizontal="center")
+        cell.alignment = Alignment(
+            horizontal="center",
+        )
 
     previous_store = None
 
-    lines = period.target_lines.select_related("store", "category", "period").order_by(
-        "store_id", "category__name"
-    )
-
     for line in lines:
-        if previous_store is not None and previous_store != line.store_id:
+        if (
+            previous_store is not None
+            and previous_store != line.store_id
+        ):
             ws.append([])
 
         ws.append(
@@ -525,7 +573,7 @@ def export_sales_target_management_dashboard(request, period_id):
                 line.store.number,
                 line.category.name,
                 round(float(line.target_amount)),
-                round(float(line.current_sales)),
+                round(float(line.current_value)),
                 round(float(line.percent_to_target)),
                 round(float(line.projected_sales)),
                 round(float(line.projected_variance)),
@@ -536,16 +584,46 @@ def export_sales_target_management_dashboard(request, period_id):
 
         row = ws.max_row
 
-        variance_cell = ws.cell(row=row, column=7)
+        # Number formats
+        if line.is_unit_campaign:
+            tracked_number_format = "#,##0"
+        else:
+            tracked_number_format = '$#,##0'
+
+        for column in [3, 4, 6, 7, 8]:
+            ws.cell(
+                row=row,
+                column=column,
+            ).number_format = tracked_number_format
+
+        ws.cell(
+            row=row,
+            column=5,
+        ).number_format = '0"%"'
+
+        # Variance formatting
+        variance_cell = ws.cell(
+            row=row,
+            column=7,
+        )
 
         if line.projected_variance > 0:
-            variance_cell.font = Font(color="008000", bold=True)
+            variance_cell.font = Font(
+                color="008000",
+                bold=True,
+            )
+
         elif line.projected_variance < 0:
-            variance_cell.font = Font(color="FF0000", bold=True)
+            variance_cell.font = Font(
+                color="FF0000",
+                bold=True,
+            )
 
-        ws.cell(row=row, column=8).number_format = "#,##0"
-
-        status_cell = ws.cell(row=row, column=9)
+        # Status formatting
+        status_cell = ws.cell(
+            row=row,
+            column=9,
+        )
 
         status_cell.alignment = Alignment(
             horizontal="left",
@@ -555,19 +633,31 @@ def export_sales_target_management_dashboard(request, period_id):
 
         if "Ahead" in line.status:
             status_cell.value = "● Ahead"
-            status_cell.font = Font(color="008000", bold=True)
+            status_cell.font = Font(
+                color="008000",
+                bold=True,
+            )
 
         elif "On Track" in line.status:
             status_cell.value = "● On Track"
-            status_cell.font = Font(color="C9A000", bold=True)
+            status_cell.font = Font(
+                color="C9A000",
+                bold=True,
+            )
 
         elif "Behind" in line.status:
             status_cell.value = "● Behind"
-            status_cell.font = Font(color="C00000", bold=True)
+            status_cell.font = Font(
+                color="C00000",
+                bold=True,
+            )
 
         else:
             status_cell.value = "○ Not Started"
-            status_cell.font = Font(color="808080", bold=True)
+            status_cell.font = Font(
+                color="808080",
+                bold=True,
+            )
 
         previous_store = line.store_id
 
@@ -576,22 +666,35 @@ def export_sales_target_management_dashboard(request, period_id):
         column_letter = col[0].column_letter
 
         for cell in col:
-            if cell.value:
-                max_length = max(max_length, len(str(cell.value)))
+            if cell.value is not None:
+                max_length = max(
+                    max_length,
+                    len(str(cell.value)),
+                )
 
-        ws.column_dimensions[column_letter].width = min(max_length + 2, 45)
+        ws.column_dimensions[
+            column_letter
+        ].width = min(
+            max_length + 2,
+            45,
+        )
 
     response = HttpResponse(
-        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        content_type=(
+            "application/vnd.openxmlformats-"
+            "officedocument.spreadsheetml.sheet"
+        )
     )
 
     response["Content-Disposition"] = (
-        f'attachment; filename="sales_target_management_{period.name}.xlsx"'
+        f'attachment; filename="'
+        f'sales_target_management_{period.name}.xlsx"'
     )
 
     wb.save(response)
-    return response
 
+    return response
+    
 
 def generate_ai_sales_coaching(period):
     client = OpenAI(api_key=settings.OPENAI_API_KEY)
