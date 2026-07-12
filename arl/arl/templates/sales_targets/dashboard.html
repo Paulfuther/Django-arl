@@ -149,10 +149,11 @@
         Change Campaign
       </a>
       <a
-        href="{% url 'sales_targets:sales_import_upload' %}"
-        class="btn btn-outline-secondary">
-        Import Sales Reports
-    </a>
+          href="{% url 'sales_targets:sales_import_upload' period.id %}"
+          class="btn btn-outline-secondary"
+      >
+          Import Sales Reports
+      </a>
     </div>
   </div>
 

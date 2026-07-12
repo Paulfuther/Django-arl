@@ -1,48 +1,52 @@
 {% extends "../../base/base.html" %}
-{% block title %}Sales Target Upload{% endblock %}
+
+{% block title %}
+Sales Import Preview
+{% endblock %}
 
 {% block template %}
+
 {% include "../../base/navbar.html" %}
 
 <style>
-  .page-container {
-    max-width: 1180px;
-    margin: 0 auto;
-    padding-top: 6rem;   /* same offset below fixed navbar */
-}
+    .page-container {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 6rem 1rem 0;
+    }
+
+    .summary-card .card-body {
+        min-height: 130px;
+    }
+
+    .mobile-sales-row:last-child {
+        border-bottom: 0 !important;
+    }
+
+    @media (max-width: 575.98px) {
+        .page-container {
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+        }
+
+        .summary-card .card-body {
+            min-height: 145px;
+            padding: 1rem;
+        }
+
+        .import-alert {
+            padding: 1rem;
+        }
+    }
 </style>
 
-<div class="page-container ">
+<div class="page-container">
 
-<div class="card shadow-sm mb-4">
-    <div class="card-body py-3">
-        <div>
-            <strong>Selected campaign:</strong>
-            {{ batch.target_period.name }}
-        </div>
-
-        <div class="text-muted small mt-1">
-            {{ batch.target_period.start_date }}
-            to
-            {{ batch.target_period.end_date }}
-        </div>
-    </div>
-</div>
-
-<div class="text-muted small">
-    {{ total_rows }} sales values ready
-</div>
-
-{% if skipped_rows %}
-    <div class="text-muted small">
-        {{ skipped_rows }} categor{{ skipped_rows|pluralize:"y,ies" }}
-        skipped
-    </div>
-{% endif %}
-
+    <!-- Page heading -->
     <div
-        class="d-flex flex-wrap justify-content-between
-               align-items-start gap-3 mb-4"
+        class="d-flex flex-column flex-sm-row
+               justify-content-between align-items-sm-start
+               gap-3 mb-4"
     >
         <div>
             <h1 class="h4 mb-1">
@@ -54,48 +58,196 @@
             </p>
         </div>
 
-        <div class="text-end">
+        <div class="text-start text-sm-end">
             <div>
                 <strong>{{ store_count }}</strong>
                 store{{ store_count|pluralize }}
             </div>
 
             <div class="text-muted small">
-                {{ total_rows }} sales values staged
+                {{ valid_row_count }}
+                sales value{{ valid_row_count|pluralize }}
+                ready
             </div>
         </div>
     </div>
 
-    {% if report_from_date and report_to_date %}
-        <div class="card shadow-sm mb-4">
-            <div class="card-body py-3">
-                <strong>Reporting period:</strong>
-                {{ report_from_date }}
+    <!-- Selected campaign -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body py-3">
+            <div>
+                <strong>Selected campaign:</strong>
+                {{ batch.target_period.name }}
+            </div>
+
+            <div class="small text-muted mt-1">
+                {{ batch.target_period.start_date }}
                 to
-                {{ report_to_date }}
+                {{ batch.target_period.end_date }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary cards -->
+    <div class="row g-3 mb-4">
+
+        <div class="col-6 col-lg-3">
+            <div class="card shadow-sm h-100 summary-card">
+                <div class="card-body">
+                    <div class="text-muted small">
+                        Files Uploaded
+                    </div>
+
+                    <div class="fs-3 fw-semibold">
+                        {{ store_count }}
+                    </div>
+
+                    <div class="small text-muted">
+                        Maximum 15
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+            <div class="card shadow-sm h-100 summary-card">
+                <div class="card-body">
+                    <div class="text-muted small">
+                        Stores Validated
+                    </div>
+
+                    <div class="fs-3 fw-semibold">
+                        {{ ready_store_count }}
+                    </div>
+
+                    <div class="small text-muted">
+                        of {{ store_count }} uploaded
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+            <div class="card shadow-sm h-100 summary-card">
+                <div class="card-body">
+                    <div class="text-muted small">
+                        Sales Values Matched
+                    </div>
+
+                    <div class="fs-3 fw-semibold">
+                        {{ valid_row_count }}
+                    </div>
+
+                    <div class="small text-muted">
+                        ready to update
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-lg-3">
+            <div class="card shadow-sm h-100 summary-card">
+                <div class="card-body">
+                    <div class="text-muted small">
+                        Import Status
+                    </div>
+
+                    {% if is_valid %}
+                        <div class="fs-5 fw-semibold text-success">
+                            Ready
+                        </div>
+
+                        <div class="small text-muted">
+                            No blocking errors
+                        </div>
+                    {% else %}
+                        <div class="fs-5 fw-semibold text-danger">
+                            Needs Review
+                        </div>
+
+                        <div class="small text-muted">
+                            {{ error_store_count }}
+                            store{{ error_store_count|pluralize }}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Batch status -->
+    {% if is_valid %}
+        <div
+            class="alert alert-success
+                   d-flex align-items-start gap-3
+                   import-alert mb-4"
+            role="alert"
+        >
+            <div class="fs-4">
+                ✓
+            </div>
+
+            <div>
+                <div class="fw-semibold">
+                    Ready to import
+                </div>
+
+                <div>
+                    All {{ ready_store_count }} uploaded
+                    spreadsheet{{ ready_store_count|pluralize }}
+                    passed validation.
+                </div>
+
+                <div class="mt-2">
+                    <strong>
+                        Estimated database updates:
+                    </strong>
+
+                    {{ valid_row_count }}
+                    SalesTargetLine
+                    record{{ valid_row_count|pluralize }}
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <div
+            class="alert alert-danger
+                   d-flex align-items-start gap-3
+                   import-alert mb-4"
+            role="alert"
+        >
+            <div class="fs-5">
+                !
+            </div>
+
+            <div>
+                <div class="fw-semibold">
+                    Import cannot continue
+                </div>
+
+                <div>
+                    {{ error_store_count }}
+                    spreadsheet{{ error_store_count|pluralize }}
+                    require{{ error_store_count|pluralize:"s," }}
+                    attention.
+
+                    Review the affected store
+                    card{{ error_store_count|pluralize }}
+                    below.
+                </div>
             </div>
         </div>
     {% endif %}
 
-    {% if is_valid %}
-        <div class="alert alert-success">
-            <strong>Ready to import.</strong>
-            All files, stores, categories, periods, and
-            target lines passed validation.
-        </div>
-    {% else %}
-        <div class="alert alert-danger">
-            <strong>Import cannot continue.</strong>
-            {{ validation_error }}
-        </div>
-    {% endif %}
-
+    <!-- Store cards -->
     {% for staged_file in files %}
         <div class="card shadow-sm mb-4">
 
+            <!-- Store header -->
             <div
-                class="card-header d-flex flex-wrap
-                       justify-content-between
+                class="card-header d-flex flex-column
+                       flex-sm-row justify-content-between
                        align-items-start gap-3"
             >
                 <div>
@@ -112,9 +264,9 @@
                     </div>
                 </div>
 
-                <div class="text-end">
+                <div class="text-start text-sm-end">
                     {% if staged_file.from_date %}
-                        <div class="small mb-1">
+                        <div class="small mb-2">
                             {{ staged_file.from_date }}
                             to
                             {{ staged_file.to_date }}
@@ -127,126 +279,250 @@
                         </span>
                     {% else %}
                         <span class="badge text-bg-danger">
-                            Error
+                            Validation Failed
                         </span>
                     {% endif %}
                 </div>
             </div>
 
+            <!-- Spreadsheet-level error -->
             {% if staged_file.error_message %}
-                <div class="card-body pb-0">
-                    <div class="alert alert-danger mb-0">
+                <div class="card-body pb-3">
+                    <div
+                        class="alert alert-danger mb-0"
+                        role="alert"
+                    >
                         {{ staged_file.error_message }}
                     </div>
                 </div>
             {% endif %}
 
-            {% if staged_file.rows.all %}
-                <div class="table-responsive">
-    <table
-        class="table table-striped
-               table-hover align-middle mb-0"
-    >
-        <thead>
-            <tr>
-                <th>Code</th>
-                <th>Category</th>
-                <th class="text-end">Current DB</th>
-                <th class="text-end">Spreadsheet</th>
-                <th class="text-end">Difference</th>
-                <th>Status</th>
-            </tr>
-        </thead>
+            <!-- Desktop table -->
+            <div class="d-none d-md-block table-responsive">
+                <table
+                    class="table table-striped
+                           table-hover align-middle mb-0"
+                >
+                    <thead>
+                        <tr>
+                            <th>D365 Code</th>
+                            <th>Category</th>
+                            <th class="text-end">Current DB</th>
+                            <th class="text-end">Imported Sales</th>
+                            <th class="text-end">Difference</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
 
-        <tbody>
-            {% for row in staged_file.rows.all %}
-                <tr>
-                    <td>
-                        <code>{{ row.category_code }}</code>
-                    </td>
+                    <tbody>
+                        {% for row in staged_file.rows.all %}
+                            <tr>
+                                <td>
+                                    <code>{{ row.category_code }}</code>
+                                </td>
 
-                    <td>{{ row.category_name }}</td>
+                                <td>
+                                    {{ row.category_name }}
+                                </td>
 
-                    <td class="text-end">
-                        {{ row.current_sales|floatformat:2 }}
-                    </td>
+                                <td class="text-end">
+                                    {{ row.current_sales|floatformat:2 }}
+                                </td>
 
-                    <td class="text-end fw-semibold">
-                        {{ row.imported_sales|floatformat:2 }}
-                    </td>
+                                <td class="text-end fw-semibold">
+                                    {{ row.imported_sales|floatformat:2 }}
+                                </td>
 
-                    <td
-                        class="
-                            text-end
-                            {% if row.difference > 0 %}
-                                text-success
-                            {% elif row.difference < 0 %}
-                                text-danger
+                                <td
+                                    class="
+                                        text-end
+                                        {% if row.difference > 0 %}
+                                            text-success
+                                        {% elif row.difference < 0 %}
+                                            text-danger
+                                        {% else %}
+                                            text-muted
+                                        {% endif %}
+                                    "
+                                >
+                                    {% if row.difference > 0 %}+{% endif %}
+                                    {{ row.difference|floatformat:2 }}
+                                </td>
+
+                                <td>
+                                    {% if row.is_skipped %}
+                                        <span class="badge text-bg-secondary">
+                                            Skipped
+                                        </span>
+                                    {% elif row.is_valid %}
+                                        <span class="badge text-bg-success">
+                                            Ready
+                                        </span>
+                                    {% else %}
+                                        <span class="badge text-bg-danger">
+                                            Error
+                                        </span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+
+                            {% if row.error_message %}
+                                <tr>
+                                    <td
+                                        colspan="6"
+                                        class="
+                                            small
+                                            {% if row.is_skipped %}
+                                                text-muted
+                                            {% else %}
+                                                text-danger
+                                            {% endif %}
+                                        "
+                                    >
+                                        {{ row.error_message }}
+                                    </td>
+                                </tr>
                             {% endif %}
-                        "
+
+                        {% empty %}
+                            <tr>
+                                <td
+                                    colspan="6"
+                                    class="text-muted text-center py-4"
+                                >
+                                    No category rows were staged
+                                    for this spreadsheet.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Mobile category cards -->
+            <div class="d-md-none">
+                {% for row in staged_file.rows.all %}
+                    <div
+                        class="mobile-sales-row
+                               border-bottom p-3"
                     >
-                        {% if row.difference > 0 %}+{% endif %}
-                        {{ row.difference|floatformat:2 }}
-                    </td>
-
-                    <td>
-                        {% if row.is_skipped %}
-                        <span class="badge text-bg-secondary">
-                            Skipped
-                        </span>
-                    {% elif row.is_valid %}
-                        <span class="badge text-bg-success">
-                            Ready
-                        </span>
-                    {% else %}
-                        <span class="badge text-bg-danger">
-                            Error
-                        </span>
-                    {% endif %}
-                    </td>
-                </tr>
-
-                {% if row.error_message %}
-                    <tr>
-                        <td
-                            colspan="6"
-                            class="
-                                small
-                                {% if row.is_skipped %}
-                                    text-muted
-                                {% else %}
-                                    text-danger
-                                {% endif %}
-                            "
+                        <div
+                            class="d-flex justify-content-between
+                                   align-items-start gap-3 mb-3"
                         >
-                            {{ row.error_message }}
-                        </td>
-                    </tr>
-                {% endif %}
-            {% empty %}
-                <tr>
-                    <td
-                        colspan="6"
-                        class="text-muted text-center py-4"
-                    >
-                        No category rows were staged for this spreadsheet.
-                    </td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
-            {% endif %}
+                            <div>
+                                <div class="fw-semibold">
+                                    {{ row.category_name }}
+                                </div>
+
+                                <div class="small text-muted">
+                                    D365 Code:
+                                    <code>{{ row.category_code }}</code>
+                                </div>
+                            </div>
+
+                            {% if row.is_skipped %}
+                                <span class="badge text-bg-secondary">
+                                    Skipped
+                                </span>
+                            {% elif row.is_valid %}
+                                <span class="badge text-bg-success">
+                                    Ready
+                                </span>
+                            {% else %}
+                                <span class="badge text-bg-danger">
+                                    Error
+                                </span>
+                            {% endif %}
+                        </div>
+
+                        <div class="row g-3">
+
+                            <div class="col-6">
+                                <div class="small text-muted">
+                                    Current DB
+                                </div>
+
+                                <div class="fw-semibold">
+                                    {{ row.current_sales|floatformat:2 }}
+                                </div>
+                            </div>
+
+                            <div class="col-6 text-end">
+                                <div class="small text-muted">
+                                    Imported Sales
+                                </div>
+
+                                <div class="fw-semibold">
+                                    {{ row.imported_sales|floatformat:2 }}
+                                </div>
+                            </div>
+
+                            <div class="col-12">
+                                <div
+                                    class="d-flex justify-content-between
+                                           align-items-center
+                                           border-top pt-2"
+                                >
+                                    <span class="small text-muted">
+                                        Difference
+                                    </span>
+
+                                    <span
+                                        class="
+                                            fw-semibold
+                                            {% if row.difference > 0 %}
+                                                text-success
+                                            {% elif row.difference < 0 %}
+                                                text-danger
+                                            {% else %}
+                                                text-muted
+                                            {% endif %}
+                                        "
+                                    >
+                                        {% if row.difference > 0 %}+{% endif %}
+                                        {{ row.difference|floatformat:2 }}
+                                    </span>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        {% if row.error_message %}
+                            <div
+                                class="
+                                    small mt-3
+                                    {% if row.is_skipped %}
+                                        text-muted
+                                    {% else %}
+                                        text-danger
+                                    {% endif %}
+                                "
+                            >
+                                {{ row.error_message }}
+                            </div>
+                        {% endif %}
+                    </div>
+
+                {% empty %}
+                    <div class="text-center text-muted p-4">
+                        No category rows were staged
+                        for this spreadsheet.
+                    </div>
+                {% endfor %}
+            </div>
 
         </div>
     {% endfor %}
 
-    <div class="d-flex flex-wrap gap-2 mb-5">
+    <!-- Actions -->
+    <div class="d-grid d-sm-flex gap-2 mb-5">
 
         {% if is_valid and batch.status == "preview" %}
             <form
                 method="post"
                 action="{% url 'sales_targets:sales_import_confirm' batch.id %}"
+                class="d-grid"
             >
                 {% csrf_token %}
 
@@ -255,11 +531,12 @@
                     class="btn btn-outline-success"
                     onclick="
                         return confirm(
-                            'Update all staged sales values?'
+                            'Update all validated sales values?'
                         );
                     "
                 >
-                    Import {{ total_rows }} Sales Values
+                    Import {{ valid_row_count }}
+                    Sales Value{{ valid_row_count|pluralize }}
                 </button>
             </form>
         {% endif %}
@@ -268,6 +545,7 @@
             <form
                 method="post"
                 action="{% url 'sales_targets:sales_import_cancel' batch.id %}"
+                class="d-grid"
             >
                 {% csrf_token %}
 
@@ -286,7 +564,7 @@
         {% endif %}
 
         <a
-            href="{% url 'sales_targets:sales_import_upload' %}"
+            href="{% url 'sales_targets:sales_import_upload' batch.target_period.id %}"
             class="btn btn-outline-secondary"
         >
             Upload Different Files
@@ -295,4 +573,5 @@
     </div>
 
 </div>
+
 {% endblock %}

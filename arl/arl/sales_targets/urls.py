@@ -32,7 +32,7 @@ urlpatterns = [
     #    name="ai_sales_coaching_dashboard",
     # ),
     path(
-        "import/",
+        "period/<int:period_id>/import/",
         views.sales_import_upload,
         name="sales_import_upload",
     ),

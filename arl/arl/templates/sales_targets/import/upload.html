@@ -43,35 +43,21 @@
                         Sales spreadsheets
                     </label>
 
+                        <div class="alert alert-light border mb-4">
+    <div class="fw-semibold">
+        Importing sales into:
+    </div>
 
-                        <div class="mb-3">
-    <label
-        for="target_period"
-        class="form-label fw-semibold"
-    >
-        Sales target period
-    </label>
+    <div class="fs-5">
+        {{ target_period.name }}
+    </div>
 
-    <select
-        name="target_period"
-        id="target_period"
-        class="form-select"
-        required
-    >
-        <option value="">
-            Select a target period
-        </option>
-
-        {% for period in periods %}
-            <option value="{{ period.id }}">
-                {{ period.name }}
-                — {{ period.start_date }}
-                to {{ period.end_date }}
-            </option>
-        {% endfor %}
-    </select>
+    <div class="text-muted small mt-1">
+        {{ target_period.start_date }}
+        to
+        {{ target_period.end_date }}
+    </div>
 </div>
-
 
                     <input
                         type="file"
@@ -84,8 +70,9 @@
                     >
 
                     <div class="form-text">
-                        You can select all nine store files
-                        in the file-selection window.
+                        Select up to {{ max_sales_files }} spreadsheets at once.
+                        Hold Command on Mac or Ctrl on Windows to select
+                        multiple files.
                     </div>
                 </div>
 
@@ -140,9 +127,15 @@ document.addEventListener("DOMContentLoaded", function () {
         fileError.classList.add("d-none");
         previewButton.disabled = false;
 
-        if (files.length === 0) {
-            selectedFiles.classList.add("d-none");
-            return;
+        if (files.length > maximumFiles) {
+            fileError.textContent =
+                `You can upload a maximum of ${maximumFiles} spreadsheets.`;
+
+            fileError.classList.remove("d-none");
+            previewButton.disabled = true;
+        } else {
+            fileError.classList.add("d-none");
+            previewButton.disabled = false;
         }
 
         const heading = document.createElement("div");

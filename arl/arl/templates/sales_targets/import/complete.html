@@ -106,10 +106,17 @@
             </div>
 
             <a
-                href="{% url 'sales_targets:sales_import_upload' %}"
+                href="{% url 'sales_targets:sales_import_upload' batch.target_period.id %}"
                 class="btn btn-outline-secondary"
             >
-                Import Another Sales Period
+                Import More Sales Reports
+            </a>
+
+            <a
+                href="{% url 'sales_targets:sales_target_dashboard' batch.target_period.id %}"
+                class="btn btn-outline-success"
+            >
+                Return to Sales Dashboard
             </a>
 
         </div>

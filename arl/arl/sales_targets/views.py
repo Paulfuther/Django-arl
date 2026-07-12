@@ -3,31 +3,28 @@ from collections import defaultdict
 from decimal import Decimal
 
 from django.conf import settings
+
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.db.models import Max
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from openai import OpenAI
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
+
 from .models import (
     SalesImportBatch,
+    SalesTargetLine,
     SalesTargetPeriod,
 )
-from .models import SalesTargetLine, SalesTargetPeriod
-# arl/sales_targets/views.py
-
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.http import Http404
-from django.shortcuts import get_object_or_404, redirect, render
-
-from .models import SalesImportBatch
 from .services.sales_importer import (
     MAX_SALES_FILES,
     commit_sales_import,
     create_preview_batch,
     validate_batch,
 )
+
 
 def index(request):
     return HttpResponse("Sales targets app is working.")
@@ -175,15 +172,9 @@ def sales_target_dashboard(request, period_id):
     morning_summary = build_morning_summary(period)
     today_focus = build_today_focus(period)
     biggest_win = build_biggest_win(period)
-    last_updated = period.target_lines.aggregate(
-        Max("updated_at")
-    )["updated_at__max"]
-    target_lines = period.target_lines.select_related(
-        "store",
-        "category"
-    ).order_by(
-        "store__number",
-        "category__name"
+    last_updated = period.target_lines.aggregate(Max("updated_at"))["updated_at__max"]
+    target_lines = period.target_lines.select_related("store", "category").order_by(
+        "store__number", "category__name"
     )
 
     context = {
@@ -605,9 +596,6 @@ def ai_sales_coaching_dashboard(request, period_id):
     )
 
 
-
-
-
 def get_user_batch_or_404(request, batch_id):
     batch = get_object_or_404(
         SalesImportBatch,
@@ -615,51 +603,26 @@ def get_user_batch_or_404(request, batch_id):
         employer=request.user.employer,
     )
 
-    if (
-        batch.uploaded_by_id
-        and batch.uploaded_by_id != request.user.id
-    ):
+    if batch.uploaded_by_id and batch.uploaded_by_id != request.user.id:
         raise Http404
 
     return batch
 
 
 @login_required
-def sales_import_upload(request):
-    periods = (
-        SalesTargetPeriod.objects
-        .filter(
-            employer=request.user.employer,
-        )
-        .order_by(
-            "-start_date",
-            "name",
-        )
+def sales_import_upload(
+    request,
+    period_id,
+):
+    target_period = get_object_or_404(
+        SalesTargetPeriod,
+        id=period_id,
+        employer=request.user.employer,
     )
 
     if request.method == "POST":
         uploaded_files = request.FILES.getlist(
             "sales_files"
-        )
-
-        period_id = request.POST.get(
-            "target_period"
-        )
-
-        if not period_id:
-            messages.error(
-                request,
-                "Please select a sales target period.",
-            )
-
-            return redirect(
-                "sales_targets:sales_import_upload"
-            )
-
-        target_period = get_object_or_404(
-            SalesTargetPeriod,
-            id=period_id,
-            employer=request.user.employer,
         )
 
         try:
@@ -677,7 +640,8 @@ def sales_import_upload(request):
             )
 
             return redirect(
-                "sales_targets:sales_import_upload"
+                "sales_targets:sales_import_upload",
+                period_id=target_period.id,
             )
 
         return redirect(
@@ -689,19 +653,20 @@ def sales_import_upload(request):
         request,
         "sales_targets/import/upload.html",
         {
+            "target_period": target_period,
             "max_sales_files": MAX_SALES_FILES,
-            "periods": periods,
         },
     )
+
 
 @login_required
 def sales_import_preview(request, batch_id):
     batch = get_user_batch_or_404(
-        request,
-        batch_id,
+        request=request,
+        batch_id=batch_id,
     )
 
-    files = (
+    files = list(
         batch.files
         .prefetch_related("rows__target_category")
         .all()
@@ -709,17 +674,33 @@ def sales_import_preview(request, batch_id):
 
     is_valid, validation_error = validate_batch(batch)
 
+    store_count = len(files)
+
+    ready_store_count = sum(
+        1
+        for staged_file in files
+        if staged_file.is_valid
+    )
+
+    error_store_count = (
+        store_count - ready_store_count
+    )
+
     total_rows = sum(
+        staged_file.rows.count()
+        for staged_file in files
+    )
+
+    valid_row_count = sum(
         staged_file.rows.filter(
-            error_message="",
             is_valid=True,
         ).count()
         for staged_file in files
     )
 
-    skipped_rows = sum(
+    error_row_count = sum(
         staged_file.rows.filter(
-            error_message__startswith="Skipped:",
+            is_valid=False,
         ).count()
         for staged_file in files
     )
@@ -732,9 +713,21 @@ def sales_import_preview(request, batch_id):
             "files": files,
             "is_valid": is_valid,
             "validation_error": validation_error,
+
+            "store_count": store_count,
+            "ready_store_count": ready_store_count,
+            "error_store_count": error_store_count,
+
             "total_rows": total_rows,
-            "store_count": len(files),
-            "skipped_rows": skipped_rows,
+            "valid_row_count": valid_row_count,
+            "error_row_count": error_row_count,
+
+            "report_from_date": (
+                batch.target_period.start_date
+            ),
+            "report_to_date": (
+                batch.target_period.end_date
+            ),
         },
     )
 
@@ -783,10 +776,7 @@ def sales_import_complete(request, batch_id):
 
     files = batch.files.prefetch_related("rows").all()
 
-    total_rows = sum(
-        staged_file.rows.count()
-        for staged_file in files
-    )
+    total_rows = sum(staged_file.rows.count() for staged_file in files)
 
     return render(
         request,
@@ -800,7 +790,10 @@ def sales_import_complete(request, batch_id):
 
 
 @login_required
-def sales_import_cancel(request, batch_id):
+def sales_import_cancel(
+    request,
+    batch_id,
+):
     if request.method != "POST":
         return redirect(
             "sales_targets:sales_import_preview",
@@ -808,11 +801,14 @@ def sales_import_cancel(request, batch_id):
         )
 
     batch = get_user_batch_or_404(
-        request,
-        batch_id,
+        request=request,
+        batch_id=batch_id,
     )
 
-    if batch.status != SalesImportBatch.STATUS_PREVIEW:
+    if (
+        batch.status
+        != SalesImportBatch.STATUS_PREVIEW
+    ):
         messages.error(
             request,
             "Only preview batches can be cancelled.",
@@ -823,13 +819,17 @@ def sales_import_cancel(request, batch_id):
             batch_id=batch.id,
         )
 
+    period_id = batch.target_period_id
+
     batch.delete()
 
     messages.info(
         request,
-        "Import cancelled. No sales values were changed.",
+        "The sales import was cancelled. "
+        "No sales values were changed.",
     )
 
     return redirect(
-        "sales_targets:sales_import_upload"
+        "sales_targets:sales_import_upload",
+        period_id=period_id,
     )
