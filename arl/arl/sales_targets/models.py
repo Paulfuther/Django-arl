@@ -9,6 +9,10 @@ from django.utils import timezone
 
 
 class SalesTargetCategory(models.Model):
+    MEASUREMENT_CHOICES = [
+        ("sales", "Dollar Sales"),
+        ("units", "Units Sold"),
+    ]
     employer = models.ForeignKey(
         "user.Employer",  # Change if your Employer model is elsewhere
         on_delete=models.CASCADE,
@@ -16,6 +20,11 @@ class SalesTargetCategory(models.Model):
     )
 
     name = models.CharField(max_length=100)
+    measurement_type = models.CharField(
+        max_length=20,
+        choices=MEASUREMENT_CHOICES,
+        default="sales",
+    )
 
     d365_category_code = models.CharField(
         max_length=20,
@@ -91,7 +100,11 @@ class SalesTargetLine(models.Model):
     target_amount = models.DecimalField(max_digits=12, decimal_places=2)
 
     current_sales = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-
+    current_units = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+    )
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -143,14 +156,22 @@ class SalesTargetLine(models.Model):
         if not self.target_amount:
             return Decimal("0")
 
-        return self.current_sales / self.target_amount * Decimal("100")
+        return (
+            self.current_value
+            / self.target_amount
+            * Decimal("100")
+        )
 
     @property
     def projected_sales(self):
         if self.elapsed_days == 0:
             return Decimal("0")
 
-        daily_average = self.current_sales / Decimal(self.elapsed_days)
+        daily_average = (
+            self.current_value
+            / Decimal(self.elapsed_days)
+        )
+
         return daily_average * Decimal(self.total_days)
 
     @property
@@ -159,7 +180,10 @@ class SalesTargetLine(models.Model):
 
     @property
     def remaining_sales_needed(self):
-        return max(self.target_amount - self.current_sales, Decimal("0"))
+        return max(
+            self.target_amount - self.current_value,
+            Decimal("0"),
+        )
 
     @property
     def required_daily_sales(self):
@@ -187,6 +211,59 @@ class SalesTargetLine(models.Model):
 
         return "🔴 Behind"
 
+
+    @property
+    def is_unit_campaign(self):
+        return self.category.measurement_type == "units"
+
+    @property
+    def current_value(self):
+        if self.is_unit_campaign:
+            return self.current_units or Decimal("0")
+
+        return self.current_sales or Decimal("0")
+
+    @property
+    def target_display(self):
+        if self.is_unit_campaign:
+            return f"{self.target_amount:,.0f}"
+
+        return f"${self.target_amount:,.0f}"
+
+    @property
+    def current_display(self):
+        if self.is_unit_campaign:
+            return f"{self.current_value:,.0f}"
+
+        return f"${self.current_value:,.0f}"
+
+    @property
+    def projected_display(self):
+        if self.is_unit_campaign:
+            return f"{self.projected_sales:,.0f}"
+
+        return f"${self.projected_sales:,.0f}"
+
+    @property
+    def variance_display(self):
+        if self.is_unit_campaign:
+            return f"{self.projected_variance:,.0f}"
+
+        return f"${self.projected_variance:,.0f}"
+
+    @property
+    def required_daily_display(self):
+        if self.is_unit_campaign:
+            return f"{self.required_daily_sales:,}"
+
+        return f"${self.required_daily_sales:,}"
+
+    @property
+    def measurement_label(self):
+        if self.is_unit_campaign:
+            return "Units"
+
+        return "Sales"
 
 class SalesImportBatch(models.Model):
     STATUS_PREVIEW = "preview"

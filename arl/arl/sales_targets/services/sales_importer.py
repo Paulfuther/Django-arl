@@ -22,6 +22,19 @@ from ..models import (
 MAX_SALES_FILES = 15
 
 
+def clean_decimal(value):
+    if value is None or value == "":
+        return Decimal("0")
+
+    try:
+        cleaned_value = str(value).replace("$", "").replace(",", "").strip()
+
+        return Decimal(cleaned_value)
+
+    except (InvalidOperation, ValueError, TypeError):
+        return Decimal("0")
+
+
 def validate_report_title(worksheet):
     """
     Confirm this is a D365 Category Sales Report.
@@ -324,9 +337,18 @@ def read_category_sales(
 
     The report uses columns A:I:
         A = Category name
+        B = Quantity
         D = Sales amount
 
-    The column headings are still detected dynamically.
+    Column headings are detected dynamically.
+
+    Returns:
+        {
+            "CATEGORY_CODE": {
+                "quantity": Decimal(...),
+                "sales": Decimal(...),
+            }
+        }
     """
 
     header_row = find_header_row(worksheet)
@@ -337,6 +359,12 @@ def read_category_sales(
         heading_name="Category name",
     )
 
+    quantity_column = find_column_number(
+        worksheet=worksheet,
+        header_row=header_row,
+        heading_name="Quantity",
+    )
+
     sales_column = find_column_number(
         worksheet=worksheet,
         header_row=header_row,
@@ -345,7 +373,7 @@ def read_category_sales(
 
     expected_codes = {normalize_code(code) for code in expected_codes}
 
-    category_sales = {}
+    category_results = {}
     duplicate_codes = []
 
     for row in worksheet.iter_rows(
@@ -360,13 +388,17 @@ def read_category_sales(
         if category_code not in expected_codes:
             continue
 
-        if category_code in category_sales:
+        if category_code in category_results:
             duplicate_codes.append(category_code)
             continue
 
+        quantity_value = row[quantity_column - 1].value
         sales_value = row[sales_column - 1].value
 
-        category_sales[category_code] = parse_decimal(sales_value)
+        category_results[category_code] = {
+            "quantity": parse_decimal(quantity_value),
+            "sales": parse_decimal(sales_value),
+        }
 
     if duplicate_codes:
         duplicate_text = ", ".join(sorted(set(duplicate_codes)))
@@ -375,7 +407,7 @@ def read_category_sales(
             f"Duplicate configured category codes were found: {duplicate_text}"
         )
 
-    return category_sales
+    return category_results
 
 
 def get_store(employer, store_number):
@@ -500,7 +532,7 @@ def parse_and_stage_file(
         # Read configured category sales
         # -----------------------------------------
 
-        category_sales = read_category_sales(
+        category_results = read_category_sales(
             worksheet=worksheet,
             expected_codes=categories_by_code.keys(),
         )
@@ -550,7 +582,7 @@ def parse_and_stage_file(
         # -----------------------------------------
 
         missing_codes = [
-            code for code in categories_by_code if code not in category_sales
+            code for code in categories_by_code if code not in category_results
         ]
 
         if missing_codes:
@@ -570,7 +602,15 @@ def parse_and_stage_file(
         file_has_errors = False
 
         for category_code, target_category in categories_by_code.items():
-            imported_sales = category_sales[category_code]
+            imported_result = category_results[category_code]
+
+            imported_quantity = imported_result["quantity"]
+            imported_sales_amount = imported_result["sales"]
+
+            if target_category.measurement_type == "units":
+                imported_value = imported_quantity
+            else:
+                imported_value = imported_sales_amount
 
             try:
                 target_line = SalesTargetLine.objects.get(
@@ -592,9 +632,9 @@ def parse_and_stage_file(
                     target_category=target_category,
                     category_code=category_code,
                     category_name=target_category.name,
-                    imported_sales=imported_sales,
+                    imported_sales=imported_value,
                     current_sales=Decimal("0.00"),
-                    difference=imported_sales,
+                    difference=imported_value,
                     is_valid=False,
                     error_message=(
                         "Multiple sales target lines exist for "
@@ -605,16 +645,16 @@ def parse_and_stage_file(
 
                 continue
 
-            current_sales = target_line.current_sales or Decimal("0.00")
+            current_value = target_line.current_sales or Decimal("0.00")
 
             SalesImportRow.objects.create(
                 staged_file=staged_file,
                 target_category=target_category,
                 category_code=category_code,
                 category_name=target_category.name,
-                imported_sales=imported_sales,
-                current_sales=current_sales,
-                difference=(imported_sales - current_sales),
+                imported_sales=imported_value,
+                current_sales=current_value,
+                difference=(imported_value - current_value),
                 is_valid=True,
                 error_message="",
             )
@@ -821,7 +861,7 @@ def validate_batch(batch):
 @transaction.atomic
 def commit_sales_import(batch):
     """
-    Update all staged sales values in one transaction.
+    Update all staged sales or unit values in one transaction.
 
     If any update fails, all changes are rolled back.
     """
@@ -851,15 +891,37 @@ def commit_sales_import(batch):
             if staged_row.is_skipped:
                 continue
 
-            target_line = SalesTargetLine.objects.select_for_update().get(
-                period=period,
-                store=store,
-                category=staged_row.target_category,
+            target_line = (
+                SalesTargetLine.objects.select_for_update()
+                .select_related("category")
+                .get(
+                    period=period,
+                    store=store,
+                    category=staged_row.target_category,
+                )
             )
 
-            target_line.current_sales = staged_row.imported_sales
+            imported_value = staged_row.imported_sales
 
-            target_line.save(update_fields=["current_sales"])
+            if target_line.category.measurement_type == "units":
+                target_line.current_units = imported_value
+
+                target_line.save(
+                    update_fields=[
+                        "current_units",
+                        "updated_at",
+                    ]
+                )
+
+            else:
+                target_line.current_sales = imported_value
+
+                target_line.save(
+                    update_fields=[
+                        "current_sales",
+                        "updated_at",
+                    ]
+                )
 
             updated_count += 1
 
