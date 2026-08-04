@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+
+    <title>Significant Security Incident Report Form</title>
+
+    <style>
+        @page {
+            size: Letter;
+            margin: 0;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            color: #000;
+            background: #fff;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 8.4pt;
+            line-height: 1.2;
+        }
+
+        .document {
+            margin: 0;
+            padding: 0;
+        }
+
+        .pdf-page {
+            position: relative;
+            width: 8.5in;
+            height: 11in;
+            margin: 0 auto;
+            padding: 0.38in 0.52in 0.48in;
+            overflow: hidden;
+            background: #fff;
+            page-break-after: always;
+        }
+
+        .pdf-page:last-child {
+            page-break-after: auto;
+        }
+
+        table {
+            width: 100%;
+            margin: 0;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        tr {
+            page-break-inside: avoid;
+        }
+
+        td,
+        th {
+            border: 1px solid #777;
+            padding: 4px 6px;
+            text-align: left;
+            vertical-align: top;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+        }
+
+        .section-heading {
+            background: #bdbdbd;
+            font-size: 9pt;
+            font-weight: bold;
+        }
+
+        .label-cell {
+            background: #c9c9c9;
+            font-weight: bold;
+        }
+
+        .value-cell {
+            background: #fff;
+        }
+
+        .site-heading {
+            margin: 0.05in 0 0.1in;
+            font-size: 14pt;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .red-rule-wrap {
+            position: relative;
+            width: 88%;
+            height: 18px;
+            margin: 0 auto 0.18in;
+        }
+
+        .red-rule {
+            position: absolute;
+            right: 0;
+            bottom: 4px;
+            left: 0;
+            height: 3px;
+            background: #e60020;
+        }
+
+        .red-mark {
+            position: absolute;
+            right: 2%;
+            bottom: 0;
+            color: #e60020;
+            font-size: 22pt;
+            font-weight: bold;
+            letter-spacing: -5px;
+            background: #fff;
+            padding-left: 5px;
+        }
+
+        .report-title {
+            margin: 0 0 10px;
+            font-size: 13pt;
+            font-weight: bold;
+        }
+
+        .meta-table {
+            width: 72%;
+            margin-bottom: 8px;
+        }
+
+        .meta-table td {
+            border: 0;
+            padding: 1px 4px;
+            font-size: 7.5pt;
+        }
+
+        .meta-label {
+            width: 25%;
+            font-weight: bold;
+        }
+
+        .intro-rule {
+            border-top: 1px solid #555;
+            margin: 7px 0;
+        }
+
+        .instructions {
+            margin: 7px 0 10px 42px;
+            font-size: 7.6pt;
+        }
+
+        .instructions li {
+            margin-bottom: 3px;
+        }
+
+        .contact-email {
+            margin: 6px 0 10px;
+            color: #1a4db3;
+            font-weight: bold;
+            text-align: center;
+            text-decoration: underline;
+        }
+
+        .checkbox {
+            display: inline-block;
+            margin-right: 12px;
+            margin-bottom: 4px;
+            white-space: nowrap;
+        }
+
+        .box {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            margin-right: 4px;
+            border: 1px solid #777;
+            background: #fff;
+            vertical-align: -1px;
+            text-align: center;
+            line-height: 9px;
+            font-size: 9px;
+            font-weight: bold;
+        }
+
+        .checked::after {
+            content: "✓";
+        }
+
+        .incident-type-cell {
+            height: 3.9in;
+        }
+
+        .police-cell {
+            height: 3.9in;
+        }
+
+        .theft-cell {
+            height: 2.3in;
+        }
+
+        .damage-cell {
+            height: 2.3in;
+        }
+
+        .suspect-cell {
+            height: 2.25in;
+        }
+
+        .vehicle-cell {
+            height: 1.85in;
+        }
+
+        .footer {
+            position: absolute;
+            right: 0.52in;
+            bottom: 0.24in;
+            left: 0.52in;
+            border-top: 1px solid #777;
+            padding-top: 5px;
+            font-size: 6.4pt;
+            line-height: 1.2;
+        }
+
+        .footer-left {
+            float: left;
+        }
+
+        .footer-page {
+            float: right;
+        }
+
+        .footer-warning {
+            clear: both;
+            padding-top: 7px;
+            font-weight: bold;
+        }
+
+        .small {
+            font-size: 6.8pt;
+        }
+
+        .center {
+            text-align: center;
+        }
+
+        .bold {
+            font-weight: bold;
+        }
+
+        @media screen {
+            body {
+                padding: 24px 0;
+                background: #d9dde3;
+            }
+
+            .pdf-page {
+                margin-bottom: 22px;
+                box-shadow: 0 3px 18px rgba(0, 0, 0, 0.2);
+            }
+        }
+
+        @media print {
+            body {
+                background: #fff;
+            }
+
+            .pdf-page {
+                margin: 0;
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<main class="document">
+
+    <!-- PAGE 1 -->
+    <section class="pdf-page">
+
+        <div class="site-heading">
+            Site Operating Procedure
+        </div>
+
+        <div class="red-rule-wrap">
+            <div class="red-rule"></div>
+            <div class="red-mark">〽</div>
+        </div>
+
+        <div class="report-title">
+            Significant Security Incident Report Form - ENMCFM373
+        </div>
+
+        <table class="meta-table">
+            <tr>
+                <td class="meta-label">Effective Date:</td>
+                <td>March 2024</td>
+            </tr>
+            <tr>
+                <td class="meta-label">Last Reviewed:</td>
+                <td>December 2, 2025</td>
+            </tr>
+            <tr>
+                <td class="meta-label">Review Cycle:</td>
+                <td>Every 3 Years</td>
+            </tr>
+            <tr>
+                <td class="meta-label">SME Business Segment:</td>
+                <td>Suncor &gt;&gt; Security Operations</td>
+            </tr>
+            <tr>
+                <td class="meta-label">Applicable Classes of Trade:</td>
+                <td>
+                    Area Retail Licensee (ARL), Retail Licensee (RL),
+                    Retail Marketer – All (RM), Petro-Pass (PP),
+                    Wholesale Marketer (WM)
+                </td>
+            </tr>
+        </table>
+
+        <div class="intro-rule"></div>
+
+        <ul class="instructions">
+            <li>
+                For significant security incidents only, including robbery,
+                break and enter, assaults, bomb threats, major fire or
+                explosions, fatality, and critical injury.
+            </li>
+            <li>
+                This form must be submitted to your TM/FSF/WBM and to Suncor’s
+                Global Security Operations Center.
+            </li>
+            <li>
+                Include relevant photos, videos, and police statements as
+                applicable.
+            </li>
+        </ul>
+
+        <div class="contact-email">
+            securityoperations@suncor.com
+        </div>
+
+        <table>
+            <tr>
+                <td class="section-heading" colspan="4">
+                    SIGNIFICANT SECURITY INCIDENTS REPORT:
+                    <span class="small">
+                        complete form for Significant Security incident only
+                    </span>
+                </td>
+            </tr>
+
+            <tr>
+                <td class="label-cell center" style="width: 20%;">
+                    Significant Security<br>
+                    Incident Type
+                </td>
+
+                <td class="value-cell incident-type-cell" style="width: 31%;">
+                    <span class="checkbox">
+                        <span class="box {% if incident.security_robbery %}checked{% endif %}"></span>
+                        Robbery
+                    </span>
+
+                    <div class="small" style="margin-left: 16px;">
+                        Theft with the use or implied use of a weapon
+                        and/or violence
+                    </div>
+
+                    <br>
+
+                    <span class="checkbox">
+                        <span class="box {% if incident.security_break_and_enter %}checked{% endif %}"></span>
+                        Break &amp; Enter
+                    </span>
+
+                    <br>
+
+                    <span class="checkbox">
+                        <span class="box {% if incident.security_assault %}checked{% endif %}"></span>
+                        Assault
+                    </span>
+
+                    <br>
+
+                    <span class="checkbox">
+                        <span class="box {% if incident.security_bomb_threat %}checked{% endif %}"></span>
+                        Bomb Threat
+                    </span>
+
+                    <br>
+
+                    <span class="checkbox">
+                        <span class="box {% if incident.security_major_fire_explosion %}checked{% endif %}"></span>
+                        Major Fire or Explosion
+                    </span>
+
+                    <br>
+
+                    <span class="checkbox">
+                        <span class="box {% if incident.security_fatality %}checked{% endif %}"></span>
+                        Fatality
+                    </span>
+
+                    <br>
+
+                    <span class="checkbox">
+                        <span class="box {% if incident.security_critical_injury %}checked{% endif %}"></span>
+                        Critical Injury
+                    </span>
+
+                    <div class="small" style="margin-top: 22px;">
+                        Other security incidents such as theft, suspicious
+                        activity, fraud, vandalism, loitering, etc. should be
+                        reported directly to GSOC and do not require this form.
+                    </div>
+                </td>
+
+                <td class="label-cell center" style="width: 15%;">
+                    Police<br>
+                    Information
+                </td>
+
+                <td class="value-cell police-cell">
+                    <strong>Police notified?</strong>
+
+                    <div style="margin: 18px 0;">
+                        <span class="checkbox">
+                            Yes
+                            <span class="box {% if incident.pyes %}checked{% endif %}"></span>
+                        </span>
+
+                        <span class="checkbox">
+                            No
+                            <span class="box {% if incident.pno %}checked{% endif %}"></span>
+                        </span>
+                    </div>
+
+                    <strong>Police attended the site?</strong>
+
+                    <div style="margin: 18px 0;">
+                        <span class="checkbox">
+                            Yes
+                            <span class="box {% if incident.police_attended == True %}checked{% endif %}"></span>
+                        </span>
+
+                        <span class="checkbox">
+                            No
+                            <span class="box {% if incident.police_attended == False %}checked{% endif %}"></span>
+                        </span>
+                    </div>
+
+                    <p>
+                        <strong>File #:</strong>
+                        {{ incident.pcase|default:"" }}
+                    </p>
+
+                    <p>
+                        <strong>Police Agency:</strong><br>
+                        {{ incident.police_agency|default:"" }}
+                    </p>
+
+                    <p>
+                        <strong>Officer Details:</strong><br>
+                        {{ incident.police_officer_name|default:"" }}
+
+                        {% if incident.police_officer_rank %}
+                            , {{ incident.police_officer_rank }}
+                        {% endif %}
+
+                        {% if incident.police_officer_badge_number %}
+                            , Badge # {{ incident.police_officer_badge_number }}
+                        {% endif %}
+                    </p>
+                </td>
+            </tr>
+
+            <tr>
+                <td class="label-cell center">
+                    GSOC Notification
+                </td>
+
+                <td class="value-cell" colspan="3">
+                    Was the GSOC called once safe to do so?
+
+                    <span style="float: right;">
+                        <span class="checkbox">
+                            Yes
+                            <span class="box {% if incident.gsoc_called == True %}checked{% endif %}"></span>
+                        </span>
+
+                        <span class="checkbox">
+                            No
+                            <span class="box {% if incident.gsoc_called == False %}checked{% endif %}"></span>
+                        </span>
+                    </span>
+                </td>
+            </tr>
+
+            <tr>
+                <td class="value-cell small" colspan="4">
+                    A Critical Injury refers to a serious injury that places a
+                    life in jeopardy, involves an unconscious patient, a
+                    significant loss of blood, fracture or amputation, burns
+                    over a major portion of the body, or other significant
+                    losses requiring immediate medical attention.
+                </td>
+            </tr>
+        </table>
+
+        <div class="footer">
+            <div class="footer-left">
+                SOP# ENMCFM373
+            </div>
+
+            <div class="footer-page">
+                Page 1 of 2
+            </div>
+
+            <div class="footer-warning">
+                NON-CONTROLLED DOCUMENT WHEN PRINTED
+            </div>
+        </div>
+    </section>
+
+    <!-- PAGE 2 -->
+    <section class="pdf-page">
+
+        <div class="site-heading">
+            Site Operating Procedure
+        </div>
+
+        <div class="red-rule-wrap">
+            <div class="red-rule"></div>
+            <div class="red-mark">〽</div>
+        </div>
+
+        <table>
+            <tr>
+                <td class="label-cell center" style="width: 19%;">
+                    Theft Details<br>
+                    (What was taken<br>
+                    &amp; value?)
+                </td>
+
+                <td class="value-cell theft-cell" style="width: 32%;">
+                    <span class="checkbox">
+                        <span class="box {% if incident.theft_cash %}checked{% endif %}"></span>
+                        Cash
+                    </span>
+
+                    {% if incident.theft_cash_value %}
+                        – {{ incident.theft_cash_value }}
+                    {% endif %}
+
+                    <br><br>
+
+                    <span class="checkbox">
+                        <span class="box {% if incident.stolentobacco %}checked{% endif %}"></span>
+                        Tobacco
+                    </span>
+
+                    {% if incident.stoltobacco %}
+                        – {{ incident.stoltobacco }}
+                    {% endif %}
+
+                    <br><br>
+
+                    <span class="checkbox">
+                        <span class="box {% if incident.stolenlottery %}checked{% endif %}"></span>
+                        Lottery Value
+                    </span>
+
+                    {% if incident.stollottery %}
+                        – {{ incident.stollottery }}
+                    {% endif %}
+
+                    <br><br>
+
+                    <span class="checkbox">
+                        <span class="box {% if incident.stolencards %}checked{% endif %}"></span>
+                        Gift Cards
+                    </span>
+
+                    {% if incident.stolcards %}
+                        – {{ incident.stolcards }}
+                    {% endif %}
+
+                    <br><br>
+
+                    <span class="checkbox">
+                        <span class="box {% if incident.stolenna %}checked{% endif %}"></span>
+                        N/A
+                    </span>
+
+                    <br><br>
+
+                    <span class="checkbox">
+                        <span class="box {% if incident.stolenother %}checked{% endif %}"></span>
+                        Other Items
+                    </span>
+
+                    <br>
+
+                    {{ incident.stolother|default:"" }}
+
+                    {% if incident.stolenothervalue %}
+                        – {{ incident.stolenothervalue }}
+                    {% endif %}
+                </td>
+
+                <td class="label-cell center" style="width: 12%;">
+                    Damage<br>
+                    to<br>
+                    Property?
+                </td>
+
+                <td class="value-cell damage-cell">
+                    <strong>Damage details &amp; value:</strong>
+
+                    <p>
+                        {{ incident.damage|linebreaksbr }}
+                    </p>
+
+                    {% if incident.damage_value %}
+                        <p>
+                            <strong>Estimated value:</strong>
+                            {{ incident.damage_value }}
+                        </p>
+                    {% endif %}
+                </td>
+            </tr>
+
+            <tr>
+                <td class="label-cell center">
+                    Suspect Details
+                </td>
+
+                <td class="value-cell suspect-cell" colspan="2">
+                    <p><strong>Gender:</strong> {{ incident.gender|default:"" }}</p>
+                    <p><strong>Age:</strong> {{ incident.suspect_age|default:"" }}</p>
+                    <p><strong>Height:</strong> {{ incident.height|default:"" }}</p>
+                    <p><strong>Weight:</strong> {{ incident.weight|default:"" }}</p>
+                    <p><strong>Complexion:</strong> {{ incident.complexion|default:"" }}</p>
+                    <p><strong>Facial Hair:</strong> {{ incident.beardmoustache|default:"" }}</p>
+                </td>
+
+                <td class="value-cell suspect-cell">
+                    <p><strong>Eye Colour/Glasses:</strong> {{ incident.eyeeyeglasses|default:"" }}</p>
+
+                    <p>
+                        <strong>Visible Scars/Tattoos:</strong>
+                        {{ incident.scars|default:"" }}
+
+                        {% if incident.tatoos %}
+                            / {{ incident.tatoos }}
+                        {% endif %}
+                    </p>
+
+                    <p><strong>Hat:</strong> {{ incident.hat|default:"" }}</p>
+                    <p><strong>Shoes:</strong> {{ incident.shoes|default:"" }}</p>
+
+                    <p>
+                        <strong>Clothing:</strong>
+                        {% if incident.clothing_description %}
+                            {{ incident.clothing_description }}
+                        {% else %}
+                            {{ incident.shirt|default:"" }}
+                            {{ incident.trousers|default:"" }}
+                        {% endif %}
+                    </p>
+                </td>
+            </tr>
+
+            <tr>
+                <td class="label-cell center">
+                    Vehicle Details
+                </td>
+
+                <td class="value-cell vehicle-cell" colspan="2">
+                    <p>
+                        <strong>License Plate #:</strong>
+                        {{ incident.licencenumber|default:"" }}
+                    </p>
+
+                    <p>
+                        <strong>Approximate Year, Make &amp; Model:</strong>
+                        {{ incident.vehicle_year|default:"" }}
+                        {{ incident.makemodel|default:"" }}
+                    </p>
+
+                    <p>
+                        <strong>Colour:</strong>
+                        {{ incident.color|default:"" }}
+                    </p>
+                </td>
+
+                <td class="value-cell vehicle-cell">
+                    <p>
+                        <strong>Direction of Travel:</strong>
+                        {{ incident.direction|default:"" }}
+                    </p>
+
+                    <p>
+                        <strong>Distinguishable Features:</strong>
+                        {% if incident.vehicle_distinguishing_features %}
+                            {{ incident.vehicle_distinguishing_features|linebreaksbr }}
+                        {% else %}
+                            {{ incident.bumpersticker|default:"" }}
+                            {{ incident.damage|default:"" }}
+                        {% endif %}
+                    </p>
+                </td>
+            </tr>
+        </table>
+
+        <div class="footer">
+            <div class="footer-left">
+                SOP# ENMCFM373
+            </div>
+
+            <div class="footer-page">
+                Page 2 of 2
+            </div>
+
+            <div class="footer-warning">
+                NON-CONTROLLED DOCUMENT WHEN PRINTED
+            </div>
+        </div>
+    </section>
+
+</main>
+</body>
+</html>
