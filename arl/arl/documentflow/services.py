@@ -96,7 +96,7 @@ def build_document_audit(employer, search_query="", incomplete_only=False):
             | Q(email__icontains=search_query)
         )
 
-    employees = employees.order_by("-date_joined")
+    employees = employees.order_by("date_joined")
 
     if not flow:
         return {
@@ -262,6 +262,16 @@ def build_document_audit(employer, search_query="", incomplete_only=False):
                 "is_complete": is_complete,
             }
         )
+
+    # Outstanding documentation first, then completed staff.
+    # Within each group, order by hire date from oldest to newest.
+
+    rows.sort(
+        key=lambda row: (
+            0 if not row["is_complete"] else 1,
+            row["employee"].date_joined,
+        )
+    )
 
     return {
         "flow": flow,

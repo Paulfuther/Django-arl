@@ -44,10 +44,11 @@
                             <th>Description</th>
                             <th>Date</th>
                             <th>Edit</th>
-                            <th>PDF</th>
+                            <th>Insurance PDF</th>
                             {% if can_view_pdf %}
-                                        <th>Restricted PDF</th>
+                                        <th>Investigation PDF</th>
                             {% endif %}
+                            <th>Security PDF</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -72,6 +73,14 @@
                                         </td>
                                 
                             {% endif %}
+                            <td>
+                            <a
+                                href="{% url 'email_significant_security_report' incident.id %}"
+                                class="fa fa-file-pdf-o" style="font-size:22px;color:rgb(236, 134, 19)"
+                            >
+                            
+                            </a>
+                            </td>
                             </tr>
                         {% endfor %}
                     </tbody>

@@ -16,6 +16,8 @@ class IncidentForm(forms.ModelForm):
         fields = "__all__"
         exclude = ['queued_for_sending', 'sent', 'sent_at']
         labels = {
+            "contractor_involved": "Contractor Involved in Incident?",
+            "contractor_company_name": "Contractor Company Name",
             "syes": "Off Property Impact: Yes",
             "sno": "Off Property Impact: No",
             "scomment": "Comment",
@@ -48,32 +50,58 @@ class IncidentForm(forms.ModelForm):
             "stolother": "Description of Other",
             "stolenothervalue": "Dollar Amount of Other",
             "stolenna": "Information Not Available",
+            # Significant Security Incident Type
+            "security_robbery": "Robbery",
+            "security_break_and_enter": "Break & Enter",
+            "security_assault": "Assault",
+            "security_bomb_threat": "Bomb Threat",
+            "security_major_fire_explosion": "Major Fire or Explosion",
+            "security_fatality": "Fatality",
+            "security_critical_injury": "Critical Injury",
+
+            # Police Information
+            "police_attended": "Did Police Attend the Site?",
+            "police_agency": "Police Agency",
+            "police_officer_name": "Officer Name",
+            "police_officer_rank": "Officer Rank",
+            "police_officer_badge_number": "Officer Badge Number",
+
+            # GSOC
+            "gsoc_called": "Was GSOC Called Once Safe to Do So?",
+
+            # Theft and damage
+            "theft_cash": "Cash",
+            "theft_cash_value": "Cash Value",
+            "damage_value": "Estimated Property Damage Value",
+
+            # Suspect and vehicle
+            "suspect_age": "Approximate Age",
+            "clothing_description": "Clothing Description",
+            "vehicle_year": "Approximate Vehicle Year",
+            "vehicle_distinguishing_features": "Vehicle Distinguishing Features",
         }
         widgets = {
             "causalfactors": forms.Textarea(
                 attrs={
                     "class": "form-control",
                     "rows": 4,
-                    "placeholder": "Enter any unplanned, unintended contributor to the incident, that if eliminated would have either prevented the occurrence of the incident or reduced its severity or frequency: (i.e. fatigue, acts of nature, improper lifting, removed guard, following too closely, etc.) What equipment/tools were not available or failed? Were there any workarounds from the normal process? What training did you receive to complete the task?",
-                    "style": "font-weight:300; font-style:italic; color:#666;",
+                    "placeholder": "",
                 }
             ),
             "determincauses": forms.Textarea(
-                attrs={
-                    "class": "form-control",
-                    "rows": 4,
-                    "placeholder": "Understand what happened, including any weaknesses in the process. Do not accept human error as the single cause of the event. Think about the most basic reason and primary driver the incident took place. Consider root cause by using methods such as 5-Why.",
-                    "style": "font-weight:300; font-style:italic; color:#666;",
-                }
-            ),
-            "preventiveactions": forms.Textarea(
-                attrs={
-                    "class": "form-control",
-                    "rows": 4,
-                    "placeholder": "Describe the actions or changes that will be made to prevent the same or a similar incident from occurring in the future. Will the action(s) prevent, or significantly reduce the likelihood of, the incident from reoccurring? If the answer is ”No”, revisit the investigation. Ask the worker/victim – what do we need to ensure this incident does not happen again? What safeguard(s) should be in place to allow you to fail safely? Consider recurring hazards. What controls are available to prevent you from being seriously injured? Were they effective? How can we make them more effective?",
-                    "style": "font-weight:300; font-style:italic; color:#666;",
-                }
-            ),
+    attrs={
+        "class": "form-control",
+        "rows": 4,
+        "placeholder": "",
+    }
+),
+           "preventiveactions": forms.Textarea(
+    attrs={
+        "class": "form-control",
+        "rows": 5,
+        "placeholder": "",
+    }
+),
             "eventtimeline": forms.Textarea(
                 attrs={
                     "class": "form-control",
@@ -108,6 +136,9 @@ class IncidentForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user", None)  # Get the user from the kwargs
         super().__init__(*args, **kwargs)
+        self.fields["causalfactors"].required = True
+        self.fields["determincauses"].required = True
+        self.fields["preventiveactions"].required = True
 
         # Check if it's a new form (not an update)
         if self.instance.pk is None:

@@ -12,7 +12,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMix
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.signals import post_save
 from django.dispatch import Signal, receiver
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse_lazy
 from django.views import View
@@ -26,15 +26,13 @@ from .forms import IncidentForm, MajorIncidentForm
 from .models import Incident, MajorIncident
 from .tasks import (
     generate_and_send_pdf_task,
-    generate_major_incident_pdf_from_list_task,
-    generate_major_incident_pdf_task,
     generate_pdf_email_to_user_task,
     generate_pdf_task,
     generate_restricted_incident_pdf_email_task,
+    process_new_incident_reports_task,
     save_incident_file,
-    save_major_incident_file,
     send_email_to_group_task,
-    upload_file_to_dropbox_task,
+    generate_significant_security_pdf_email_task
 )
 
 incident_updated = Signal()
@@ -46,8 +44,11 @@ def is_abm_incident_pdf(user):
     return user.groups.filter(name="abm_incident_pdf").exists()
 
 
-# APPROVED for multi tenant
-class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView):
+class IncidentCreateView(
+    PermissionRequiredMixin,
+    LoginRequiredMixin,
+    CreateView,
+):
     model = Incident
     login_url = "/login/"
     permission_required = "incident.add_incident"
@@ -57,66 +58,40 @@ class IncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["existing_images"] = []  # or fetch real images if editing
+        context["existing_images"] = []
         return context
 
     def handle_no_permission(self):
-        # Render the custom 403.html template for permission denial
-        return render(self.request, "incident/403.html", status=403)
-
-    def dispatch(self, request, *args, **kwargs):
-        try:
-            # Your print statement for debugging
-            print("Dispatch method called.")
-            return super().dispatch(request, *args, **kwargs)
-        except Exception as e:
-            print(f"Exception occurred: {e}")
-            raise
+        return render(
+            self.request,
+            "incident/403.html",
+            status=403,
+        )
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs["user"] = self.request.user  # Pass the user to the form
+        kwargs["user"] = self.request.user
         return kwargs
 
-    def get(self, request, *args, **kwargs):
-        form = self.form_class(user=self.request.user)
-        return self.render_to_response({
-            "form": form,
-            "existing_images": [],  # Add this line
-        })
-
     def form_valid(self, form):
+        # Assign tenant ownership server-side.
         form.instance.user_employer = self.request.user.employer
-        form_data = self.serialize_form_data(form.cleaned_data)
 
-        # Trigger the Celery task to save form data
-        save_incident_file.delay(**form_data)
+        # Save the Incident. This triggers the post_save receiver.
+        self.object = form.save()
 
         messages.success(
             self.request,
-            "PDF generation started. Check your email. The file is attached.",
+            (
+                "The incident was submitted successfully. "
+                "The reports are being generated and will be emailed when ready."
+            ),
         )
-        return redirect("home")
+
+        return redirect(self.get_success_url())
 
     def form_invalid(self, form):
-        return self.render_to_response({
-            "form": form,
-            "existing_images": [],  # Add this line too
-        })
-
-    def serialize_form_data(self, form_data):
-        # Convert ForeignKey fields to their primary key values
-        form_data["store"] = (
-            form_data["store"].pk
-            if "store" in form_data and form_data["store"] is not None
-            else None
-        )
-        form_data["user_employer"] = (
-            form_data["user_employer"].pk
-            if "user_employer" in form_data and form_data["user_employer"] is not None
-            else None
-        )
-        return form_data
+        return self.render_to_response(self.get_context_data(form=form))
 
 
 class MajorIncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, CreateView):
@@ -181,59 +156,18 @@ class MajorIncidentCreateView(PermissionRequiredMixin, LoginRequiredMixin, Creat
         return form_data
 
 
-@receiver(post_save, sender=MajorIncident)
-def handle_new_major_incident_form_creation(sender, instance, created, **kwargs):
-    if created:
-        try:
-            generate_major_incident_pdf_task.delay(instance.id)
-        except Exception as e:
-            print(f"An error occurred: {e}")
-
-
-@receiver(post_save, sender=Incident)
+@receiver(
+    post_save,
+    sender=Incident,
+    dispatch_uid="handle_new_incident_form_creation",
+)
 def handle_new_incident_form_creation(sender, instance, created, **kwargs):
-    """
-    Signal to handle actions on Incident form creation.
-    """
-    logger.warning(
-        f"instance: {instance.user_employer} | Employer ID: {instance.user_employer.id}"
-    )
-    try:
-        if created:
-            employer_id = instance.user_employer.id if instance.user_employer else None
+    if not created:
+        return
 
-            if not employer_id:
-                logger.warning(
-                    f"⚠️ Employer not found for Incident {instance.id}. Skipping email."
-                )
-                return
+    Incident.objects.filter(pk=instance.pk).update(queued_for_sending=True)
 
-            # ✅ Mark the instance as queued for sending
-            instance.queued_for_sending = True
-            instance.save(update_fields=["queued_for_sending"])
-            logger.warning(
-                f"instance: {instance.user_employer} | Employer ID: {instance.user_employer.id}"
-            )
-
-            # Step 1: Generate PDF and email the group
-            chain(
-                generate_pdf_task.s(instance.id),
-                send_email_to_group_task.s(
-                    group_name="incident_form_email",
-                    employer_id=employer_id,
-                ),
-            ).apply_async()
-
-            # Step 2: Independent Dropbox upload (optional)
-            generate_pdf_task.s(instance.id).apply_async(
-                link=upload_file_to_dropbox_task.s()
-            )
-
-    except Exception as e:
-        logger.error(
-            f"Error processing post_save signal for Incident ID {instance.id}: {e}",
-            exc_info=True,
-        )
+    process_new_incident_reports_task.delay(instance.pk)
 
 
 class QueuedIncidentsListView(ListView):
@@ -587,14 +521,6 @@ def generate_pdf(request, incident_id):
     return redirect("home")
 
 
-def generate_major_incident_pdf(request, incident_id):
-    user_email = request.user.email
-    print(user_email, incident_id)
-    generate_major_incident_pdf_from_list_task.delay(incident_id, user_email)
-    messages.success(request, "PDF generation started. HR will receive copy")
-    return redirect("home")
-
-
 # This route is used to generate a pdf and
 # email it to the user
 
@@ -651,13 +577,55 @@ def generate_restricted_pdf_web(request, incident_id):
     return render(request, "incident/restricted_incident_form_pdf.html", context)
 
 
+@login_required
+@permission_required(
+    "incident.view_incident",
+    raise_exception=True,
+)
+def email_significant_security_report(
+    request,
+    incident_id,
+):
+    """
+    Queue the Significant Security Incident Report for email
+    to the current user.
+    """
+    incident = get_object_or_404(
+        Incident,
+        pk=incident_id,
+        user_employer=request.user.employer,
+    )
+
+    if not request.user.email:
+        messages.error(
+            request,
+            "Your account does not have an email address.",
+        )
+
+        return redirect("incident_list")
+
+    generate_significant_security_pdf_email_task.delay(
+        incident.pk,
+        request.user.email,
+    )
+
+    messages.success(
+        request,
+        (
+            "The Significant Security Incident Report is being "
+            "generated and will be emailed to you."
+        ),
+    )
+
+    return redirect("incident_list")
+
+
 class IncidentListView(PermissionRequiredMixin, ListView):
     model = Incident
     template_name = "incident/incident_list.html"
     context_object_name = "incidents"
     permission_required = "incident.view_incident"
     raise_exception = False
-    
 
     def get_queryset(self):
         """Filter incidents by the employer of the logged-in user."""
@@ -682,7 +650,7 @@ class IncidentListView(PermissionRequiredMixin, ListView):
     def handle_no_permission(self):
         # Render the custom 403.html template for permission denial
         return render(self.request, "incident/403.html", status=403)
-    
+
 
 class MajorIncidentListView(PermissionRequiredMixin, ListView):
     model = MajorIncident
@@ -702,3 +670,39 @@ class MajorIncidentListView(PermissionRequiredMixin, ListView):
 def Permission_Denied_View(request, exception):
     def get(self, request, exception):
         return render(request, "incident/403.html", status=403)
+
+
+@login_required
+def preview_restricted_incident(request):
+    incident = Incident.objects.select_related("store").order_by("-id").first()
+
+    if incident is None:
+        raise Http404("No incidents found.")
+
+    return render(
+        request,
+        "incident/restricted_incident_form_pdf.html",
+        {
+            "incident": incident,
+        },
+    )
+
+
+@login_required
+def preview_significant_security_report(request):
+    incident = (
+        Incident.objects
+        .filter(user_employer=request.user.employer)
+        .select_related("store", "user_employer")
+        .order_by("-id")
+        .first()
+    )
+    if incident is None:
+        raise Http404("No incident records were found.")
+    return render(
+        request,
+        "incident/significant_security_incident_report_pdf.html",
+        {
+            "incident": incident,
+        },
+    )

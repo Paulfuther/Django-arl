@@ -254,7 +254,7 @@ AUTHENTICATION_BACKENDS = [
 LOGIN_URL = "/login/"
 
 #BROKER_URL = os.environ.get("CLOUDAMQP_URL")
-BROKER_URL ="amqps://ctscemmj:HzMGkRB1IsJJtlVT2DwfimyE1PBkocPj@rabbit.lmq.cloudamqp.com/ctscemmj"
+BROKER_URL =""
 
 EMAIL_BACKEND = "arl.msg.helpers.SendGridEmailBackend"
 
