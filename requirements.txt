@@ -103,7 +103,7 @@ pathspec==0.11.1
 pdfkit==1.0.0
 phonenumbers==8.13.15
 phonenumberslite==8.13.55
-pillow==11.2.1
+pillow==11.3.0
 pillow_heif==1.1.0
 pip-tools==7.6.0
 pipdeptree==2.24.0
